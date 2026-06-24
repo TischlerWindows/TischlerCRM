@@ -125,6 +125,9 @@ function pluralizeTypeName(name: string): string {
   const base = parenMatch ? (parenMatch[1] ?? name).trimEnd() : name;
   const paren = parenMatch ? ` ${parenMatch[2]}` : '';
 
+  // "Fixed with Sash" is always "Fixed with Sash Units" regardless of window/door context
+  if (base === 'Fixed with Sash') return 'Fixed with Sash Units' + paren;
+
   const lastWord = base.split(/\s+/).pop() ?? '';
   // These last words simply take an 's'
   if (/^(Door|Outswing|Inswing|Window|Lock|Bolt)$/.test(lastWord)) return base + 's' + paren;
@@ -452,35 +455,28 @@ export function buildTokenMap(
         )
       );
 
+      const seenDisplayNames = new Set<string>();
+
       for (const [typeName, opts] of Object.entries(pto)) {
         // Skip types not present in any current row (deleted ghost entries)
         if (activeTypes.size > 0 && !activeTypes.has(typeName)) continue;
         if (!Array.isArray(opts) || opts.length === 0) continue;
         // Split colon-compound types into two entries, e.g.
-        // "Fixed with Sash: Push Outswing" → "Fixed with Sash" + "Push Outswing"
+        // "Fixed with Sash: Push Outswing" → "Fixed with Sash Units" + "Push Outswings"
         const typeNames = typeName.includes(':')
           ? typeName.split(':').map((s: string) => s.trim()).filter(Boolean)
           : [typeName];
-        // If any part of the compound is a door type, the prefix (e.g. "Fixed with Sash")
-        // should pluralize as "Doors" rather than "Windows".
-        const isDoorCompound = typeNames.some(n => {
-          const lo = n.toLowerCase();
-          return /\bgd\b/.test(lo) || lo.includes('garden door') ||
-                 /\bdd\b/.test(lo) || lo.includes('domestic door') ||
-                 lo.includes('house door') || lo.includes('french house');
-        });
         for (const singleName of typeNames) {
-          // For a door compound, rename "Fixed with Sash" → "Fixed with Sash Door"
-          // so pluralizeTypeName produces "Doors" instead of "Windows".
-          const resolvedName =
-            isDoorCompound && singleName.toLowerCase() === 'fixed with sash'
-              ? 'Fixed with Sash Door'
-              : singleName;
-          const nfrcBlock = formatNfrcBlock(resolvedName, glassType, opts);
+          // Deduplicate: "Fixed with Sash Units" should appear only once
+          // even when multiple compound types share the same prefix.
+          const displayName = expandProductTypeName(singleName);
+          if (seenDisplayNames.has(displayName)) continue;
+          seenDisplayNames.add(displayName);
+          const nfrcBlock = formatNfrcBlock(singleName, glassType, opts);
           if (nfrcBlock) {
             lines.push(nfrcBlock);
           } else {
-            lines.push(buildFirstLine(resolvedName, opts));
+            lines.push(buildFirstLine(singleName, opts));
           }
         }
       }
