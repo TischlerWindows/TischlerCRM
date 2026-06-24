@@ -146,11 +146,16 @@ function expandProductTypeName(name: string): string {
   return pluralizeTypeName(expanded);
 }
 
-/** Format a single product type option, converting "XXmm Thick Sash" to fractional inches. */
+/** Format a single product type option, converting "XXmm Thick Sash" to fractional inches and expanding abbreviations. */
 function formatProductTypeOption(opt: string): string {
+  // Convert mm sash sizes to fractional inches
   const m = opt.match(/^(\d+(?:\.\d+)?)mm Thick Sash$/i);
   if (m && m[1]) return `${mmToFractionalInches(parseFloat(m[1]))} Thick Sash`;
-  return opt;
+  // Expand "SS" prefix → "Stainless Steel"
+  let result = opt.replace(/\bSS\b/g, 'Stainless Steel');
+  // Expand trailing " RH" → " Rough Hardware"
+  result = result.replace(/\bRH\b/g, 'Rough Hardware');
+  return result;
 }
 
 /**
