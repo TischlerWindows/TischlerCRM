@@ -179,19 +179,21 @@ function formatNfrcBlock(typeName: string, glassType: string, formattedOpts: str
   if (!entry) return null;
 
   const displayName = expandProductTypeName(typeName);
-  const firstLine = formattedOpts ? `${displayName} with ${formattedOpts}` : displayName;
+  const firstLine = formattedOpts
+    ? `<strong>${displayName}</strong> with ${formattedOpts}`
+    : `<strong>${displayName}</strong>`;
 
   const ng = entry.noGrid;
   const gr = entry.grid;
   const hasGridData = gr.u !== '0.00' && gr.s !== 'N/A';
 
-  const blockLines = [firstLine];
+  const nfrcLines: string[] = [];
   if (hasGridData) {
-    blockLines.push(`<1" Grid: U-Factor ${gr.u} / SHGC ${gr.s} | IGU: ${gr.igu} | Coating: ${gr.coat}`);
+    nfrcLines.push(`<li>&lt;1" Grid: U-Factor ${gr.u} / SHGC ${gr.s} | IGU: ${gr.igu} | Coating: ${gr.coat}</li>`);
   }
-  blockLines.push(`No Grid: U-Factor ${ng.u} / SHGC ${ng.s} | IGU: ${ng.igu} | Coating: ${ng.coat}`);
+  nfrcLines.push(`<li>No Grid: U-Factor ${ng.u} / SHGC ${ng.s} | IGU: ${ng.igu} | Coating: ${ng.coat}</li>`);
 
-  return blockLines.join('<br>');
+  return `${firstLine}<br><ul style="margin:0;padding-left:1.25em">${nfrcLines.join('')}</ul>`;
 }
 
 
