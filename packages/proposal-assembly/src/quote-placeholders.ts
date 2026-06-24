@@ -193,7 +193,7 @@ function formatNfrcBlock(typeName: string, glassType: string, formattedOpts: str
   }
   nfrcLines.push(`<li>No Grid: U-Factor ${ng.u} / SHGC ${ng.s} | IGU: ${ng.igu} | Coating: ${ng.coat}</li>`);
 
-  return `${firstLine}<br><ul style="margin:0;padding-left:1.25em">${nfrcLines.join('')}</ul>`;
+  return `${firstLine}<br><strong>Product NFRC Values:</strong><ul style="margin:0;padding-left:1.25em">${nfrcLines.join('')}</ul>`;
 }
 
 
