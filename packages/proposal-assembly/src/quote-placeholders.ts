@@ -63,6 +63,8 @@ export interface SummaryForPlaceholders {
   jobType: string;
   glassType: string;
   glassTypeCustom?: string;
+  hungType?: string;
+  hungTypeCustom?: string;
   finish: string;
   sdl: string;
   sdlCustom?: string;
@@ -479,6 +481,7 @@ export function buildTokenMap(
       const pto = (summary as any).productTypeOptions as Record<string, string[]> | undefined;
       if (!pto) return '';
       const glassType = summary.glassTypeCustom || summary.glassType || '';
+      const hungGlassType = summary.hungTypeCustom || summary.hungType || glassType;
       const lines: string[] = [];
 
       // Derive the active product type keys from actual rows so that types
@@ -527,7 +530,10 @@ export function buildTokenMap(
           const displayName = expandProductTypeName(singleName);
           if (seenDisplayNames.has(displayName)) continue;
           seenDisplayNames.add(displayName);
-          const nfrcBlock = formatNfrcBlock(singleName, glassType, filteredOpts);
+          // Double hung uses its own glass type field if set
+          const cat = getProductNfrcCategory(singleName);
+          const effectiveGlass = cat === 'doubleHung' ? hungGlassType : glassType;
+          const nfrcBlock = formatNfrcBlock(singleName, effectiveGlass, filteredOpts);
           if (nfrcBlock) {
             lines.push(nfrcBlock);
           } else {
