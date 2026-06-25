@@ -7,6 +7,52 @@
 
 import { NFRC_DATA } from './nfrc-data.js';
 
+// ── Valid options per product type ────────────────────────────────
+// Mirrors apps/web/lib/product-type-options.ts so stale saved values
+// can be filtered before being rendered into the proposal.
+function getValidOptionsForType(t: string): string[] {
+  const lo = t.toLowerCase();
+  if (lo === 'pivot' || lo === 'outswing pivot' || lo.includes('convert pivot')) {
+    return ['Maco Instinct Motorized Locks'];
+  }
+  if (lo === 'inswing folding') return ['Threshold #6', 'Threshold #6C', 'Threshold ADA'];
+  if (lo === 'outswing folding') return ['Threshold #7', 'Threshold #8', 'Threshold ADA'];
+  if (lo.includes('folding')) {
+    return lo.includes('inswing')
+      ? ['Threshold #6', 'Threshold #6C', 'Threshold ADA']
+      : ['Threshold #7', 'Threshold #8', 'Threshold ADA'];
+  }
+  if (lo === 'l&r d') return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
+  if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #6', 'Threshold #6C', 'Threshold ADA'];
+  }
+  if (lo.includes('outswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #7', 'Threshold #8', 'Threshold ADA'];
+  }
+  if (lo.includes('offset simulated') || lo.includes('offset french simulated')) {
+    return ['72mm Thick Sash', '84mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+  }
+  if (lo.includes('simulated dh') || lo.includes('simulated double hung')) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+  }
+  if (lo.includes('single hung') || lo.includes('double hung') || lo.includes('triple hung')) {
+    return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash', 'Vent Locks'];
+  }
+  if (lo.includes('direct glaze')) return ['72mm Thick Sash', '90mm Thick Sash', 'Threshold to match'];
+  if (lo.includes('fixed with sash')) {
+    return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash', 'Threshold to match'];
+  }
+  if (lo.includes('tilt-in') || lo.includes('tilt in')) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+  }
+  if (lo.includes('inswing')) return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+  if (lo.includes('outswing') || lo.includes('awning')) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+  }
+  if (lo.includes('lift') || lo.includes('roll')) return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
+  return ['72mm Thick Sash', '90mm Thick Sash'];
+}
+
 // ── Types ──────────────────────────────────────────────────────────
 
 /** Subset of Summary fields used for token resolution. */
@@ -468,6 +514,10 @@ export function buildTokenMap(
         // Skip types not present in any current row (deleted ghost entries)
         if (activeTypes.size > 0 && !activeTypes.has(typeName)) continue;
         if (!Array.isArray(opts) || opts.length === 0) continue;
+        // Filter out stale option values no longer valid for this type
+        const validSet = new Set(getValidOptionsForType(typeName));
+        const filteredOpts = opts.filter((o: string) => validSet.has(o));
+        if (filteredOpts.length === 0) continue;
         // Split colon-compound types into two entries, e.g.
         // "Fixed with Sash: Push Outswing" → "Fixed with Sash Units" + "Push Outswings"
         const typeNames = typeName.includes(':')
@@ -479,11 +529,11 @@ export function buildTokenMap(
           const displayName = expandProductTypeName(singleName);
           if (seenDisplayNames.has(displayName)) continue;
           seenDisplayNames.add(displayName);
-          const nfrcBlock = formatNfrcBlock(singleName, glassType, opts);
+          const nfrcBlock = formatNfrcBlock(singleName, glassType, filteredOpts);
           if (nfrcBlock) {
             lines.push(nfrcBlock);
           } else {
-            lines.push(buildFirstLine(singleName, opts));
+            lines.push(buildFirstLine(singleName, filteredOpts));
           }
         }
       }
