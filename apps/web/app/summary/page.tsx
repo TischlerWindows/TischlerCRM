@@ -2245,26 +2245,36 @@ export default function SummaryPage() {
     }
     
     const isNew = !summaries.find(s => s.id === editingSummary.id);
+
+    // Prune productTypeOptions: remove option values that are no longer valid
+    // for their type (e.g. stale options saved before option lists changed).
+    const rawPto = (editingSummary.productTypeOptions || {}) as Record<string, string[]>;
+    const prunedPto: Record<string, string[]> = {};
+    for (const [typeName, opts] of Object.entries(rawPto)) {
+      const validSet = new Set(getOptionsForType(typeName));
+      prunedPto[typeName] = Array.isArray(opts) ? opts.filter((o: string) => validSet.has(o)) : [];
+    }
+    const summaryToSave = { ...editingSummary, productTypeOptions: prunedPto };
+
     let updatedSummaries;
-    
     if (isNew) {
-      updatedSummaries = [editingSummary, ...summaries];
+      updatedSummaries = [summaryToSave, ...summaries];
     } else {
-      updatedSummaries = summaries.map(s => 
-        s.id === editingSummary.id ? editingSummary : s
+      updatedSummaries = summaries.map(s =>
+        s.id === summaryToSave.id ? summaryToSave : s
       );
     }
-    
+
     setSummaries(updatedSummaries);
     setSetting('summaries', updatedSummaries);
     // Sync product log
-    const logItems = buildProductLogItems(editingSummary);
+    const logItems = buildProductLogItems(summaryToSave);
     apiClient.post('/product-log/sync', {
-      summaryId: editingSummary.id,
-      summaryName: editingSummary.name || '',
-      opportunityNumber: editingSummary.opportunityNumber || '',
-      linkedOpportunityId: editingSummary.linkedOpportunityId || null,
-      date: editingSummary.date || undefined,
+      summaryId: summaryToSave.id,
+      summaryName: summaryToSave.name || '',
+      opportunityNumber: summaryToSave.opportunityNumber || '',
+      linkedOpportunityId: summaryToSave.linkedOpportunityId || null,
+      date: summaryToSave.date || undefined,
       items: logItems,
     }).catch(() => {});
     setShowSavedToast(true);
