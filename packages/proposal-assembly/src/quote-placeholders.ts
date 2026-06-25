@@ -233,10 +233,8 @@ function getProductNfrcCategory(typeName: string): string | null {
   if (lo.includes('outswing') && lo.includes('french') && !lo.includes('house') && !lo.includes('door')) return 'osCasement';
   // Direct Glaze / Fixed with Sash (Fixed Simulation)
   if (lo.includes('direct glaze') || lo.includes('fixed with sash') || lo.includes('fixed sash')) return 'fixedSimulation';
-  // Double / Single / Triple Hung, or standalone DH abbreviation
-  if (lo.includes('double hung') || lo.includes('single hung') || lo.includes('triple hung') || /\bdh\b/.test(lo)) return 'doubleHung';
-  // Curtain Wall, Garden Door, Domestic Door
-  if (lo.includes('curtain wall') || /\bgd\b/.test(lo) || lo.includes('garden door') || /\bdd\b/.test(lo) || lo.includes('domestic door')) return 'curtainWall';
+  // Double Hung only (not single or triple hung)
+  if (lo.includes('double hung') || /\bdh\b/.test(lo)) return 'doubleHung';
   return null;
 }
 
