@@ -531,7 +531,9 @@ export function buildTokenMap(
           if (nfrcBlock) {
             lines.push(nfrcBlock);
           } else {
-            lines.push(buildFirstLine(singleName, filteredOpts));
+            // Extra <br> so plain (no-NFRC) entries get the same visual
+            // spacing as NFRC entries whose </ul> creates a natural gap.
+            lines.push(buildFirstLine(singleName, filteredOpts) + '<br>');
           }
         }
       }
