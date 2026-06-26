@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon, PenLine } from 'lucide-react';
 import Link from 'next/link';
 
 interface QuoteTemplate {
@@ -21,6 +21,8 @@ interface Props {
   onSelectSummary: (id: string) => void;
   onPreviewPDF: () => void;
   isPreviewingPDF: boolean;
+  onHardEdit: () => void;
+  canHardEdit: boolean;
   onSave: () => void;
   saving: boolean;
   canSave: boolean;
@@ -40,6 +42,8 @@ export function TopBar({
   onSelectSummary,
   onPreviewPDF,
   isPreviewingPDF,
+  onHardEdit,
+  canHardEdit,
   onSave,
   saving,
   canSave,
@@ -184,6 +188,16 @@ export function TopBar({
       >
         <FileText className="w-3.5 h-3.5" />
         {isPreviewingPDF ? 'Generating...' : 'Preview PDF'}
+      </button>
+
+      <button
+        onClick={onHardEdit}
+        disabled={!canHardEdit}
+        title={canHardEdit ? 'Open an editable copy of this proposal' : 'Select a summary first'}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-white/30 rounded-lg text-white hover:bg-white/10 transition-colors disabled:opacity-40"
+      >
+        <PenLine className="w-3.5 h-3.5" />
+        Hard Edit
       </button>
 
       <button

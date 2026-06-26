@@ -20,6 +20,7 @@ import { type BodyEditorHandle } from './_components/body-editor';
 import { NewTokenModal } from './_components/new-token-modal';
 import { BrandingTab } from './_components/branding-tab';
 import { PdfPreviewPane } from './_components/pdf-preview-pane';
+import { HardEditModal } from './_components/hard-edit-modal';
 import { pageLogosSchema, BLOCK_TYPE_META, type PageLogoRule, type BlockType } from '@crm/types';
 import {
   conditionToDraft,
@@ -141,6 +142,7 @@ export default function QuoteBuilderPage() {
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [lastPdfRenderedAt, setLastPdfRenderedAt] = useState<number | null>(null);
   const [pdfRefreshKey, setPdfRefreshKey] = useState(0);
+  const [hardEditOpen, setHardEditOpen] = useState(false);
 
   // ── Dirty tracking ────────────────────────────────────────────
   // Defined early (before callbacks) so that useCallback dependency arrays
@@ -1212,6 +1214,8 @@ export default function QuoteBuilderPage() {
         onSelectSummary={setSelectedSummaryId}
         onPreviewPDF={handlePreviewPDF}
         isPreviewingPDF={isPreviewingPDF}
+        onHardEdit={() => setHardEditOpen(true)}
+        canHardEdit={!!previewState.result}
         onSave={() => void handleSave()}
         saving={saving}
         canSave={canSave}
@@ -1440,6 +1444,13 @@ export default function QuoteBuilderPage() {
         onClose={() => setShowNewTokenModal(false)}
         onSubmit={handleCreateToken}
       />
+
+      {hardEditOpen && previewState.result && (
+        <HardEditModal
+          result={previewState.result}
+          onClose={() => setHardEditOpen(false)}
+        />
+      )}
     </div>
   );
 }
