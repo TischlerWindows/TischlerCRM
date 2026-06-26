@@ -417,8 +417,7 @@ export function buildApp() {
     // and @font-face declarations can load them (neither can attach a Bearer
     // token). The UUIDs are non-enumerable and these assets ultimately ship
     // inside customer-facing PDFs, so they're not sensitive.
-    if (routeUrl === '/company-resources/logos/:id/bytes') return;
-    if (routeUrl === '/company-resources/fonts/:id/bytes') return;
+    if (/^\/company-resources\/(logos|fonts)\/[^/]+\/bytes$/.test(pathOnly)) return;
 
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
