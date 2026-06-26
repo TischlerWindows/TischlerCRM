@@ -48,32 +48,44 @@ export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props)
     const paper = containerRef.current?.querySelector<HTMLElement>('.bg-white.shadow-md');
     if (!paper) return;
 
-    const win = window.open('', '_blank', 'width=950,height=750');
-    if (!win) return;
+    // Use a hidden same-origin iframe instead of window.open('','_blank') so
+    // that relative stylesheet hrefs (/_next/static/css/…) and cross-origin
+    // logo images resolve the same way they do in the parent document.
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText =
+      'position:fixed;visibility:hidden;top:0;left:0;width:950px;height:100%;border:0;z-index:-1;';
+    document.body.appendChild(iframe);
 
-    // Mirror all compiled stylesheets (Tailwind + brand @font-face rules) into
-    // the new window so classes and custom fonts render identically.
+    const iframeDoc = iframe.contentDocument!;
     const headTags = Array.from(
       document.querySelectorAll<HTMLElement>('link[rel="stylesheet"], style'),
     )
       .map((el) => el.outerHTML)
       .join('\n');
 
-    win.document.write(
+    iframeDoc.write(
       `<!DOCTYPE html><html><head>` +
       `<meta charset="utf-8"><title>Proposal</title>` +
       headTags +
       `<style>` +
       `@media print { @page { margin: 0.5in; } body { background: white !important; } }` +
-      `body { margin: 0; padding: 0; background: #f3f4f6; }` +
+      `body { margin: 0; padding: 16px; background: #f3f4f6; }` +
       `</style>` +
       `</head><body>` +
       paper.outerHTML +
       `</body></html>`,
     );
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 600);
+    iframeDoc.close();
+
+    // Give images/fonts inside the iframe time to load before printing.
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      // Remove after a short delay to let the print dialog finish.
+      setTimeout(() => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
+      }, 2000);
+    }, 800);
   };
 
   return (
