@@ -143,6 +143,7 @@ export default function QuoteBuilderPage() {
   const [lastPdfRenderedAt, setLastPdfRenderedAt] = useState<number | null>(null);
   const [pdfRefreshKey, setPdfRefreshKey] = useState(0);
   const [hardEditOpen, setHardEditOpen] = useState(false);
+  const letterPreviewRef = useRef<HTMLDivElement>(null);
 
   // ── Dirty tracking ────────────────────────────────────────────
   // Defined early (before callbacks) so that useCallback dependency arrays
@@ -1347,6 +1348,7 @@ export default function QuoteBuilderPage() {
                 result={previewState.result}
                 onSelectBlock={handleSelectBlock}
               />
+              <div ref={letterPreviewRef}>
               <LetterPreview
                 result={previewState.result}
                 error={previewState.error}
@@ -1355,6 +1357,7 @@ export default function QuoteBuilderPage() {
                 brandFonts={brandFonts}
                 pageLogos={pageLogos}
               />
+              </div>
             </>
           )}
         </div>
@@ -1448,8 +1451,7 @@ export default function QuoteBuilderPage() {
       {hardEditOpen && previewState.result && (
         <HardEditModal
           result={previewState.result}
-          brandFonts={brandFonts}
-          pageLogos={pageLogos}
+          sourceRef={letterPreviewRef}
           onClose={() => setHardEditOpen(false)}
         />
       )}

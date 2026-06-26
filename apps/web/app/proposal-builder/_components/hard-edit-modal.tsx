@@ -3,37 +3,32 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Printer, Loader2 } from 'lucide-react';
 import type { ProposalAssemblyResult } from '@crm/proposal-assembly';
-import type { PageLogoRule } from '@crm/types';
-import { LetterPreview, type BrandFontMap } from './letter-preview';
 
 interface Props {
   result: ProposalAssemblyResult;
-  brandFonts: BrandFontMap;
-  pageLogos: PageLogoRule[];
+  /** Ref to the wrapper div around the visible LetterPreview — used to copy
+   *  already-rendered, already-loaded DOM (images, fonts, etc.) into the
+   *  editable area without a second off-screen render. */
+  sourceRef: React.RefObject<HTMLDivElement>;
   onClose: () => void;
 }
 
-export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props) {
-  const hiddenRef = useRef<HTMLDivElement>(null);
+export function HardEditModal({ sourceRef, onClose }: Props) {
   const editRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
 
-  // After the hidden LetterPreview renders, copy its paper div innerHTML into
-  // the contentEditable area. This gives exact visual fidelity — same Tailwind
-  // classes, same inline styles, same brand fonts.
+  // Copy the already-rendered paper div from the visible LetterPreview.
+  // Images and brand fonts are already loaded there, so the copy is faithful.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!hiddenRef.current || !editRef.current) return;
-      // The paper container is the white shadow div inside LetterPreview.
-      const paper = hiddenRef.current.querySelector<HTMLElement>('.bg-white.shadow-md');
-      if (paper) {
-        editRef.current.innerHTML = paper.innerHTML;
-      }
-      setReady(true);
-    }, 250);
-    return () => clearTimeout(timer);
+    if (!editRef.current || !sourceRef.current) return;
+    const paper = sourceRef.current.querySelector<HTMLElement>('.bg-white.shadow-md');
+    if (paper) {
+      editRef.current.innerHTML = paper.innerHTML;
+    }
+    setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   const handlePrint = () => {
     const content = editRef.current?.innerHTML ?? '';
@@ -78,22 +73,6 @@ export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props)
       aria-modal
       aria-label="Hard Edit Proposal"
     >
-      {/* Off-screen LetterPreview — rendered for DOM copying only */}
-      <div
-        ref={hiddenRef}
-        aria-hidden
-        style={{ position: 'fixed', left: '-99999px', top: 0, width: 816, pointerEvents: 'none' }}
-      >
-        <LetterPreview
-          result={result}
-          error={null}
-          selectedPresetId={null}
-          onSelectBlock={() => {}}
-          brandFonts={brandFonts}
-          pageLogos={pageLogos}
-        />
-      </div>
-
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 bg-[#1e3a5f] px-5 py-3 text-white">
         <span className="text-sm font-semibold">Hard Edit</span>
