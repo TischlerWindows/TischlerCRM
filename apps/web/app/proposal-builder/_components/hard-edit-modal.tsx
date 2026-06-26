@@ -145,13 +145,6 @@ export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props)
 }
 
 
-interface Props {
-  result: ProposalAssemblyResult;
-  onClose: () => void;
-}
-
-const NAVY = '#1e3a5f';
-
 /**
  * Build an editable HTML string from the assembled proposal blocks.
  * Structural/data-heavy blocks (pricing tables, letterhead) show a placeholder.
