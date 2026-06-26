@@ -63,9 +63,12 @@ export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props)
     if (capturedHtml && editRef.current) {
       editRef.current.innerHTML = capturedHtml;
 
-      // Ensure no img is left hidden (defensive — onError may have fired).
+      // Ensure no img is left hidden and force a fresh src load so images
+      // that previously failed (e.g. auth errors) are retried.
       editRef.current.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
         img.style.display = '';
+        const src = img.getAttribute('src') ?? '';
+        if (src) { img.setAttribute('src', ''); img.setAttribute('src', src); }
       });
 
       const paper = editRef.current.querySelector<HTMLElement>('.bg-white.shadow-md');
