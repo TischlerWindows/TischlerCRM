@@ -20,18 +20,54 @@ export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props)
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    let cancelled = false;
+
+    const capture = () => {
       const paper = containerRef.current?.querySelector<HTMLElement>('.bg-white.shadow-md');
-      if (!paper) return;
-      setCapturedHtml(paper.outerHTML);
-      setReady(true);
-    }, 600);
-    return () => clearTimeout(timer);
+      if (!paper || cancelled) return;
+
+      const imgs = Array.from(paper.querySelectorAll<HTMLImageElement>('img'));
+
+      // Wait for every image to finish loading (or fail) before capturing so
+      // that the logo is fully loaded rather than hidden by the onError handler.
+      Promise.all(
+        imgs.map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete) { resolve(); return; }
+              img.addEventListener('load', () => resolve(), { once: true });
+              img.addEventListener('error', () => resolve(), { once: true });
+            }),
+        ),
+      ).then(() => {
+        if (cancelled) return;
+        const p = containerRef.current?.querySelector<HTMLElement>('.bg-white.shadow-md');
+        if (!p) return;
+        // Clear any display:none that onError handlers may have applied.
+        p.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
+          img.style.display = '';
+        });
+        setCapturedHtml(p.outerHTML);
+        setReady(true);
+      });
+    };
+
+    // Short initial delay so React finishes the first paint before we start
+    // watching image load events.
+    const timer = setTimeout(capture, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, []);
 
+  // Populate editRef exactly once — bypasses React reconciler so edits stick.
   useEffect(() => {
     if (capturedHtml && editRef.current) {
       editRef.current.innerHTML = capturedHtml;
+
+      // Ensure no img is left hidden (defensive — onError may have fired).
+      editRef.current.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
+        img.style.display = '';
+      });
+
       const paper = editRef.current.querySelector<HTMLElement>('.bg-white.shadow-md');
       if (paper) {
         paper.contentEditable = 'true';
