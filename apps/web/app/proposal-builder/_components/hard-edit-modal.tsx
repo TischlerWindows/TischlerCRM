@@ -1,26 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, FileText, Loader2 } from 'lucide-react';
+import { X, FileText } from 'lucide-react';
 import type { ProposalAssemblyResult } from '@crm/proposal-assembly';
 import type { PageLogoRule } from '@crm/types';
-import { apiClient } from '@/lib/api-client';
 import { LetterPreview, type BrandFontMap } from './letter-preview';
 
 interface Props {
   result: ProposalAssemblyResult;
   brandFonts: BrandFontMap;
   pageLogos: PageLogoRule[];
-  templateId: string;
-  summaryId: string;
   onClose: () => void;
 }
 
-export function HardEditModal({ result, brandFonts, pageLogos, templateId, summaryId, onClose }: Props) {
+export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
 
   // After the LetterPreview has rendered visibly (images + fonts load because
   // it is on-screen), find the paper div and flip it to contentEditable so the
@@ -49,46 +44,45 @@ export function HardEditModal({ result, brandFonts, pageLogos, templateId, summa
     return () => clearTimeout(timer);
   }, []);
 
-  // Server-side PDF render — identical to the proposal builder's Preview PDF.
-  // window.open() must be called synchronously before any await so popup
-  // blockers treat it as a direct user-gesture response.
-  const handlePreviewPDF = async () => {
-    setPreviewError(null);
-    const previewWindow = window.open('', '_blank');
-    setIsPreviewing(true);
-    try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      const token = apiClient.getToken();
-      const response = await fetch(`${apiBase}/proposal-pdf/render`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ templateId, summaryId }),
-      });
-      if (!response.ok) {
-        const detail = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error(detail.error || `Failed to render PDF (${response.status})`);
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      if (previewWindow && !previewWindow.closed) {
-        previewWindow.location.href = url;
-      } else {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'proposal.pdf';
-        link.click();
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (err: unknown) {
-      previewWindow?.close();
-      setPreviewError(err instanceof Error ? err.message : 'Failed to generate PDF');
-    } finally {
-      setIsPreviewing(false);
-    }
-  };
+  // Capture the edited paper DOM as a self-contained HTML blob and open it
+  // in a new tab. Using blob: URL (not about:blank) means the browser sets a
+  // unique opaque origin and all link[href] stylesheet URLs are resolved using
+  // their absolute form (link.href property is always absolute). The logo img
+  // src is already an absolute API URL so it loads normally.
+  const handlePreviewPDF = () => {
+    const paper = containerRef.current?.querySelector<HTMLElement>('.bg-white.shadow-md');
+    if (!paper) return;
+
+    // Build link tags with absolute hrefs so they load from the blob origin.
+    const headTags = Array.from(
+      document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>('link[rel="stylesheet"], style'),
+    )
+      .map((el) => {
+        if (el.tagName === 'LINK') {
+          return `<link rel="stylesheet" href="${(el as HTMLLinkElement).href}">`;
+        }
+        return el.outerHTML;
+      })
+      .join('\n');
+
+    const html = [
+      '<!DOCTYPE html><html><head>',
+      '<meta charset="utf-8"><title>Proposal Preview</title>',
+      headTags,
+      '<style>',
+      '@media print { @page { margin: 0.5in; } body { background: white !important; } }',
+      'body { margin: 0; padding: 24px; background: #f3f4f6; }',
+      '</style>',
+      '</head><body>',
+      paper.outerHTML,
+      '</body></html>',
+    ].join('');
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };;
 
   return (
     <div
@@ -104,18 +98,15 @@ export function HardEditModal({ result, brandFonts, pageLogos, templateId, summa
           Click any text to edit directly. Changes here do not affect the template.
         </span>
         <div className="flex-1" />
-        {(!ready || isPreviewing) && (
+        {!ready && (
           <span className="inline-flex items-center gap-1.5 text-xs text-white/60">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            {isPreviewing ? 'Generating…' : 'Loading…'}
+            <FileText className="h-3.5 w-3.5 animate-pulse" />
+            Loading…
           </span>
-        )}
-        {previewError && (
-          <span className="text-xs text-red-300">{previewError}</span>
         )}
         <button
           onClick={handlePreviewPDF}
-          disabled={!ready || isPreviewing}
+          disabled={!ready}
           className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-40"
         >
           <FileText className="h-3.5 w-3.5" />

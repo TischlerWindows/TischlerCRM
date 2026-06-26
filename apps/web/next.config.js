@@ -1,4 +1,4 @@
-// build 2026-06-26f
+// build 2026-06-26g
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
