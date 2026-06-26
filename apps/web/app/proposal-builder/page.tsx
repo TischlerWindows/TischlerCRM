@@ -1448,6 +1448,8 @@ export default function QuoteBuilderPage() {
       {hardEditOpen && previewState.result && (
         <HardEditModal
           result={previewState.result}
+          brandFonts={brandFonts}
+          pageLogos={pageLogos}
           onClose={() => setHardEditOpen(false)}
         />
       )}
