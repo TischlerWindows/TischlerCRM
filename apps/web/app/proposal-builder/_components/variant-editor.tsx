@@ -427,10 +427,12 @@ interface TitleVariantProps {
   onChange: (variants: DraftVariant[]) => void;
   driverField: string;
   matchOptions?: string[];
+  /** Start expanded (default false). Pass true when the section is the primary UI for titles. */
+  defaultOpen?: boolean;
 }
 
-export function TitleVariantEditor({ variants, onChange, driverField, matchOptions }: TitleVariantProps) {
-  const [open, setOpen] = useState(false);
+export function TitleVariantEditor({ variants, onChange, driverField, matchOptions, defaultOpen = false }: TitleVariantProps) {
+  const [open, setOpen] = useState(defaultOpen);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const add = () => {

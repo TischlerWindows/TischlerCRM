@@ -259,28 +259,46 @@ export function BlockEditor({
           </div>
         )}
 
-        {/* Title */}
+        {/* Title — universal OR per-variant (checkbox toggles between the two) */}
         <div>
-          <label className="text-[10px] font-semibold text-gray-500 mb-1 block">
-            {isLayoutOnly ? 'Internal name' : 'Title'}
-          </label>
-          <input
-            ref={titleRef}
-            value={title}
-            onChange={(e) => onTitleChange(e.target.value)}
-            onFocus={() => onTitleFocus?.()}
-            placeholder={isLayoutOnly ? 'Shown only in the block list' : 'e.g., Glass Specification'}
-            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
-          />
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[10px] font-semibold text-gray-500">
+              {isLayoutOnly ? 'Internal name' : 'Title'}
+            </label>
+            {isVariantMode && !isLayoutOnly && (
+              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={!!config.useTitleVariants}
+                  onChange={(e) =>
+                    onConfigChange({ ...config, useTitleVariants: e.target.checked })
+                  }
+                  className="w-3 h-3 accent-brand-navy"
+                />
+                <span className="text-[9px] text-gray-500 font-medium">Title Variants?</span>
+              </label>
+            )}
+          </div>
+          {(!isVariantMode || !config.useTitleVariants) && (
+            <input
+              ref={titleRef}
+              value={title}
+              onChange={(e) => onTitleChange(e.target.value)}
+              onFocus={() => onTitleFocus?.()}
+              placeholder={isLayoutOnly ? 'Shown only in the block list' : 'e.g., Glass Specification'}
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+            />
+          )}
         </div>
 
-        {/* Title Variants — collapsible, same card UX as body variants */}
-        {isVariantMode && !isLayoutOnly && (
+        {/* Title Variants — only shown when the checkbox above is checked */}
+        {isVariantMode && !isLayoutOnly && !!config.useTitleVariants && (
           <TitleVariantEditor
             variants={variants}
             onChange={onVariantsChange}
             driverField={driverField}
             matchOptions={matchOptions}
+            defaultOpen
           />
         )}
 
