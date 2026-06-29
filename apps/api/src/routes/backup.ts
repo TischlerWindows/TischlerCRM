@@ -638,6 +638,26 @@ export async function backupRoutes(app: FastifyInstance) {
           return patched;
         });
 
+      // Rehydrate any fields that were serialised as { type: "Buffer", data: [...] }
+      // back into real Buffer instances so Prisma Bytes columns accept them.
+      const rehydrateBuffers = (rows: any[]): any[] =>
+        rows.map((row: any) => {
+          const patched: any = {};
+          for (const [k, v] of Object.entries(row)) {
+            if (
+              v !== null &&
+              typeof v === 'object' &&
+              (v as any).type === 'Buffer' &&
+              Array.isArray((v as any).data)
+            ) {
+              patched[k] = Buffer.from((v as any).data);
+            } else {
+              patched[k] = v;
+            }
+          }
+          return patched;
+        });
+
       // 1. Delete existing data (reverse dependency order)
       await prisma.$transaction([
         prisma.auditLog.deleteMany(),
@@ -743,7 +763,7 @@ export async function backupRoutes(app: FastifyInstance) {
       }
       // Brand assets (must precede quoteTemplates which FK to brandFont)
       if (data.brandLogos?.length) {
-        await prisma.brandLogo.createMany({ data: remapUserIds(data.brandLogos), skipDuplicates: true });
+        await prisma.brandLogo.createMany({ data: rehydrateBuffers(remapUserIds(data.brandLogos)), skipDuplicates: true });
       }
       if (data.brandFonts?.length) {
         await prisma.brandFont.createMany({ data: remapUserIds(data.brandFonts), skipDuplicates: true });
