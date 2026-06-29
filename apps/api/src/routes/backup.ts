@@ -658,139 +658,145 @@ export async function backupRoutes(app: FastifyInstance) {
           return patched;
         });
 
-      // 1. Delete existing data (reverse dependency order)
-      await prisma.$transaction([
-        prisma.auditLog.deleteMany(),
-        prisma.loginEvent.deleteMany(),
-        prisma.productLog.deleteMany(),
-        // Proposal builder (children first)
-        prisma.specCondition.deleteMany(),
-        prisma.specVariant.deleteMany(),
-        prisma.tokenMapping.deleteMany(),
-        prisma.specPreset.deleteMany(),
-        prisma.quoteTemplate.deleteMany(),
-        // Brand assets
-        prisma.brandLogo.deleteMany(),
-        prisma.brandFont.deleteMany(),
-        prisma.brandColor.deleteMany(),
-        // Automation settings
-        prisma.widgetSetting.deleteMany(),
-        prisma.triggerSetting.deleteMany(),
-        prisma.controllerSetting.deleteMany(),
-        // Dashboard / report children
-        prisma.dashboardWidget.deleteMany(),
-        prisma.dashboard.deleteMany(),
-        prisma.report.deleteMany(),
-        prisma.reportFolder.deleteMany(),
-        // User preferences & integrations
-        prisma.userPreference.deleteMany(),
-        prisma.userIntegration.deleteMany(),
-        prisma.integration.deleteMany(),
-        // Core data
-        prisma.record.deleteMany(),
-        prisma.layoutField.deleteMany(),
-        prisma.layoutSection.deleteMany(),
-        prisma.layoutTab.deleteMany(),
-        prisma.pageLayout.deleteMany(),
-        prisma.relationship.deleteMany(),
-        prisma.customField.deleteMany(),
-        prisma.customObject.deleteMany(),
-        prisma.setting.deleteMany(),
-      ]);
+      // Delete + re-insert run inside ONE interactive transaction. If any insert
+      // fails, the deletes roll back too — so a failed restore can never leave the
+      // database half-wiped (which previously nuked the proposal builder).
+      await prisma.$transaction(
+        async (tx) => {
+          // 1. Delete existing data (reverse dependency order)
+          await tx.auditLog.deleteMany();
+          await tx.loginEvent.deleteMany();
+          await tx.productLog.deleteMany();
+          // Proposal builder (children first)
+          await tx.specCondition.deleteMany();
+          await tx.specVariant.deleteMany();
+          await tx.tokenMapping.deleteMany();
+          await tx.specPreset.deleteMany();
+          await tx.quoteTemplate.deleteMany();
+          // Brand assets
+          await tx.brandLogo.deleteMany();
+          await tx.brandFont.deleteMany();
+          await tx.brandColor.deleteMany();
+          // Automation settings
+          await tx.widgetSetting.deleteMany();
+          await tx.triggerSetting.deleteMany();
+          await tx.controllerSetting.deleteMany();
+          // Dashboard / report children
+          await tx.dashboardWidget.deleteMany();
+          await tx.dashboard.deleteMany();
+          await tx.report.deleteMany();
+          await tx.reportFolder.deleteMany();
+          // User preferences & integrations
+          await tx.userPreference.deleteMany();
+          await tx.userIntegration.deleteMany();
+          await tx.integration.deleteMany();
+          // Core data
+          await tx.record.deleteMany();
+          await tx.layoutField.deleteMany();
+          await tx.layoutSection.deleteMany();
+          await tx.layoutTab.deleteMany();
+          await tx.pageLayout.deleteMany();
+          await tx.relationship.deleteMany();
+          await tx.customField.deleteMany();
+          await tx.customObject.deleteMany();
+          await tx.setting.deleteMany();
 
-      // 2. Re-insert data (forward dependency order)
-      // All rows with createdById / lastModifiedById / userId are remapped
-      // so orphaned user references point to the current restoring user.
-      if (data.settings?.length) {
-        await prisma.setting.createMany({ data: data.settings, skipDuplicates: true });
-      }
-      if (data.objects?.length) {
-        await prisma.customObject.createMany({ data: remapUserIds(data.objects), skipDuplicates: true });
-      }
-      if (data.fields?.length) {
-        await prisma.customField.createMany({ data: remapUserIds(data.fields), skipDuplicates: true });
-      }
-      if (data.relationships?.length) {
-        await prisma.relationship.createMany({ data: data.relationships, skipDuplicates: true });
-      }
-      if (data.layouts?.length) {
-        await prisma.pageLayout.createMany({ data: remapUserIds(data.layouts), skipDuplicates: true });
-      }
-      if (data.layoutTabs?.length) {
-        await prisma.layoutTab.createMany({ data: data.layoutTabs, skipDuplicates: true });
-      }
-      if (data.layoutSections?.length) {
-        await prisma.layoutSection.createMany({ data: data.layoutSections, skipDuplicates: true });
-      }
-      if (data.layoutFields?.length) {
-        await prisma.layoutField.createMany({ data: data.layoutFields, skipDuplicates: true });
-      }
-      if (data.records?.length) {
-        await prisma.record.createMany({ data: remapUserIds(data.records), skipDuplicates: true });
-      }
-      if (data.reports?.length) {
-        await prisma.report.createMany({ data: remapUserIds(data.reports), skipDuplicates: true });
-      }
-      if (data.reportFolders?.length) {
-        await prisma.reportFolder.createMany({ data: remapUserIds(data.reportFolders), skipDuplicates: true });
-      }
-      if (data.dashboards?.length) {
-        await prisma.dashboard.createMany({ data: remapUserIds(data.dashboards), skipDuplicates: true });
-      }
-      if (data.dashboardWidgets?.length) {
-        await prisma.dashboardWidget.createMany({ data: data.dashboardWidgets, skipDuplicates: true });
-      }
-      // Automation settings
-      if (data.widgetSettings?.length) {
-        await prisma.widgetSetting.createMany({ data: remapUserIds(data.widgetSettings), skipDuplicates: true });
-      }
-      if (data.triggerSettings?.length) {
-        await prisma.triggerSetting.createMany({ data: remapUserIds(data.triggerSettings), skipDuplicates: true });
-      }
-      if (data.controllerSettings?.length) {
-        await prisma.controllerSetting.createMany({ data: remapUserIds(data.controllerSettings), skipDuplicates: true });
-      }
-      // Integrations
-      if (data.integrations?.length) {
-        await prisma.integration.createMany({ data: remapUserIds(data.integrations), skipDuplicates: true });
-      }
-      if (data.userIntegrations?.length) {
-        await prisma.userIntegration.createMany({ data: remapUserIds(data.userIntegrations), skipDuplicates: true });
-      }
-      // User preferences
-      if (data.userPreferences?.length) {
-        await prisma.userPreference.createMany({ data: remapUserIds(data.userPreferences), skipDuplicates: true });
-      }
-      // Brand assets (must precede quoteTemplates which FK to brandFont)
-      if (data.brandLogos?.length) {
-        await prisma.brandLogo.createMany({ data: rehydrateBuffers(remapUserIds(data.brandLogos)), skipDuplicates: true });
-      }
-      if (data.brandFonts?.length) {
-        await prisma.brandFont.createMany({ data: remapUserIds(data.brandFonts), skipDuplicates: true });
-      }
-      if (data.brandColors?.length) {
-        await prisma.brandColor.createMany({ data: remapUserIds(data.brandColors), skipDuplicates: true });
-      }
-      // Proposal builder (parents first)
-      if (data.quoteTemplates?.length) {
-        await prisma.quoteTemplate.createMany({ data: remapUserIds(data.quoteTemplates), skipDuplicates: true });
-      }
-      if (data.specPresets?.length) {
-        await prisma.specPreset.createMany({ data: remapUserIds(data.specPresets), skipDuplicates: true });
-      }
-      if (data.specVariants?.length) {
-        await prisma.specVariant.createMany({ data: data.specVariants, skipDuplicates: true });
-      }
-      if (data.specConditions?.length) {
-        await prisma.specCondition.createMany({ data: data.specConditions, skipDuplicates: true });
-      }
-      if (data.tokenMappings?.length) {
-        await prisma.tokenMapping.createMany({ data: remapUserIds(data.tokenMappings), skipDuplicates: true });
-      }
-      // Product logs
-      if (data.productLogs?.length) {
-        await prisma.productLog.createMany({ data: remapUserIds(data.productLogs), skipDuplicates: true });
-      }
+          // 2. Re-insert data (forward dependency order)
+          // All rows with createdById / lastModifiedById / userId are remapped
+          // so orphaned user references point to the current restoring user.
+          if (data.settings?.length) {
+            await tx.setting.createMany({ data: data.settings, skipDuplicates: true });
+          }
+          if (data.objects?.length) {
+            await tx.customObject.createMany({ data: remapUserIds(data.objects), skipDuplicates: true });
+          }
+          if (data.fields?.length) {
+            await tx.customField.createMany({ data: remapUserIds(data.fields), skipDuplicates: true });
+          }
+          if (data.relationships?.length) {
+            await tx.relationship.createMany({ data: data.relationships, skipDuplicates: true });
+          }
+          if (data.layouts?.length) {
+            await tx.pageLayout.createMany({ data: remapUserIds(data.layouts), skipDuplicates: true });
+          }
+          if (data.layoutTabs?.length) {
+            await tx.layoutTab.createMany({ data: data.layoutTabs, skipDuplicates: true });
+          }
+          if (data.layoutSections?.length) {
+            await tx.layoutSection.createMany({ data: data.layoutSections, skipDuplicates: true });
+          }
+          if (data.layoutFields?.length) {
+            await tx.layoutField.createMany({ data: data.layoutFields, skipDuplicates: true });
+          }
+          if (data.records?.length) {
+            await tx.record.createMany({ data: remapUserIds(data.records), skipDuplicates: true });
+          }
+          if (data.reports?.length) {
+            await tx.report.createMany({ data: remapUserIds(data.reports), skipDuplicates: true });
+          }
+          if (data.reportFolders?.length) {
+            await tx.reportFolder.createMany({ data: remapUserIds(data.reportFolders), skipDuplicates: true });
+          }
+          if (data.dashboards?.length) {
+            await tx.dashboard.createMany({ data: remapUserIds(data.dashboards), skipDuplicates: true });
+          }
+          if (data.dashboardWidgets?.length) {
+            await tx.dashboardWidget.createMany({ data: data.dashboardWidgets, skipDuplicates: true });
+          }
+          // Automation settings
+          if (data.widgetSettings?.length) {
+            await tx.widgetSetting.createMany({ data: remapUserIds(data.widgetSettings), skipDuplicates: true });
+          }
+          if (data.triggerSettings?.length) {
+            await tx.triggerSetting.createMany({ data: remapUserIds(data.triggerSettings), skipDuplicates: true });
+          }
+          if (data.controllerSettings?.length) {
+            await tx.controllerSetting.createMany({ data: remapUserIds(data.controllerSettings), skipDuplicates: true });
+          }
+          // Integrations
+          if (data.integrations?.length) {
+            await tx.integration.createMany({ data: remapUserIds(data.integrations), skipDuplicates: true });
+          }
+          if (data.userIntegrations?.length) {
+            await tx.userIntegration.createMany({ data: remapUserIds(data.userIntegrations), skipDuplicates: true });
+          }
+          // User preferences
+          if (data.userPreferences?.length) {
+            await tx.userPreference.createMany({ data: remapUserIds(data.userPreferences), skipDuplicates: true });
+          }
+          // Brand assets (must precede quoteTemplates which FK to brandFont)
+          if (data.brandLogos?.length) {
+            await tx.brandLogo.createMany({ data: rehydrateBuffers(remapUserIds(data.brandLogos)), skipDuplicates: true });
+          }
+          if (data.brandFonts?.length) {
+            await tx.brandFont.createMany({ data: remapUserIds(data.brandFonts), skipDuplicates: true });
+          }
+          if (data.brandColors?.length) {
+            await tx.brandColor.createMany({ data: remapUserIds(data.brandColors), skipDuplicates: true });
+          }
+          // Proposal builder (parents first)
+          if (data.quoteTemplates?.length) {
+            await tx.quoteTemplate.createMany({ data: remapUserIds(data.quoteTemplates), skipDuplicates: true });
+          }
+          if (data.specPresets?.length) {
+            await tx.specPreset.createMany({ data: remapUserIds(data.specPresets), skipDuplicates: true });
+          }
+          if (data.specVariants?.length) {
+            await tx.specVariant.createMany({ data: data.specVariants, skipDuplicates: true });
+          }
+          if (data.specConditions?.length) {
+            await tx.specCondition.createMany({ data: data.specConditions, skipDuplicates: true });
+          }
+          if (data.tokenMappings?.length) {
+            await tx.tokenMapping.createMany({ data: remapUserIds(data.tokenMappings), skipDuplicates: true });
+          }
+          // Product logs
+          if (data.productLogs?.length) {
+            await tx.productLog.createMany({ data: remapUserIds(data.productLogs), skipDuplicates: true });
+          }
+        },
+        { timeout: 120000, maxWait: 120000 }
+      );
 
       reply.send({ success: true, message: 'Database restored from backup' });
     } catch (error: any) {
