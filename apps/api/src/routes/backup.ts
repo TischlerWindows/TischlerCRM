@@ -642,6 +642,31 @@ export async function backupRoutes(app: FastifyInstance) {
       await prisma.$transaction([
         prisma.auditLog.deleteMany(),
         prisma.loginEvent.deleteMany(),
+        prisma.productLog.deleteMany(),
+        // Proposal builder (children first)
+        prisma.specCondition.deleteMany(),
+        prisma.specVariant.deleteMany(),
+        prisma.tokenMapping.deleteMany(),
+        prisma.specPreset.deleteMany(),
+        prisma.quoteTemplate.deleteMany(),
+        // Brand assets
+        prisma.brandLogo.deleteMany(),
+        prisma.brandFont.deleteMany(),
+        prisma.brandColor.deleteMany(),
+        // Automation settings
+        prisma.widgetSetting.deleteMany(),
+        prisma.triggerSetting.deleteMany(),
+        prisma.controllerSetting.deleteMany(),
+        // Dashboard / report children
+        prisma.dashboardWidget.deleteMany(),
+        prisma.dashboard.deleteMany(),
+        prisma.report.deleteMany(),
+        prisma.reportFolder.deleteMany(),
+        // User preferences & integrations
+        prisma.userPreference.deleteMany(),
+        prisma.userIntegration.deleteMany(),
+        prisma.integration.deleteMany(),
+        // Core data
         prisma.record.deleteMany(),
         prisma.layoutField.deleteMany(),
         prisma.layoutSection.deleteMany(),
@@ -650,8 +675,6 @@ export async function backupRoutes(app: FastifyInstance) {
         prisma.relationship.deleteMany(),
         prisma.customField.deleteMany(),
         prisma.customObject.deleteMany(),
-        prisma.dashboard.deleteMany(),
-        prisma.report.deleteMany(),
         prisma.setting.deleteMany(),
       ]);
 
@@ -688,8 +711,65 @@ export async function backupRoutes(app: FastifyInstance) {
       if (data.reports?.length) {
         await prisma.report.createMany({ data: remapUserIds(data.reports), skipDuplicates: true });
       }
+      if (data.reportFolders?.length) {
+        await prisma.reportFolder.createMany({ data: remapUserIds(data.reportFolders), skipDuplicates: true });
+      }
       if (data.dashboards?.length) {
         await prisma.dashboard.createMany({ data: remapUserIds(data.dashboards), skipDuplicates: true });
+      }
+      if (data.dashboardWidgets?.length) {
+        await prisma.dashboardWidget.createMany({ data: data.dashboardWidgets, skipDuplicates: true });
+      }
+      // Automation settings
+      if (data.widgetSettings?.length) {
+        await prisma.widgetSetting.createMany({ data: remapUserIds(data.widgetSettings), skipDuplicates: true });
+      }
+      if (data.triggerSettings?.length) {
+        await prisma.triggerSetting.createMany({ data: remapUserIds(data.triggerSettings), skipDuplicates: true });
+      }
+      if (data.controllerSettings?.length) {
+        await prisma.controllerSetting.createMany({ data: remapUserIds(data.controllerSettings), skipDuplicates: true });
+      }
+      // Integrations
+      if (data.integrations?.length) {
+        await prisma.integration.createMany({ data: remapUserIds(data.integrations), skipDuplicates: true });
+      }
+      if (data.userIntegrations?.length) {
+        await prisma.userIntegration.createMany({ data: remapUserIds(data.userIntegrations), skipDuplicates: true });
+      }
+      // User preferences
+      if (data.userPreferences?.length) {
+        await prisma.userPreference.createMany({ data: remapUserIds(data.userPreferences), skipDuplicates: true });
+      }
+      // Proposal builder (parents first)
+      if (data.quoteTemplates?.length) {
+        await prisma.quoteTemplate.createMany({ data: remapUserIds(data.quoteTemplates), skipDuplicates: true });
+      }
+      if (data.specPresets?.length) {
+        await prisma.specPreset.createMany({ data: remapUserIds(data.specPresets), skipDuplicates: true });
+      }
+      if (data.specVariants?.length) {
+        await prisma.specVariant.createMany({ data: data.specVariants, skipDuplicates: true });
+      }
+      if (data.specConditions?.length) {
+        await prisma.specCondition.createMany({ data: data.specConditions, skipDuplicates: true });
+      }
+      if (data.tokenMappings?.length) {
+        await prisma.tokenMapping.createMany({ data: remapUserIds(data.tokenMappings), skipDuplicates: true });
+      }
+      // Brand assets
+      if (data.brandLogos?.length) {
+        await prisma.brandLogo.createMany({ data: remapUserIds(data.brandLogos), skipDuplicates: true });
+      }
+      if (data.brandFonts?.length) {
+        await prisma.brandFont.createMany({ data: remapUserIds(data.brandFonts), skipDuplicates: true });
+      }
+      if (data.brandColors?.length) {
+        await prisma.brandColor.createMany({ data: remapUserIds(data.brandColors), skipDuplicates: true });
+      }
+      // Product logs
+      if (data.productLogs?.length) {
+        await prisma.productLog.createMany({ data: remapUserIds(data.productLogs), skipDuplicates: true });
       }
 
       reply.send({ success: true, message: 'Database restored from backup' });
