@@ -29,6 +29,12 @@ interface Props {
   html: string;
   /** Tailwind classes applied to the wrapper. */
   className?: string;
+  /**
+   * When set, stamps `data-hard-edit-body="<key>"` on the wrapper element.
+   * The Hard Edit modal reads these to map edited block bodies back to their
+   * ordered-block index so the server PDF renderer can apply the overrides.
+   */
+  bodyKey?: string;
 }
 
 /**
@@ -48,7 +54,7 @@ interface Props {
  * wrapper applies `whitespace-pre-wrap` so embedded newlines in legacy bodies
  * are preserved (rich-text content with explicit block tags is unaffected).
  */
-export function SafeRichHtml({ html, className }: Props) {
+export function SafeRichHtml({ html, className, bodyKey }: Props) {
   const isPlainText = !html.trim().startsWith('<');
   // Escape `<`, `>`, `&` in plain-text legacy bodies so they survive sanitize-html
   // as literal characters. Matches the server-side wrapper in html-to-runs.ts so
@@ -60,7 +66,11 @@ export function SafeRichHtml({ html, className }: Props) {
   // so we always apply base rich-text styles in addition to the caller's className.
   const baseClasses = '[&_p]:min-h-[1em] [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:pl-0.5';
   return (
-    <div className={`${baseClasses}${className ? ` ${className}` : ''}`} style={isPlainText ? { whiteSpace: 'pre-wrap' } : undefined}>
+    <div
+      className={`${baseClasses}${className ? ` ${className}` : ''}`}
+      style={isPlainText ? { whiteSpace: 'pre-wrap' } : undefined}
+      data-hard-edit-body={bodyKey}
+    >
       {parse(clean)}
     </div>
   );

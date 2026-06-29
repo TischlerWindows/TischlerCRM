@@ -235,6 +235,7 @@ export function LetterPreview({
                 key={`${ob.preset.id}-${idx}`}
                 ordered={ob}
                 blockType={blockType}
+                blockIndex={idx}
                 specNumber={blockType === 'SPECIFICATION_ITEM' ? specCounter : undefined}
                 firstPageLogo={blockType === 'LETTERHEAD' ? firstPageLogo : null}
                 isSelected={ob.preset.id === selectedPresetId}
@@ -281,6 +282,8 @@ export function LetterPreview({
 interface BlockPreviewProps {
   ordered: OrderedBlock;
   blockType: BlockType;
+  /** Position in result.orderedBlocks — used as the Hard Edit override key. */
+  blockIndex: number;
   specNumber?: number;
   firstPageLogo: PageLogoRule | null;
   isSelected: boolean;
@@ -292,6 +295,7 @@ interface BlockPreviewProps {
 function BlockPreview({
   ordered,
   blockType,
+  blockIndex,
   specNumber,
   firstPageLogo,
   isSelected,
@@ -302,6 +306,7 @@ function BlockPreview({
   const preset = ordered.preset;
   const config = (preset.config ?? {}) as Record<string, unknown>;
   const hideTitle = !!config.hideTitle;
+  const bodyKey = String(blockIndex);
 
   const wrap = (children: React.ReactNode) => (
     <div
@@ -325,7 +330,7 @@ function BlockPreview({
             <div className="text-[10pt] font-bold mb-1" style={{ color: NAVY }}>{preset.title}</div>
           )}
           {preset.body && (
-            <SafeRichHtml className="text-[10pt] leading-[1.5] p-1" html={preset.body} />
+            <SafeRichHtml className="text-[10pt] leading-[1.5] p-1" html={preset.body} bodyKey={bodyKey} />
           )}
         </div>,
       );
@@ -341,7 +346,7 @@ function BlockPreview({
             </div>
           )}
           {preset.body && preset.body.trim() && (
-            <SafeRichHtml className="mt-1 text-[10pt] leading-[1.5] text-center" html={preset.body} />
+            <SafeRichHtml className="mt-1 text-[10pt] leading-[1.5] text-center" html={preset.body} bodyKey={bodyKey} />
           )}
         </div>,
       );
@@ -352,7 +357,7 @@ function BlockPreview({
             <div className="flex text-[10pt] leading-[1.55]">
               <span className="inline-block w-7 font-bold shrink-0" style={{ color: NAVY }}>({specNumber ?? 1})</span>
               {preset.body && (
-                <SafeRichHtml className="text-[10pt] leading-[1.55]" html={preset.body} />
+                <SafeRichHtml className="text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
               )}
             </div>
           ) : (
@@ -362,7 +367,7 @@ function BlockPreview({
                 <span>{preset.title}</span>
               </div>
               {preset.body && (
-                <SafeRichHtml className="ml-7 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
+                <SafeRichHtml className="ml-7 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
               )}
             </>
           )}
@@ -373,7 +378,7 @@ function BlockPreview({
         <div className="mt-3 px-1 py-0.5">
           {!hideTitle && <div className="text-[10pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>}
           {preset.body && (
-            <SafeRichHtml className="mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
+            <SafeRichHtml className="mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
           )}
         </div>,
       );
@@ -382,7 +387,7 @@ function BlockPreview({
         <div className="mt-2 px-1">
           {!hideTitle && <div className="text-[10pt] font-bold">•&nbsp;&nbsp;{preset.title}</div>}
           {preset.body && preset.body.trim() && (
-            <SafeRichHtml className="ml-4 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
+            <SafeRichHtml className="ml-4 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
           )}
         </div>,
       );
@@ -391,7 +396,7 @@ function BlockPreview({
         <div className="mt-3 px-1">
           {!hideTitle && <div className="text-[10pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>}
           {preset.body && preset.body.trim() && (
-            <SafeRichHtml className="ml-3 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
+            <SafeRichHtml className="ml-3 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
           )}
         </div>,
       );

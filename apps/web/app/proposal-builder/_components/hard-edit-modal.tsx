@@ -4,21 +4,25 @@ import { useEffect, useRef, useState } from 'react';
 import { X, FileText } from 'lucide-react';
 import type { ProposalAssemblyResult } from '@crm/proposal-assembly';
 import type { PageLogoRule } from '@crm/types';
+import { apiClient } from '@/lib/api-client';
 import { LetterPreview, type BrandFontMap } from './letter-preview';
 
 interface Props {
   result: ProposalAssemblyResult;
   brandFonts: BrandFontMap;
   pageLogos: PageLogoRule[];
+  templateId: string | null;
+  summaryId: string;
   onClose: () => void;
 }
 
-export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props) {
+export function HardEditModal({ result, brandFonts, pageLogos, templateId, summaryId, onClose }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editRef = useRef<HTMLDivElement>(null);
   const [capturedHtml, setCapturedHtml] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,104 +91,58 @@ export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props)
   }, [capturedHtml]);
 
   const handlePreviewPDF = async () => {
-    const paper = editRef.current?.querySelector<HTMLElement>('.bg-white.shadow-md') ?? editRef.current;
-    if (!paper || generating) return;
+    if (generating) return;
+    if (!templateId || !summaryId) {
+      setError('Missing template or summary — reopen the preview and try again.');
+      return;
+    }
+
+    // Collect edited block bodies, keyed by ordered-block index. These match
+    // the data-hard-edit-body attributes stamped by SafeRichHtml in the
+    // preview, and line up 1:1 with result.orderedBlocks on the server.
+    const bodyOverrides: Record<string, string> = {};
+    editRef.current
+      ?.querySelectorAll<HTMLElement>('[data-hard-edit-body]')
+      .forEach((el) => {
+        const key = el.getAttribute('data-hard-edit-body');
+        if (key) bodyOverrides[key] = el.innerHTML;
+      });
+
+    // Open the tab synchronously inside the click handler so popup blockers
+    // don't kill it after the await (matches the proposal builder behaviour).
+    const previewWindow = window.open('', '_blank');
     setGenerating(true);
-
+    setError(null);
     try {
-      // Clone so we can strip editing artefacts without mutating the live DOM.
-      const clone = paper.cloneNode(true) as HTMLElement;
-      clone.removeAttribute('contenteditable');
-      clone.style.outline = '';
-      clone.querySelectorAll<HTMLElement>('[style]').forEach((el) => {
-        el.style.cursor = '';
-        el.style.pointerEvents = '';
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const token = apiClient.getToken();
+      const response = await fetch(`${apiBase}/proposal-pdf/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ templateId, summaryId, bodyOverrides }),
       });
-
-      // Helper: Blob → base64 data-URL
-      const blobToDataUrl = (b: Blob): Promise<string> =>
-        new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result as string);
-          r.onerror = rej;
-          r.readAsDataURL(b);
-        });
-
-      // 1. Inline every image so the standalone blob page doesn't need
-      //    any external requests (images load in the editing context already).
-      await Promise.all(
-        Array.from(clone.querySelectorAll<HTMLImageElement>('img')).map(async (img) => {
-          const src = img.getAttribute('src');
-          if (!src || src.startsWith('data:')) return;
-          try {
-            const resp = await fetch(src, { credentials: 'include' });
-            if (resp.ok) img.setAttribute('src', await blobToDataUrl(await resp.blob()));
-          } catch { /* leave original src – better than crashing */ }
-        }),
-      );
-
-      // 2. Collect all stylesheet text.  For <style> tags grab textContent; for
-      //    <link rel="stylesheet"> fetch the file so the blob is self-contained.
-      const cssChunks: string[] = [];
-      await Promise.all(
-        Array.from(
-          document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>(
-            'link[rel="stylesheet"], style',
-          ),
-        ).map(async (el) => {
-          if (el.tagName === 'STYLE') {
-            cssChunks.push((el as HTMLStyleElement).textContent ?? '');
-          } else {
-            const href = (el as HTMLLinkElement).href;
-            if (!href) return;
-            try {
-              const r = await fetch(href);
-              if (r.ok) cssChunks.push(await r.text());
-            } catch { /* skip failed sheets */ }
-          }
-        }),
-      );
-
-      // 3. Within the collected CSS, replace font url(...) with data-URLs so
-      //    custom brand fonts render correctly in the blob page.
-      const rawCss = cssChunks.join('\n');
-      const fontUrlRe = /url\(["']?(https?:[^"')]+\.(?:woff2?|ttf|otf|eot)[^"')"]*)["']?\)/g;
-      const fontUrls = [...new Set([...rawCss.matchAll(fontUrlRe)].map((m) => m[1]))];
-      const fontDataMap = new Map<string, string>();
-      await Promise.all(
-        fontUrls.map(async (u) => {
-          try {
-            const r = await fetch(u, { credentials: 'include' });
-            if (r.ok) fontDataMap.set(u, await blobToDataUrl(await r.blob()));
-          } catch { /* keep URL */ }
-        }),
-      );
-      const inlinedCss = rawCss.replace(fontUrlRe, (match, url) => {
-        const d = fontDataMap.get(url);
-        return d ? `url("${d}")` : match;
-      });
-
-      const html = [
-        '<!DOCTYPE html><html><head>',
-        '<meta charset="utf-8"><title>Proposal</title>',
-        // Single fully-inlined stylesheet — no external requests needed.
-        `<style>${inlinedCss}</style>`,
-        '<style>',
-        'body { margin: 0; padding: 0; background: white; }',
-        '@media print { @page { margin: 0.5in; } body { background: white !important; } }',
-        '</style>',
-        '</head><body>',
-        clone.outerHTML,
-        // Auto-trigger print dialog so the experience mirrors the proposal
-        // builder's Preview PDF button.
-        '<script>window.addEventListener("load", function() { setTimeout(function() { window.print(); }, 1200); });<\/script>',
-        '</body></html>',
-      ].join('');
-
-      const blob = new Blob([html], { type: 'text/html' });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(detail.error || `Failed to render PDF (${response.status})`);
+      }
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 300_000);
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url;
+      } else {
+        // Popup blocker killed the synchronous open — fall back to a download.
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'proposal.pdf';
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: unknown) {
+      previewWindow?.close();
+      setError(err instanceof Error ? err.message : 'Failed to generate proposal PDF');
     } finally {
       setGenerating(false);
     }
@@ -196,6 +154,9 @@ export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props)
         <span className="text-sm font-semibold">Hard Edit</span>
         <span className="ml-1 text-xs text-white/50">Click any text to edit directly. Changes here do not affect the template.</span>
         <div className="flex-1" />
+        {error && (
+          <span role="alert" className="text-xs text-red-300">{error}</span>
+        )}
         {(!ready || generating) && (
           <span className="inline-flex items-center gap-1.5 text-xs text-white/60">
             <FileText className="h-3.5 w-3.5 animate-pulse" />

@@ -1450,6 +1450,8 @@ export default function QuoteBuilderPage() {
           result={previewState.result}
           brandFonts={brandFonts}
           pageLogos={pageLogos}
+          templateId={selectedTemplateId}
+          summaryId={selectedSummaryId}
           onClose={() => setHardEditOpen(false)}
         />
       )}

@@ -12,6 +12,13 @@ import {
 const renderSchema = z.object({
   summaryId: z.string().min(1),
   templateId: z.string().min(1),
+  /**
+   * Optional Hard Edit overrides. Maps an ordered-block index (as a string)
+   * to the edited HTML body for that block. Applied to the assembled result
+   * before rendering so the PDF reflects the user's inline edits while using
+   * the exact same PDFKit renderer as the normal preview.
+   */
+  bodyOverrides: z.record(z.string()).optional(),
 });
 
 export async function proposalPdfRoutes(app: FastifyInstance) {
@@ -30,7 +37,7 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
     }
-    const { summaryId, templateId } = parsed.data;
+    const { summaryId, templateId, bodyOverrides } = parsed.data;
 
     // ── Fetch template + presets + token mappings + brand wiring ────
     // The template includes 5 distinct font roles per the brand guide
@@ -96,6 +103,19 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
       opportunity: opportunity ?? undefined,
       project: project ?? undefined,
     });
+
+    // ── Apply Hard Edit body overrides ────────────────────────────
+    // Each key is an ordered-block index; the value is the edited HTML body.
+    // Mutating preset.body here means the PDFKit renderer draws the user's
+    // edits with the identical layout/fonts/logo as a normal preview.
+    if (bodyOverrides) {
+      for (const [key, body] of Object.entries(bodyOverrides)) {
+        const idx = Number(key);
+        if (Number.isInteger(idx) && idx >= 0 && idx < result.orderedBlocks.length) {
+          result.orderedBlocks[idx].preset.body = body;
+        }
+      }
+    }
 
     // ── Render ────────────────────────────────────────────────────
     let pdfBuffer: Buffer;
