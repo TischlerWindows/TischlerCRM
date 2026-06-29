@@ -225,8 +225,8 @@ function MatrixEditor({
         </tbody>
       </table>
       <p className="mt-2 text-xs text-gray-500">
-        Checked = option is visible. Unchecked = hidden when controlling field has that value.
-        Values not governed by any row are always visible.
+        Checked = option is visible when controlling field has that value. Unchecked = hidden.
+        When no row matches (controlling field is empty or unconfigured), all options are shown.
       </p>
     </div>
   );

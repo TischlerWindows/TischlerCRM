@@ -122,8 +122,13 @@ export function PicklistTextDropdown({
 
 /**
  * Filter picklist values using picklistDependencies rules.
- * Only values whose dependency conditions are met (or values not governed
- * by any rule) are returned.
+ *
+ * When at least one rule's conditions are currently met (i.e. a controlling
+ * field has a configured value), show ONLY the values whitelisted by those
+ * matching rules — everything else is hidden.
+ *
+ * When no rules match (controlling field is empty or has an unconfigured
+ * value), all values are shown (no filtering applied).
  */
 export function filterPicklistValues(
   values: string[],
@@ -134,20 +139,18 @@ export function filterPicklistValues(
   const rules = fieldDef.picklistDependencies;
   if (!rules || rules.length === 0) return values;
 
-  // Collect all values that are governed by at least one rule
-  const governedValues = new Set<string>();
-  rules.forEach((r) => r.values.forEach((v) => governedValues.add(v)));
+  // Find rules whose conditions are currently satisfied
+  const matchingRules = rules.filter((r) =>
+    evaluateVisibility(r.conditions, formData, visibilityCtx),
+  );
 
-  return values.filter((val) => {
-    // If no rule mentions this value, always show it
-    if (!governedValues.has(val)) return true;
-    // Show if ANY rule containing this value has all its conditions met
-    return rules.some(
-      (r) =>
-        r.values.includes(val) &&
-        evaluateVisibility(r.conditions, formData, visibilityCtx),
-    );
-  });
+  // No rule matched → controlling field is empty / has an unconfigured value; show all
+  if (matchingRules.length === 0) return values;
+
+  // At least one rule matched → restrict to the union of all matched-rule values
+  const allowed = new Set<string>();
+  matchingRules.forEach((r) => r.values.forEach((v) => allowed.add(v)));
+  return values.filter((v) => allowed.has(v));
 }
 
 // ── Picklist input ──────────────────────────────────────────────────
