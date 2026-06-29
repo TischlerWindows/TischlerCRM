@@ -271,7 +271,9 @@ export function assembleProposal({
         includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched (merged).` });
       } else {
         for (const variant of matched) {
-          const resolved = resolveTokensWithDiagnostics(variant.body, tokens);
+          // If the variant body is blank (title-only variant), fall back to the block body.
+          const variantBodySource = variant.body?.trim() ? variant.body : (preset.body || '');
+          const resolved = resolveTokensWithDiagnostics(variantBodySource, tokens);
           // If the variant has its own title, use it (with token resolution); otherwise
           // fall back to the block title which already had tokens resolved above.
           const rawVariantTitle = variant.title?.trim() || null;

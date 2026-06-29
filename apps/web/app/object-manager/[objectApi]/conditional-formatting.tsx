@@ -310,7 +310,7 @@ function EditorPanel({
   const [local, setLocal] = useState<RuleSetDraft>(draft);
 
   const picklistFields = allFields.filter(
-    (f) => (f.type === 'Picklist' || f.type === 'MultiSelectPicklist') && !f.readOnly,
+    (f) => (f.type === 'Picklist' || f.type === 'MultiSelectPicklist' || f.type === 'DropdownWithCustom') && !f.readOnly,
   );
 
   const dependentField = allFields.find((f) => f.apiName === local.dependentFieldApiName);
@@ -376,7 +376,7 @@ function EditorPanel({
             {allFields
               .filter(
                 (f) =>
-                  f.type === 'Picklist' &&
+                  (f.type === 'Picklist' || f.type === 'DropdownWithCustom') &&
                   f.apiName !== local.dependentFieldApiName,
               )
               .map((f) => (

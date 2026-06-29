@@ -272,6 +272,35 @@ export function BlockEditor({
             placeholder={isLayoutOnly ? 'Shown only in the block list' : 'e.g., Glass Specification'}
             className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
           />
+          {/* Per-variant title overrides — shown when driver fields are set and variants exist */}
+          {isVariantMode && variants.length > 0 && (
+            <div className="mt-2 border border-dashed border-brand-navy/20 rounded-lg p-2.5 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-semibold text-brand-navy/70 uppercase tracking-wider">Per-variant title overrides</span>
+                <span className="text-[9px] text-gray-400">Blank = use block title above</span>
+              </div>
+              {variants.map((v) => {
+                const displayName = v.matchLabel || v.matchValue.split('\n')[0] || '—';
+                return (
+                  <div key={v._key} className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500 w-20 flex-shrink-0 truncate" title={displayName}>
+                      {displayName}
+                    </span>
+                    <input
+                      value={v.title}
+                      onChange={(e) =>
+                        onVariantsChange(
+                          variants.map((x) => (x._key === v._key ? { ...x, title: e.target.value } : x)),
+                        )
+                      }
+                      placeholder="Same as block title"
+                      className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Type-specific config form */}
