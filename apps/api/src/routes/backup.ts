@@ -658,6 +658,10 @@ export async function backupRoutes(app: FastifyInstance) {
           return patched;
         });
 
+      // Combined preparation applied to EVERY insert: remap orphaned user FKs and
+      // rehydrate any JSON-serialised Buffers (Bytes columns) back into real Buffers.
+      const prep = (rows: any[]): any[] => rehydrateBuffers(remapUserIds(rows));
+
       // Delete + re-insert run inside ONE interactive transaction. If any insert
       // fails, the deletes roll back too — so a failed restore can never leave the
       // database half-wiped (which previously nuked the proposal builder).
@@ -702,97 +706,97 @@ export async function backupRoutes(app: FastifyInstance) {
           await tx.setting.deleteMany();
 
           // 2. Re-insert data (forward dependency order)
-          // All rows with createdById / lastModifiedById / userId are remapped
-          // so orphaned user references point to the current restoring user.
+          // Every insert is run through prep(): orphaned user FKs are remapped and
+          // any JSON-serialised Buffers (Bytes columns) are rehydrated.
           if (data.settings?.length) {
-            await tx.setting.createMany({ data: data.settings, skipDuplicates: true });
+            await tx.setting.createMany({ data: prep(data.settings), skipDuplicates: true });
           }
           if (data.objects?.length) {
-            await tx.customObject.createMany({ data: remapUserIds(data.objects), skipDuplicates: true });
+            await tx.customObject.createMany({ data: prep(data.objects), skipDuplicates: true });
           }
           if (data.fields?.length) {
-            await tx.customField.createMany({ data: remapUserIds(data.fields), skipDuplicates: true });
+            await tx.customField.createMany({ data: prep(data.fields), skipDuplicates: true });
           }
           if (data.relationships?.length) {
-            await tx.relationship.createMany({ data: data.relationships, skipDuplicates: true });
+            await tx.relationship.createMany({ data: prep(data.relationships), skipDuplicates: true });
           }
           if (data.layouts?.length) {
-            await tx.pageLayout.createMany({ data: remapUserIds(data.layouts), skipDuplicates: true });
+            await tx.pageLayout.createMany({ data: prep(data.layouts), skipDuplicates: true });
           }
           if (data.layoutTabs?.length) {
-            await tx.layoutTab.createMany({ data: data.layoutTabs, skipDuplicates: true });
+            await tx.layoutTab.createMany({ data: prep(data.layoutTabs), skipDuplicates: true });
           }
           if (data.layoutSections?.length) {
-            await tx.layoutSection.createMany({ data: data.layoutSections, skipDuplicates: true });
+            await tx.layoutSection.createMany({ data: prep(data.layoutSections), skipDuplicates: true });
           }
           if (data.layoutFields?.length) {
-            await tx.layoutField.createMany({ data: data.layoutFields, skipDuplicates: true });
+            await tx.layoutField.createMany({ data: prep(data.layoutFields), skipDuplicates: true });
           }
           if (data.records?.length) {
-            await tx.record.createMany({ data: remapUserIds(data.records), skipDuplicates: true });
+            await tx.record.createMany({ data: prep(data.records), skipDuplicates: true });
           }
           if (data.reports?.length) {
-            await tx.report.createMany({ data: remapUserIds(data.reports), skipDuplicates: true });
+            await tx.report.createMany({ data: prep(data.reports), skipDuplicates: true });
           }
           if (data.reportFolders?.length) {
-            await tx.reportFolder.createMany({ data: remapUserIds(data.reportFolders), skipDuplicates: true });
+            await tx.reportFolder.createMany({ data: prep(data.reportFolders), skipDuplicates: true });
           }
           if (data.dashboards?.length) {
-            await tx.dashboard.createMany({ data: remapUserIds(data.dashboards), skipDuplicates: true });
+            await tx.dashboard.createMany({ data: prep(data.dashboards), skipDuplicates: true });
           }
           if (data.dashboardWidgets?.length) {
-            await tx.dashboardWidget.createMany({ data: data.dashboardWidgets, skipDuplicates: true });
+            await tx.dashboardWidget.createMany({ data: prep(data.dashboardWidgets), skipDuplicates: true });
           }
           // Automation settings
           if (data.widgetSettings?.length) {
-            await tx.widgetSetting.createMany({ data: remapUserIds(data.widgetSettings), skipDuplicates: true });
+            await tx.widgetSetting.createMany({ data: prep(data.widgetSettings), skipDuplicates: true });
           }
           if (data.triggerSettings?.length) {
-            await tx.triggerSetting.createMany({ data: remapUserIds(data.triggerSettings), skipDuplicates: true });
+            await tx.triggerSetting.createMany({ data: prep(data.triggerSettings), skipDuplicates: true });
           }
           if (data.controllerSettings?.length) {
-            await tx.controllerSetting.createMany({ data: remapUserIds(data.controllerSettings), skipDuplicates: true });
+            await tx.controllerSetting.createMany({ data: prep(data.controllerSettings), skipDuplicates: true });
           }
           // Integrations
           if (data.integrations?.length) {
-            await tx.integration.createMany({ data: remapUserIds(data.integrations), skipDuplicates: true });
+            await tx.integration.createMany({ data: prep(data.integrations), skipDuplicates: true });
           }
           if (data.userIntegrations?.length) {
-            await tx.userIntegration.createMany({ data: remapUserIds(data.userIntegrations), skipDuplicates: true });
+            await tx.userIntegration.createMany({ data: prep(data.userIntegrations), skipDuplicates: true });
           }
           // User preferences
           if (data.userPreferences?.length) {
-            await tx.userPreference.createMany({ data: remapUserIds(data.userPreferences), skipDuplicates: true });
+            await tx.userPreference.createMany({ data: prep(data.userPreferences), skipDuplicates: true });
           }
           // Brand assets (must precede quoteTemplates which FK to brandFont)
           if (data.brandLogos?.length) {
-            await tx.brandLogo.createMany({ data: rehydrateBuffers(remapUserIds(data.brandLogos)), skipDuplicates: true });
+            await tx.brandLogo.createMany({ data: prep(data.brandLogos), skipDuplicates: true });
           }
           if (data.brandFonts?.length) {
-            await tx.brandFont.createMany({ data: remapUserIds(data.brandFonts), skipDuplicates: true });
+            await tx.brandFont.createMany({ data: prep(data.brandFonts), skipDuplicates: true });
           }
           if (data.brandColors?.length) {
-            await tx.brandColor.createMany({ data: remapUserIds(data.brandColors), skipDuplicates: true });
+            await tx.brandColor.createMany({ data: prep(data.brandColors), skipDuplicates: true });
           }
           // Proposal builder (parents first)
           if (data.quoteTemplates?.length) {
-            await tx.quoteTemplate.createMany({ data: remapUserIds(data.quoteTemplates), skipDuplicates: true });
+            await tx.quoteTemplate.createMany({ data: prep(data.quoteTemplates), skipDuplicates: true });
           }
           if (data.specPresets?.length) {
-            await tx.specPreset.createMany({ data: remapUserIds(data.specPresets), skipDuplicates: true });
+            await tx.specPreset.createMany({ data: prep(data.specPresets), skipDuplicates: true });
           }
           if (data.specVariants?.length) {
-            await tx.specVariant.createMany({ data: data.specVariants, skipDuplicates: true });
+            await tx.specVariant.createMany({ data: prep(data.specVariants), skipDuplicates: true });
           }
           if (data.specConditions?.length) {
-            await tx.specCondition.createMany({ data: data.specConditions, skipDuplicates: true });
+            await tx.specCondition.createMany({ data: prep(data.specConditions), skipDuplicates: true });
           }
           if (data.tokenMappings?.length) {
-            await tx.tokenMapping.createMany({ data: remapUserIds(data.tokenMappings), skipDuplicates: true });
+            await tx.tokenMapping.createMany({ data: prep(data.tokenMappings), skipDuplicates: true });
           }
           // Product logs
           if (data.productLogs?.length) {
-            await tx.productLog.createMany({ data: remapUserIds(data.productLogs), skipDuplicates: true });
+            await tx.productLog.createMany({ data: prep(data.productLogs), skipDuplicates: true });
           }
         },
         { timeout: 120000, maxWait: 120000 }
