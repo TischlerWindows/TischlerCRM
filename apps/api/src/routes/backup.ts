@@ -741,6 +741,16 @@ export async function backupRoutes(app: FastifyInstance) {
       if (data.userPreferences?.length) {
         await prisma.userPreference.createMany({ data: remapUserIds(data.userPreferences), skipDuplicates: true });
       }
+      // Brand assets (must precede quoteTemplates which FK to brandFont)
+      if (data.brandLogos?.length) {
+        await prisma.brandLogo.createMany({ data: remapUserIds(data.brandLogos), skipDuplicates: true });
+      }
+      if (data.brandFonts?.length) {
+        await prisma.brandFont.createMany({ data: remapUserIds(data.brandFonts), skipDuplicates: true });
+      }
+      if (data.brandColors?.length) {
+        await prisma.brandColor.createMany({ data: remapUserIds(data.brandColors), skipDuplicates: true });
+      }
       // Proposal builder (parents first)
       if (data.quoteTemplates?.length) {
         await prisma.quoteTemplate.createMany({ data: remapUserIds(data.quoteTemplates), skipDuplicates: true });
@@ -756,16 +766,6 @@ export async function backupRoutes(app: FastifyInstance) {
       }
       if (data.tokenMappings?.length) {
         await prisma.tokenMapping.createMany({ data: remapUserIds(data.tokenMappings), skipDuplicates: true });
-      }
-      // Brand assets
-      if (data.brandLogos?.length) {
-        await prisma.brandLogo.createMany({ data: remapUserIds(data.brandLogos), skipDuplicates: true });
-      }
-      if (data.brandFonts?.length) {
-        await prisma.brandFont.createMany({ data: remapUserIds(data.brandFonts), skipDuplicates: true });
-      }
-      if (data.brandColors?.length) {
-        await prisma.brandColor.createMany({ data: remapUserIds(data.brandColors), skipDuplicates: true });
       }
       // Product logs
       if (data.productLogs?.length) {
