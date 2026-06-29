@@ -624,8 +624,8 @@ export function matchVariants(
 ): SpecVariantData[] {
   if (!preset.driverField || !preset.variants?.length) return [];
 
-  const driverValue = (context as unknown as Record<string, unknown>)[preset.driverField];
-  if (driverValue === undefined || driverValue === null) return [];
+  // Support comma-separated multi-driver: "glassType,productTypes"
+  const driverFields = preset.driverField.split(',').map((f) => f.trim()).filter(Boolean);
 
   const activeVariants = preset.variants
     .filter((v) => v.isActive)
@@ -661,13 +661,22 @@ export function matchVariants(
       return v.startsWith(matchPart) && (afterMatch === '' || /^[\s,;-]/.test(afterMatch));
     };
 
-    let typeMatch: boolean;
-    if (Array.isArray(driverValue)) {
-      typeMatch = matchParts.some((match) =>
-        driverValue.some((item) => typeValueMatch(String(item), match))
-      );
-    } else {
-      typeMatch = matchParts.some((match) => typeValueMatch(String(driverValue), match));
+    // A variant matches if ANY of the configured driver fields produces a match.
+    let typeMatch = false;
+    for (const driverField of driverFields) {
+      const driverValue = (context as unknown as Record<string, unknown>)[driverField];
+      if (driverValue === undefined || driverValue === null) continue;
+      if (Array.isArray(driverValue)) {
+        if (matchParts.some((match) => driverValue.some((item) => typeValueMatch(String(item), match)))) {
+          typeMatch = true;
+          break;
+        }
+      } else {
+        if (matchParts.some((match) => typeValueMatch(String(driverValue), match))) {
+          typeMatch = true;
+          break;
+        }
+      }
     }
     if (!typeMatch) return false;
 

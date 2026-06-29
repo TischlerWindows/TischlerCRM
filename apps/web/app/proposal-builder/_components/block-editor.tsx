@@ -178,16 +178,27 @@ export function BlockEditor({
   const blockTypeMeta = blockType ? BLOCK_TYPE_META[blockType] : null;
 
   // Resolve the match-value choices for the current driver field.
-  // Try the schema picklist first, fall back to static options, then free text (undefined).
+  // With multi-driver support, driverField is a comma-separated list; return the
+  // union of options for all selected drivers.
   const schema = useSchemaStore(s => s.schema);
   const matchOptions: string[] | undefined = (() => {
     if (!driverField) return undefined;
-    if (DRIVER_FIELD_STATIC_OPTIONS[driverField]) return DRIVER_FIELD_STATIC_OPTIONS[driverField];
-    const schemaApiName = DRIVER_FIELD_SCHEMA_MAP[driverField];
-    if (!schemaApiName) return undefined;
-    const oppObj = schema?.objects?.find(o => o.apiName === 'Opportunity');
-    const field = oppObj?.fields?.find(f => f.apiName === schemaApiName);
-    return field?.picklistValues?.length ? field.picklistValues : undefined;
+    const drivers = driverField.split(',').map(d => d.trim()).filter(Boolean);
+    if (drivers.length === 0) return undefined;
+    const all: string[] = [];
+    for (const d of drivers) {
+      if (DRIVER_FIELD_STATIC_OPTIONS[d]) {
+        all.push(...DRIVER_FIELD_STATIC_OPTIONS[d]);
+      } else {
+        const schemaApiName = DRIVER_FIELD_SCHEMA_MAP[d];
+        if (schemaApiName) {
+          const oppObj = schema?.objects?.find(o => o.apiName === 'Opportunity');
+          const field = oppObj?.fields?.find(f => f.apiName === schemaApiName);
+          if (field?.picklistValues?.length) all.push(...field.picklistValues);
+        }
+      }
+    }
+    return all.length > 0 ? [...new Set(all)] : undefined;
   })();
 
   return (
@@ -310,31 +321,45 @@ CONSTANT → intro paragraphs and closing (no number)`}
         {/* Driver field — only meaningful for content blocks. */}
         {!isLayoutOnly && (
         <div>
-          <div className="flex items-center gap-1 mb-1">
-            <label className="text-[10px] font-semibold text-gray-500">Driver Variable</label>
+          <div className="flex items-center gap-1 mb-1.5">
+            <label className="text-[10px] font-semibold text-gray-500">Driver Variables</label>
             <HelpHint
               label="Driver Variable help"
               title="Variant by field value"
-              description="A simple block has one Body Text. Set a Driver Variable to make the body change based on a summary field — for example, different wording per Glass Type. Each value gets its own variant card below."
-              example={`Driver = "glassType"
-  → variant matching #28 renders one paragraph
-  → variant matching #3 renders another
-A project with multiple glass types prints all matches.`}
+              description="Select one or more fields to drive variant selection. Each variant's Match Value is checked against ALL selected drivers — add a variant per value you want to handle."
+              example={`Drivers = "glassType" + "productTypes"
+  → variant matching "#28" fires when Glass Type is #28
+  → variant matching "Double Hung" fires when a product type matches
+  → both can live in the same block`}
             />
           </div>
-          <select
-            value={driverField}
-            onChange={(e) => onDriverFieldChange(e.target.value)}
-            className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
-          >
-            {DRIVER_FIELDS.map((d) => (
-              <option key={d.value} value={d.value}>{d.label}</option>
-            ))}
-          </select>
+          {/* Multi-select checkboxes — one per available driver */}
+          <div className="border border-gray-200 rounded-lg px-3 py-2 space-y-1.5">
+            {DRIVER_FIELDS.filter((d) => d.value !== '').map((d) => {
+              const selected = driverField.split(',').map(v => v.trim()).filter(Boolean).includes(d.value);
+              return (
+                <label key={d.value} className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={(e) => {
+                      const current = driverField.split(',').map(v => v.trim()).filter(Boolean);
+                      const next = e.target.checked
+                        ? [...current, d.value]
+                        : current.filter((v) => v !== d.value);
+                      onDriverFieldChange(next.join(','));
+                    }}
+                    className="w-3.5 h-3.5 rounded border-gray-300 text-[#1e3a5f] focus:ring-[#1e3a5f]/20"
+                  />
+                  <span className="text-xs text-gray-700">{d.label}</span>
+                </label>
+              );
+            })}
+          </div>
           <p className="text-[10px] text-gray-400 mt-0.5">
             {isVariantMode
-              ? `Body text now varies by ${driverField} — define one variant per value below.`
-              : 'Leave empty for a single body text.'}
+              ? `Variants match against: ${driverField.split(',').map(v => v.trim()).filter(Boolean).join(', ')}`
+              : 'Tick at least one driver to enable variant mode.'}
           </p>
         </div>
         )}

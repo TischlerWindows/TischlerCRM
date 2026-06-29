@@ -252,8 +252,11 @@ export function assembleProposal({
       };
 
       // No variants matched — render universal text alone.
+      // Resolve {{tokens}} in the block title once — shared across all variant paths.
+      const resolvedBlockTitle = resolveTokensWithDiagnostics(preset.title, tokens).text;
+
       if (matched.length === 0 && universalText) {
-        const resolvedPreset = { ...preset, body: universalText };
+        const resolvedPreset = { ...preset, title: resolvedBlockTitle, body: universalText };
         sections[sectionOf(preset)].push(resolvedPreset);
         orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
         includedBlocks.push({ ...block, reason: 'No variant matched; universal text rendered.' });
@@ -262,18 +265,22 @@ export function assembleProposal({
         const mergedBody = matched
           .map((v) => resolveTokensWithDiagnostics(v.body, tokens).text)
           .join('<br/><br/>');
-        const resolvedPreset = { ...preset, body: withUniversal(mergedBody) };
+        const resolvedPreset = { ...preset, title: resolvedBlockTitle, body: withUniversal(mergedBody) };
         sections[sectionOf(preset)].push(resolvedPreset);
         orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
         includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched (merged).` });
       } else {
         for (const variant of matched) {
           const resolved = resolveTokensWithDiagnostics(variant.body, tokens);
-          // If the variant has its own title, override the block title for this entry.
-          const variantTitle = variant.title?.trim() || null;
+          // If the variant has its own title, use it (with token resolution); otherwise
+          // fall back to the block title which already had tokens resolved above.
+          const rawVariantTitle = variant.title?.trim() || null;
+          const variantTitle = rawVariantTitle
+            ? resolveTokensWithDiagnostics(rawVariantTitle, tokens).text
+            : null;
           const resolvedPreset = {
             ...preset,
-            ...(variantTitle ? { title: variantTitle } : {}),
+            title: variantTitle ?? resolvedBlockTitle,
             body: withUniversal(resolved.text),
           };
           sections[sectionOf(preset)].push(resolvedPreset);
@@ -301,12 +308,13 @@ export function assembleProposal({
       const resolved = bodyText
         ? resolveTokensWithDiagnostics(bodyText, tokens)
         : { text: '', unresolvedTokens: [] as string[] };
-      const resolvedPreset = { ...preset, body: resolved.text };
+      const resolvedTitle = resolveTokensWithDiagnostics(preset.title, tokens);
+      const resolvedPreset = { ...preset, title: resolvedTitle.text, body: resolved.text };
       sections[sectionOf(preset)].push(resolvedPreset);
       orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
       includedBlocks.push(block);
 
-      for (const token of resolved.unresolvedTokens) {
+      for (const token of [...resolved.unresolvedTokens, ...resolvedTitle.unresolvedTokens]) {
         unresolvedTokens.push({ presetId: preset.id, token });
         warnings.push(`${preset.title}: unresolved token {{${token}}}.`);
       }

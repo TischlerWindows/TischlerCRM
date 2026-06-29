@@ -47,7 +47,7 @@ interface Props {
   /** If provided, Match Value renders as a multi-select dropdown instead of free text. */
   matchOptions?: string[];
   /**
-   * When driverField === 'productTypes', the available options per product type
+   * When driverField includes 'productTypes', the available options per product type
    * from the current summary (Record<productTypeName, optionName[]>).
    * Used to populate the "Product Type Options" sub-dropdown.
    */
@@ -251,7 +251,9 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
         <div>
           <label className="text-xs font-semibold text-gray-600">Variants</label>
           <p className="text-[11px] text-gray-400 mt-0.5">
-            Driver: <span className="font-mono text-brand-navy">{driverField}</span> — each variant matches a value
+            Drivers: <span className="font-mono text-brand-navy">
+              {driverField.split(',').map(d => d.trim()).filter(Boolean).join(', ') || driverField}
+            </span> — each variant matches a value from any driver
           </p>
         </div>
         <button onClick={add} className="text-xs text-brand-navy font-semibold hover:underline flex items-center gap-1">
@@ -316,7 +318,7 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                       const selectedTypes = splitValues(typePart, matchOptions);
                       // Available options = union of ALL possible options for selected product types
                       // (from the static definition, not just what's checked in the summary)
-                      const availableOptions = driverField === 'productTypes'
+                      const availableOptions = driverField.split(',').some(d => d.trim() === 'productTypes')
                         ? [...new Set(selectedTypes.flatMap(t => getOptionsForType(t)))]
                         : [];
                       const selectedOptions = splitValues(optionPart, availableOptions);
@@ -365,7 +367,7 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                             />
                           </div>
                           {/* Product Type Options sub-filter — only for productTypes driver */}
-                          {driverField === 'productTypes' && productTypeOptionsMap !== undefined && (
+                          {driverField.split(',').some(d => d.trim() === 'productTypes') && productTypeOptionsMap !== undefined && (
                             <div>
                               <div className="flex items-center gap-1 mb-1">
                                 <label className="text-[10px] font-semibold text-gray-500">Product Type Options</label>

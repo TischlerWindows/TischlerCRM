@@ -225,6 +225,67 @@ describe('proposal assembly', () => {
     expect(result.sections.SPECIFICATION[1].body).toBe('Outswing spec text.');
   });
 
+  it('multi-driver block matches variants across all configured driver fields', () => {
+    // summary has glassType="#28" and productTypes includes "Double Hung Concealed Balance"
+    const result = assembleProposal({
+      summary,
+      template: {
+        id: 'template-1',
+        name: 'Standard Proposal',
+        presets: [
+          {
+            id: 'multi-driver',
+            templateId: 'template-1',
+            order: 0,
+            title: 'Spec',
+            body: null,
+            section: 'SPECIFICATION',
+            isAlwaysIncluded: true,
+            driverField: 'glassType,productTypes',
+            isActive: true,
+            conditions: [],
+            variants: [
+              { id: 'vg', presetId: 'multi-driver', matchValue: '#28', matchLabel: null, body: 'Glass #28 spec.', order: 0, isActive: true },
+              { id: 'vp', presetId: 'multi-driver', matchValue: 'Double Hung Concealed Balance', matchLabel: null, body: 'DH spec.', order: 1, isActive: true },
+              { id: 'vx', presetId: 'multi-driver', matchValue: 'Inswing', matchLabel: null, body: 'Inswing spec.', order: 2, isActive: true },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(result.sections.SPECIFICATION).toHaveLength(2);
+    expect(result.sections.SPECIFICATION[0].body).toBe('Glass #28 spec.');
+    expect(result.sections.SPECIFICATION[1].body).toBe('DH spec.');
+  });
+
+  it('resolves {{tokens}} in block titles', () => {
+    const result = assembleProposal({
+      summary,
+      template: {
+        id: 'template-1',
+        name: 'Standard Proposal',
+        presets: [
+          {
+            id: 'token-title',
+            templateId: 'template-1',
+            order: 0,
+            title: 'Specification for {{projectName}}',
+            body: 'Body text.',
+            section: 'SPECIFICATION',
+            isAlwaysIncluded: true,
+            driverField: null,
+            isActive: true,
+            conditions: [],
+            variants: [],
+          },
+        ],
+      },
+    });
+
+    expect(result.orderedBlocks[0].preset.title).toBe('Specification for Little Club Road #1');
+  });
+
   it('silently skips simple preset with null body', () => {
     const result = assembleProposal({
       summary,
