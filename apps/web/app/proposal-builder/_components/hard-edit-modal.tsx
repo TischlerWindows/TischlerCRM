@@ -88,25 +88,45 @@ export function HardEditModal({ result, brandFonts, pageLogos, onClose }: Props)
   const handlePreviewPDF = () => {
     const paper = editRef.current?.querySelector<HTMLElement>('.bg-white.shadow-md') ?? editRef.current;
     if (!paper) return;
+
+    // Clone so we can strip editing artefacts without mutating the live DOM.
+    const clone = paper.cloneNode(true) as HTMLElement;
+    clone.removeAttribute('contenteditable');
+    clone.style.outline = '';
+    // Remove cursor-text / pointer-events overrides added by the edit setup.
+    clone.querySelectorAll<HTMLElement>('[style]').forEach((el) => {
+      el.style.cursor = '';
+      el.style.pointerEvents = '';
+    });
+
     const headTags = Array.from(
       document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>('link[rel="stylesheet"], style'),
     ).map((el) => {
       if (el.tagName === 'LINK') return `<link rel="stylesheet" href="${(el as HTMLLinkElement).href}">`;
       return el.outerHTML;
     }).join('\n');
+
+    // The script auto-triggers print once the page is ready so the user gets
+    // the browser's Save-as-PDF dialog without any extra clicks — matching the
+    // feel of the proposal builder's Preview PDF button.
     const html = [
       '<!DOCTYPE html><html><head>',
-      '<meta charset="utf-8"><title>Proposal Preview</title>',
+      '<meta charset="utf-8"><title>Proposal</title>',
       headTags,
-      '<style>@media print { @page { margin: 0.5in; } body { background: white !important; } } body { margin: 0; padding: 24px; background: #f3f4f6; }</style>',
+      '<style>',
+      'body { margin: 0; padding: 0; background: white; }',
+      '@media print { @page { margin: 0.5in; } body { background: white !important; } }',
+      '</style>',
       '</head><body>',
-      paper.outerHTML,
+      clone.outerHTML,
+      '<script>window.addEventListener("load", function() { setTimeout(function() { window.print(); }, 800); });<\/script>',
       '</body></html>',
     ].join('');
+
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    setTimeout(() => URL.revokeObjectURL(url), 120_000);
   };
 
   return (
