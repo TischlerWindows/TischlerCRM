@@ -177,6 +177,17 @@ export function BlockEditor({
   const isLayoutOnly = blockType !== null && LAYOUT_ONLY_TYPES.includes(blockType);
   const blockTypeMeta = blockType ? BLOCK_TYPE_META[blockType] : null;
 
+  // Title variants and body variants persist to the same array but are managed
+  // as two independent lists. Each editor sees only its own kind and merges its
+  // changes back while preserving the other kind — so deleting/adding a title
+  // variant never touches the body variants and vice versa.
+  const bodyVariants = variants.filter((v) => v.kind !== 'title');
+  const titleVariants = variants.filter((v) => v.kind === 'title');
+  const handleBodyVariantsChange = (next: DraftVariant[]) =>
+    onVariantsChange([...next, ...variants.filter((v) => v.kind === 'title')]);
+  const handleTitleVariantsChange = (next: DraftVariant[]) =>
+    onVariantsChange([...variants.filter((v) => v.kind !== 'title'), ...next]);
+
   // Resolve the match-value choices for the current driver field.
   // With multi-driver support, driverField is a comma-separated list; return the
   // union of options for all selected drivers.
@@ -294,8 +305,8 @@ export function BlockEditor({
         {/* Title Variants — only shown when the checkbox above is checked */}
         {isVariantMode && !isLayoutOnly && !!config.useTitleVariants && (
           <TitleVariantEditor
-            variants={variants}
-            onChange={onVariantsChange}
+            variants={titleVariants}
+            onChange={handleTitleVariantsChange}
             driverField={driverField}
             matchOptions={matchOptions}
             defaultOpen
@@ -397,8 +408,8 @@ CONSTANT → intro paragraphs and closing (no number)`}
           <>
             <VariantEditor
               ref={variantEditorRef}
-              variants={variants}
-              onChange={onVariantsChange}
+              variants={bodyVariants}
+              onChange={handleBodyVariantsChange}
               driverField={driverField}
               matchOptions={matchOptions}
               productTypeOptionsMap={productTypeOptionsMap}

@@ -6,6 +6,14 @@ import { Plus, Trash2, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { BodyEditor, type BodyEditorHandle } from './body-editor';
 import { getOptionsForType } from '@/lib/product-type-options';
 
+/**
+ * Client-side discriminator that keeps the title-variant list and the
+ * body-variant list independent even though both persist to the same
+ * SpecVariant table. It is derived on load and dropped on save — never
+ * sent to the API.
+ */
+export type VariantKind = 'title' | 'body';
+
 export interface DraftVariant {
   _key: string;
   matchValue: string;
@@ -14,6 +22,7 @@ export interface DraftVariant {
   body: string;
   order: number;
   isActive: boolean;
+  kind: VariantKind;
 }
 
 let _variantKey = 0;
@@ -21,12 +30,15 @@ export function nextVariantKey(): string {
   return `vk_${++_variantKey}`;
 }
 
-export function emptyDraftVariant(order: number): DraftVariant {
-  return { _key: nextVariantKey(), matchValue: '', matchLabel: '', title: '', body: '', order, isActive: true };
+export function emptyDraftVariant(order: number, kind: VariantKind = 'body'): DraftVariant {
+  return { _key: nextVariantKey(), matchValue: '', matchLabel: '', title: '', body: '', order, isActive: true, kind };
 }
 
 export function variantToDraft(v: { matchValue: string; matchLabel: string | null; title?: string | null; body: string; order: number; isActive: boolean }): DraftVariant {
-  return { _key: nextVariantKey(), matchValue: v.matchValue, matchLabel: v.matchLabel || '', title: v.title || '', body: v.body, order: v.order, isActive: v.isActive };
+  // A record with a title but no body is a title-only variant; everything
+  // else (has body, or empty) belongs to the body-variant list.
+  const kind: VariantKind = v.title?.trim() && !v.body?.trim() ? 'title' : 'body';
+  return { _key: nextVariantKey(), matchValue: v.matchValue, matchLabel: v.matchLabel || '', title: v.title || '', body: v.body, order: v.order, isActive: v.isActive, kind };
 }
 
 export function variantsPayload(variants: DraftVariant[]) {
@@ -232,7 +244,7 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
   }), [expandedKey]);
 
   const add = () => {
-    const v = emptyDraftVariant(variants.length);
+    const v = emptyDraftVariant(variants.length, 'body');
     onChange([...variants, v]);
     setExpandedKey(v._key);
   };
@@ -436,7 +448,7 @@ export function TitleVariantEditor({ variants, onChange, driverField, matchOptio
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const add = () => {
-    const v = emptyDraftVariant(variants.length);
+    const v = emptyDraftVariant(variants.length, 'title');
     onChange([...variants, v]);
     setExpandedKey(v._key);
     setOpen(true);
