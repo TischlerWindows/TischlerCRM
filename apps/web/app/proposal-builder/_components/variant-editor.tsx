@@ -289,19 +289,20 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                         : null;
                       return (
                         <span className="flex flex-col min-w-0">
-                          <span className="truncate">
-                            {typeLabel ?? <span className="text-gray-400 italic">untitled</span>}
-                          </span>
-                          {optLabel && (
-                            <span className="text-[10px] text-indigo-600 truncate">{optLabel}</span>
+                          {/* Variant title is the primary identity — show it first if set */}
+                          {variant.title ? (
+                            <span className="truncate font-semibold text-[#1e3a5f]">{variant.title}</span>
+                          ) : (
+                            <span className="truncate text-gray-500 italic text-[10px]">No title set</span>
                           )}
+                          <span className="truncate text-[10px] text-gray-400">
+                            {typeLabel ?? <span className="italic">no match value</span>}
+                            {optLabel && <span className="text-indigo-500 ml-1">· {optLabel}</span>}
+                          </span>
                         </span>
                       );
                     })()}
                   </span>
-                  {(variant.title || variant.matchLabel) && (
-                    <span className="text-[10px] text-gray-500 flex-shrink-0 truncate max-w-[120px]">{variant.title || variant.matchLabel}</span>
-                  )}
                   <button
                     onClick={(e) => { e.stopPropagation(); remove(variant._key); }}
                     className="p-0.5 text-gray-400 hover:text-red-500"
@@ -312,7 +313,19 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
 
                 {isOpen && (
                   <div className="px-3 py-3 space-y-3 border-t border-gray-200">
-                    {/* Match Value + optional Product Type Options sub-row */}
+                    {/* Title — first field so it's clear this IS the PDF title for this variant */}
+                    <div>
+                      <label className="text-[10px] font-semibold text-gray-500 mb-1 block">
+                        Title <span className="text-gray-400 font-normal">(shown in PDF for this variant — leave blank to use block title)</span>
+                      </label>
+                      <input
+                        value={variant.title}
+                        onChange={(e) => update(variant._key, { title: e.target.value })}
+                        placeholder="e.g., 28 DC Standard Insulated Glass"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                      />
+                    </div>
+                    {/* Match Value + optional Label sub-row */}
                     {(() => {
                       const { typePart, optionPart } = parseMatchValueParts(variant.matchValue);
                       const selectedTypes = splitValues(typePart, matchOptions);
@@ -347,7 +360,7 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                               )}
                             </div>
                             <div>
-                              <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Label (optional)</label>
+                              <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Label <span className="font-normal text-gray-400">(internal only)</span></label>
                               <input
                                 value={variant.matchLabel}
                                 onChange={(e) => update(variant._key, { matchLabel: e.target.value })}
@@ -355,16 +368,6 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                                 className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
                               />
                             </div>
-                          </div>
-                          {/* Per-variant title override */}
-                          <div>
-                            <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Title (optional — overrides block title for this variant)</label>
-                            <input
-                              value={variant.title}
-                              onChange={(e) => update(variant._key, { title: e.target.value })}
-                              placeholder="e.g., 28 DC Standard Insulated Glass"
-                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
-                            />
                           </div>
                           {/* Product Type Options sub-filter — only for productTypes driver */}
                           {driverField.split(',').some(d => d.trim() === 'productTypes') && productTypeOptionsMap !== undefined && (
@@ -413,3 +416,181 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
     </div>
   );
 });
+
+// ── Title-only variant editor ─────────────────────────────────────
+// Same card-based UX as VariantEditor but only exposes Match Value + Title.
+// Stored in the same DraftVariant array; body is left blank so the
+// assembly falls through to the block's universal body.
+
+interface TitleVariantProps {
+  variants: DraftVariant[];
+  onChange: (variants: DraftVariant[]) => void;
+  driverField: string;
+  matchOptions?: string[];
+}
+
+export function TitleVariantEditor({ variants, onChange, driverField, matchOptions }: TitleVariantProps) {
+  const [open, setOpen] = useState(false);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
+  const add = () => {
+    const v = emptyDraftVariant(variants.length);
+    onChange([...variants, v]);
+    setExpandedKey(v._key);
+    setOpen(true);
+  };
+
+  const remove = (key: string) => {
+    onChange(variants.filter((v) => v._key !== key));
+    if (expandedKey === key) setExpandedKey(null);
+  };
+
+  const update = (key: string, patch: Partial<DraftVariant>) =>
+    onChange(variants.map((v) => (v._key === key ? { ...v, ...patch } : v)));
+
+  return (
+    <div className="border border-dashed border-brand-navy/20 rounded-lg overflow-hidden">
+      {/* Toggle header */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-gray-50/80 hover:bg-gray-100/80 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2">
+          {open ? (
+            <ChevronDown className="w-3.5 h-3.5 text-brand-navy/60" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-brand-navy/60" />
+          )}
+          <span className="text-[10px] font-semibold text-brand-navy/80 uppercase tracking-wider">
+            Title Variants
+          </span>
+          {variants.length > 0 && (
+            <span className="text-[9px] bg-brand-navy/10 text-brand-navy px-1.5 py-0.5 rounded-full">
+              {variants.length}
+            </span>
+          )}
+        </div>
+        <span className="text-[9px] text-gray-400">Blank body = uses block body</span>
+      </button>
+
+      {open && (
+        <div className="px-3 py-2.5 space-y-2 border-t border-brand-navy/10">
+          {variants.length === 0 ? (
+            <p className="text-[10px] text-gray-400 italic">
+              No title variants yet. Add one to give a specific variant a different title in the PDF.
+            </p>
+          ) : (
+            variants.map((variant) => {
+              const isCardOpen = expandedKey === variant._key;
+              const { typePart, optionPart } = parseMatchValueParts(variant.matchValue);
+              const selectedTypes = splitValues(typePart, matchOptions);
+              const displayName =
+                variant.matchLabel ||
+                (selectedTypes.length > 0 ? selectedTypes.join(', ') : null) ||
+                typePart ||
+                '—';
+
+              return (
+                <div key={variant._key} className="border border-gray-200 rounded-lg overflow-hidden">
+                  {/* Card header */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedKey(isCardOpen ? null : variant._key)}
+                    className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  >
+                    {isCardOpen ? (
+                      <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    )}
+                    <span className="flex-1 min-w-0 flex flex-col">
+                      {variant.title ? (
+                        <span className="text-xs font-semibold text-[#1e3a5f] truncate">{variant.title}</span>
+                      ) : (
+                        <span className="text-[10px] text-gray-400 italic">No title set</span>
+                      )}
+                      <span className="text-[10px] text-gray-400 truncate">{displayName}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); remove(variant._key); }}
+                      className="p-0.5 text-gray-400 hover:text-red-500 flex-shrink-0"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </button>
+
+                  {/* Expanded card body */}
+                  {isCardOpen && (
+                    <div className="px-3 py-3 space-y-3 border-t border-gray-200">
+                      {/* Title input */}
+                      <div>
+                        <label className="text-[10px] font-semibold text-gray-500 mb-1 block">
+                          Title <span className="text-gray-400 font-normal">(shown in PDF for this variant)</span>
+                        </label>
+                        <input
+                          value={variant.title}
+                          onChange={(e) => update(variant._key, { title: e.target.value })}
+                          placeholder="e.g., 28 DC Standard Insulated Glass"
+                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                        />
+                      </div>
+                      {/* Match Value */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Match Value</label>
+                          {matchOptions ? (
+                            <MultiSelectDropdown
+                              options={matchOptions}
+                              selected={selectedTypes}
+                              onChange={(vals) =>
+                                update(variant._key, {
+                                  matchValue: buildMatchValue(joinValues(vals), optionPart),
+                                })
+                              }
+                            />
+                          ) : (
+                            <input
+                              value={typePart}
+                              onChange={(e) =>
+                                update(variant._key, {
+                                  matchValue: buildMatchValue(e.target.value, optionPart),
+                                })
+                              }
+                              placeholder="e.g., #28"
+                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-gray-500 mb-1 block">
+                            Label <span className="text-gray-400 font-normal">(internal only)</span>
+                          </label>
+                          <input
+                            value={variant.matchLabel}
+                            onChange={(e) => update(variant._key, { matchLabel: e.target.value })}
+                            placeholder="e.g., Glass #28"
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+
+          <button
+            type="button"
+            onClick={add}
+            className="flex items-center gap-1 text-xs text-brand-navy font-semibold hover:underline mt-1"
+          >
+            <Plus className="w-3 h-3" /> Add Title Variant
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
