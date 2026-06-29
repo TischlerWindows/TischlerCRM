@@ -1013,6 +1013,7 @@ export default function QuoteBuilderPage() {
             presetId: p.id,
             matchValue: v.matchValue,
             matchLabel: v.matchLabel || null,
+            title: v.title || null,
             body: v.body,
             order: i,
             isActive: v.isActive,
