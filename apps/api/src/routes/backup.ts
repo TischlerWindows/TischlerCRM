@@ -586,7 +586,7 @@ export async function backupRoutes(app: FastifyInstance) {
       // -----------------------------------------------------------
       // 0. Ensure EVERY user ID referenced anywhere in backup exists
       // -----------------------------------------------------------
-      const USER_FK_FIELDS = ['createdById', 'modifiedById', 'lastModifiedById', 'userId', 'actorId', 'deletedById'];
+      const USER_FK_FIELDS = ['createdById', 'modifiedById', 'lastModifiedById', 'userId', 'actorId', 'deletedById', 'uploadedById', 'configuredById'];
 
       // Scan all backup tables and collect every referenced user ID
       const referencedUserIds = new Set<string>();
