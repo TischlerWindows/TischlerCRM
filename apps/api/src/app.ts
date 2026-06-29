@@ -93,7 +93,13 @@ export function buildApp() {
   });
 
   // H-2: security headers — must be registered before CORS
-  app.register(helmet, { contentSecurityPolicy: false });
+  // crossOriginResourcePolicy: cross-origin because this is an API consumed by
+  // the frontend on a sibling domain; logos and fonts must be loadable by
+  // <img> and @font-face from cross-origin pages.
+  app.register(helmet, {
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  });
 
   // H-3: explicit CORS origin whitelist — never reflect arbitrary origins
   const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
