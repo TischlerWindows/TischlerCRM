@@ -444,7 +444,10 @@ export default function ConditionalFormatting({ objectApiName }: ConditionalForm
   // Collect all (dependentFieldApiName, controllingFieldApiName) pairs that already have rules
   const existingPairs: { dep: FieldDef; ctrl: string }[] = [];
   for (const field of allFields) {
-    if ((field.type !== 'Picklist' && field.type !== 'MultiSelectPicklist') || !field.picklistDependencies?.length) continue;
+    if (
+      (field.type !== 'Picklist' && field.type !== 'MultiSelectPicklist' && field.type !== 'DropdownWithCustom') ||
+      !field.picklistDependencies?.length
+    ) continue;
     const ctrlFields = new Set<string>();
     for (const rule of field.picklistDependencies) {
       for (const cond of rule.conditions) {
