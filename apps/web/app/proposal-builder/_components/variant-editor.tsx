@@ -46,7 +46,11 @@ export function variantsPayload(variants: DraftVariant[]) {
     matchValue: v.matchValue,
     matchLabel: v.matchLabel || null,
     title: v.title || null,
-    body: v.body,
+    // Title-only variants intentionally have no body — they fall through to the
+    // block's universal body at render time (assembly trims and checks falsiness).
+    // Send a single space so that older API deployments (body: z.string().min(1))
+    // accept the save. The space is indistinguishable from '' after trim().
+    body: v.kind === 'title' ? (v.body.trim() || ' ') : v.body,
     order: i,
     isActive: v.isActive,
   }));
