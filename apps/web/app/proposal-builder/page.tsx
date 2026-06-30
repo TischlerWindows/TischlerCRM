@@ -32,7 +32,11 @@ import {
   variantToDraft,
   variantsPayload,
   emptyDraftVariant,
+  configToTitleVariants,
+  titleVariantsToConfig,
+  titleVariantToDraft,
   type DraftVariant,
+  type TitleVariantDraft,
 } from './_components/variant-editor';
 
 interface EditorSnapshot {
@@ -46,6 +50,7 @@ interface EditorSnapshot {
   driverField: string;
   conditions: DraftCondition[];
   variants: DraftVariant[];
+  titleVariants: TitleVariantDraft[];
 }
 
 function snapshotsEqual(a: EditorSnapshot | null, b: EditorSnapshot): boolean {
@@ -103,6 +108,7 @@ export default function QuoteBuilderPage() {
   const [editDriverField, setEditDriverField] = useState('');
   const [editConditions, setEditConditions] = useState<DraftCondition[]>([]);
   const [editVariants, setEditVariants] = useState<DraftVariant[]>([]);
+  const [editTitleVariants, setEditTitleVariants] = useState<TitleVariantDraft[]>([]);
   const [isNewPreset, setIsNewPreset] = useState(false);
   const [editorBaseline, setEditorBaseline] = useState<EditorSnapshot | null>(null);
 
@@ -158,6 +164,7 @@ export default function QuoteBuilderPage() {
     driverField: editDriverField,
     conditions: editConditions,
     variants: editVariants,
+    titleVariants: editTitleVariants,
   };
   const isDirty = editorBaseline !== null && !snapshotsEqual(editorBaseline, currentSnapshot);
   // Any unsaved changes — either current block or stashed blocks.
@@ -360,6 +367,7 @@ export default function QuoteBuilderPage() {
         driverField: editDriverField,
         conditions: editConditions,
         variants: editVariants,
+        titleVariants: editTitleVariants,
       };
       if (snapshotsEqual(baseline, current) && Object.keys(pendingEdits).length === 0) return;
       e.preventDefault();
@@ -379,6 +387,7 @@ export default function QuoteBuilderPage() {
     editDriverField,
     editConditions,
     editVariants,
+    editTitleVariants,
     pendingEdits,
   ]);
 
@@ -397,6 +406,7 @@ export default function QuoteBuilderPage() {
     setEditDriverField('');
     setEditConditions([]);
     setEditVariants([]);
+    setEditTitleVariants([]);
     setEditorBaseline(null);
     setPendingEdits({});
   };
@@ -418,6 +428,7 @@ export default function QuoteBuilderPage() {
       setEditDriverField(pending.driverField);
       setEditConditions(pending.conditions);
       setEditVariants(pending.variants);
+      setEditTitleVariants(pending.titleVariants);
       // Baseline = DB state so isDirty stays true (pending differs from DB)
       const blockType = (preset.blockType as BlockType | null) ?? null;
       const config = (preset.config && typeof preset.config === 'object'
@@ -434,27 +445,54 @@ export default function QuoteBuilderPage() {
         driverField: preset.driverField || '',
         conditions: preset.conditions.map(conditionToDraft),
         variants: (preset.variants || []).map(variantToDraft),
+        titleVariants: configToTitleVariants(config.titleVariants),
       });
       return;
     }
     const conditions = preset.conditions.map(conditionToDraft);
-    const variants = (preset.variants || []).map(variantToDraft);
+    const rawVariants = (preset.variants || []).map(variantToDraft);
     const blockType = (preset.blockType as BlockType | null) ?? null;
     const config = (preset.config && typeof preset.config === 'object'
       ? (preset.config as Record<string, unknown>)
       : {}) as Record<string, unknown>;
+    const existingTitleVariants = configToTitleVariants(config.titleVariants);
+
+    // One-time migration: under the old scheme, title variants were stored as
+    // body variants with a blank body. Lift those into config.titleVariants so
+    // they render correctly. The baseline below stays on the un-migrated DB
+    // state, so the block reads as dirty and the cleanup persists on next save.
+    const legacyTitleVariants =
+      existingTitleVariants.length === 0
+        ? rawVariants.filter((v) => !v.body.trim() && v.title.trim())
+        : [];
+    const hasMigration = legacyTitleVariants.length > 0;
+    const variants = hasMigration
+      ? rawVariants.filter((v) => v.body.trim() || !v.title.trim())
+      : rawVariants;
+    const titleVariants = hasMigration
+      ? legacyTitleVariants.map((v) =>
+          titleVariantToDraft({
+            matchValue: v.matchValue,
+            matchLabel: v.matchLabel || null,
+            title: v.title,
+          })
+        )
+      : existingTitleVariants;
+    const editorConfig = hasMigration ? { ...config, useTitleVariants: true } : config;
+
     setSelectedPresetId(preset.id);
     setIsNewPreset(false);
     setEditTitle(preset.title);
     setEditBody(preset.body ?? '');
     setEditSection(preset.section);
     setEditBlockType(blockType);
-    setEditConfig(config);
+    setEditConfig(editorConfig);
     setEditAlwaysIncluded(preset.isAlwaysIncluded);
     setEditActive(preset.isActive);
     setEditDriverField(preset.driverField || '');
     setEditConditions(conditions);
     setEditVariants(variants);
+    setEditTitleVariants(titleVariants);
     setEditorBaseline({
       title: preset.title,
       body: preset.body ?? '',
@@ -465,7 +503,8 @@ export default function QuoteBuilderPage() {
       active: preset.isActive,
       driverField: preset.driverField || '',
       conditions,
-      variants,
+      variants: rawVariants,
+      titleVariants: existingTitleVariants,
     });
   };
 
@@ -499,6 +538,7 @@ export default function QuoteBuilderPage() {
     setEditDriverField('');
     setEditConditions([]);
     setEditVariants([]);
+    setEditTitleVariants([]);
     setEditorBaseline({
       title: defaultTitle,
       body: '',
@@ -510,6 +550,7 @@ export default function QuoteBuilderPage() {
       driverField: '',
       conditions: [],
       variants: [],
+      titleVariants: [],
     });
   };
 
@@ -532,6 +573,7 @@ export default function QuoteBuilderPage() {
     const config = (source.config && typeof source.config === 'object'
       ? (source.config as Record<string, unknown>)
       : {}) as Record<string, unknown>;
+    const titleVariants = configToTitleVariants(config.titleVariants);
     setSelectedPresetId(null);
     setIsNewPreset(true);
     const title = `${source.title} (copy)`;
@@ -545,6 +587,7 @@ export default function QuoteBuilderPage() {
     setEditDriverField(source.driverField || '');
     setEditConditions(conditions);
     setEditVariants(variants);
+    setEditTitleVariants(titleVariants);
     setEditorBaseline({
       title,
       body: source.body ?? '',
@@ -556,6 +599,7 @@ export default function QuoteBuilderPage() {
       driverField: source.driverField || '',
       conditions,
       variants,
+      titleVariants,
     });
   };
 
@@ -623,12 +667,16 @@ export default function QuoteBuilderPage() {
         const isVariantMode = !!snap.driverField;
         const conds = conditionsPayload(snap.conditions);
         const vars = isVariantMode ? variantsPayload(snap.variants) : [];
+        // Title variants persist inside config (variant blocks only).
+        const config = isVariantMode
+          ? { ...snap.config, titleVariants: titleVariantsToConfig(snap.titleVariants) }
+          : snap.config;
         return {
           title: snap.title.trim(),
           body: isVariantMode ? null : snap.body,
           section: snap.section,
           blockType: snap.blockType,
-          config: snap.config,
+          config,
           isAlwaysIncluded: snap.alwaysIncluded,
           isActive: snap.active,
           driverField: snap.driverField || null,
@@ -656,7 +704,9 @@ export default function QuoteBuilderPage() {
             body: isVariantMode ? null : editBody,
             section: editSection,
             blockType: editBlockType,
-            config: editConfig,
+            config: isVariantMode
+              ? { ...editConfig, titleVariants: titleVariantsToConfig(editTitleVariants) }
+              : editConfig,
             isAlwaysIncluded: editAlwaysIncluded,
             isActive: editActive,
             driverField: editDriverField || null,
@@ -707,6 +757,7 @@ export default function QuoteBuilderPage() {
           driverField: editDriverField || '',
           conditions: editConditions,
           variants: editVariants,
+          titleVariants: editTitleVariants,
         });
 
         if (!silent) flash('Saved');
@@ -728,6 +779,7 @@ export default function QuoteBuilderPage() {
       editDriverField,
       editConditions,
       editVariants,
+      editTitleVariants,
       isNewPreset,
       selectedPresetId,
       isDirty,
@@ -996,7 +1048,11 @@ export default function QuoteBuilderPage() {
       body: snap.driverField ? null : snap.body,
       section: snap.section,
       blockType: snap.blockType,
-      config: snap.config,
+      // Inject title variants into config so the live preview resolves the
+      // effective title without requiring a Save.
+      config: snap.driverField
+        ? { ...snap.config, titleVariants: titleVariantsToConfig(snap.titleVariants) }
+        : snap.config,
       isAlwaysIncluded: snap.alwaysIncluded,
       driverField: snap.driverField || null,
       isActive: snap.active,
@@ -1066,6 +1122,7 @@ export default function QuoteBuilderPage() {
     editBlockType,
     editConfig,
     editDriverField,
+    editTitleVariants,
   ]);
 
   const previewState = useMemo(() => {
@@ -1422,6 +1479,8 @@ export default function QuoteBuilderPage() {
                   onConditionsChange={setEditConditions}
                   variants={editVariants}
                   onVariantsChange={setEditVariants}
+                  titleVariants={editTitleVariants}
+                  onTitleVariantsChange={setEditTitleVariants}
                   onDelete={handleDelete}
                   bodyEditorRef={bodyEditorRef}
                   variantEditorRef={variantEditorRef}

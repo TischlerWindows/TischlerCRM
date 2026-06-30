@@ -49,7 +49,8 @@ const variantSchema = z.object({
   matchValue: z.string().min(1),
   matchLabel: z.string().nullable().optional(),
   title: z.string().nullable().optional(),
-  // body is empty string for title-only variants (they use the block's body)
+  // Empty string is allowed: a body variant with no body falls through to the
+  // block's own body at render time.
   body: z.string(),
   order: z.number().int().min(0),
   isActive: z.boolean().optional(),

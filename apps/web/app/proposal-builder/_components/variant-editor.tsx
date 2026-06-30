@@ -7,13 +7,10 @@ import { BodyEditor, type BodyEditorHandle } from './body-editor';
 import { getOptionsForType } from '@/lib/product-type-options';
 
 /**
- * Client-side discriminator that keeps the title-variant list and the
- * body-variant list independent even though both persist to the same
- * SpecVariant table. It is derived on load and dropped on save — never
- * sent to the API.
+ * A body variant — maps a driver Match Value to body text (and an optional
+ * per-variant title used only when title-variant mode is off). Body variants
+ * persist as SpecVariant rows.
  */
-export type VariantKind = 'title' | 'body';
-
 export interface DraftVariant {
   _key: string;
   matchValue: string;
@@ -22,7 +19,6 @@ export interface DraftVariant {
   body: string;
   order: number;
   isActive: boolean;
-  kind: VariantKind;
 }
 
 let _variantKey = 0;
@@ -30,15 +26,12 @@ export function nextVariantKey(): string {
   return `vk_${++_variantKey}`;
 }
 
-export function emptyDraftVariant(order: number, kind: VariantKind = 'body'): DraftVariant {
-  return { _key: nextVariantKey(), matchValue: '', matchLabel: '', title: '', body: '', order, isActive: true, kind };
+export function emptyDraftVariant(order: number): DraftVariant {
+  return { _key: nextVariantKey(), matchValue: '', matchLabel: '', title: '', body: '', order, isActive: true };
 }
 
 export function variantToDraft(v: { matchValue: string; matchLabel: string | null; title?: string | null; body: string; order: number; isActive: boolean }): DraftVariant {
-  // A record with a title but no body is a title-only variant; everything
-  // else (has body, or empty) belongs to the body-variant list.
-  const kind: VariantKind = v.title?.trim() && !v.body?.trim() ? 'title' : 'body';
-  return { _key: nextVariantKey(), matchValue: v.matchValue, matchLabel: v.matchLabel || '', title: v.title || '', body: v.body, order: v.order, isActive: v.isActive, kind };
+  return { _key: nextVariantKey(), matchValue: v.matchValue, matchLabel: v.matchLabel || '', title: v.title || '', body: v.body, order: v.order, isActive: v.isActive };
 }
 
 export function variantsPayload(variants: DraftVariant[]) {
@@ -46,13 +39,66 @@ export function variantsPayload(variants: DraftVariant[]) {
     matchValue: v.matchValue,
     matchLabel: v.matchLabel || null,
     title: v.title || null,
-    // Title-only variants intentionally have no body — they fall through to the
-    // block's universal body at render time (assembly trims and checks falsiness).
-    // Send a single space so that older API deployments (body: z.string().min(1))
-    // accept the save. The space is indistinguishable from '' after trim().
-    body: v.kind === 'title' ? (v.body.trim() || ' ') : v.body,
+    body: v.body,
     order: i,
     isActive: v.isActive,
+  }));
+}
+
+// ── Title variants ─────────────────────────────────────────────────
+// Title variants are independent from body variants. They map driver Match
+// Values to a Title that replaces the static block title when the context
+// matches. They persist inside the preset's `config.titleVariants` (a plain
+// serializable array), NOT in the SpecVariant table.
+
+/** Keyed draft used by the editor. `_key` is dropped when serialized to config. */
+export interface TitleVariantDraft {
+  _key: string;
+  matchValue: string;
+  matchLabel: string;
+  title: string;
+}
+
+/** Shape persisted in `config.titleVariants`. */
+export interface TitleVariantConfig {
+  matchValue: string;
+  matchLabel: string | null;
+  title: string;
+}
+
+export function emptyTitleVariant(): TitleVariantDraft {
+  return { _key: nextVariantKey(), matchValue: '', matchLabel: '', title: '' };
+}
+
+export function titleVariantToDraft(v: { matchValue?: string; matchLabel?: string | null; title?: string }): TitleVariantDraft {
+  return {
+    _key: nextVariantKey(),
+    matchValue: v.matchValue || '',
+    matchLabel: v.matchLabel || '',
+    title: v.title || '',
+  };
+}
+
+/** Parse the persisted `config.titleVariants` array into keyed drafts. */
+export function configToTitleVariants(raw: unknown): TitleVariantDraft[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((v): v is Record<string, unknown> => !!v && typeof v === 'object')
+    .map((v) =>
+      titleVariantToDraft({
+        matchValue: typeof v.matchValue === 'string' ? v.matchValue : '',
+        matchLabel: typeof v.matchLabel === 'string' ? v.matchLabel : null,
+        title: typeof v.title === 'string' ? v.title : '',
+      }),
+    );
+}
+
+/** Serialize keyed drafts back into the persisted `config.titleVariants` shape. */
+export function titleVariantsToConfig(variants: TitleVariantDraft[]): TitleVariantConfig[] {
+  return variants.map((v) => ({
+    matchValue: v.matchValue,
+    matchLabel: v.matchLabel || null,
+    title: v.title,
   }));
 }
 
@@ -248,7 +294,7 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
   }), [expandedKey]);
 
   const add = () => {
-    const v = emptyDraftVariant(variants.length, 'body');
+    const v = emptyDraftVariant(variants.length);
     onChange([...variants, v]);
     setExpandedKey(v._key);
   };
@@ -434,13 +480,13 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
 });
 
 // ── Title-only variant editor ─────────────────────────────────────
-// Same card-based UX as VariantEditor but only exposes Match Value + Title.
-// Stored in the same DraftVariant array; body is left blank so the
-// assembly falls through to the block's universal body.
+// Maps driver Match Value(s) → a Title that replaces the static block title
+// when the context matches. Independent from body variants; persists in
+// config.titleVariants.
 
 interface TitleVariantProps {
-  variants: DraftVariant[];
-  onChange: (variants: DraftVariant[]) => void;
+  variants: TitleVariantDraft[];
+  onChange: (variants: TitleVariantDraft[]) => void;
   driverField: string;
   matchOptions?: string[];
   /** Start expanded (default false). Pass true when the section is the primary UI for titles. */
@@ -452,7 +498,7 @@ export function TitleVariantEditor({ variants, onChange, driverField, matchOptio
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const add = () => {
-    const v = emptyDraftVariant(variants.length, 'title');
+    const v = emptyTitleVariant();
     onChange([...variants, v]);
     setExpandedKey(v._key);
     setOpen(true);
@@ -463,7 +509,7 @@ export function TitleVariantEditor({ variants, onChange, driverField, matchOptio
     if (expandedKey === key) setExpandedKey(null);
   };
 
-  const update = (key: string, patch: Partial<DraftVariant>) =>
+  const update = (key: string, patch: Partial<TitleVariantDraft>) =>
     onChange(variants.map((v) => (v._key === key ? { ...v, ...patch } : v)));
 
   return (

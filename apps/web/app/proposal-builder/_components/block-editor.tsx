@@ -2,7 +2,7 @@
 
 import { Trash2, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
 import { ConditionBuilder, type DraftCondition } from './condition-builder';
-import { VariantEditor, TitleVariantEditor, type DraftVariant } from './variant-editor';
+import { VariantEditor, TitleVariantEditor, type DraftVariant, type TitleVariantDraft } from './variant-editor';
 import { BodyEditor, type BodyEditorHandle } from './body-editor';
 import { BlockConfigForm } from './block-config-form';
 import { HelpHint } from './help-hint';
@@ -104,6 +104,9 @@ interface Props {
   onConditionsChange: (v: DraftCondition[]) => void;
   variants: DraftVariant[];
   onVariantsChange: (v: DraftVariant[]) => void;
+  /** Title variants (config.titleVariants) — independent from body variants. */
+  titleVariants: TitleVariantDraft[];
+  onTitleVariantsChange: (v: TitleVariantDraft[]) => void;
   onDelete: () => void;
   /** Ref to the body editor — used by the Variables chip panel to insert tokens at cursor. */
   bodyEditorRef?: React.RefObject<BodyEditorHandle | null>;
@@ -162,6 +165,8 @@ export function BlockEditor({
   onConditionsChange,
   variants,
   onVariantsChange,
+  titleVariants,
+  onTitleVariantsChange,
   onDelete,
   bodyEditorRef,
   variantEditorRef,
@@ -176,17 +181,6 @@ export function BlockEditor({
   const isVariantMode = !!driverField;
   const isLayoutOnly = blockType !== null && LAYOUT_ONLY_TYPES.includes(blockType);
   const blockTypeMeta = blockType ? BLOCK_TYPE_META[blockType] : null;
-
-  // Title variants and body variants persist to the same array but are managed
-  // as two independent lists. Each editor sees only its own kind and merges its
-  // changes back while preserving the other kind — so deleting/adding a title
-  // variant never touches the body variants and vice versa.
-  const bodyVariants = variants.filter((v) => v.kind !== 'title');
-  const titleVariants = variants.filter((v) => v.kind === 'title');
-  const handleBodyVariantsChange = (next: DraftVariant[]) =>
-    onVariantsChange([...next, ...variants.filter((v) => v.kind === 'title')]);
-  const handleTitleVariantsChange = (next: DraftVariant[]) =>
-    onVariantsChange([...variants.filter((v) => v.kind !== 'title'), ...next]);
 
   // Resolve the match-value choices for the current driver field.
   // With multi-driver support, driverField is a comma-separated list; return the
@@ -306,7 +300,7 @@ export function BlockEditor({
         {isVariantMode && !isLayoutOnly && !!config.useTitleVariants && (
           <TitleVariantEditor
             variants={titleVariants}
-            onChange={handleTitleVariantsChange}
+            onChange={onTitleVariantsChange}
             driverField={driverField}
             matchOptions={matchOptions}
             defaultOpen
@@ -408,8 +402,8 @@ CONSTANT → intro paragraphs and closing (no number)`}
           <>
             <VariantEditor
               ref={variantEditorRef}
-              variants={bodyVariants}
-              onChange={handleBodyVariantsChange}
+              variants={variants}
+              onChange={onVariantsChange}
               driverField={driverField}
               matchOptions={matchOptions}
               productTypeOptionsMap={productTypeOptionsMap}

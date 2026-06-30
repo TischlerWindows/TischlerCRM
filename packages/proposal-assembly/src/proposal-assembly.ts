@@ -3,6 +3,7 @@ import {
   evaluatePresetDecision,
   getUnsupportedConditionFields,
   matchVariants,
+  matchValueMatchesContext,
   type QuoteContext,
   type SpecPresetData,
   type SummaryForConditions,
@@ -91,6 +92,49 @@ function sectionOf(preset: SpecPresetData): ProposalSection {
 function intValue(value: string | undefined | null): number {
   const parsed = parseInt(value || '0', 10);
   return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * A title variant stored in `config.titleVariants`. Maps one or more driver
+ * Match Values to a Title that replaces the static block title when the
+ * current context matches. Title variants are independent from body variants.
+ */
+interface ConfigTitleVariant {
+  matchValue: string;
+  matchLabel?: string | null;
+  title: string;
+}
+
+/**
+ * Choose the block's title from `config.titleVariants` when title-variant mode
+ * is on. The first title variant whose Match Value matches the context (across
+ * any of the block's driver fields) wins. Falls back to the static block title
+ * when title-variant mode is off, no variant matches, or the matched variant
+ * has a blank title.
+ */
+function resolveEffectiveTitle(params: {
+  useTitleVariants: boolean;
+  titleVariantsRaw: unknown;
+  driverFields: string[];
+  context: QuoteContext;
+  tokens: Record<string, string>;
+  fallback: string;
+}): string {
+  const { useTitleVariants, titleVariantsRaw, driverFields, context, tokens, fallback } = params;
+  if (!useTitleVariants || !Array.isArray(titleVariantsRaw) || driverFields.length === 0) {
+    return fallback;
+  }
+  for (const raw of titleVariantsRaw) {
+    if (!raw || typeof raw !== 'object') continue;
+    const tv = raw as Partial<ConfigTitleVariant>;
+    const title = typeof tv.title === 'string' ? tv.title.trim() : '';
+    const matchValue = typeof tv.matchValue === 'string' ? tv.matchValue : '';
+    if (!title || !matchValue) continue;
+    if (matchValueMatchesContext(matchValue, driverFields, context)) {
+      return resolveTokensWithDiagnostics(title, tokens).text || fallback;
+    }
+  }
+  return fallback;
 }
 
 function buildPdfData(
@@ -227,14 +271,6 @@ export function assembleProposal({
 
       const matched = preset.variants?.length ? matchVariants(preset, context) : [];
 
-      // Separate title-only variants (blank body, title set — from TitleVariantEditor)
-      // from body variants. Title-only variants drive the block title; body variants
-      // drive the block content. Keeping them mixed caused title variant spaces to
-      // bleed into merged bodies and the static block title to show through.
-      const useTitleVariants = !!configObj.useTitleVariants;
-      const bodyMatched = matched.filter((v) => !!v.body?.trim());
-      const titleMatched = matched.filter((v) => !v.body?.trim() && !!v.title?.trim());
-
       if (matched.length === 0 && !universalBodyRaw) {
         excludedBlocks.push({ ...block, reason: `No variant matched for driver "${preset.driverField}" and no universal text.` });
         continue;
@@ -263,39 +299,42 @@ export function assembleProposal({
       // Resolve {{tokens}} in the block title once — shared across all variant paths.
       const resolvedBlockTitle = resolveTokensWithDiagnostics(preset.title, tokens).text;
 
-      // When useTitleVariants is on, the first matching title-only variant
-      // provides the title. Fall back to the static block title when no
-      // title variant matches or when the matched variant has a blank title.
-      const effectiveTitle = useTitleVariants
-        ? (() => {
-            const tv = titleMatched[0];
-            if (!tv) return resolvedBlockTitle;
-            const tvTitle = resolveTokensWithDiagnostics(tv.title!.trim(), tokens).text;
-            return tvTitle || resolvedBlockTitle;
-          })()
-        : resolvedBlockTitle;
+      // Title variants are stored in config (config.titleVariants), independent
+      // from body variants. When useTitleVariants is on, the block title is
+      // chosen by matching the current context against each title variant's
+      // Match Value; otherwise the static block title is used.
+      const useTitleVariants = !!configObj.useTitleVariants;
+      const driverFields = preset.driverField.split(',').map((f) => f.trim()).filter(Boolean);
+      const effectiveTitle = resolveEffectiveTitle({
+        useTitleVariants,
+        titleVariantsRaw: configObj.titleVariants,
+        driverFields,
+        context,
+        tokens,
+        fallback: resolvedBlockTitle,
+      });
 
-      if (bodyMatched.length === 0 && universalText) {
+      if (matched.length === 0 && universalText) {
         const resolvedPreset = { ...preset, title: effectiveTitle, body: universalText };
         sections[sectionOf(preset)].push(resolvedPreset);
         orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
         includedBlocks.push({ ...block, reason: 'No variant matched; universal text rendered.' });
-      } else if (mergeVariants && bodyMatched.length > 1) {
-        // Merge all matched body-variant bodies into one block, then attach universal text.
-        const mergedBody = bodyMatched
+      } else if (mergeVariants && matched.length > 1) {
+        // Merge all matched variant bodies into one block, then attach universal text.
+        const mergedBody = matched
           .map((v) => resolveTokensWithDiagnostics(v.body, tokens).text)
           .join('<br/><br/>');
         const resolvedPreset = { ...preset, title: effectiveTitle, body: withUniversal(mergedBody) };
         sections[sectionOf(preset)].push(resolvedPreset);
         orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
-        includedBlocks.push({ ...block, reason: `${bodyMatched.length} variant(s) matched (merged).` });
+        includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched (merged).` });
       } else {
-        for (const variant of bodyMatched) {
-          // If the variant body is blank (title-only variant), fall back to the block body.
+        for (const variant of matched) {
+          // If the variant body is blank, fall back to the block body.
           const variantBodySource = variant.body?.trim() ? variant.body : (preset.body || '');
           const resolved = resolveTokensWithDiagnostics(variantBodySource, tokens);
           // Per-body-variant title (set via VariantEditor title field) overrides the
-          // effective title when useTitleVariants is off. When on, effectiveTitle wins.
+          // effective title when useTitleVariants is off. When on, title variants win.
           const rawVariantTitle = useTitleVariants ? null : (variant.title?.trim() || null);
           const variantTitle = rawVariantTitle
             ? resolveTokensWithDiagnostics(rawVariantTitle, tokens).text
@@ -316,7 +355,7 @@ export function assembleProposal({
             warnings.push(`${preset.title} (variant ${variant.matchValue}): unresolved token {{${token}}}.`);
           }
         }
-        includedBlocks.push({ ...block, reason: `${bodyMatched.length} variant(s) matched.` });
+        includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched.` });
       }
     } else {
       // Layout blocks (PRICING_TABLE, LETTERHEAD, PAGE_BREAK, etc.)

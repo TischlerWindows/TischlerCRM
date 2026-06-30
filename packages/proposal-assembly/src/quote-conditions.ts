@@ -618,6 +618,88 @@ export function assemblePresets(
  * filter checked against context.hardwareOptions (flattened productTypeOptions).
  * If an option filter is present, ALL checks must pass for the variant to match.
  */
+/**
+ * Test whether a single encoded `matchValue` string matches the given context
+ * across ANY of the supplied driver fields.
+ *
+ * `matchValue` encoding: a newline- (new) or comma- (legacy) separated list of
+ * values to match the driver against, optionally followed by `||` and a second
+ * list that further filters against `hardwareOptions`.
+ *
+ * Shared by body-variant matching (`matchVariants`) and title-variant matching
+ * (assembly `effectiveTitle`) so both use identical semantics.
+ */
+export function matchValueMatchesContext(
+  matchValue: string,
+  driverFields: string[],
+  context: QuoteContext
+): boolean {
+  if (!matchValue || driverFields.length === 0) return false;
+
+  // Split matchValue on newline (new format) or comma (legacy format).
+  // Newline is used as separator because option names (e.g. glass types)
+  // can contain commas, which would fragment them if split on comma.
+  const sep = matchValue.includes('\n') ? '\n' : ',';
+  const pipeIdx = matchValue.indexOf('||');
+  const typeMatchStr = pipeIdx === -1 ? matchValue : matchValue.slice(0, pipeIdx);
+  const optionFilterStr = pipeIdx === -1 ? '' : matchValue.slice(pipeIdx + 2);
+
+  const matchParts = typeMatchStr
+    .split(sep)
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean);
+  if (matchParts.length === 0) return false;
+
+  // Use exact-or-prefix matching, NOT substring matching.
+  // Substring caused false positives: matchValue "8" would match glassType
+  // "28 DC Standard..." because "28..." contains "8". Prefix matching ensures
+  // "8" only matches "8 Bullet Resistant..." (starts with "8 " / "8." / etc.).
+  const typeValueMatch = (contextItem: string, matchPart: string): boolean => {
+    const v = contextItem.toLowerCase().trim();
+    if (v === matchPart) return true;
+    // Prefix matching: "8" matches "8 Bullet Resistant..." but NOT "28 DC..." or "7.1 ...".
+    // Exclude "." from the allowed trailing chars so that short code "7" does NOT
+    // ghost-match sub-variants "7.1" or "7.2" (the decimal IS part of the numeric code).
+    const afterMatch = v.slice(matchPart.length);
+    return v.startsWith(matchPart) && (afterMatch === '' || /^[\s,;-]/.test(afterMatch));
+  };
+
+  // Matches if ANY of the configured driver fields produces a match.
+  let typeMatch = false;
+  for (const driverField of driverFields) {
+    const driverValue = (context as unknown as Record<string, unknown>)[driverField];
+    if (driverValue === undefined || driverValue === null) continue;
+    if (Array.isArray(driverValue)) {
+      if (matchParts.some((match) => driverValue.some((item) => typeValueMatch(String(item), match)))) {
+        typeMatch = true;
+        break;
+      }
+    } else {
+      if (matchParts.some((match) => typeValueMatch(String(driverValue), match))) {
+        typeMatch = true;
+        break;
+      }
+    }
+  }
+  if (!typeMatch) return false;
+
+  // If an option filter is encoded, also check against hardwareOptions.
+  if (optionFilterStr) {
+    const optSep = optionFilterStr.includes('\n') ? '\n' : ',';
+    const optionParts = optionFilterStr
+      .split(optSep)
+      .map((p) => p.trim().toLowerCase())
+      .filter(Boolean);
+    if (optionParts.length > 0) {
+      const hwLower = context.hardwareOptions.map((o) => o.toLowerCase());
+      const optionMatch = optionParts.some((opt) => hwLower.some((hw) => typeValueMatch(hw, opt)));
+      if (!optionMatch) return false;
+    }
+  }
+
+  return true;
+}
+
 export function matchVariants(
   preset: SpecPresetData,
   context: QuoteContext
@@ -631,71 +713,9 @@ export function matchVariants(
     .filter((v) => v.isActive)
     .sort((a, b) => a.order - b.order);
 
-  return activeVariants.filter((variant) => {
-    // Split matchValue on newline (new format) or comma (legacy format).
-    // Newline is used as separator because option names (e.g. glass types)
-    // can contain commas, which would fragment them if split on comma.
-    const sep = variant.matchValue.includes('\n') ? '\n' : ',';
-    const pipeIdx = variant.matchValue.indexOf('||');
-    const typeMatchStr = pipeIdx === -1 ? variant.matchValue : variant.matchValue.slice(0, pipeIdx);
-    const optionFilterStr = pipeIdx === -1 ? '' : variant.matchValue.slice(pipeIdx + 2);
-
-    const matchParts = typeMatchStr
-      .split(sep)
-      .map((p) => p.trim().toLowerCase())
-      .filter(Boolean);
-    if (matchParts.length === 0) return false;
-
-    // Check the driver field value.
-    // Use exact-or-prefix matching, NOT substring matching.
-    // Substring caused false positives: matchValue "8" would match glassType
-    // "28 DC Standard..." because "28..." contains "8". Prefix matching ensures
-    // "8" only matches "8 Bullet Resistant..." (starts with "8 " / "8." / etc.).
-    const typeValueMatch = (contextItem: string, matchPart: string): boolean => {
-      const v = contextItem.toLowerCase().trim();
-      if (v === matchPart) return true;
-      // Prefix matching: "8" matches "8 Bullet Resistant..." but NOT "28 DC..." or "7.1 ...".
-      // Exclude "." from the allowed trailing chars so that short code "7" does NOT
-      // ghost-match sub-variants "7.1" or "7.2" (the decimal IS part of the numeric code).
-      const afterMatch = v.slice(matchPart.length);
-      return v.startsWith(matchPart) && (afterMatch === '' || /^[\s,;-]/.test(afterMatch));
-    };
-
-    // A variant matches if ANY of the configured driver fields produces a match.
-    let typeMatch = false;
-    for (const driverField of driverFields) {
-      const driverValue = (context as unknown as Record<string, unknown>)[driverField];
-      if (driverValue === undefined || driverValue === null) continue;
-      if (Array.isArray(driverValue)) {
-        if (matchParts.some((match) => driverValue.some((item) => typeValueMatch(String(item), match)))) {
-          typeMatch = true;
-          break;
-        }
-      } else {
-        if (matchParts.some((match) => typeValueMatch(String(driverValue), match))) {
-          typeMatch = true;
-          break;
-        }
-      }
-    }
-    if (!typeMatch) return false;
-
-    // If an option filter is encoded, also check against hardwareOptions.
-    if (optionFilterStr) {
-      const optSep = optionFilterStr.includes('\n') ? '\n' : ',';
-      const optionParts = optionFilterStr
-        .split(optSep)
-        .map((p) => p.trim().toLowerCase())
-        .filter(Boolean);
-      if (optionParts.length > 0) {
-        const hwLower = context.hardwareOptions.map((o) => o.toLowerCase());
-        const optionMatch = optionParts.some((opt) => hwLower.some((hw) => typeValueMatch(hw, opt)));
-        if (!optionMatch) return false;
-      }
-    }
-
-    return true;
-  });
+  return activeVariants.filter((variant) =>
+    matchValueMatchesContext(variant.matchValue, driverFields, context)
+  );
 }
 
 export function assemblePresetsBySection(
