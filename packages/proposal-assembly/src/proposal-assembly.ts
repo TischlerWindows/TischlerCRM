@@ -226,6 +226,15 @@ export function assembleProposal({
       const universalBodyPosition = configObj.universalBodyPosition === 'before' ? 'before' : 'after';
 
       const matched = preset.variants?.length ? matchVariants(preset, context) : [];
+
+      // Separate title-only variants (blank body, title set — from TitleVariantEditor)
+      // from body variants. Title-only variants drive the block title; body variants
+      // drive the block content. Keeping them mixed caused title variant spaces to
+      // bleed into merged bodies and the static block title to show through.
+      const useTitleVariants = !!configObj.useTitleVariants;
+      const bodyMatched = matched.filter((v) => !!v.body?.trim());
+      const titleMatched = matched.filter((v) => !v.body?.trim() && !!v.title?.trim());
+
       if (matched.length === 0 && !universalBodyRaw) {
         excludedBlocks.push({ ...block, reason: `No variant matched for driver "${preset.driverField}" and no universal text.` });
         continue;
@@ -251,38 +260,49 @@ export function assembleProposal({
           : `${variantBody}<br/><br/>${universalText}`;
       };
 
-      // No variants matched — render universal text alone.
       // Resolve {{tokens}} in the block title once — shared across all variant paths.
       const resolvedBlockTitle = resolveTokensWithDiagnostics(preset.title, tokens).text;
 
-      if (matched.length === 0 && universalText) {
-        const resolvedPreset = { ...preset, title: resolvedBlockTitle, body: universalText };
+      // When useTitleVariants is on, the static block title is suppressed.
+      // The first matching title-only variant provides the title instead.
+      // If none matched, the title is blank (user chose variant-only titles).
+      const effectiveTitle = useTitleVariants
+        ? (() => {
+            const tv = titleMatched[0];
+            return tv
+              ? resolveTokensWithDiagnostics(tv.title!.trim(), tokens).text
+              : '';
+          })()
+        : resolvedBlockTitle;
+
+      if (bodyMatched.length === 0 && universalText) {
+        const resolvedPreset = { ...preset, title: effectiveTitle, body: universalText };
         sections[sectionOf(preset)].push(resolvedPreset);
         orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
         includedBlocks.push({ ...block, reason: 'No variant matched; universal text rendered.' });
-      } else if (mergeVariants && matched.length > 1) {
-        // Merge all matched variant bodies into one block, then attach universal text.
-        const mergedBody = matched
+      } else if (mergeVariants && bodyMatched.length > 1) {
+        // Merge all matched body-variant bodies into one block, then attach universal text.
+        const mergedBody = bodyMatched
           .map((v) => resolveTokensWithDiagnostics(v.body, tokens).text)
           .join('<br/><br/>');
-        const resolvedPreset = { ...preset, title: resolvedBlockTitle, body: withUniversal(mergedBody) };
+        const resolvedPreset = { ...preset, title: effectiveTitle, body: withUniversal(mergedBody) };
         sections[sectionOf(preset)].push(resolvedPreset);
         orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
-        includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched (merged).` });
+        includedBlocks.push({ ...block, reason: `${bodyMatched.length} variant(s) matched (merged).` });
       } else {
-        for (const variant of matched) {
+        for (const variant of bodyMatched) {
           // If the variant body is blank (title-only variant), fall back to the block body.
           const variantBodySource = variant.body?.trim() ? variant.body : (preset.body || '');
           const resolved = resolveTokensWithDiagnostics(variantBodySource, tokens);
-          // If the variant has its own title, use it (with token resolution); otherwise
-          // fall back to the block title which already had tokens resolved above.
-          const rawVariantTitle = variant.title?.trim() || null;
+          // Per-body-variant title (set via VariantEditor title field) overrides the
+          // effective title when useTitleVariants is off. When on, effectiveTitle wins.
+          const rawVariantTitle = useTitleVariants ? null : (variant.title?.trim() || null);
           const variantTitle = rawVariantTitle
             ? resolveTokensWithDiagnostics(rawVariantTitle, tokens).text
             : null;
           const resolvedPreset = {
             ...preset,
-            title: variantTitle ?? resolvedBlockTitle,
+            title: variantTitle ?? effectiveTitle,
             body: withUniversal(resolved.text),
           };
           sections[sectionOf(preset)].push(resolvedPreset);
@@ -296,7 +316,7 @@ export function assembleProposal({
             warnings.push(`${preset.title} (variant ${variant.matchValue}): unresolved token {{${token}}}.`);
           }
         }
-        includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched.` });
+        includedBlocks.push({ ...block, reason: `${bodyMatched.length} variant(s) matched.` });
       }
     } else {
       // Layout blocks (PRICING_TABLE, LETTERHEAD, PAGE_BREAK, etc.)
