@@ -264,15 +264,14 @@ export function assembleProposal({
       const resolvedBlockTitle = resolveTokensWithDiagnostics(preset.title, tokens).text;
 
       // When useTitleVariants is on, the first matching title-only variant
-      // provides the title. If none matched, fall back to the static block
-      // title rather than leaving the title blank — so the block always has
-      // a visible heading even when no title variant applies to this context.
+      // provides the title. Fall back to the static block title when no
+      // title variant matches or when the matched variant has a blank title.
       const effectiveTitle = useTitleVariants
         ? (() => {
             const tv = titleMatched[0];
-            return tv
-              ? resolveTokensWithDiagnostics(tv.title!.trim(), tokens).text
-              : resolvedBlockTitle;
+            if (!tv) return resolvedBlockTitle;
+            const tvTitle = resolveTokensWithDiagnostics(tv.title!.trim(), tokens).text;
+            return tvTitle || resolvedBlockTitle;
           })()
         : resolvedBlockTitle;
 
