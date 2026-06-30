@@ -49,7 +49,8 @@ const variantSchema = z.object({
   matchValue: z.string().min(1),
   matchLabel: z.string().nullable().optional(),
   title: z.string().nullable().optional(),
-  body: z.string().min(1),
+  // body is empty string for title-only variants (they use the block's body)
+  body: z.string(),
   order: z.number().int().min(0),
   isActive: z.boolean().optional(),
 });
