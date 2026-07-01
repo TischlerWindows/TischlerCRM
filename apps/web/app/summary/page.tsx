@@ -190,6 +190,63 @@ const CellNavContext = createContext<CellNavCtx>({
   setPendingInput: () => {},
 });
 
+// Finds the data-cell-id of the table cell adjacent to `td` in the given direction.
+// 'right' wraps to the first cell of the next row when at the end of a row.
+const findAdjacentCellId = (
+  td: Element,
+  direction: 'left' | 'right' | 'up' | 'down'
+): string | null => {
+  const tr = td.closest('tr');
+  const tbody = tr?.closest('tbody');
+  if (!tr || !tbody) return null;
+  const rows = Array.from(tbody.querySelectorAll(':scope > tr'));
+  const cells = Array.from(tr.querySelectorAll(':scope > td'));
+  const rowIdx = rows.indexOf(tr as HTMLTableRowElement);
+  const colIdx = cells.indexOf(td as HTMLTableCellElement);
+  const cellIdOf = (el: Element | undefined) => el?.querySelector('[data-cell-id]')?.getAttribute('data-cell-id') ?? null;
+
+  if (direction === 'right') {
+    for (let c = colIdx + 1; c < cells.length; c++) {
+      const id = cellIdOf(cells[c]);
+      if (id) return id;
+    }
+    if (rowIdx + 1 < rows.length) {
+      const nextCells = Array.from((rows[rowIdx + 1] as Element).querySelectorAll(':scope > td'));
+      for (const tc of nextCells) {
+        const id = cellIdOf(tc);
+        if (id) return id;
+      }
+    }
+    return null;
+  }
+  if (direction === 'left') {
+    for (let c = colIdx - 1; c >= 0; c--) {
+      const id = cellIdOf(cells[c]);
+      if (id) return id;
+    }
+    return null;
+  }
+  if (direction === 'down') {
+    for (let r = rowIdx + 1; r < rows.length; r++) {
+      const targetCells = Array.from((rows[r] as Element).querySelectorAll(':scope > td'));
+      if (colIdx < targetCells.length) {
+        const id = cellIdOf(targetCells[colIdx]);
+        if (id) return id;
+      }
+    }
+    return null;
+  }
+  // up
+  for (let r = rowIdx - 1; r >= 0; r--) {
+    const targetCells = Array.from((rows[r] as Element).querySelectorAll(':scope > td'));
+    if (colIdx < targetCells.length) {
+      const id = cellIdOf(targetCells[colIdx]);
+      if (id) return id;
+    }
+  }
+  return null;
+};
+
 // Searchable dropdown cell component for Type columns
 const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue }: { 
   rowId: string; 
@@ -314,6 +371,49 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue 
       if (e.key === 'Escape') {
         e.preventDefault();
         setEditing(null);
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const td = e.currentTarget.closest('td');
+        setEditing(null);
+        const id = td && findAdjacentCellId(td, 'right');
+        if (id) { setActive(id); setEditing(id); }
+        return;
+      }
+      const textarea = e.currentTarget;
+      const atEnd = textarea.selectionStart === textarea.value.length && textarea.selectionEnd === textarea.value.length;
+      const atStart = textarea.selectionStart === 0 && textarea.selectionEnd === 0;
+      if (e.key === 'ArrowRight' && atEnd) {
+        e.preventDefault();
+        const td = e.currentTarget.closest('td');
+        setEditing(null);
+        const id = td && findAdjacentCellId(td, 'right');
+        if (id) { setActive(id); setEditing(id); }
+        return;
+      }
+      if (e.key === 'ArrowLeft' && atStart) {
+        e.preventDefault();
+        const td = e.currentTarget.closest('td');
+        setEditing(null);
+        const id = td && findAdjacentCellId(td, 'left');
+        if (id) { setActive(id); setEditing(id); }
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const td = e.currentTarget.closest('td');
+        setEditing(null);
+        const id = td && findAdjacentCellId(td, 'down');
+        if (id) { setActive(id); setEditing(id); }
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const td = e.currentTarget.closest('td');
+        setEditing(null);
+        const id = td && findAdjacentCellId(td, 'up');
+        if (id) { setActive(id); setEditing(id); }
         return;
       }
       return;
@@ -473,6 +573,50 @@ const CellInput = ({ rowId, field, value, onChange }: {
       return;
     }
 
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const td = e.currentTarget.closest('td');
+      setEditing(null);
+      const id = td && findAdjacentCellId(td, 'right');
+      if (id) { setActive(id); setEditing(id); }
+      return;
+    }
+
+    const textarea = e.currentTarget;
+    const atEnd = textarea.selectionStart === textarea.value.length && textarea.selectionEnd === textarea.value.length;
+    const atStart = textarea.selectionStart === 0 && textarea.selectionEnd === 0;
+    if (e.key === 'ArrowRight' && atEnd) {
+      e.preventDefault();
+      const td = e.currentTarget.closest('td');
+      setEditing(null);
+      const id = td && findAdjacentCellId(td, 'right');
+      if (id) { setActive(id); setEditing(id); }
+      return;
+    }
+    if (e.key === 'ArrowLeft' && atStart) {
+      e.preventDefault();
+      const td = e.currentTarget.closest('td');
+      setEditing(null);
+      const id = td && findAdjacentCellId(td, 'left');
+      if (id) { setActive(id); setEditing(id); }
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const td = e.currentTarget.closest('td');
+      setEditing(null);
+      const id = td && findAdjacentCellId(td, 'down');
+      if (id) { setActive(id); setEditing(id); }
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const td = e.currentTarget.closest('td');
+      setEditing(null);
+      const id = td && findAdjacentCellId(td, 'up');
+      if (id) { setActive(id); setEditing(id); }
+      return;
+    }
   };
 
   if (!isEditing) {
@@ -755,59 +899,20 @@ export default function SummaryPage() {
   const getOppPicklist = (apiName: string): string[] =>
     oppFields.find(f => f.apiName === apiName)?.picklistValues ?? [];
 
-  // Arrow-key navigation when a cell is selected but not in edit mode
+  // Arrow-key/Tab navigation when a cell is selected but not in edit mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!activeCellId || editingCellId) return;
       const dir = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down'
-        : e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : null;
+        : e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right'
+        : e.key === 'Tab' ? 'right' : null;
       if (dir) {
         e.preventDefault();
         const el = document.querySelector(`[data-cell-id="${activeCellId}"]`);
-        if (!el) return;
-        const td = el.closest('td');
-        const tr = td?.closest('tr');
-        const tbody = tr?.closest('tbody');
-        if (!td || !tr || !tbody) return;
-        const rows = Array.from(tbody.querySelectorAll(':scope > tr'));
-        const cells = Array.from(tr.querySelectorAll(':scope > td'));
-        const rowIdx = rows.indexOf(tr as HTMLTableRowElement);
-        const colIdx = cells.indexOf(td as HTMLTableCellElement);
-        if (dir === 'right') {
-          for (let c = colIdx + 1; c < cells.length; c++) {
-            const cId = (cells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
-            if (cId) { setActiveCellId(cId); return; }
-          }
-          // End of row: wrap to first cell of next row
-          if (rowIdx + 1 < rows.length) {
-            const nextCells = Array.from((rows[rowIdx + 1] as Element).querySelectorAll(':scope > td'));
-            for (const tc of nextCells) {
-              const cId = (tc as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
-              if (cId) { setActiveCellId(cId); return; }
-            }
-          }
-        } else if (dir === 'left') {
-          for (let c = colIdx - 1; c >= 0; c--) {
-            const cId = (cells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
-            if (cId) { setActiveCellId(cId); return; }
-          }
-        } else if (dir === 'down') {
-          for (let r = rowIdx + 1; r < rows.length; r++) {
-            const targetCells = Array.from((rows[r] as Element).querySelectorAll(':scope > td'));
-            if (colIdx < targetCells.length) {
-              const cId = (targetCells[colIdx] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
-              if (cId) { setActiveCellId(cId); return; }
-            }
-          }
-        } else if (dir === 'up') {
-          for (let r = rowIdx - 1; r >= 0; r--) {
-            const targetCells = Array.from((rows[r] as Element).querySelectorAll(':scope > td'));
-            if (colIdx < targetCells.length) {
-              const cId = (targetCells[colIdx] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
-              if (cId) { setActiveCellId(cId); return; }
-            }
-          }
-        }
+        const td = el?.closest('td');
+        if (!td) return;
+        const cId = findAdjacentCellId(td, dir);
+        if (cId) setActiveCellId(cId);
       } else if (e.key === 'Enter' || e.key === 'F2') {
         e.preventDefault();
         setEditingCellId(activeCellId);
