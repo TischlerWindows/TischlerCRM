@@ -662,7 +662,8 @@ interface Summary {
     magneticContact: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     splitFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     integratedContacts: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
-    poolContacts: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    poolContacts: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    rollScreens: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     shadeBoxes: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     geniusLock: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     customRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }>;
@@ -1299,7 +1300,8 @@ export default function SummaryPage() {
         magneticContact: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         splitFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         integratedContacts: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
-        poolContacts: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        poolContacts: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        rollScreens: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         shadeBoxes: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         geniusLock: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         customRows: [],
@@ -2188,7 +2190,8 @@ export default function SummaryPage() {
       ['Magnetic Contact', aoV('magneticContact', 'qty'), '—', aoFmtNet('magneticContact'), aoFmt('magneticContact', 'full'), aoFmt('magneticContact', 'pct'), aoFmt('magneticContact', 'final'), ...aoCalc('magneticContact')],
       ['Split Finish', '—', '—', aoFmtNet('splitFinish'), aoFmt('splitFinish', 'full'), aoFmt('splitFinish', 'pct'), aoFmt('splitFinish', 'final'), ...aoCalc('splitFinish')],
       ['Integrated Contacts', aoV('integratedContacts', 'qty'), '—', aoFmtNet('integratedContacts'), aoFmt('integratedContacts', 'full'), aoFmt('integratedContacts', 'pct'), aoFmt('integratedContacts', 'final'), ...aoCalc('integratedContacts')],
-      ['Pool Contacts', '—', '—', aoFmtNet('poolContacts'), aoFmt('poolContacts', 'full'), aoFmt('poolContacts', 'pct'), aoFmt('poolContacts', 'final'), ...aoCalc('poolContacts')],
+      ['Pool Contacts', aoV('poolContacts', 'qty'), '—', aoFmtNet('poolContacts'), aoFmt('poolContacts', 'full'), aoFmt('poolContacts', 'pct'), aoFmt('poolContacts', 'final'), ...aoCalc('poolContacts')],
+      ['Roll Screens', aoV('rollScreens', 'qty'), '—', aoFmtNet('rollScreens'), aoFmt('rollScreens', 'full'), aoFmt('rollScreens', 'pct'), aoFmt('rollScreens', 'final'), ...aoCalc('rollScreens')],
       ['Shade Boxes', '—', '—', aoFmtNet('shadeBoxes'), aoFmt('shadeBoxes', 'full'), aoFmt('shadeBoxes', 'pct'), aoFmt('shadeBoxes', 'final'), ...aoCalc('shadeBoxes')],
       ['Genius Lock', aoV('geniusLock', 'qty'), '—', aoFmtNet('geniusLock'), aoFmt('geniusLock', 'full'), aoFmt('geniusLock', 'pct'), aoFmt('geniusLock', 'final'), ...aoCalc('geniusLock')],
       ['Final Finish', '—', '—', aoFmtNet('finalFinish'), aoFmt('finalFinish', 'full'), aoFmt('finalFinish', 'pct'), aoFmt('finalFinish', 'final'), ...aoCalc('finalFinish')],
@@ -2199,7 +2202,7 @@ export default function SummaryPage() {
       }),
       ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
     ].filter(row => [row[3], row[4], row[5], row[6]].some(v => v !== '—'));
-    const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
+    const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'rollScreens', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
     y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors });
@@ -4870,7 +4873,7 @@ export default function SummaryPage() {
                         const ao = editingSummary.addOns || {} as any;
                         const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
                         const getAo = (key: string) => ({ ...defaultAo, ...(ao as any)[key] });
-                        const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
+                        const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'rollScreens', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
                         const customRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }> = (ao.customRows || []) as any;
                         const addCustomRow = () => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: [...customRows, { item: '', qty: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' }] } });
                         const removeCustomRow = (idx: number) => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: customRows.filter((_, i) => i !== idx) } });
@@ -4906,6 +4909,7 @@ export default function SummaryPage() {
                               splitFinish: ao.splitFinish || defaultAo,
                               integratedContacts: ao.integratedContacts || defaultAo,
                               poolContacts: ao.poolContacts || defaultAo,
+                              rollScreens: ao.rollScreens || defaultAo,
                               shadeBoxes: ao.shadeBoxes || defaultAo,
                               geniusLock: ao.geniusLock || defaultAo,
                               customRows: ao.customRows || [],
@@ -5113,7 +5117,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('poolContacts')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Pool Contacts</td>
-                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1">{inp('poolContacts', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('poolContacts', 'netEuro')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('poolContacts', 'full')}</td>
@@ -5123,6 +5127,24 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('poolContacts', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('poolContacts', 'disc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('poolContacts', 'final')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  )}
+                                  {/* Roll Screens */}
+                                  {!hiddenAoRows.has('rollScreens') && (
+                                  <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('rollScreens')}
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Roll Screens</td>
+                                    <td className="px-1 py-1">{inp('rollScreens', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('rollScreens', 'netEuro')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('rollScreens', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('rollScreens', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('rollScreens', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('rollScreens', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('rollScreens', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('rollScreens', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   )}
@@ -5290,7 +5312,7 @@ export default function SummaryPage() {
                                   })()}
                                   {/* Minimized rows — grouped at bottom */}
                                   {(() => {
-                                    const aoLabels: Record<string, string> = { windowScreens: 'Window Screens', doorScreenSash: 'Door Screen Sash', entryDoor: 'Entry Door', jambExtensions: 'Jamb Extensions', magneticContact: 'Magnetic Contact', splitFinish: 'Split Finish', integratedContacts: 'Integrated Contacts', poolContacts: 'Pool Contacts', shadeBoxes: 'Shade Boxes', geniusLock: 'Genius Lock', finalFinish: 'Final Finish', installation: 'Installation' };
+                                    const aoLabels: Record<string, string> = { windowScreens: 'Window Screens', doorScreenSash: 'Door Screen Sash', entryDoor: 'Entry Door', jambExtensions: 'Jamb Extensions', magneticContact: 'Magnetic Contact', splitFinish: 'Split Finish', integratedContacts: 'Integrated Contacts', poolContacts: 'Pool Contacts', rollScreens: 'Roll Screens', shadeBoxes: 'Shade Boxes', geniusLock: 'Genius Lock', finalFinish: 'Final Finish', installation: 'Installation' };
                                     return aoKeys.filter(k => hiddenAoRows.has(k)).map(k => (
                                       <tr key={k} className="hover:bg-gray-50 border-t border-dashed border-gray-200">
                                         {aoToggleBtn(k)}
