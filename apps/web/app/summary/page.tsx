@@ -5320,6 +5320,29 @@ export default function SummaryPage() {
                                       </tr>
                                     ));
                                   })()}
+                                  {/* Add-On Items TOTAL */}
+                                  {(() => {
+                                    const installationRowsTotal = ((ao.installation?.installationRows || []) as Array<{ price: string }>).reduce((s: number, r: { price: string }) => s + (parseFloat((r.price || '').replace(/[^0-9.-]/g, '')) || 0), 0);
+                                    const aoFullTotal = aoKeys.reduce((s, k) => s + (parseFloat(getAo(k).full) || 0), 0) + customRows.reduce((s, cr) => s + (parseFloat(cr.full) || 0), 0);
+                                    const aoFinalTotal = aoKeys.reduce((s, k) => s + (parseFloat(getAo(k).final) || 0), 0) + installationRowsTotal + customRows.reduce((s, cr) => s + (parseFloat(cr.final) || 0), 0);
+                                    return (
+                                      <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                                        <td className="sticky left-0 z-10 bg-gray-50"></td>
+                                        <td className="px-3 py-3 text-gray-900 sticky left-[24px] z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap">TOTAL</td>
+                                        <td className="px-2 py-3"></td>
+                                        <td className="px-2 py-3" colSpan={2}></td>
+                                        <td className="px-2 py-3"></td>
+                                        <td className="px-2 py-3 text-right text-blue-700 bg-blue-50/60">{aoFullTotal ? '$' + fmtAo(aoFullTotal) : '—'}</td>
+                                        <td className="px-2 py-3 bg-blue-50/60"></td>
+                                        <td className="px-2 py-3 text-right text-green-700 bg-green-50/60">{aoFinalTotal ? '$' + fmtAo(aoFinalTotal) : '—'}</td>
+                                        <td className="px-2 py-3"></td>
+                                        <td className="px-2 py-3 border-l-4 border-blue-300 bg-blue-50/60"></td>
+                                        <td className="px-2 py-3 bg-blue-50/60"></td>
+                                        <td className="px-2 py-3 bg-green-50/60"></td>
+                                        <td className="px-2 py-3 bg-purple-50/60"></td>
+                                      </tr>
+                                    );
+                                  })()}
                                   {/* Add Custom Row button */}
                                   <tr>
                                     <td colSpan={14} className="px-4 py-2 border-t border-gray-200">
