@@ -801,7 +801,7 @@ interface Summary {
   addOns: {
     windowScreens: { qty: string; frameType: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     doorScreenSash: { qty: string; woodFrame: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
-    entryDoor: { qty: string; style: string; color: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    entryDoor: { qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     jambExtensions: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     magneticContact: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     splitFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
@@ -1401,7 +1401,7 @@ export default function SummaryPage() {
       addOns: {
         windowScreens: { qty: '', frameType: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         doorScreenSash: { qty: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
-        entryDoor: { qty: '', style: '', color: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        entryDoor: { qty: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         jambExtensions: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         magneticContact: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         splitFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
@@ -2292,7 +2292,7 @@ export default function SummaryPage() {
     const aoRows = [
       ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoFmtNet('windowScreens'), aoFmt('windowScreens', 'full'), aoFmt('windowScreens', 'pct'), aoFmt('windowScreens', 'final'), ...aoCalc('windowScreens')],
       ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoFmtNet('doorScreenSash'), aoFmt('doorScreenSash', 'full'), aoFmt('doorScreenSash', 'pct'), aoFmt('doorScreenSash', 'final'), ...aoCalc('doorScreenSash')],
-      ['Entry Door', aoV('entryDoor', 'qty'), `Style: ${aoV('entryDoor', 'style')} | Color: ${aoV('entryDoor', 'color')}`, aoFmtNet('entryDoor'), aoFmt('entryDoor', 'full'), aoFmt('entryDoor', 'pct'), aoFmt('entryDoor', 'final'), ...aoCalc('entryDoor')],
+      ['Entry Door', aoV('entryDoor', 'qty'), aoV('entryDoor', 'details'), aoFmtNet('entryDoor'), aoFmt('entryDoor', 'full'), aoFmt('entryDoor', 'pct'), aoFmt('entryDoor', 'final'), ...aoCalc('entryDoor')],
       ['Jamb Extensions', '—', '—', aoFmtNet('jambExtensions'), aoFmt('jambExtensions', 'full'), aoFmt('jambExtensions', 'pct'), aoFmt('jambExtensions', 'final'), ...aoCalc('jambExtensions')],
       ['Magnetic Contact', aoV('magneticContact', 'qty'), '—', aoFmtNet('magneticContact'), aoFmt('magneticContact', 'full'), aoFmt('magneticContact', 'pct'), aoFmt('magneticContact', 'final'), ...aoCalc('magneticContact')],
       ['Split Finish', '—', '—', aoFmtNet('splitFinish'), aoFmt('splitFinish', 'full'), aoFmt('splitFinish', 'pct'), aoFmt('splitFinish', 'final'), ...aoCalc('splitFinish')],
@@ -4983,7 +4983,7 @@ export default function SummaryPage() {
                       {/* ── Add-On Items ── */}
                       {(() => {
                         const ao = editingSummary.addOns || {} as any;
-                        const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', style: '', color: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
+                        const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
                         const getAo = (key: string) => ({ ...defaultAo, ...(ao as any)[key] });
                         const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'rollScreens', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
                         const customRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }> = (ao.customRows || []) as any;
@@ -5144,8 +5144,7 @@ export default function SummaryPage() {
                                     {aoToggleBtn('entryDoor')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Entry Door</td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'qty', 'Qty')}</td>
-                                    <td className="px-1 py-1">{inpLeft('entryDoor', 'style', 'Style')}</td>
-                                    <td className="px-1 py-1">{inpLeft('entryDoor', 'color', 'Color')}</td>
+                                    <td className="px-1 py-1" colSpan={2}>{inpLeft('entryDoor', 'details', 'Details')}</td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'netEuro')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('entryDoor', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('entryDoor', 'pct')}</td>
