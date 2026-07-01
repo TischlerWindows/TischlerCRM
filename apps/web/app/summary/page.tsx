@@ -667,6 +667,7 @@ interface Summary {
     shadeBoxes: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     geniusLock: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     customRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }>;
+    deductRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }>;
     finalFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     installation: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string; installationRows?: Array<{ label: string; price: string }> };
   };
@@ -1305,6 +1306,7 @@ export default function SummaryPage() {
         shadeBoxes: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         geniusLock: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         customRows: [],
+        deductRows: [],
         finalFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '', installationRows: [] },
       },
@@ -2199,6 +2201,11 @@ export default function SummaryPage() {
         const net = pv(cr.netEuro);
         const r = (v: string | undefined) => (net && pv(v)) ? (pv(v) / net).toFixed(2) : '—';
         return [cr.item || 'Custom', cr.qty || '—', cr.details || '—', net ? '\u20ac' + fmtInt(net) : '—', fmtDollar(cr.full), fmtDollar(cr.pct), fmtDollar(cr.final), r(cr.full), r(cr.pct), r(cr.final)];
+      }),
+      ...(ao.deductRows || []).map((cr: any) => {
+        const net = pv(cr.netEuro);
+        const r = (v: string | undefined) => (net && pv(v)) ? (pv(v) / net).toFixed(2) : '—';
+        return ['(\u2212) ' + (cr.item || 'Deduct'), cr.qty || '—', cr.details || '—', net ? '\u20ac' + fmtInt(net) : '—', fmtDollar(cr.full) !== '\u2014' ? '('+fmtDollar(cr.full)+')' : '\u2014', fmtDollar(cr.pct) !== '\u2014' ? '('+fmtDollar(cr.pct)+')' : '\u2014', fmtDollar(cr.final) !== '\u2014' ? '('+fmtDollar(cr.final)+')' : '\u2014', r(cr.full), r(cr.pct), r(cr.final)];
       }),
       ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
     ].filter(row => [row[3], row[4], row[5], row[6]].some(v => v !== '—'));
@@ -4878,6 +4885,10 @@ export default function SummaryPage() {
                         const addCustomRow = () => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: [...customRows, { item: '', qty: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' }] } });
                         const removeCustomRow = (idx: number) => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: customRows.filter((_, i) => i !== idx) } });
                         const setCustomRow = (idx: number, field: string, value: string) => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: customRows.map((r, i) => i === idx ? { ...r, [field]: value } : r) } });
+                        const deductRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }> = (ao.deductRows || []) as any;
+                        const addDeductRow = () => setEditingSummary({ ...editingSummary, addOns: { ...ao, deductRows: [...deductRows, { item: '', qty: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' }] } });
+                        const removeDeductRow = (idx: number) => setEditingSummary({ ...editingSummary, addOns: { ...ao, deductRows: deductRows.filter((_, i) => i !== idx) } });
+                        const setDeductRow = (idx: number, field: string, value: string) => setEditingSummary({ ...editingSummary, addOns: { ...ao, deductRows: deductRows.map((r, i) => i === idx ? { ...r, [field]: value } : r) } });
                         const calcCr = (cr: typeof customRows[0]) => { const net = parseFloat(cr.netEuro) || 0; return { full: net ? (parseFloat(cr.full) || 0) / net : 0, disc: net ? (parseFloat(cr.pct) || 0) / net : 0, final: net ? (parseFloat(cr.final) || 0) / net : 0 }; };
                         const aoCalcDisplayCr = (cr: typeof customRows[0], field: 'full' | 'disc' | 'final') => { const v = calcCr(cr)[field]; const color = field === 'final' ? 'text-green-600' : 'text-blue-600'; return <div className={`w-full px-2 py-1.5 text-right text-sm ${color}`}>{v ? fmtAo(v) : '—'}</div>; };
                         const aoSum = (field: string) => aoKeys.reduce((acc, k) => acc + (parseFloat(getAo(k)[field]) || 0), 0);
@@ -5186,6 +5197,7 @@ export default function SummaryPage() {
                                   )}
                                   {/* Custom rows */}
                                   {customRows.map((cr, idx) => (
+
                                     <tr key={idx} className="hover:bg-gray-50 bg-amber-50/30">
                                       <td className="px-1 py-1"></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.item} onChange={e => setCustomRow(idx, 'item', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Item name" /></td>
@@ -5200,6 +5212,29 @@ export default function SummaryPage() {
                                       <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplayCr(cr, 'disc')}</td>
                                       <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplayCr(cr, 'final')}</td>
                                       <td className="px-1 py-1 bg-purple-50/30"></td>
+                                    </tr>
+                                  ))}
+                                  {/* Deduct rows */}
+                                  {deductRows.map((cr, idx) => (
+                                    <tr key={`deduct-${idx}`} className="bg-red-50/60 hover:bg-red-50">
+                                      <td className="px-1 py-1"></td>
+                                      <td className="px-1 py-1">
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-red-500 font-bold text-xs select-none">&minus;</span>
+                                          <input type="text" value={cr.item} onChange={e => setDeductRow(idx, 'item', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 bg-white" placeholder="Deduct item name" />
+                                        </div>
+                                      </td>
+                                      <td className="px-1 py-1"><input type="text" value={cr.qty} onChange={e => setDeductRow(idx, 'qty', e.target.value)} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 bg-white" placeholder="Qty" /></td>
+                                      <td className="px-1 py-1" colSpan={2}><textarea ref={autoSize} rows={1} value={cr.details} onChange={e => { setDeductRow(idx, 'details', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} className="w-full px-2 py-1.5 text-left text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 resize-none overflow-hidden bg-white" placeholder="Details" style={{ lineHeight: '1.25rem', minHeight: '2rem' }} /></td>
+                                      <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[€,]/g, '') ? '€' + parseFloat(cr.netEuro.replace(/[€,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setDeductRow(idx, 'netEuro', e.target.value.replace(/[€,]/g, ''))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 bg-white" placeholder="—" /></td>
+                                      <td className="px-1 py-1 bg-red-100/40"><input type="text" value={fmtQtInput(cr.full)} onChange={e => setDeductRow(idx, 'full', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 text-red-700 bg-white" placeholder="—" /></td>
+                                      <td className="px-1 py-1 bg-red-100/40"><input type="text" value={fmtQtInput(cr.pct)} onChange={e => setDeductRow(idx, 'pct', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 text-red-700 bg-white" placeholder="—" /></td>
+                                      <td className="px-1 py-1 bg-red-100/40"><input type="text" value={fmtQtInput(cr.final)} onChange={e => setDeductRow(idx, 'final', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 text-red-700 bg-white" placeholder="—" /></td>
+                                      <td className="px-1 py-1"><button onClick={() => removeDeductRow(idx)} className="w-full flex items-center justify-center text-red-400 hover:text-red-600" title="Remove row"><X className="w-3.5 h-3.5" /></button></td>
+                                      <td className="px-1 py-1 border-l-4 border-red-300 bg-red-100/40">{aoCalcDisplayCr(cr, 'full')}</td>
+                                      <td className="px-1 py-1 bg-red-100/40">{aoCalcDisplayCr(cr, 'disc')}</td>
+                                      <td className="px-1 py-1 bg-red-100/40">{aoCalcDisplayCr(cr, 'final')}</td>
+                                      <td className="px-1 py-1 bg-red-50/60"></td>
                                     </tr>
                                   ))}
                                   {/* Final Finish */}
@@ -5323,8 +5358,8 @@ export default function SummaryPage() {
                                   {/* Add-On Items TOTAL */}
                                   {(() => {
                                     const installationRowsTotal = ((ao.installation?.installationRows || []) as Array<{ price: string }>).reduce((s: number, r: { price: string }) => s + (parseFloat((r.price || '').replace(/[^0-9.-]/g, '')) || 0), 0);
-                                    const aoFullTotal = aoKeys.reduce((s, k) => s + (parseFloat(getAo(k).full) || 0), 0) + customRows.reduce((s, cr) => s + (parseFloat(cr.full) || 0), 0);
-                                    const aoFinalTotal = aoKeys.reduce((s, k) => s + (parseFloat(getAo(k).final) || 0), 0) + installationRowsTotal + customRows.reduce((s, cr) => s + (parseFloat(cr.final) || 0), 0);
+                                    const aoFullTotal = aoKeys.reduce((s, k) => s + (parseFloat(getAo(k).full) || 0), 0) + customRows.reduce((s, cr) => s + (parseFloat(cr.full) || 0), 0) - deductRows.reduce((s, cr) => s + (parseFloat(cr.full) || 0), 0);
+                                    const aoFinalTotal = aoKeys.reduce((s, k) => s + (parseFloat(getAo(k).final) || 0), 0) + installationRowsTotal + customRows.reduce((s, cr) => s + (parseFloat(cr.final) || 0), 0) - deductRows.reduce((s, cr) => s + (parseFloat(cr.final) || 0), 0);
                                     return (
                                       <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
                                         <td className="sticky left-0 z-10 bg-gray-50"></td>
@@ -5343,12 +5378,17 @@ export default function SummaryPage() {
                                       </tr>
                                     );
                                   })()}
-                                  {/* Add Custom Row button */}
+                                  {/* Add Custom Row / Add Deduct Row buttons */}
                                   <tr>
                                     <td colSpan={14} className="px-4 py-2 border-t border-gray-200">
-                                      <button onClick={addCustomRow} className="inline-flex items-center gap-1.5 text-xs text-brand-navy hover:text-brand-navy/70 font-medium">
-                                        <Plus className="w-3.5 h-3.5" /> Add Custom Row
-                                      </button>
+                                      <div className="flex items-center gap-4">
+                                        <button onClick={addCustomRow} className="inline-flex items-center gap-1.5 text-xs text-brand-navy hover:text-brand-navy/70 font-medium">
+                                          <Plus className="w-3.5 h-3.5" /> Add Custom Row
+                                        </button>
+                                        <button onClick={addDeductRow} className="inline-flex items-center gap-1.5 text-xs text-red-600 hover:text-red-700 font-medium">
+                                          <Plus className="w-3.5 h-3.5" /> Add Deduct Row
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
 
