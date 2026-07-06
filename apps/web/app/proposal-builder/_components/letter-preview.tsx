@@ -367,7 +367,7 @@ function BlockPreview({
                 <span>{preset.title}</span>
               </div>
               {preset.body && (
-                <SafeRichHtml className="ml-7 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
+                <SafeRichHtml className="mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
               )}
             </>
           )}
@@ -387,7 +387,7 @@ function BlockPreview({
         <div className="mt-2 px-1">
           {!hideTitle && <div className="text-[10pt] font-bold">•&nbsp;&nbsp;{preset.title}</div>}
           {preset.body && preset.body.trim() && (
-            <SafeRichHtml className="ml-4 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
+            <SafeRichHtml className="mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
           )}
         </div>,
       );
@@ -396,7 +396,7 @@ function BlockPreview({
         <div className="mt-3 px-1">
           {!hideTitle && <div className="text-[10pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>}
           {preset.body && preset.body.trim() && (
-            <SafeRichHtml className="ml-3 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
+            <SafeRichHtml className="mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
           )}
         </div>,
       );

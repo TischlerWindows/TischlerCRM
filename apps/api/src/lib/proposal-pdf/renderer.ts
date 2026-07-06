@@ -537,7 +537,7 @@ function drawSpecificationItem(
 
     if (preset.body && preset.body.trim()) {
       doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: 18 });
+      drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: 0 });
     }
   }
 }
@@ -570,7 +570,7 @@ function drawExclusionItem(
   }
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    drawRichBody(doc, preset.body, ctx, { topGap: 0.05, indent: 12 });
+    drawRichBody(doc, preset.body, ctx, { topGap: 0.05, indent: 0 });
   }
 }
 
@@ -586,7 +586,7 @@ function drawInstallationItem(
   }
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    drawRichBody(doc, preset.body, ctx, { topGap: 0.05, indent: 12 });
+    drawRichBody(doc, preset.body, ctx, { topGap: 0.05, indent: 0 });
   }
 }
 
