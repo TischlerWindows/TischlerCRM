@@ -1,9 +1,17 @@
 'use client';
 
-import { useEffect, useState, useRef, createContext, useContext } from 'react';
+import { useEffect, useState, useRef, createContext, useContext, Fragment } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getOptionsForType } from '@/lib/product-type-options';
+
+// Groups product-type option checkboxes visually: Thickness | Hardware | Threshold.
+// A vertical divider is drawn between adjacent options whose categories differ.
+function categorizeProductOption(opt: string): 'thickness' | 'threshold' | 'hardware' {
+  if (opt.includes('Thick Sash')) return 'thickness';
+  if (opt.includes('Threshold')) return 'threshold';
+  return 'hardware';
+}
 import { 
   Plus, 
   Search, 
@@ -4041,21 +4049,32 @@ export default function SummaryPage() {
                             {uniqueTypes.map(typeName => {
                               const opts = getOptionsForType(typeName);
                               const selected = (pto[typeName] || []).filter((o: string) => opts.includes(o));
+                              let prevCategory: string | null = null;
                               return (
                                 <div key={typeName} className="flex items-start gap-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                                   <div className="min-w-[200px] text-sm font-medium text-gray-800 pt-0.5">{typeName}</div>
-                                  <div className="flex flex-wrap gap-x-6 gap-y-2">
-                                    {opts.map(opt => (
-                                      <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                          type="checkbox"
-                                          checked={selected.includes(opt)}
-                                          onChange={() => toggleOpt(typeName, opt)}
-                                          className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-                                        />
-                                        <span className="text-sm text-gray-700">{opt}</span>
-                                      </label>
-                                    ))}
+                                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                                    {opts.map(opt => {
+                                      const category = categorizeProductOption(opt);
+                                      const showDivider = prevCategory !== null && category !== prevCategory;
+                                      prevCategory = category;
+                                      return (
+                                        <Fragment key={opt}>
+                                          {showDivider && (
+                                            <div className="self-stretch w-px bg-gray-300" aria-hidden="true" />
+                                          )}
+                                          <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                              type="checkbox"
+                                              checked={selected.includes(opt)}
+                                              onChange={() => toggleOpt(typeName, opt)}
+                                              className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                            />
+                                            <span className="text-sm text-gray-700">{opt}</span>
+                                          </label>
+                                        </Fragment>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               );
