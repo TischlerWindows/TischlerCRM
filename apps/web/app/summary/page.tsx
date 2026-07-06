@@ -2318,7 +2318,7 @@ export default function SummaryPage() {
       ...(ao.deductRows || []).map((cr: any) => {
         const net = pv(cr.netEuro);
         const r = (v: string | undefined) => (net && pv(v)) ? (pv(v) / net).toFixed(2) : '—';
-        return ['(\u2212) ' + (cr.item || 'Deduct'), cr.qty || '—', cr.details || '—', net ? '\u20ac' + fmtInt(net) : '—', fmtDollar(cr.full) !== '\u2014' ? '('+fmtDollar(cr.full)+')' : '\u2014', fmtDollar(cr.pct) !== '\u2014' ? '('+fmtDollar(cr.pct)+')' : '\u2014', fmtDollar(cr.final) !== '\u2014' ? '('+fmtDollar(cr.final)+')' : '\u2014', r(cr.full), r(cr.pct), r(cr.final)];
+        return ['(-) ' + (cr.item || 'Deduct'), cr.qty || '—', cr.details || '—', net ? '\u20ac' + fmtInt(net) : '—', fmtDollar(cr.full) !== '\u2014' ? '('+fmtDollar(cr.full)+')' : '\u2014', fmtDollar(cr.pct) !== '\u2014' ? '('+fmtDollar(cr.pct)+')' : '\u2014', fmtDollar(cr.final) !== '\u2014' ? '('+fmtDollar(cr.final)+')' : '\u2014', r(cr.full), r(cr.pct), r(cr.final)];
       }),
       ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
     ].filter(row => [row[3], row[4], row[5], row[6]].some(v => v !== '—'));
