@@ -154,7 +154,14 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     }
 
     const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-    if (existing) return reply.code(409).send({ error: 'Email already registered' });
+    if (existing) {
+      if (existing.deletedAt) {
+        return reply.code(409).send({
+          error: 'This email belongs to a deleted user. Restore it from Settings > Recycle Bin, or permanently delete it there, before creating a new account with this email.',
+        });
+      }
+      return reply.code(409).send({ error: 'Email already registered' });
+    }
 
     const systemRole = await resolveSystemRole(parsed.data.profileId);
     const actorId = (req as any).user.sub;
