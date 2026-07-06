@@ -7,6 +7,9 @@ const idParam = z.object({ id: z.string().min(1) });
 
 export async function recycleBinRoutes(app: FastifyInstance) {
   app.get('/admin/recycle-bin', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions' });
+    }
     const [deletedUsers, deletedDepartments, deletedRecords] = await Promise.all([
       prisma.user.findMany({
         where: { deletedAt: { not: null } },
@@ -70,6 +73,9 @@ export async function recycleBinRoutes(app: FastifyInstance) {
   });
 
   app.post('/admin/recycle-bin/users/:id/restore', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions' });
+    }
     const parsed = idParam.safeParse(req.params);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid user ID' });
 
@@ -97,6 +103,9 @@ export async function recycleBinRoutes(app: FastifyInstance) {
   });
 
   app.post('/admin/recycle-bin/departments/:id/restore', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions' });
+    }
     const parsed = idParam.safeParse(req.params);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid department ID' });
 
@@ -125,6 +134,9 @@ export async function recycleBinRoutes(app: FastifyInstance) {
 
   // ── Record restore ──
   app.post('/admin/recycle-bin/records/:id/restore', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions' });
+    }
     const parsed = idParam.safeParse(req.params);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid record ID' });
 
@@ -162,6 +174,9 @@ export async function recycleBinRoutes(app: FastifyInstance) {
 
   // ── Permanently delete a record ──
   app.delete('/admin/recycle-bin/records/:id', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions' });
+    }
     const parsed = idParam.safeParse(req.params);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid record ID' });
 
@@ -188,6 +203,46 @@ export async function recycleBinRoutes(app: FastifyInstance) {
       objectType: objectApi,
       objectId: record.id,
       objectName: typeof recName === 'string' ? recName : String(recName),
+      ipAddress: extractIp(req),
+    });
+
+    reply.code(204).send();
+  });
+
+  // ── Permanently delete a user ──
+  // Only allowed once the user is already soft-deleted. Historical activity
+  // (records created/modified, audit log entries, tickets, etc.) is preserved
+  // by design — the DB foreign keys will reject the delete (P2003) if any
+  // exist, and we surface that as a clear 409 instead of a raw DB error.
+  app.delete('/admin/recycle-bin/users/:id', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions' });
+    }
+    const parsed = idParam.safeParse(req.params);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid user ID' });
+
+    const user = await prisma.user.findUnique({ where: { id: parsed.data.id } });
+    if (!user) return reply.code(404).send({ error: 'User not found' });
+    if (!user.deletedAt) return reply.code(400).send({ error: 'User is not in the recycle bin' });
+
+    try {
+      await prisma.user.delete({ where: { id: parsed.data.id } });
+    } catch (err: any) {
+      if (err?.code === 'P2003') {
+        return reply.code(409).send({
+          error: 'Cannot permanently delete this user: they have historical activity (records, audit log entries, tickets, etc.) that must be preserved. The account will remain in the Recycle Bin.',
+        });
+      }
+      throw err;
+    }
+
+    const actorId = req.user!.sub;
+    await logAudit({
+      actorId,
+      action: 'PERMANENT_DELETE',
+      objectType: 'User',
+      objectId: user.id,
+      objectName: user.name ?? user.email,
       ipAddress: extractIp(req),
     });
 

@@ -124,6 +124,20 @@ export default function RecycleBinPage() {
     }
   };
 
+  const handlePermanentDeleteUser = async (user: DeletedUser) => {
+    if (!confirm(`Permanently delete user "${user.name || user.email}"? This cannot be undone.`)) return;
+    setRestoring(user.id);
+    try {
+      await apiClient.delete(`/admin/recycle-bin/users/${user.id}`);
+      setSuccess(`User "${user.name || user.email}" permanently deleted`);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete user');
+    } finally {
+      setRestoring(null);
+    }
+  };
+
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -235,7 +249,7 @@ export default function RecycleBinPage() {
                       <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Email</th>
                       <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Deleted By</th>
                       <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Deleted At</th>
-                      <th className="px-4 py-3 text-right text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Action</th>
+                      <th className="px-4 py-3 text-right text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Actions</th>
                     </tr>
                   </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -245,7 +259,7 @@ export default function RecycleBinPage() {
                       <td className="px-4 py-3 text-sm text-gray-600">{user.email}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{user.deletedBy?.name || user.deletedBy?.email || '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-500">{formatDate(user.deletedAt)}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
                         <button
                           onClick={() => handleRestoreUser(user)}
                           disabled={restoring === user.id}
@@ -253,6 +267,14 @@ export default function RecycleBinPage() {
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                           {restoring === user.id ? 'Restoring...' : 'Restore'}
+                        </button>
+                        <button
+                          onClick={() => handlePermanentDeleteUser(user)}
+                          disabled={restoring === user.id}
+                          className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                        >
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          Delete
                         </button>
                       </td>
                     </tr>
