@@ -4061,7 +4061,7 @@ export default function SummaryPage() {
                                       return (
                                         <Fragment key={opt}>
                                           {showDivider && (
-                                            <div className="self-stretch w-px bg-gray-300" aria-hidden="true" />
+                                            <div className="self-stretch w-0.5 bg-gray-400 mx-2 rounded-full" aria-hidden="true" />
                                           )}
                                           <label className="flex items-center gap-2 cursor-pointer">
                                             <input

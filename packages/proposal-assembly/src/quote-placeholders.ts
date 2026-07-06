@@ -318,7 +318,8 @@ function getJambDepth(typeName: string, sashMm: number): string | null {
 
 /**
  * Build the bolded first-line string for a product type entry.
- * Inserts jamb depth (if known) between the sash thickness and any remaining options.
+ * Only shows sash thickness and jamb depth — hardware/threshold options are
+ * intentionally omitted from this section of the proposal.
  */
 function buildFirstLine(typeName: string, rawOpts: string[]): string {
   const sashRe = /^\d+(\.\d+)?mm Thick Sash$/i;
@@ -332,10 +333,6 @@ function buildFirstLine(typeName: string, rawOpts: string[]): string {
     // Fractional-inch value → "X" Jamb Depth"; full note → show as-is
     specParts.push(jambDepth.endsWith('"') ? `${jambDepth} Jamb Depth` : jambDepth);
   }
-  rawOpts
-    .filter(o => !sashRe.test(o))
-    .map(formatProductTypeOption)
-    .forEach(p => specParts.push(p));
 
   const displayName = expandProductTypeName(typeName);
   return specParts.length > 0
