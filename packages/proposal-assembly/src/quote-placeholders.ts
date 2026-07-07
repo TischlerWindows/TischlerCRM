@@ -87,6 +87,10 @@ export interface SummaryForPlaceholders {
     euroDoors: { full: string; pct: string; final: string; finalAdj: string };
   };
   grandTotalAdjustment?: { full: string; pct: string; final: string; finalAdj: string };
+  /** Multi-location jobs store their own quoteTotals per sub-location; the
+   * top-level `quoteTotals` above is left blank/unused in that case. */
+  hasMultipleLocations?: boolean;
+  subLocations?: Array<{ quoteTotals?: SummaryForPlaceholders['quoteTotals'] }>;
   addOns: {
     windowScreens: { qty: string; final: string; [k: string]: unknown };
     doorScreenSash: { qty: string; final: string; [k: string]: unknown };
@@ -373,6 +377,31 @@ function formatNfrcBlock(typeName: string, glassType: string, rawOpts: string[])
 // ── Token map builder ──────────────────────────────────────────────
 
 /**
+ * Return the effective `quoteTotals` for a summary, aggregating across
+ * `subLocations` when the job has multiple locations.
+ *
+ * Multi-location jobs keep each location's totals in `subLocations[i].quoteTotals`
+ * and leave the top-level `quoteTotals` unused — the Summary page UI aggregates
+ * these on the fly for display, but that aggregate was never available to the
+ * Proposal Builder, causing prices to show as $0.00 for multi-location jobs.
+ */
+export function getEffectiveQuoteTotals(
+  summary: Pick<SummaryForPlaceholders, 'quoteTotals' | 'hasMultipleLocations' | 'subLocations'>
+): SummaryForPlaceholders['quoteTotals'] {
+  if (!summary.hasMultipleLocations || !summary.subLocations?.length) {
+    return summary.quoteTotals;
+  }
+  const p = (v: string | undefined) => parseFloat(v || '0') || 0;
+  const sumCat = (cat: 'euroWindows' | 'doubleHung' | 'euroDoors', f: 'full' | 'pct' | 'final' | 'finalAdj') =>
+    summary.subLocations!.reduce((a, l) => a + p(l.quoteTotals?.[cat]?.[f]), 0).toString();
+  return {
+    euroWindows: { full: sumCat('euroWindows', 'full'), pct: sumCat('euroWindows', 'pct'), final: sumCat('euroWindows', 'final'), finalAdj: sumCat('euroWindows', 'finalAdj') },
+    doubleHung: { full: sumCat('doubleHung', 'full'), pct: sumCat('doubleHung', 'pct'), final: sumCat('doubleHung', 'final'), finalAdj: sumCat('doubleHung', 'finalAdj') },
+    euroDoors: { full: sumCat('euroDoors', 'full'), pct: sumCat('euroDoors', 'pct'), final: sumCat('euroDoors', 'final'), finalAdj: sumCat('euroDoors', 'finalAdj') },
+  };
+}
+
+/**
  * Build a map of token names to resolved string values.
  *
  * Token names match the {{tokenName}} placeholders used in preset bodies.
@@ -392,10 +421,13 @@ export function buildTokenMap(
   const nameParts = (summary.contactReceivingQuote || '').trim().split(/\s+/);
   const fallbackLastName = nameParts.length > 1 ? (nameParts[nameParts.length - 1] ?? '') : '';
 
+  // Aggregate across sub-locations for multi-location jobs (see getEffectiveQuoteTotals)
+  const effQuoteTotals = getEffectiveQuoteTotals(summary);
+
   // Calculate grand total
-  const euroWindowsFinal = parseInt(summary.quoteTotals?.euroWindows?.finalAdj || '0', 10) || 0;
-  const doubleHungFinal = parseInt(summary.quoteTotals?.doubleHung?.finalAdj || '0', 10) || 0;
-  const euroDoorsFinal = parseInt(summary.quoteTotals?.euroDoors?.finalAdj || '0', 10) || 0;
+  const euroWindowsFinal = parseInt(effQuoteTotals?.euroWindows?.finalAdj || '0', 10) || 0;
+  const doubleHungFinal = parseInt(effQuoteTotals?.doubleHung?.finalAdj || '0', 10) || 0;
+  const euroDoorsFinal = parseInt(effQuoteTotals?.euroDoors?.finalAdj || '0', 10) || 0;
   const grandAdj = parseInt(summary.grandTotalAdjustment?.finalAdj || '0', 10) || 0;
   const grandTotal = euroWindowsFinal + doubleHungFinal + euroDoorsFinal + grandAdj;
 
@@ -431,9 +463,9 @@ export function buildTokenMap(
     todayDate: formatDate(new Date().toISOString()),
 
     // Category pricing
-    euroWindowsPrice: formatDollar(summary.quoteTotals?.euroWindows?.finalAdj),
-    doubleHungPrice: formatDollar(summary.quoteTotals?.doubleHung?.finalAdj),
-    euroDoorsPrice: formatDollar(summary.quoteTotals?.euroDoors?.finalAdj),
+    euroWindowsPrice: formatDollar(effQuoteTotals?.euroWindows?.finalAdj),
+    doubleHungPrice: formatDollar(effQuoteTotals?.doubleHung?.finalAdj),
+    euroDoorsPrice: formatDollar(effQuoteTotals?.euroDoors?.finalAdj),
     grandTotal: formatDollar(String(grandTotal)),
     grandTotalAdjustment: formatDollar(summary.grandTotalAdjustment?.finalAdj),
 

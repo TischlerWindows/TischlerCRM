@@ -10,6 +10,7 @@ import {
 } from './quote-conditions.js';
 import {
   buildTokenMap,
+  getEffectiveQuoteTotals,
   resolveCustomTokens,
   resolveTokensWithDiagnostics,
   type ContactData,
@@ -144,9 +145,10 @@ function buildPdfData(
   tokens: Record<string, string>,
   context: QuoteContext
 ): QuotePDFData {
-  const euroWindowsVal = intValue(summary.quoteTotals?.euroWindows?.finalAdj);
-  const doubleHungVal = intValue(summary.quoteTotals?.doubleHung?.finalAdj);
-  const euroDoorsVal = intValue(summary.quoteTotals?.euroDoors?.finalAdj);
+  const effQuoteTotals = getEffectiveQuoteTotals(summary);
+  const euroWindowsVal = intValue(effQuoteTotals?.euroWindows?.finalAdj);
+  const doubleHungVal = intValue(effQuoteTotals?.doubleHung?.finalAdj);
+  const euroDoorsVal = intValue(effQuoteTotals?.euroDoors?.finalAdj);
 
   return {
     contactName: summary.contactReceivingQuote || '',
