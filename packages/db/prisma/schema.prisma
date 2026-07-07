@@ -197,10 +197,10 @@ model CustomObject {
   enableHistory Boolean @default(false)
   enableSearch  Boolean @default(true)
 
-  createdBy    User     @relation("CreatedObjects", fields: [createdById], references: [id])
-  createdById  String
-  modifiedBy   User     @relation("ModifiedObjects", fields: [modifiedById], references: [id])
-  modifiedById String
+  createdBy    User?    @relation("CreatedObjects", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  String?
+  modifiedBy   User?    @relation("ModifiedObjects", fields: [modifiedById], references: [id], onDelete: SetNull)
+  modifiedById String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -251,10 +251,10 @@ model CustomField {
   isCustom Boolean @default(true)
   isActive Boolean @default(true)
 
-  createdBy    User     @relation("CreatedFields", fields: [createdById], references: [id])
-  createdById  String
-  modifiedBy   User     @relation("ModifiedFields", fields: [modifiedById], references: [id])
-  modifiedById String
+  createdBy    User?    @relation("CreatedFields", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  String?
+  modifiedBy   User?    @relation("ModifiedFields", fields: [modifiedById], references: [id], onDelete: SetNull)
+  modifiedById String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -306,10 +306,10 @@ model PageLayout {
   /// Layout-level JSON: formattingRules, version, forward-compatible keys
   extensions Json?
 
-  createdBy    User     @relation("CreatedLayouts", fields: [createdById], references: [id])
-  createdById  String
-  modifiedBy   User     @relation("ModifiedLayouts", fields: [modifiedById], references: [id])
-  modifiedById String
+  createdBy    User?    @relation("CreatedLayouts", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  String?
+  modifiedBy   User?    @relation("ModifiedLayouts", fields: [modifiedById], references: [id], onDelete: SetNull)
+  modifiedById String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -389,10 +389,10 @@ model Record {
   data Json @default("{}")
 
   // System fields
-  createdBy    User     @relation("CreatedRecords", fields: [createdById], references: [id])
-  createdById  String
-  modifiedBy   User     @relation("ModifiedRecords", fields: [modifiedById], references: [id])
-  modifiedById String
+  createdBy    User?    @relation("CreatedRecords", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  String?
+  modifiedBy   User?    @relation("ModifiedRecords", fields: [modifiedById], references: [id], onDelete: SetNull)
+  modifiedById String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -437,10 +437,10 @@ model Report {
   folder   ReportFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   // Audit fields
-  createdBy    User     @relation("CreatedReports", fields: [createdById], references: [id])
-  createdById  String
-  modifiedBy   User     @relation("ModifiedReports", fields: [modifiedById], references: [id])
-  modifiedById String
+  createdBy    User?    @relation("CreatedReports", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  String?
+  modifiedBy   User?    @relation("ModifiedReports", fields: [modifiedById], references: [id], onDelete: SetNull)
+  modifiedById String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -465,10 +465,10 @@ model ReportFolder {
   sharedWith Json? // Array of user emails/IDs
 
   // Audit fields
-  createdBy    User     @relation("CreatedFolders", fields: [createdById], references: [id])
-  createdById  String
-  modifiedBy   User     @relation("ModifiedFolders", fields: [modifiedById], references: [id])
-  modifiedById String
+  createdBy    User?    @relation("CreatedFolders", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  String?
+  modifiedBy   User?    @relation("ModifiedFolders", fields: [modifiedById], references: [id], onDelete: SetNull)
+  modifiedById String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -493,10 +493,10 @@ model Dashboard {
   sharedWith Json? // Array of user emails/IDs
 
   // Audit fields
-  createdBy    User     @relation("CreatedDashboards", fields: [createdById], references: [id])
-  createdById  String
-  modifiedBy   User     @relation("ModifiedDashboards", fields: [modifiedById], references: [id])
-  modifiedById String
+  createdBy    User?    @relation("CreatedDashboards", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById  String?
+  modifiedBy   User?    @relation("ModifiedDashboards", fields: [modifiedById], references: [id], onDelete: SetNull)
+  modifiedById String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -700,8 +700,8 @@ model SupportTicket {
   priority      TicketPriority @default(NORMAL)
   category      String         @default("UNTRIAGED")
 
-  submittedBy   User   @relation("TicketSubmitter", fields: [submittedById], references: [id])
-  submittedById String
+  submittedBy   User?   @relation("TicketSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  submittedById String?
 
   assignedTo   User?   @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   assignedToId String?
@@ -745,8 +745,8 @@ model TicketComment {
   ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   ticketId String
 
-  author   User   @relation("TicketCommentAuthor", fields: [authorId], references: [id])
-  authorId String
+  author   User?   @relation("TicketCommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  authorId String?
 
   body       String
   isInternal Boolean @default(false)
@@ -767,8 +767,8 @@ model TicketAttachment {
   ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   ticketId String
 
-  uploadedBy   User   @relation("TicketAttachmentUploader", fields: [uploadedById], references: [id])
-  uploadedById String
+  uploadedBy   User?   @relation("TicketAttachmentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedById String?
 
   kind      String // "screenshot" | "file"
   fileName  String
