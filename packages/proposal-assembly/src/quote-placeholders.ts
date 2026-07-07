@@ -452,7 +452,7 @@ export function buildTokenMap(
     ];
     return categories
       .filter(([, amount]) => (parseInt(amount || '0', 10) || 0) !== 0)
-      .map(([label, amount]) => `${indent}${padLabel(label)}${formatDollar(amount)}`);
+      .map(([label, amount]) => `${indent}<strong>${padLabel(label)}</strong>${formatDollar(amount)}`);
   };
 
   const baseBidLine = `<strong>${padLabel('BASE BID PRICE:')}${formatDollar(String(grandTotal))}</strong>`;
