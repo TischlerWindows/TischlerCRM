@@ -12,12 +12,15 @@ const ALLOWED_TAGS = ['p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'u'
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: ALLOWED_TAGS,
   allowedAttributes: {
-    // Allow span with style restricted to font-size only (for TextStyle/font-size extension).
+    // Allow span with style restricted to font-size / font-family (the latter
+    // only for the literal "monospace" keyword, used by the nbsp-padded
+    // pricing-column tokens so columns actually line up in a preview font).
     span: ['style'],
   },
   allowedStyles: {
     span: {
       'font-size': [/^\d+(\.\d+)?pt$/],
+      'font-family': [/^monospace$/],
     },
   },
   // Drop disallowed tags entirely (no fallback to plain text inside <script>).

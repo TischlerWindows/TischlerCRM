@@ -471,7 +471,10 @@ export function buildTokenMap(
     finalPriceLines[finalPriceLines.length - 1] = `<u>${finalPriceLines[finalPriceLines.length - 1]}</u>`;
   }
   const finalBaseBidLine = `<strong>${padLabel('BASE BID PRICE:')}${padAmountRight(baseBidAmount, finalAmountWidth)}</strong>`;
-  const finalPrice = [...finalPriceLines, finalBaseBidLine].join('<br>');
+  // Wrapped in a monospace span: nbsp-count padding only lines up into real
+  // columns when every character (letters, digits, nbsp) has the same width,
+  // which proportional fonts don't guarantee.
+  const finalPrice = `<span style="font-family:monospace">${[...finalPriceLines, finalBaseBidLine].join('<br>')}</span>`;
 
   // Per-location breakdown for multi-location jobs (falls back to the single
   // block above when there's only one location). Location name shares its
@@ -504,7 +507,7 @@ export function buildTokenMap(
     lines.push(
       `<strong>${padTo('BASE BID PRICE:', locColWidth + LABEL_COL_WIDTH)}${padAmountRight(baseBidAmount, amountWidth)}</strong>`
     );
-    return lines.join('<br>');
+    return `<span style="font-family:monospace">${lines.join('<br>')}</span>`;
   })();
 
   const tokens: Record<string, string> = {

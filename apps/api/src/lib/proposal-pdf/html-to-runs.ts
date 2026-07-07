@@ -19,6 +19,14 @@ export interface StyledRun {
   underline?: boolean;
   /** Font size override in points. Undefined = use block default. */
   fontSize?: number;
+  /**
+   * Render with a monospace font (PDFKit's built-in Courier). Used for the
+   * nbsp-padded pricing blocks ({{FinalPrice}} / {{MultipleLocationsFinalPrice}})
+   * where columns must line up — proportional fonts don't have uniform
+   * character widths, so nbsp-count padding only produces real alignment in
+   * a monospace font.
+   */
+  monospace?: boolean;
 }
 
 export type Block =
@@ -97,7 +105,7 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
 
 function collectRuns(
   el: HTMLElement,
-  ctx: { bold: boolean; italic: boolean; underline?: boolean; fontSize?: number } = { bold: false, italic: false },
+  ctx: { bold: boolean; italic: boolean; underline?: boolean; fontSize?: number; monospace?: boolean } = { bold: false, italic: false },
 ): StyledRun[] {
   const runs: StyledRun[] = [];
 
@@ -112,7 +120,7 @@ function collectRuns(
         m.split('').map((_, i) => (i % 2 === 0 ? ' ' : '\u00A0')).join(''),
       );
       if (text.length > 0) {
-        runs.push({ text, bold: ctx.bold, italic: ctx.italic, underline: ctx.underline, fontSize: ctx.fontSize });
+        runs.push({ text, bold: ctx.bold, italic: ctx.italic, underline: ctx.underline, fontSize: ctx.fontSize, monospace: ctx.monospace });
       }
       continue;
     }
@@ -122,7 +130,7 @@ function collectRuns(
     const tag = childEl.tagName?.toUpperCase();
 
     if (tag === 'BR') {
-      runs.push({ text: '\n', bold: ctx.bold, italic: ctx.italic, underline: ctx.underline, fontSize: ctx.fontSize });
+      runs.push({ text: '\n', bold: ctx.bold, italic: ctx.italic, underline: ctx.underline, fontSize: ctx.fontSize, monospace: ctx.monospace });
       continue;
     }
 
@@ -130,14 +138,16 @@ function collectRuns(
     if (tag === 'STRONG' || tag === 'B') next.bold = true;
     if (tag === 'EM' || tag === 'I') next.italic = true;
     if (tag === 'U') next.underline = true;
-    // Parse font-size from <span style="font-size: Xpt"> (TipTap TextStyle output)
+    // Parse font-size / font-family from <span style="..."> (TipTap TextStyle
+    // output, plus our own monospace pricing-column spans).
     if (tag === 'SPAN') {
       const style = childEl.getAttribute('style') ?? '';
-      const match = /font-size:\s*([\d.]+)pt/i.exec(style);
-      if (match) {
-        const parsed = parseFloat(match[1]);
+      const sizeMatch = /font-size:\s*([\d.]+)pt/i.exec(style);
+      if (sizeMatch) {
+        const parsed = parseFloat(sizeMatch[1]);
         if (!isNaN(parsed) && parsed > 0) next.fontSize = parsed;
       }
+      if (/font-family:\s*monospace/i.test(style)) next.monospace = true;
     }
     runs.push(...collectRuns(childEl, next));
   }

@@ -929,6 +929,11 @@ function drawStyledRuns(
 }
 
 function fontFor(run: StyledRun, fonts: FontMap): string {
+  // Monospace pricing columns use PDFKit's built-in Courier — no brand-font
+  // registration needed, and (unlike the regular proportional fonts) every
+  // character has the same advance width, so nbsp-count padding actually
+  // lines up.
+  if (run.monospace) return run.bold ? 'Courier-Bold' : 'Courier';
   if (run.bold && run.italic) return fonts.boldItalic;
   if (run.bold) return fonts.bold;
   if (run.italic) return fonts.italic;
