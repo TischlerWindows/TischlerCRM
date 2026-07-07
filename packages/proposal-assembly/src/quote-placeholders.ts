@@ -433,12 +433,35 @@ export function buildTokenMap(
 
   // Consolidated pricing block — combines the Double Hungs / Euro Windows / Doors /
   // BASE BID PRICE lines that used to require 4 separate tokens into a single token.
-  const finalPrice = [
-    `Double Hungs: ${formatDollar(effQuoteTotals?.doubleHung?.finalAdj)}`,
-    `Euro Windows: ${formatDollar(effQuoteTotals?.euroWindows?.finalAdj)}`,
-    `Doors: ${formatDollar(effQuoteTotals?.euroDoors?.finalAdj)}`,
-    `BASE BID PRICE: ${formatDollar(String(grandTotal))}`,
-  ].join('<br>');
+  // Labels are right-padded with non-breaking spaces (rather than plain spaces, which
+  // both PDFKit and the browser preview would collapse) so the dollar amounts line up
+  // in a rough column, and the last line before BASE BID PRICE is underlined like a
+  // subtotal rule. Categories with a $0 total for a given location are omitted.
+  const LABEL_COL_WIDTH = 16;
+  const padLabel = (label: string): string =>
+    label + '\u00A0'.repeat(Math.max(2, LABEL_COL_WIDTH - label.length));
+
+  const buildCategoryLines = (
+    qt: SummaryForPlaceholders['quoteTotals'] | undefined,
+    indent = ''
+  ): string[] => {
+    const categories: Array<[string, string | undefined]> = [
+      ['Double Hungs:', qt?.doubleHung?.finalAdj],
+      ['Euro Windows:', qt?.euroWindows?.finalAdj],
+      ['Doors:', qt?.euroDoors?.finalAdj],
+    ];
+    return categories
+      .filter(([, amount]) => (parseInt(amount || '0', 10) || 0) !== 0)
+      .map(([label, amount]) => `${indent}${padLabel(label)}${formatDollar(amount)}`);
+  };
+
+  const baseBidLine = `<strong>${padLabel('BASE BID PRICE:')}${formatDollar(String(grandTotal))}</strong>`;
+
+  const finalPriceLines = buildCategoryLines(effQuoteTotals);
+  if (finalPriceLines.length > 0) {
+    finalPriceLines[finalPriceLines.length - 1] = `<u>${finalPriceLines[finalPriceLines.length - 1]}</u>`;
+  }
+  const finalPrice = [...finalPriceLines, baseBidLine].join('<br>');
 
   // Same pricing block, broken out per sub-location for multi-location jobs
   // (falls back to the single-block output above when there's only one location).
@@ -448,12 +471,13 @@ export function buildTokenMap(
     }
     const lines: string[] = [];
     summary.subLocations.forEach((loc, i) => {
-      lines.push(`${loc.label || `Location ${i + 1}`}:`);
-      lines.push(`Double Hungs: ${formatDollar(loc.quoteTotals?.doubleHung?.finalAdj)}`);
-      lines.push(`Euro Windows: ${formatDollar(loc.quoteTotals?.euroWindows?.finalAdj)}`);
-      lines.push(`Doors: ${formatDollar(loc.quoteTotals?.euroDoors?.finalAdj)}`);
+      lines.push(`<strong>${loc.label || `Location ${i + 1}`}:</strong>`);
+      lines.push(...buildCategoryLines(loc.quoteTotals, '\u00A0\u00A0'));
     });
-    lines.push(`BASE BID PRICE: ${formatDollar(String(grandTotal))}`);
+    if (lines.length > 0) {
+      lines[lines.length - 1] = `<u>${lines[lines.length - 1]}</u>`;
+    }
+    lines.push(baseBidLine);
     return lines.join('<br>');
   })();
 
