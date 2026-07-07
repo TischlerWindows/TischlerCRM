@@ -22,6 +22,7 @@ const DRIVER_FIELDS = [
   { value: 'spacerBarType', label: 'Spacer Bar Type' },
   { value: 'spacerBarColors', label: 'Spacer Bar Colors' },
   { value: 'sdlType', label: 'SDL Type' },
+  { value: 'hasMultipleLocations', label: 'Multiple Locations' },
 ];
 
 /** Maps driver field key → the Opportunity schema field whose picklistValues provide match choices. */
@@ -36,6 +37,10 @@ const DRIVER_FIELD_SCHEMA_MAP: Record<string, string> = {
 const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
   jobType: ['Premium', 'Coastal', 'Dade County'],
   spacerBarColors: ['Standard White, Silver, Brown, Black', 'Premium C31, C32, C33, C34'],
+  // Matched against QuoteContext.hasMultipleLocations, which is coerced to the
+  // literal string "true"/"false" during variant matching — keep these values
+  // in sync with that (see matchValueMatchesContext in quote-conditions.ts).
+  hasMultipleLocations: ['true', 'false'],
   productTypes: [
     // Hung windows
     'Single Hung Concealed Balance',
