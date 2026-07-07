@@ -433,18 +433,21 @@ export function buildTokenMap(
 
   // Consolidated pricing block — combines the Double Hungs / Euro Windows / Doors /
   // BASE BID PRICE lines that used to require 4 separate tokens into a single token.
-  // Labels are right-padded with non-breaking spaces (rather than plain spaces, which
-  // both PDFKit and the browser preview would collapse) so the dollar amounts line up
-  // in a rough column, and the last line before BASE BID PRICE is underlined like a
-  // subtotal rule. Categories with a $0 total for a given location are omitted.
+  // Labels and dollar amounts are padded with non-breaking spaces (rather than plain
+  // spaces, which both PDFKit and the browser preview would collapse) so labels form
+  // a left column and dollar amounts right-align into their own column, and the last
+  // line before BASE BID PRICE is underlined like a subtotal rule. Categories with a
+  // $0 total for a given location are omitted.
   const LABEL_COL_WIDTH = 16;
-  const padLabel = (label: string): string =>
-    label + '\u00A0'.repeat(Math.max(2, LABEL_COL_WIDTH - label.length));
+  const padTo = (str: string, width: number): string =>
+    str + '\u00A0'.repeat(Math.max(2, width - str.length));
+  const padLabel = (label: string): string => padTo(label, LABEL_COL_WIDTH);
+  const padAmountRight = (amount: string, width: number): string =>
+    '\u00A0'.repeat(Math.max(0, width - amount.length)) + amount;
 
-  const buildCategoryLines = (
-    qt: SummaryForPlaceholders['quoteTotals'] | undefined,
-    indent = ''
-  ): string[] => {
+  type CategoryEntry = { label: string; amount: string };
+
+  const getCategoryEntries = (qt: SummaryForPlaceholders['quoteTotals'] | undefined): CategoryEntry[] => {
     const categories: Array<[string, string | undefined]> = [
       ['Double Hungs:', qt?.doubleHung?.finalAdj],
       ['Euro Windows:', qt?.euroWindows?.finalAdj],
@@ -452,32 +455,55 @@ export function buildTokenMap(
     ];
     return categories
       .filter(([, amount]) => (parseInt(amount || '0', 10) || 0) !== 0)
-      .map(([label, amount]) => `${indent}<strong>${padLabel(label)}</strong>${formatDollar(amount)}`);
+      .map(([label, amount]) => ({ label, amount: formatDollar(amount) }));
   };
 
-  const baseBidLine = `<strong>${padLabel('BASE BID PRICE:')}${formatDollar(String(grandTotal))}</strong>`;
+  const baseBidAmount = formatDollar(String(grandTotal));
 
-  const finalPriceLines = buildCategoryLines(effQuoteTotals);
+  // Single-location block: bold category labels + bold BASE BID PRICE line,
+  // dollar amounts right-aligned to a shared column.
+  const finalEntries = getCategoryEntries(effQuoteTotals);
+  const finalAmountWidth = Math.max(baseBidAmount.length, ...finalEntries.map(e => e.amount.length));
+  const finalPriceLines = finalEntries.map(
+    ({ label, amount }) => `<strong>${padLabel(label)}</strong>${padAmountRight(amount, finalAmountWidth)}`
+  );
   if (finalPriceLines.length > 0) {
     finalPriceLines[finalPriceLines.length - 1] = `<u>${finalPriceLines[finalPriceLines.length - 1]}</u>`;
   }
-  const finalPrice = [...finalPriceLines, baseBidLine].join('<br>');
+  const finalBaseBidLine = `<strong>${padLabel('BASE BID PRICE:')}${padAmountRight(baseBidAmount, finalAmountWidth)}</strong>`;
+  const finalPrice = [...finalPriceLines, finalBaseBidLine].join('<br>');
 
-  // Same pricing block, broken out per sub-location for multi-location jobs
-  // (falls back to the single-block output above when there's only one location).
+  // Per-location breakdown for multi-location jobs (falls back to the single
+  // block above when there's only one location). Location name shares its
+  // first category's line ("Main House:    Double Hungs:    $924,140.00"),
+  // later categories for the same location repeat with a blank location cell
+  // so everything lines up under it. Only the BASE BID PRICE line is bold —
+  // location/category labels stay plain weight to match the reference layout.
   const multipleLocationsFinalPrice = (() => {
     if (!summary.hasMultipleLocations || !summary.subLocations?.length) {
       return finalPrice;
     }
+    const locEntries = summary.subLocations.map((loc, i) => ({
+      label: `${loc.label || `Location ${i + 1}`}:`,
+      categories: getCategoryEntries(loc.quoteTotals),
+    }));
+    const locColWidth = Math.max(LABEL_COL_WIDTH, ...locEntries.map(l => l.label.length + 2));
+    const allAmounts = locEntries.flatMap(l => l.categories.map(c => c.amount)).concat(baseBidAmount);
+    const amountWidth = Math.max(...allAmounts.map(a => a.length));
+
     const lines: string[] = [];
-    summary.subLocations.forEach((loc, i) => {
-      lines.push(`<strong>${loc.label || `Location ${i + 1}`}:</strong>`);
-      lines.push(...buildCategoryLines(loc.quoteTotals, '\u00A0\u00A0'));
+    locEntries.forEach(({ label, categories }) => {
+      categories.forEach((cat, idx) => {
+        const locCell = idx === 0 ? padTo(label, locColWidth) : '\u00A0'.repeat(locColWidth);
+        lines.push(`${locCell}${padLabel(cat.label)}${padAmountRight(cat.amount, amountWidth)}`);
+      });
     });
     if (lines.length > 0) {
       lines[lines.length - 1] = `<u>${lines[lines.length - 1]}</u>`;
     }
-    lines.push(baseBidLine);
+    lines.push(
+      `<strong>${padTo('BASE BID PRICE:', locColWidth + LABEL_COL_WIDTH)}${padAmountRight(baseBidAmount, amountWidth)}</strong>`
+    );
     return lines.join('<br>');
   })();
 
