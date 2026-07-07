@@ -4598,6 +4598,35 @@ export default function SummaryPage() {
                       finalAdj: gtNet ? (p(aggQt?.euroWindows?.finalAdj) + p(aggQt?.doubleHung?.finalAdj) + p(aggQt?.euroDoors?.finalAdj)) / gtNet : 0,
                     };
 
+                    // Grand Total table cell for a category (Euro Windows / Double Hung / Euro Doors) x field (Full/%/Final/+Adj).
+                    // Multi-location jobs: read-only, auto-summed from the per-location tables (aggQt).
+                    // Single-location jobs: editable input bound to the top-level quoteTotals (unchanged behavior).
+                    const catCell = (cat: 'euroWindows' | 'doubleHung' | 'euroDoors', f: 'full' | 'pct' | 'final' | 'finalAdj') => {
+                      const bgCls = f === 'finalAdj' ? 'bg-purple-50/30' : f === 'final' ? 'bg-green-50/30' : 'bg-blue-50/30';
+                      const txtCls = f === 'finalAdj' ? 'text-purple-700' : f === 'final' ? 'text-green-700' : 'text-blue-700';
+                      if (editingSummary.hasMultipleLocations) {
+                        const v = p((aggQt as any)?.[cat]?.[f]);
+                        return <td key={`${cat}-${f}`} className={`px-4 py-3 text-right ${txtCls} ${bgCls}`}>{v ? `$${fmtInt(v)}` : '—'}</td>;
+                      }
+                      return (
+                        <td key={`${cat}-${f}`} className={`px-1 py-1 ${bgCls}`}>
+                          <input
+                            type="text"
+                            value={fmtQtInput((editingSummary.quoteTotals?.[cat] as any)?.[f] || '')}
+                            onChange={(e) => setEditingSummary({
+                              ...editingSummary,
+                              quoteTotals: {
+                                ...(editingSummary.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } }),
+                                [cat]: { ...((editingSummary.quoteTotals?.[cat] as any) || { full: '', pct: '', final: '', finalAdj: '' }), [f]: stripQtInput(e.target.value) },
+                              },
+                            })}
+                            className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${txtCls}`}
+                            placeholder="—"
+                          />
+                        </td>
+                      );
+                    };
+
                     // Helper to render a single location's quote totals table
                     const renderQuoteTotalsTable = (
                       locLabel: string | null,
@@ -4774,11 +4803,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowSqFt)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmtInt(euroWindowNet)}` : '—'}</td>
-                                {['full','pct','final','finalAdj'].map(f => (
-                                  <td key={`ew-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
-                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroWindows as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
-                                  </td>
-                                ))}
+                                {(['full','pct','final','finalAdj'] as const).map(f => catCell('euroWindows', f))}
                                 <td className="px-4 py-3 text-right text-blue-600 border-l-4 border-blue-300 bg-blue-50/30">{ewCalc.full ? fmt(ewCalc.full) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-blue-600 bg-blue-50/30">{ewCalc.disc ? fmt(ewCalc.disc) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-green-600 bg-green-50/30">{ewCalc.final ? fmt(ewCalc.final) : '—'}</td>
@@ -4831,11 +4856,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungSqFt)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `€${fmtInt(doubleHungNet)}` : '—'}</td>
-                                {['full','pct','final','finalAdj'].map(f => (
-                                  <td key={`dh-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
-                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.doubleHung as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
-                                  </td>
-                                ))}
+                                {(['full','pct','final','finalAdj'] as const).map(f => catCell('doubleHung', f))}
                                 <td className="px-4 py-3 text-right text-blue-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? fmt(dhCalc.full) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-blue-400 bg-blue-50/30">{dhCalc.disc ? fmt(dhCalc.disc) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-green-400 bg-green-50/30">{dhCalc.final ? fmt(dhCalc.final) : '—'}</td>
@@ -4888,11 +4909,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorSqFt)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{doorNet ? `€${fmtInt(doorNet)}` : '—'}</td>
-                                {['full','pct','final','finalAdj'].map(f => (
-                                  <td key={`ed-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
-                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroDoors as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
-                                  </td>
-                                ))}
+                                {(['full','pct','final','finalAdj'] as const).map(f => catCell('euroDoors', f))}
                                 <td className="px-4 py-3 text-right text-blue-600 border-l-4 border-blue-300 bg-blue-50/30">{edCalc.full ? fmt(edCalc.full) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-blue-600 bg-blue-50/30">{edCalc.disc ? fmt(edCalc.disc) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-green-600 bg-green-50/30">{edCalc.final ? fmt(edCalc.final) : '—'}</td>
