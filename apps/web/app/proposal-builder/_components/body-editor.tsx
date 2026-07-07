@@ -94,7 +94,10 @@ function ToolbarBtn({ active, onClick, label, children }: ToolbarBtnProps) {
  * Emits HTML on every change. Token placeholders (`{{tokenName}}`) live in
  * the body as plain text — they're resolved at assembly time, not in the
  * editor. The Variables chip panel inserts these literal token strings at
- * the cursor via the exposed `insertText` handle.
+ * the cursor via the exposed `insertText` handle. Note: `{{FinalPrice}}` and
+ * `{{MultipleLocationsFinalPrice}}` resolve to pre-formatted, multi-line
+ * HTML (bold labels, underline rule before the total) — do not wrap them in
+ * additional formatting.
  */
 export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEditor(
   { value, onChange, placeholder, minHeight = 180, onFocus },
