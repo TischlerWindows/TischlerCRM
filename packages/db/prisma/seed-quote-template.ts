@@ -79,6 +79,8 @@ export const BUILT_IN_TOKEN_MAPPINGS: BuiltInTokenMappingSeed[] = [
   { tokenName: 'euroDoorsPrice', sourceObject: 'SUMMARY', sourcePath: 'quoteTotals.euroDoors.finalAdj', format: 'CURRENCY', label: 'Euro Doors Price', category: 'Pricing' },
   { tokenName: 'grandTotal', sourceObject: 'SUMMARY', sourcePath: 'computed:grandTotal', format: 'CURRENCY', label: 'Grand Total', category: 'Pricing' },
   { tokenName: 'grandTotalAdjustment', sourceObject: 'SUMMARY', sourcePath: 'grandTotalAdjustment.finalAdj', format: 'CURRENCY', label: 'Grand Total Adjustment', category: 'Pricing' },
+  { tokenName: 'FinalPrice', sourceObject: 'SUMMARY', sourcePath: 'computed:finalPrice', format: 'TEXT', label: 'Final Price (Double Hungs + Euro Windows + Doors + Base Bid, one block)', category: 'Pricing' },
+  { tokenName: 'MultipleLocationsFinalPrice', sourceObject: 'SUMMARY', sourcePath: 'computed:multipleLocationsFinalPrice', format: 'TEXT', label: 'Final Price — broken out per location (multi-location jobs)', category: 'Pricing' },
 
   // Add-on pricing
   { tokenName: 'windowScreensPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.windowScreens.final', format: 'CURRENCY', label: 'Window Screens Price', category: 'Add-ons' },

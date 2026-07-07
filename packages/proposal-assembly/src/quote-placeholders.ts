@@ -90,7 +90,7 @@ export interface SummaryForPlaceholders {
   /** Multi-location jobs store their own quoteTotals per sub-location; the
    * top-level `quoteTotals` above is left blank/unused in that case. */
   hasMultipleLocations?: boolean;
-  subLocations?: Array<{ quoteTotals?: SummaryForPlaceholders['quoteTotals'] }>;
+  subLocations?: Array<{ label?: string; quoteTotals?: SummaryForPlaceholders['quoteTotals'] }>;
   addOns: {
     windowScreens: { qty: string; final: string; [k: string]: unknown };
     doorScreenSash: { qty: string; final: string; [k: string]: unknown };
@@ -431,6 +431,32 @@ export function buildTokenMap(
   const grandAdj = parseInt(summary.grandTotalAdjustment?.finalAdj || '0', 10) || 0;
   const grandTotal = euroWindowsFinal + doubleHungFinal + euroDoorsFinal + grandAdj;
 
+  // Consolidated pricing block — combines the Double Hungs / Euro Windows / Doors /
+  // BASE BID PRICE lines that used to require 4 separate tokens into a single token.
+  const finalPrice = [
+    `Double Hungs: ${formatDollar(effQuoteTotals?.doubleHung?.finalAdj)}`,
+    `Euro Windows: ${formatDollar(effQuoteTotals?.euroWindows?.finalAdj)}`,
+    `Doors: ${formatDollar(effQuoteTotals?.euroDoors?.finalAdj)}`,
+    `BASE BID PRICE: ${formatDollar(String(grandTotal))}`,
+  ].join('<br>');
+
+  // Same pricing block, broken out per sub-location for multi-location jobs
+  // (falls back to the single-block output above when there's only one location).
+  const multipleLocationsFinalPrice = (() => {
+    if (!summary.hasMultipleLocations || !summary.subLocations?.length) {
+      return finalPrice;
+    }
+    const lines: string[] = [];
+    summary.subLocations.forEach((loc, i) => {
+      lines.push(`${loc.label || `Location ${i + 1}`}:`);
+      lines.push(`Double Hungs: ${formatDollar(loc.quoteTotals?.doubleHung?.finalAdj)}`);
+      lines.push(`Euro Windows: ${formatDollar(loc.quoteTotals?.euroWindows?.finalAdj)}`);
+      lines.push(`Doors: ${formatDollar(loc.quoteTotals?.euroDoors?.finalAdj)}`);
+    });
+    lines.push(`BASE BID PRICE: ${formatDollar(String(grandTotal))}`);
+    return lines.join('<br>');
+  })();
+
   const tokens: Record<string, string> = {
     // Project info
     projectName: summary.name || '',
@@ -468,6 +494,8 @@ export function buildTokenMap(
     euroDoorsPrice: formatDollar(effQuoteTotals?.euroDoors?.finalAdj),
     grandTotal: formatDollar(String(grandTotal)),
     grandTotalAdjustment: formatDollar(summary.grandTotalAdjustment?.finalAdj),
+    FinalPrice: finalPrice,
+    MultipleLocationsFinalPrice: multipleLocationsFinalPrice,
 
     // Add-on pricing
     windowScreensPrice: formatDollar(summary.addOns?.windowScreens?.final),
