@@ -55,6 +55,15 @@ const col = (title: string, fields: FieldDef[], opts?: { tall?: boolean; width?:
   width: opts?.width,
 })
 
+/** Build the 5 stacked free-text subrows one Shop Drawings/Loading List column holds (one per physical sheet row). */
+const rows5 = (keyPrefix: string, label: string): FieldDef[] =>
+  [1, 2, 3, 4, 5].map(n => ({
+    key: `${keyPrefix}Row${n}`,
+    label: `${label} — Row ${n}`,
+    shortLabel: `${n}`,
+    type: 'text' as FieldType,
+  }))
+
 const GROUPS: GroupDef[] = [
   {
     title: 'Order Info',
@@ -73,74 +82,50 @@ const GROUPS: GroupDef[] = [
       col('ST (Standard)', [{ key: 'standardProductType', label: 'ST (Standard)', type: 'checkbox' }]),
       col('DC (Dade County)', [{ key: 'dadeCountyProductType', label: 'DC (Dade County)', type: 'checkbox' }]),
       col('DH (Double Hung)', [{ key: 'doubleHungProductType', label: 'DH (Double Hung)', type: 'checkbox' }]),
-      col('Roll System', [{ key: 'rollSystem', label: 'Roll System', type: 'text' }]),
     ],
   },
   {
-    title: 'Materials',
+    title: 'Roll System',
     columns: [
-      col('Wood Species', [{ key: 'woodSpecies', label: 'Wood Species', type: 'text' }]),
-      col('Finish Color', [{ key: 'finishColor', label: 'Finish Color', type: 'text' }]),
-      col('DC Silicone', [{ key: 'dcSilicone', label: 'DC Silicone', type: 'checkbox' }]),
-      col('Solar Ctrl', [{ key: 'solarControl', label: 'Solar Ctrl', type: 'checkbox' }]),
       col('Screen', [{ key: 'screenFlag', label: 'Screen', type: 'checkbox' }]),
       col('Lutron', [{ key: 'lutronFlag', label: 'Lutron', type: 'checkbox' }]),
       col('Check', [{ key: 'checkFlag', label: 'Check', type: 'checkbox' }]),
     ],
   },
   {
-    title: 'Change Orders',
+    title: 'Materials',
+    columns: [
+      col('Wood Species', [{ key: 'woodSpecies', label: 'Wood Species', type: 'text' }]),
+      col('DC Silicone', [{ key: 'dcSilicone', label: 'DC Silicone', type: 'checkbox' }]),
+      col('Solar Ctrl', [{ key: 'solarControl', label: 'Solar Ctrl', type: 'checkbox' }]),
+      col('Finish Color', [{ key: 'finishColor', label: 'Finish Color', type: 'text' }]),
+    ],
+  },
+  {
+    title: 'Change Order in Estim / To Client',
     columns: [
       col(
         'Change Order in Estim / To Client',
         [{ key: 'changeOrderEstimToClient', label: 'Change Order in Estim / To Client', type: 'textarea' }],
         { tall: true, width: 'w-[220px]' }
       ),
-      col('CO Down Date', [{ key: 'coDownDate', label: 'CO Down Date', type: 'date' }]),
-      col('CO Out Date', [{ key: 'coOutDate', label: 'CO Out Date', type: 'date' }]),
-      col('CO Back Date', [{ key: 'coBackDate', label: 'CO Back Date', type: 'date' }]),
     ],
   },
   {
     title: 'Shop Drawings',
     columns: [
-      col(
-        'Shop Drawings',
-        [
-          { key: 'shopDrawingsStatus', label: 'Status', shortLabel: 'Status', type: 'select', options: ['Not Started', 'In Progress', 'Done'] },
-          { key: 'set1OrderDate', label: 'Set 1 — Order', shortLabel: 'Set 1 · Order', type: 'date' },
-          { key: 'set1BackDate', label: 'Set 1 — Back', shortLabel: 'Set 1 · Back', type: 'date' },
-          { key: 'set1DueDate', label: 'Set 1 — Due', shortLabel: 'Set 1 · Due', type: 'date' },
-          { key: 'set2OrderDate', label: 'Set 2 — Order', shortLabel: 'Set 2 · Order', type: 'date' },
-          { key: 'set2BackDate', label: 'Set 2 — Back', shortLabel: 'Set 2 · Back', type: 'date' },
-          { key: 'set2DueDate', label: 'Set 2 — Due', shortLabel: 'Set 2 · Due', type: 'date' },
-          { key: 'set3OrderDate', label: 'Set 3 — Order', shortLabel: 'Set 3 · Order', type: 'date' },
-          { key: 'set3BackDate', label: 'Set 3 — Back', shortLabel: 'Set 3 · Back', type: 'date' },
-          { key: 'set3DueDate', label: 'Set 3 — Due', shortLabel: 'Set 3 · Due', type: 'date' },
-          { key: 'set4OrderDate', label: 'Set 4 — Order', shortLabel: 'Set 4 · Order', type: 'date' },
-          { key: 'set4BackDate', label: 'Set 4 — Back', shortLabel: 'Set 4 · Back', type: 'date' },
-          { key: 'set4DueDate', label: 'Set 4 — Due', shortLabel: 'Set 4 · Due', type: 'date' },
-          { key: 'finalSetOrderDate', label: 'Final — Order', shortLabel: 'Final · Order', type: 'date' },
-          { key: 'finalSetBackDate', label: 'Final — Back', shortLabel: 'Final · Back', type: 'date' },
-          { key: 'finalSetDueDate', label: 'Final — Due', shortLabel: 'Final · Due', type: 'date' },
-        ],
-        { width: 'w-[220px]' }
-      ),
+      col('Set 1', rows5('set1', 'Set 1'), { width: 'w-[120px]' }),
+      col('Set 2', rows5('set2', 'Set 2'), { width: 'w-[120px]' }),
+      col('Set 3', rows5('set3', 'Set 3'), { width: 'w-[120px]' }),
+      col('Set 4', rows5('set4', 'Set 4'), { width: 'w-[120px]' }),
+      col('Final', rows5('finalSet', 'Final'), { width: 'w-[120px]' }),
+      col('Install Set', rows5('installSet', 'Install Set'), { width: 'w-[120px]' }),
     ],
   },
   {
     title: 'Install & Job Status',
     columns: [
-      col('Install Set Date', [{ key: 'installSetDate', label: 'Install Set Date', type: 'date' }]),
-      col(
-        'Job Status / Order Date',
-        [
-          { key: 'jobStatusDetail', label: 'Job Status', shortLabel: 'Status', type: 'select', options: ['To be scheduled', 'Ordered', 'Shipped', 'Delivered'] },
-          { key: 'jobOrderDate', label: 'Job Order Date', shortLabel: 'Order Date', type: 'date' },
-        ],
-        { width: 'w-[190px]' }
-      ),
-      col('% Complete', [{ key: 'percentComplete', label: '% Complete', type: 'number' }]),
+      col('Job Status / Order Date', [{ key: 'jobStatusOrderDate', label: 'Job Status / Order Date', type: 'text' }]),
       col('On-Hold Units', [{ key: 'onHoldUnits', label: 'On-Hold Units', type: 'number' }]),
     ],
   },
@@ -156,42 +141,22 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Shipping',
     columns: [
-      col(
-        'Shipping',
-        [
-          { key: 'shippingWeek', label: 'Shipping Week', shortLabel: 'Ship Wk', type: 'number' },
-          { key: 'estimatedDeliveryWeek', label: 'Estimated Delivery Wk', shortLabel: 'Est. Delivery Wk', type: 'number' },
-        ],
-        { width: 'w-[170px]' }
-      ),
+      col('Shipping Week', [{ key: 'shippingWeek', label: 'Shipping Week', type: 'number' }]),
+      col('Estimated Delivery Wk', [{ key: 'estimatedDeliveryWeek', label: 'Estimated Delivery Wk', type: 'number' }]),
     ],
   },
   {
     title: 'Loading List',
     columns: [
-      col(
-        'Loading List',
-        [
-          { key: 'loadingListRF', label: 'RF (Received from Factory)', shortLabel: 'RF', type: 'date' },
-          { key: 'loadingListRS', label: 'RS (Received from Site)', shortLabel: 'RS', type: 'date' },
-          { key: 'loadingListOF', label: 'OF (Out to Factory)', shortLabel: 'OF', type: 'date' },
-        ],
-        { width: 'w-[190px]' }
-      ),
+      col('RF', rows5('loadingListRF', 'RF'), { width: 'w-[100px]' }),
+      col('RS', rows5('loadingListRS', 'RS'), { width: 'w-[100px]' }),
+      col('OF', rows5('loadingListOF', 'OF'), { width: 'w-[100px]' }),
     ],
   },
   {
     title: 'Completion Sign-off',
     columns: [
-      col(
-        'Completion Sign-off',
-        [
-          { key: 'completionSignOffOrdered', label: 'Ordered', shortLabel: 'Ordered', type: 'date' },
-          { key: 'completionSignOffComplete', label: 'Complete', shortLabel: 'Complete', type: 'date' },
-          { key: 'completionSignOffBilled', label: 'Billed', shortLabel: 'Billed', type: 'date' },
-        ],
-        { width: 'w-[190px]' }
-      ),
+      col('Completion Sign-off', [{ key: 'completionSignOff', label: 'Completion Sign-off', type: 'textarea' }], { tall: true, width: 'w-[180px]' }),
     ],
   },
 ]
