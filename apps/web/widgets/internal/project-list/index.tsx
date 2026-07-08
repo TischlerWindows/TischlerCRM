@@ -113,12 +113,12 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Shop Drawings',
     columns: [
-      col('Set 1', rows5('set1', 'Set 1'), { width: 230 }),
-      col('Set 2', rows5('set2', 'Set 2'), { width: 230 }),
-      col('Set 3', rows5('set3', 'Set 3'), { width: 230 }),
-      col('Set 4', rows5('set4', 'Set 4'), { width: 230 }),
-      col('Final', rows5('finalSet', 'Final'), { width: 230 }),
-      col('Install Set', rows5('installSet', 'Install Set'), { width: 230 }),
+      col('Set 1', rows5('set1', 'Set 1'), { width: 58 }),
+      col('Set 2', rows5('set2', 'Set 2'), { width: 58 }),
+      col('Set 3', rows5('set3', 'Set 3'), { width: 58 }),
+      col('Set 4', rows5('set4', 'Set 4'), { width: 58 }),
+      col('Final', rows5('finalSet', 'Final'), { width: 58 }),
+      col('Install Set', rows5('installSet', 'Install Set'), { width: 58 }),
     ],
   },
   {
@@ -147,9 +147,9 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Loading List',
     columns: [
-      col('RF', rows5('loadingListRF', 'RF'), { width: 210 }),
-      col('RS', rows5('loadingListRS', 'RS'), { width: 210 }),
-      col('OF', rows5('loadingListOF', 'OF'), { width: 210 }),
+      col('RF', rows5('loadingListRF', 'RF'), { width: 53 }),
+      col('RS', rows5('loadingListRS', 'RS'), { width: 53 }),
+      col('OF', rows5('loadingListOF', 'OF'), { width: 53 }),
     ],
   },
   {
@@ -337,9 +337,9 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
     return (
       <div className="flex flex-col gap-1">
         {column.fields.map(f => (
-          <div key={f.key} className="flex items-center gap-1.5">
+          <div key={f.key} className="flex items-center gap-1">
             <span
-              className="text-[9px] font-medium text-gray-400 w-3.5 shrink-0 text-center"
+              className="text-[9px] font-medium text-gray-400 w-2.5 shrink-0 text-center"
               title={f.label}
             >
               {f.shortLabel || f.label}
@@ -402,7 +402,7 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
               key={column.key}
               role="cell"
               style={{ width: columnWidthPx(column), flex: `0 0 auto` }}
-              className="border-r border-b border-gray-100 px-1.5 py-1.5"
+              className="border-r border-b border-gray-100 px-1 py-1.5"
             >
               {renderCell(column)}
             </div>
