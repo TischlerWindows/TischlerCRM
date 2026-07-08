@@ -113,12 +113,12 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Shop Drawings',
     columns: [
-      col('Set 1', rows5('set1', 'Set 1'), { width: 210 }),
-      col('Set 2', rows5('set2', 'Set 2'), { width: 210 }),
-      col('Set 3', rows5('set3', 'Set 3'), { width: 210 }),
-      col('Set 4', rows5('set4', 'Set 4'), { width: 210 }),
-      col('Final', rows5('finalSet', 'Final'), { width: 210 }),
-      col('Install Set', rows5('installSet', 'Install Set'), { width: 210 }),
+      col('Set 1', rows5('set1', 'Set 1'), { width: 230 }),
+      col('Set 2', rows5('set2', 'Set 2'), { width: 230 }),
+      col('Set 3', rows5('set3', 'Set 3'), { width: 230 }),
+      col('Set 4', rows5('set4', 'Set 4'), { width: 230 }),
+      col('Final', rows5('finalSet', 'Final'), { width: 230 }),
+      col('Install Set', rows5('installSet', 'Install Set'), { width: 230 }),
     ],
   },
   {
@@ -147,9 +147,9 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Loading List',
     columns: [
-      col('RF', rows5('loadingListRF', 'RF'), { width: 190 }),
-      col('RS', rows5('loadingListRS', 'RS'), { width: 190 }),
-      col('OF', rows5('loadingListOF', 'OF'), { width: 190 }),
+      col('RF', rows5('loadingListRF', 'RF'), { width: 210 }),
+      col('RS', rows5('loadingListRS', 'RS'), { width: 210 }),
+      col('OF', rows5('loadingListOF', 'OF'), { width: 210 }),
     ],
   },
   {
@@ -371,49 +371,43 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
         </button>
       </div>
 
-      <div className="overflow-x-auto border border-gray-200 rounded-lg">
-        <table className="border-collapse text-sm table-fixed">
-          <colgroup>
-            {ALL_COLUMNS.map(column => (
-              <col key={column.key} style={{ width: `${columnWidthPx(column)}px` }} />
-            ))}
-          </colgroup>
-          <thead>
-            <tr>
-              {GROUPS.map(group => (
-                <th
-                  key={group.title}
-                  colSpan={group.columns.length}
-                  className="sticky top-0 z-10 bg-gray-100 border-b border-r border-gray-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 text-left whitespace-nowrap"
-                >
-                  {group.title}
-                </th>
-              ))}
-            </tr>
-            <tr>
-              {ALL_COLUMNS.map(column => (
-                <th
-                  key={column.key}
-                  className="sticky top-[22px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-500 text-left align-bottom whitespace-nowrap overflow-hidden text-ellipsis"
-                >
-                  {column.title}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              {ALL_COLUMNS.map(column => (
-                <td
-                  key={column.key}
-                  className="border-r border-b border-gray-100 px-1.5 py-1.5 align-top"
-                >
-                  {renderCell(column)}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
+      <div className="overflow-x-auto border border-gray-200 rounded-lg" role="table">
+        <div className="flex" role="row">
+          {GROUPS.map(group => (
+            <div
+              key={group.title}
+              role="columnheader"
+              style={{ width: group.columns.reduce((sum, c) => sum + columnWidthPx(c), 0), flex: `0 0 auto` }}
+              className="sticky top-0 z-10 bg-gray-100 border-b border-r border-gray-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap overflow-hidden"
+            >
+              {group.title}
+            </div>
+          ))}
+        </div>
+        <div className="flex" role="row">
+          {ALL_COLUMNS.map(column => (
+            <div
+              key={column.key}
+              role="columnheader"
+              style={{ width: columnWidthPx(column), flex: `0 0 auto` }}
+              className="sticky top-[22px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis"
+            >
+              {column.title}
+            </div>
+          ))}
+        </div>
+        <div className="flex" role="row">
+          {ALL_COLUMNS.map(column => (
+            <div
+              key={column.key}
+              role="cell"
+              style={{ width: columnWidthPx(column), flex: `0 0 auto` }}
+              className="border-r border-b border-gray-100 px-1.5 py-1.5"
+            >
+              {renderCell(column)}
+            </div>
+          ))}
+        </div>
       </div>
 
       {isDirty && (
