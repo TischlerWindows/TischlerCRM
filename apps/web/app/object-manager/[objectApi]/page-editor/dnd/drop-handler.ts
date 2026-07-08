@@ -31,6 +31,8 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   Path: { type: 'Path', pathId: '', showLabel: true, showGuidance: true, showKeyFields: true, compact: false },
   InstallationCostGrid: { type: 'InstallationCostGrid' },
   Summary: { type: 'Summary' },
+  DropboxFiles: { type: 'DropboxFiles' },
+  ProjectList: { type: 'ProjectList' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────

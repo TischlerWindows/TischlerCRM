@@ -42,6 +42,7 @@ const WIDGET_ICONS: Partial<Record<LayoutWidget['widgetType'], React.ElementType
   ExternalWidget: Puzzle,
   Path: GitBranch,
   InstallationCostGrid: Table2,
+  ProjectList: Table2,
 };
 
 const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
@@ -56,6 +57,7 @@ const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   TeamMemberSlot: 'Connection Slot',
   Path: 'Path',
   InstallationCostGrid: 'Installation Cost Grid',
+  ProjectList: 'Project List',
 };
 
 function summarizeWidget(widget: LayoutWidget): string {

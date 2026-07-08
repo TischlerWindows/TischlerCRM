@@ -76,6 +76,7 @@ export function useEnabledWidgetIds(): {
  * manifest id (derived from the registration).
  */
 export function widgetIdForConfig(config: WidgetConfig): string | null {
+  if (!config) return null
   if (config.type === 'ExternalWidget') return config.externalWidgetId
   const reg = getInternalRegistrationByType(config.type)
   return reg?.manifest.id ?? null

@@ -94,7 +94,8 @@ const PROVIDER_LABELS: Record<string, string> = {
   local: 'Files',
 }
 
-function getWidgetLabel(config: WidgetConfig): string {
+function getWidgetLabel(config: WidgetConfig | undefined | null): string {
+  if (!config) return 'Widget'
   switch (config.type) {
     case 'RelatedList':
       return config.label || config.relatedObjectApiName || 'Related List'
@@ -224,13 +225,15 @@ export function LayoutWidgetsInline({
     <div className="mb-4 flex flex-col gap-3">
       {sorted.map((w) => {
         const config = w.config
-        const isCollapsible = canCollapse && !NON_COLLAPSIBLE_TYPES.has(config.type) && w.collapsible !== false
+        const isCollapsible = canCollapse && !!config && !NON_COLLAPSIBLE_TYPES.has(config.type) && w.collapsible !== false
         const isCollapsed = isCollapsible && collapsedWidgetIds!.has(w.id)
         const label = getWidgetLabel(config)
 
         let content: React.ReactNode = null
 
-        if (config.type === 'ExternalWidget') {
+        if (!config) {
+          content = <WidgetInvalidConfigFallback key={w.id} widgetType={w.widgetType} />
+        } else if (config.type === 'ExternalWidget') {
           const { externalWidgetId, displayMode, config: widgetConfig } = config
           const registration = getExternalRegistration(externalWidgetId)
 
