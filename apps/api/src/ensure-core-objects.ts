@@ -119,9 +119,9 @@ const CORE_OBJECTS = [
       // ── Project List report fields (Tischler master project-tracking sheet) ──
       { apiName: 'tusOrderNumber', label: 'TUS Order #', type: 'Text' },
       { apiName: 'factory', label: 'Factory', type: 'Text' },
-      { apiName: 'standardProductType', label: 'ST (Standard)', type: 'Checkbox' },
-      { apiName: 'dadeCountyProductType', label: 'DC (Dade County)', type: 'Checkbox' },
-      { apiName: 'doubleHungProductType', label: 'DH (Double Hung)', type: 'Checkbox' },
+      { apiName: 'standardProductType', label: 'ST (Standard)', type: 'Text' },
+      { apiName: 'dadeCountyProductType', label: 'DC (Dade County)', type: 'Text' },
+      { apiName: 'doubleHungProductType', label: 'DH (Double Hung)', type: 'Text' },
       { apiName: 'screenFlag', label: 'Screen', type: 'Checkbox' },
       { apiName: 'lutronFlag', label: 'Lutron', type: 'Checkbox' },
       { apiName: 'checkFlag', label: 'Check', type: 'Checkbox' },

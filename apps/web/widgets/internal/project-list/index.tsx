@@ -82,9 +82,9 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Product Type',
     columns: [
-      col('ST (Standard)', [{ key: 'standardProductType', label: 'ST (Standard)', type: 'checkbox' }]),
-      col('DC (Dade County)', [{ key: 'dadeCountyProductType', label: 'DC (Dade County)', type: 'checkbox' }]),
-      col('DH (Double Hung)', [{ key: 'doubleHungProductType', label: 'DH (Double Hung)', type: 'checkbox' }]),
+      col('ST (Standard)', [{ key: 'standardProductType', label: 'ST (Standard)', type: 'text' }]),
+      col('DC (Dade County)', [{ key: 'dadeCountyProductType', label: 'DC (Dade County)', type: 'text' }]),
+      col('DH (Double Hung)', [{ key: 'doubleHungProductType', label: 'DH (Double Hung)', type: 'text' }]),
     ],
   },
   {
