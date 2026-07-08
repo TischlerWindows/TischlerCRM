@@ -39,7 +39,8 @@ interface ColumnDef {
   fields: FieldDef[]
   /** Render the (single) field as a taller multi-line box instead of a one-line input. */
   tall?: boolean
-  width?: string
+  /** Fixed column width in pixels, applied via <colgroup> so multi-column groups don't get auto-shrunk. */
+  width?: number
 }
 
 interface GroupDef {
@@ -47,7 +48,7 @@ interface GroupDef {
   columns: ColumnDef[]
 }
 
-const col = (title: string, fields: FieldDef[], opts?: { tall?: boolean; width?: string }): ColumnDef => ({
+const col = (title: string, fields: FieldDef[], opts?: { tall?: boolean; width?: number }): ColumnDef => ({
   key: fields[0]!.key,
   title,
   fields,
@@ -106,24 +107,24 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Change Order in Estim / To Client',
     columns: [
-      col('Change Order in Estim / To Client', rowsN(4, 'changeOrder', 'Change Order'), { width: 'w-[200px]' }),
+      col('Change Order in Estim / To Client', rowsN(4, 'changeOrder', 'Change Order'), { width: 200 }),
     ],
   },
   {
     title: 'Shop Drawings',
     columns: [
-      col('Set 1', rows5('set1', 'Set 1'), { width: 'w-[170px]' }),
-      col('Set 2', rows5('set2', 'Set 2'), { width: 'w-[170px]' }),
-      col('Set 3', rows5('set3', 'Set 3'), { width: 'w-[170px]' }),
-      col('Set 4', rows5('set4', 'Set 4'), { width: 'w-[170px]' }),
-      col('Final', rows5('finalSet', 'Final'), { width: 'w-[170px]' }),
-      col('Install Set', rows5('installSet', 'Install Set'), { width: 'w-[170px]' }),
+      col('Set 1', rows5('set1', 'Set 1'), { width: 210 }),
+      col('Set 2', rows5('set2', 'Set 2'), { width: 210 }),
+      col('Set 3', rows5('set3', 'Set 3'), { width: 210 }),
+      col('Set 4', rows5('set4', 'Set 4'), { width: 210 }),
+      col('Final', rows5('finalSet', 'Final'), { width: 210 }),
+      col('Install Set', rows5('installSet', 'Install Set'), { width: 210 }),
     ],
   },
   {
     title: 'Install & Job Status',
     columns: [
-      col('Job Status / Order Date', rowsN(3, 'jobStatusOrderDate', 'Job Status / Order Date'), { width: 'w-[190px]' }),
+      col('Job Status / Order Date', rowsN(3, 'jobStatusOrderDate', 'Job Status / Order Date'), { width: 190 }),
       col('On-Hold Units', [{ key: 'onHoldUnits', label: 'On-Hold Units', type: 'number' }]),
     ],
   },
@@ -131,30 +132,30 @@ const GROUPS: GroupDef[] = [
     title: 'Hardware & Installation',
     columns: [
       col('Custom Hardware', [{ key: 'customHardware', label: 'Custom Hardware', type: 'text' }]),
-      col('Factory O.C.', rowsN(2, 'factoryOC', 'Factory O.C.'), { width: 'w-[170px]' }),
-      col('Installation Material', rowsN(2, 'installationMaterial', 'Installation Material'), { width: 'w-[190px]' }),
-      col('Installation Instruction', rowsN(3, 'installationInstruction', 'Installation Instruction'), { width: 'w-[190px]' }),
+      col('Factory O.C.', rowsN(2, 'factoryOC', 'Factory O.C.'), { width: 170 }),
+      col('Installation Material', rowsN(2, 'installationMaterial', 'Installation Material'), { width: 190 }),
+      col('Installation Instruction', rowsN(3, 'installationInstruction', 'Installation Instruction'), { width: 190 }),
     ],
   },
   {
     title: 'Shipping',
     columns: [
-      col('Shipping Week', rowsN(5, 'shippingWeek', 'Shipping Week'), { width: 'w-[150px]' }),
-      col('Estimated Delivery Wk', rowsN(5, 'estimatedDeliveryWeek', 'Estimated Delivery Wk'), { width: 'w-[150px]' }),
+      col('Shipping Week', rowsN(5, 'shippingWeek', 'Shipping Week'), { width: 190 }),
+      col('Estimated Delivery Wk', rowsN(5, 'estimatedDeliveryWeek', 'Estimated Delivery Wk'), { width: 190 }),
     ],
   },
   {
     title: 'Loading List',
     columns: [
-      col('RF', rows5('loadingListRF', 'RF'), { width: 'w-[150px]' }),
-      col('RS', rows5('loadingListRS', 'RS'), { width: 'w-[150px]' }),
-      col('OF', rows5('loadingListOF', 'OF'), { width: 'w-[150px]' }),
+      col('RF', rows5('loadingListRF', 'RF'), { width: 190 }),
+      col('RS', rows5('loadingListRS', 'RS'), { width: 190 }),
+      col('OF', rows5('loadingListOF', 'OF'), { width: 190 }),
     ],
   },
   {
     title: 'Completion Sign-off',
     columns: [
-      col('Completion Sign-off', [{ key: 'completionSignOff', label: 'Completion Sign-off', type: 'textarea' }], { tall: true, width: 'w-[180px]' }),
+      col('Completion Sign-off', [{ key: 'completionSignOff', label: 'Completion Sign-off', type: 'textarea' }], { tall: true, width: 180 }),
     ],
   },
 ]
@@ -169,20 +170,20 @@ function toDateInputValue(v: unknown): string {
   return m ? m[1]! : ''
 }
 
-function defaultWidthClass(column: ColumnDef): string {
+function columnWidthPx(column: ColumnDef): number {
   if (column.width) return column.width
-  if (column.fields.length > 1) return 'w-[180px]'
+  if (column.fields.length > 1) return 180
   switch (column.fields[0]!.type) {
     case 'checkbox':
-      return 'w-[52px]'
+      return 52
     case 'date':
-      return 'w-[136px]'
+      return 136
     case 'number':
-      return 'w-[92px]'
+      return 92
     case 'select':
-      return 'w-[150px]'
+      return 150
     default:
-      return 'w-[140px]'
+      return 140
   }
 }
 
@@ -371,7 +372,12 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       </div>
 
       <div className="overflow-x-auto border border-gray-200 rounded-lg">
-        <table className="border-collapse text-sm w-max">
+        <table className="border-collapse text-sm table-fixed">
+          <colgroup>
+            {ALL_COLUMNS.map(column => (
+              <col key={column.key} style={{ width: `${columnWidthPx(column)}px` }} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
               {GROUPS.map(group => (
@@ -388,7 +394,7 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
               {ALL_COLUMNS.map(column => (
                 <th
                   key={column.key}
-                  className={`sticky top-[22px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-500 text-left align-bottom whitespace-nowrap ${defaultWidthClass(column)}`}
+                  className="sticky top-[22px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-500 text-left align-bottom whitespace-nowrap overflow-hidden text-ellipsis"
                 >
                   {column.title}
                 </th>
@@ -400,7 +406,7 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
               {ALL_COLUMNS.map(column => (
                 <td
                   key={column.key}
-                  className={`border-r border-b border-gray-100 px-1.5 py-1.5 align-top ${defaultWidthClass(column)}`}
+                  className="border-r border-b border-gray-100 px-1.5 py-1.5 align-top"
                 >
                   {renderCell(column)}
                 </td>
