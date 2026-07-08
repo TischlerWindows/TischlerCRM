@@ -74,7 +74,8 @@ const GROUPS: GroupDef[] = [
     title: 'Order Info',
     columns: [
       col('TUS Order #', [{ key: 'tusOrderNumber', label: 'TUS Order #', type: 'text' }]),
-      col('Factory', [{ key: 'factory', label: 'Factory', type: 'text' }]),
+      // Auto-filled (overridable): the linked Opportunity's Supplier(s) field.
+      col('Factory', [{ key: 'factory', label: 'Factory', type: 'text', computed: true }]),
     ],
   },
   {
@@ -245,9 +246,14 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       const propFlat = propRec ? recordsService.flattenRecord(propRec) : null
       const computedSalesman = oppFlat?.createdBy || ''
       const computedLocation = propFlat?.state || ''
-      setComputedValues({ projectSalesman: computedSalesman, projectLocation: computedLocation })
+      // supplier_or_suppliers is a MultiPicklist stored as a ";"-joined string.
+      const computedFactory = oppFlat?.supplier_or_suppliers
+        ? String(oppFlat.supplier_or_suppliers).split(';').filter(Boolean).join(', ')
+        : ''
+      setComputedValues({ projectSalesman: computedSalesman, projectLocation: computedLocation, factory: computedFactory })
       next.projectSalesman = next.projectSalesman || computedSalesman
       next.projectLocation = next.projectLocation || computedLocation
+      next.factory = next.factory || computedFactory
 
       setValues(next)
       setInitialValues(next)
