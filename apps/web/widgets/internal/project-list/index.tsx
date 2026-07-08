@@ -31,6 +31,8 @@ interface FieldDef {
   shortLabel?: string
   type: FieldType
   options?: string[]
+  /** Value is derived from a related record (Opportunity/Property) rather than edited directly. */
+  computed?: boolean
 }
 
 interface ColumnDef {
@@ -96,8 +98,12 @@ const GROUPS: GroupDef[] = [
     columns: [
       col('Tischler PM', [{ key: 'tischlerPM', label: 'Tischler PM', type: 'text' }]),
       col('Factory PM', [{ key: 'factoryPM', label: 'Factory PM', type: 'text' }]),
-      col('Salesman', [{ key: 'projectSalesman', label: 'Salesman', type: 'text' }]),
-      col('Location', [{ key: 'projectLocation', label: 'Location', type: 'text' }]),
+      // Derived (read-only): the Opportunity this Project is attached to (via the
+      // `opportunity` lookup field), showing who created that Opportunity.
+      col('Salesman', [{ key: 'projectSalesman', label: 'Salesman', type: 'text', computed: true }]),
+      // Derived (read-only): the state/province of the Property this Project is
+      // attached to (via the `property` lookup field).
+      col('Location', [{ key: 'projectLocation', label: 'Location', type: 'text', computed: true }]),
     ],
   },
   {
@@ -166,7 +172,9 @@ const GROUPS: GroupDef[] = [
 ]
 
 const ALL_COLUMNS: ColumnDef[] = GROUPS.flatMap(g => g.columns)
-const ALL_KEYS = ALL_COLUMNS.flatMap(c => c.fields.map(f => f.key))
+// Computed fields (Salesman, Location) are derived from related records, not
+// edited/saved directly, so they're excluded from the load/save-diff keys.
+const ALL_KEYS = ALL_COLUMNS.flatMap(c => c.fields.filter(f => !f.computed).map(f => f.key))
 
 /** Fixed pixel width for the leading, read-only "Project Name" column (sticky, not part of GROUPS/ALL_KEYS). */
 const PROJECT_NAME_WIDTH = 170
@@ -200,6 +208,8 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
   const [values, setValues] = useState<Record<string, any>>({})
   const [initialValues, setInitialValues] = useState<Record<string, any>>({})
   const [projectName, setProjectName] = useState('')
+  // Read-only values derived from related records (see FieldDef.computed).
+  const [computedValues, setComputedValues] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -220,6 +230,18 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       setValues(next)
       setInitialValues(next)
       setProjectName(flat.projectName || '')
+
+      // Resolve computed columns from the Project's related Opportunity/Property.
+      const [oppRec, propRec] = await Promise.all([
+        flat.opportunity ? recordsService.getRecord('Opportunity', String(flat.opportunity)).catch(() => null) : Promise.resolve(null),
+        flat.property ? recordsService.getRecord('Property', String(flat.property)).catch(() => null) : Promise.resolve(null),
+      ])
+      const oppFlat = oppRec ? recordsService.flattenRecord(oppRec) : null
+      const propFlat = propRec ? recordsService.flattenRecord(propRec) : null
+      setComputedValues({
+        projectSalesman: oppFlat?.createdBy || '',
+        projectLocation: propFlat?.state || '',
+      })
     } catch (err: any) {
       setError(err?.message || 'Failed to load project data')
     } finally {
@@ -329,6 +351,13 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
   const renderCell = (column: ColumnDef) => {
     if (column.fields.length === 1) {
       const f = column.fields[0]!
+      if (f.computed) {
+        return (
+          <div className="w-full text-xs px-1.5 py-1 text-gray-700 truncate" title={computedValues[f.key] || ''}>
+            {computedValues[f.key] || '—'}
+          </div>
+        )
+      }
       if (column.tall) {
         return (
           <textarea
