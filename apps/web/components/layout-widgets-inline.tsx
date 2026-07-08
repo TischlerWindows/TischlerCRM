@@ -123,6 +123,8 @@ function getWidgetLabel(config: WidgetConfig | undefined | null): string {
       return 'Dropbox Files'
     case 'ProjectList':
       return 'Project List'
+    case 'ProjectListVertical':
+      return 'Project List Vertical Page'
     default:
       return 'Widget'
   }

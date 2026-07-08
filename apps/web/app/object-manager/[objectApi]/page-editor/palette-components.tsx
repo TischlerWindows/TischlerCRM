@@ -12,6 +12,7 @@ import {
   Component,
   FolderOpen,
   LayoutGrid,
+  LayoutList,
   List,
   Minus,
   Puzzle,
@@ -28,6 +29,7 @@ const LUCIDE_ICON_MAP: Record<string, ElementType> = {
   Component,
   FolderOpen,
   LayoutGrid,
+  LayoutList,
   List,
   Minus,
   Puzzle,
@@ -60,6 +62,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'summary': 'Summary',
   'dropbox-files': 'DropboxFiles',
   'project-list': 'ProjectList',
+  'project-list-vertical': 'ProjectListVertical',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {

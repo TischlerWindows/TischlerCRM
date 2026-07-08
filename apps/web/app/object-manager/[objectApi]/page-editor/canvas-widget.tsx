@@ -12,6 +12,7 @@ import {
   Sparkles,
   Trash2,
   LayoutGrid,
+  LayoutList,
   Activity,
   FolderOpen,
   Component,
@@ -43,6 +44,7 @@ const WIDGET_ICONS: Partial<Record<LayoutWidget['widgetType'], React.ElementType
   Path: GitBranch,
   InstallationCostGrid: Table2,
   ProjectList: Table2,
+  ProjectListVertical: LayoutList,
 };
 
 const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
@@ -58,6 +60,7 @@ const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   Path: 'Path',
   InstallationCostGrid: 'Installation Cost Grid',
   ProjectList: 'Project List',
+  ProjectListVertical: 'Project List Vertical Page',
 };
 
 function summarizeWidget(widget: LayoutWidget): string {
@@ -106,6 +109,8 @@ function summarizeWidget(widget: LayoutWidget): string {
       return 'Weekly cost tracking and technician labor expenses';
     case 'ProjectList':
       return 'Shop drawings, loading list, and completion sign-off for this Project';
+    case 'ProjectListVertical':
+      return 'Same fields as Project List, as a fill-out page';
     default:
       return '';
   }

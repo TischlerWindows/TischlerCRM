@@ -22,6 +22,7 @@ export const INTERNAL_WIDGET_IDS = [
   'summary',
   'dropbox-files',
   'project-list',
+  'project-list-vertical',
 ] as const
 export type InternalWidgetId = (typeof INTERNAL_WIDGET_IDS)[number]
 

@@ -33,6 +33,7 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   Summary: { type: 'Summary' },
   DropboxFiles: { type: 'DropboxFiles' },
   ProjectList: { type: 'ProjectList' },
+  ProjectListVertical: { type: 'ProjectListVertical' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────
