@@ -60,6 +60,10 @@ const rowsN = (count: number, keyPrefix: string, label: string): FieldDef[] =>
 
 const rows5 = (keyPrefix: string, label: string): FieldDef[] => rowsN(5, keyPrefix, label)
 
+/** Override the label (keeping the numeric shortLabel) of one row produced by rowsN/rows5. */
+const withLabel = (fields: FieldDef[], rowNumber: number, label: string): FieldDef[] =>
+  fields.map((f, i) => (i === rowNumber - 1 ? { ...f, label } : f))
+
 const GROUPS: GroupDef[] = [
   {
     title: 'Order Info',
@@ -129,7 +133,8 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Install & Job Status',
     columns: [
-      col('Job Status / Order Date', rowsN(3, 'jobStatusOrderDate', 'Job Status / Order Date'), { width: 190 }),
+      // Row 2 is always the Order Date, regardless of the generic per-row label.
+      col('Job Status / Order Date', withLabel(rowsN(3, 'jobStatusOrderDate', 'Job Status / Order Date'), 2, 'Order Date'), { width: 190 }),
       col('On-Hold Units', [{ key: 'onHoldUnits', label: 'On-Hold Units', type: 'number' }]),
     ],
   },
