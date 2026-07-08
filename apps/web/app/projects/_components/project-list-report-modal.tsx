@@ -1,60 +1,109 @@
 'use client';
 
 /**
- * Full aggregate "Project List" report — one row per Project record, columns
- * mirroring the Tischler master project-tracking spreadsheet. Read-only;
- * edits are made per-project via the Project List widget on the record page.
+ * Full aggregate "Project List" report — one block of rows per Project
+ * record, columns mirroring the Tischler master project-tracking
+ * spreadsheet. Read-only; edits are made per-project via the Project List
+ * widget on the record page.
+ *
+ * Several source-sheet columns bundle multiple stacked values into one
+ * cell (e.g. Shop Drawings' Set 1-4 + Final + Install Set, Change Order's
+ * CO Down/Out/Back, Loading List's RF/RS/OF) — these are stored as
+ * `<keyPrefix>Row1`..`Row{N}` custom fields (see the Project List widget,
+ * apps/web/widgets/internal/project-list/index.tsx, which is the source of
+ * truth for these keys/row-counts). This report renders one sub-row per
+ * physical sheet row so every stacked value is visible, with the
+ * non-stacked ("simple") columns visually merged (rowSpan) down the
+ * project's whole block, matching the master spreadsheet's layout.
  */
 import { X, Printer } from 'lucide-react';
 
-interface Column {
+/** A column whose value is a single field, shown once per project (spans all sub-rows). */
+interface SimpleColumn {
+  kind: 'simple';
   key: string;
   label: string;
 }
 
+/** A column stacking `rowCount` physical sheet rows into keys `${keyPrefix}Row1..Row{rowCount}`. */
+interface StackedColumn {
+  kind: 'stacked';
+  keyPrefix: string;
+  label: string;
+  rowCount: number;
+}
+
+type Column = SimpleColumn | StackedColumn;
+
+const simple = (key: string, label: string): SimpleColumn => ({ kind: 'simple', key, label });
+const stacked = (keyPrefix: string, label: string, rowCount: number): StackedColumn => ({
+  kind: 'stacked',
+  keyPrefix,
+  label,
+  rowCount,
+});
+
 const COLUMNS: Column[] = [
-  { key: 'projectName', label: 'Customer' },
-  { key: 'tusOrderNumber', label: 'TUS Order #' },
-  { key: 'factory', label: 'Factory' },
-  { key: 'standardProductType', label: 'ST' },
-  { key: 'dadeCountyProductType', label: 'DC' },
-  { key: 'doubleHungProductType', label: 'DH' },
-  { key: 'screenFlag', label: 'Screen' },
-  { key: 'lutronFlag', label: 'Lutron' },
-  { key: 'checkFlag', label: 'Check' },
-  { key: 'tischlerPM', label: 'Tischler PM' },
-  { key: 'factoryPM', label: 'Factory PM' },
-  { key: 'projectSalesman', label: 'Salesman' },
-  { key: 'projectLocation', label: 'Location' },
-  { key: 'woodSpecies', label: 'Wood Species' },
-  { key: 'dcSilicone', label: 'DC Silicone' },
-  { key: 'solarControl', label: 'Solar Ctrl' },
-  { key: 'finishColor', label: 'Finish Color' },
-  { key: 'changeOrderRow1', label: 'Change Order' },
-  { key: 'set1Row1', label: 'Set 1' },
-  { key: 'set2Row1', label: 'Set 2' },
-  { key: 'set3Row1', label: 'Set 3' },
-  { key: 'set4Row1', label: 'Set 4' },
-  { key: 'finalSetRow1', label: 'Final' },
-  { key: 'installSetRow1', label: 'Install Set' },
-  { key: 'jobStatusOrderDateRow1', label: 'Job Status / Order Date' },
-  { key: 'onHoldUnits', label: 'On-Hold Units' },
-  { key: 'customHardware', label: 'Custom Hardware' },
-  { key: 'factoryOCRow1', label: 'Factory O.C.' },
-  { key: 'installationMaterialRow1', label: 'Installation Material' },
-  { key: 'installationInstructionRow1', label: 'Installation Instruction' },
-  { key: 'shippingWeekRow1', label: 'Shipping Wk' },
-  { key: 'estimatedDeliveryWeekRow1', label: 'Est. Delivery Wk' },
-  { key: 'loadingListRFRow1', label: 'RF' },
-  { key: 'loadingListRSRow1', label: 'RS' },
-  { key: 'loadingListOFRow1', label: 'OF' },
-  { key: 'completionSignOff', label: 'Completion Sign-off' },
+  simple('projectName', 'Customer'),
+  simple('tusOrderNumber', 'TUS Order #'),
+  simple('factory', 'Factory'),
+  simple('standardProductType', 'ST'),
+  simple('dadeCountyProductType', 'DC'),
+  simple('doubleHungProductType', 'DH'),
+  simple('screenFlag', 'Screen'),
+  simple('lutronFlag', 'Lutron'),
+  simple('checkFlag', 'Check'),
+  simple('tischlerPM', 'Tischler PM'),
+  simple('factoryPM', 'Factory PM'),
+  simple('projectSalesman', 'Salesman'),
+  simple('projectLocation', 'Location'),
+  simple('woodSpecies', 'Wood Species'),
+  simple('dcSilicone', 'DC Silicone'),
+  simple('solarControl', 'Solar Ctrl'),
+  simple('finishColor', 'Finish Color'),
+  stacked('changeOrder', 'Change Order', 4),
+  stacked('set1', 'Set 1', 5),
+  stacked('set2', 'Set 2', 5),
+  stacked('set3', 'Set 3', 5),
+  stacked('set4', 'Set 4', 5),
+  stacked('finalSet', 'Final', 5),
+  stacked('installSet', 'Install Set', 5),
+  stacked('jobStatusOrderDate', 'Job Status / Order Date', 3),
+  simple('onHoldUnits', 'On-Hold Units'),
+  simple('customHardware', 'Custom Hardware'),
+  stacked('factoryOC', 'Factory O.C.', 2),
+  stacked('installationMaterial', 'Installation Material', 2),
+  stacked('installationInstruction', 'Installation Instruction', 3),
+  stacked('shippingWeek', 'Shipping Wk', 5),
+  stacked('estimatedDeliveryWeek', 'Est. Delivery Wk', 5),
+  stacked('loadingListRF', 'RF', 5),
+  stacked('loadingListRS', 'RS', 5),
+  stacked('loadingListOF', 'OF', 5),
+  simple('completionSignOff', 'Completion Sign-off'),
 ];
 
 function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? '✓' : '';
   return String(value);
+}
+
+/** How many sub-rows a project's block needs: the highest Row index across all
+ * stacked columns that actually has a value, at least 1 (never fewer than 1
+ * so every project gets at least one row). */
+function subRowCountFor(project: Record<string, any>): number {
+  let max = 1;
+  for (const col of COLUMNS) {
+    if (col.kind !== 'stacked') continue;
+    for (let n = col.rowCount; n >= 1; n--) {
+      const v = project[`${col.keyPrefix}Row${n}`];
+      if (v !== null && v !== undefined && v !== '') {
+        if (n > max) max = n;
+        break;
+      }
+    }
+  }
+  return max;
 }
 
 export default function ProjectListReportModal({
@@ -100,7 +149,7 @@ export default function ProjectListReportModal({
               <tr>
                 {COLUMNS.map(col => (
                   <th
-                    key={col.key}
+                    key={col.kind === 'simple' ? col.key : col.keyPrefix}
                     className="text-left font-semibold text-gray-600 px-3 py-2 border-b border-gray-200 whitespace-nowrap"
                   >
                     {col.label}
@@ -109,15 +158,43 @@ export default function ProjectListReportModal({
               </tr>
             </thead>
             <tbody>
-              {projects.map((p, i) => (
-                <tr key={p.id ?? i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  {COLUMNS.map(col => (
-                    <td key={col.key} className="px-3 py-1.5 border-b border-gray-100 whitespace-nowrap text-gray-700">
-                      {formatCell(p[col.key])}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {projects.map((p, pi) => {
+                const subRows = subRowCountFor(p);
+                return Array.from({ length: subRows }, (_, ri) => (
+                  <tr
+                    key={`${p.id ?? pi}-${ri}`}
+                    className={`${pi % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${
+                      ri === subRows - 1 ? 'border-b-2 border-gray-300' : ''
+                    }`}
+                  >
+                    {COLUMNS.map(col => {
+                      if (col.kind === 'simple') {
+                        // Simple columns only carry one value per project — render it
+                        // once, visually spanning every sub-row in the project's block.
+                        if (ri !== 0) return null;
+                        return (
+                          <td
+                            key={col.key}
+                            rowSpan={subRows}
+                            className="px-3 py-1.5 border-b border-gray-100 whitespace-nowrap text-gray-700 align-top"
+                          >
+                            {formatCell(p[col.key])}
+                          </td>
+                        );
+                      }
+                      const value = ri < col.rowCount ? p[`${col.keyPrefix}Row${ri + 1}`] : undefined;
+                      return (
+                        <td
+                          key={col.keyPrefix}
+                          className="px-3 py-1.5 border-b border-gray-100 whitespace-nowrap text-gray-700"
+                        >
+                          {formatCell(value)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ));
+              })}
               {projects.length === 0 && (
                 <tr>
                   <td colSpan={COLUMNS.length} className="px-3 py-8 text-center text-gray-400">
@@ -132,3 +209,4 @@ export default function ProjectListReportModal({
     </div>
   );
 }
+
