@@ -55,14 +55,16 @@ const col = (title: string, fields: FieldDef[], opts?: { tall?: boolean; width?:
   width: opts?.width,
 })
 
-/** Build the 5 stacked free-text subrows one Shop Drawings/Loading List column holds (one per physical sheet row). */
-const rows5 = (keyPrefix: string, label: string): FieldDef[] =>
-  [1, 2, 3, 4, 5].map(n => ({
+/** Build `count` stacked free-text subrows a column holds (one per physical sheet row). */
+const rowsN = (count: number, keyPrefix: string, label: string): FieldDef[] =>
+  Array.from({ length: count }, (_, i) => i + 1).map(n => ({
     key: `${keyPrefix}Row${n}`,
     label: `${label} — Row ${n}`,
     shortLabel: `${n}`,
     type: 'text' as FieldType,
   }))
+
+const rows5 = (keyPrefix: string, label: string): FieldDef[] => rowsN(5, keyPrefix, label)
 
 const GROUPS: GroupDef[] = [
   {
@@ -104,28 +106,24 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Change Order in Estim / To Client',
     columns: [
-      col(
-        'Change Order in Estim / To Client',
-        [{ key: 'changeOrderEstimToClient', label: 'Change Order in Estim / To Client', type: 'textarea' }],
-        { tall: true, width: 'w-[220px]' }
-      ),
+      col('Change Order in Estim / To Client', rowsN(4, 'changeOrder', 'Change Order'), { width: 'w-[200px]' }),
     ],
   },
   {
     title: 'Shop Drawings',
     columns: [
-      col('Set 1', rows5('set1', 'Set 1'), { width: 'w-[120px]' }),
-      col('Set 2', rows5('set2', 'Set 2'), { width: 'w-[120px]' }),
-      col('Set 3', rows5('set3', 'Set 3'), { width: 'w-[120px]' }),
-      col('Set 4', rows5('set4', 'Set 4'), { width: 'w-[120px]' }),
-      col('Final', rows5('finalSet', 'Final'), { width: 'w-[120px]' }),
-      col('Install Set', rows5('installSet', 'Install Set'), { width: 'w-[120px]' }),
+      col('Set 1', rows5('set1', 'Set 1'), { width: 'w-[170px]' }),
+      col('Set 2', rows5('set2', 'Set 2'), { width: 'w-[170px]' }),
+      col('Set 3', rows5('set3', 'Set 3'), { width: 'w-[170px]' }),
+      col('Set 4', rows5('set4', 'Set 4'), { width: 'w-[170px]' }),
+      col('Final', rows5('finalSet', 'Final'), { width: 'w-[170px]' }),
+      col('Install Set', rows5('installSet', 'Install Set'), { width: 'w-[170px]' }),
     ],
   },
   {
     title: 'Install & Job Status',
     columns: [
-      col('Job Status / Order Date', [{ key: 'jobStatusOrderDate', label: 'Job Status / Order Date', type: 'text' }]),
+      col('Job Status / Order Date', rowsN(3, 'jobStatusOrderDate', 'Job Status / Order Date'), { width: 'w-[190px]' }),
       col('On-Hold Units', [{ key: 'onHoldUnits', label: 'On-Hold Units', type: 'number' }]),
     ],
   },
@@ -133,24 +131,24 @@ const GROUPS: GroupDef[] = [
     title: 'Hardware & Installation',
     columns: [
       col('Custom Hardware', [{ key: 'customHardware', label: 'Custom Hardware', type: 'text' }]),
-      col('Factory O.C.', [{ key: 'factoryOC', label: 'Factory O.C.', type: 'textarea' }], { tall: true, width: 'w-[180px]' }),
-      col('Installation Material', [{ key: 'installationMaterialNotes', label: 'Installation Material', type: 'textarea' }], { tall: true, width: 'w-[220px]' }),
-      col('Installation Instruction', [{ key: 'installationInstructionNotes', label: 'Installation Instruction', type: 'textarea' }], { tall: true, width: 'w-[220px]' }),
+      col('Factory O.C.', rowsN(2, 'factoryOC', 'Factory O.C.'), { width: 'w-[170px]' }),
+      col('Installation Material', rowsN(2, 'installationMaterial', 'Installation Material'), { width: 'w-[190px]' }),
+      col('Installation Instruction', rowsN(3, 'installationInstruction', 'Installation Instruction'), { width: 'w-[190px]' }),
     ],
   },
   {
     title: 'Shipping',
     columns: [
-      col('Shipping Week', [{ key: 'shippingWeek', label: 'Shipping Week', type: 'number' }]),
-      col('Estimated Delivery Wk', [{ key: 'estimatedDeliveryWeek', label: 'Estimated Delivery Wk', type: 'number' }]),
+      col('Shipping Week', rowsN(5, 'shippingWeek', 'Shipping Week'), { width: 'w-[150px]' }),
+      col('Estimated Delivery Wk', rowsN(5, 'estimatedDeliveryWeek', 'Estimated Delivery Wk'), { width: 'w-[150px]' }),
     ],
   },
   {
     title: 'Loading List',
     columns: [
-      col('RF', rows5('loadingListRF', 'RF'), { width: 'w-[100px]' }),
-      col('RS', rows5('loadingListRS', 'RS'), { width: 'w-[100px]' }),
-      col('OF', rows5('loadingListOF', 'OF'), { width: 'w-[100px]' }),
+      col('RF', rows5('loadingListRF', 'RF'), { width: 'w-[150px]' }),
+      col('RS', rows5('loadingListRS', 'RS'), { width: 'w-[150px]' }),
+      col('OF', rows5('loadingListOF', 'OF'), { width: 'w-[150px]' }),
     ],
   },
   {
@@ -340,7 +338,7 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
         {column.fields.map(f => (
           <div key={f.key} className="flex items-center gap-1.5">
             <span
-              className="text-[9px] font-medium text-gray-400 w-[52px] shrink-0 truncate"
+              className="text-[9px] font-medium text-gray-400 w-3.5 shrink-0 text-center"
               title={f.label}
             >
               {f.shortLabel || f.label}
