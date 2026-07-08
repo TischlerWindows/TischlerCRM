@@ -81,9 +81,9 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Roll System',
     columns: [
-      col('Screen', [{ key: 'screenFlag', label: 'Screen', type: 'checkbox' }]),
-      col('Lutron', [{ key: 'lutronFlag', label: 'Lutron', type: 'checkbox' }]),
-      col('Check', [{ key: 'checkFlag', label: 'Check', type: 'checkbox' }]),
+      col('Screen', [{ key: 'screenFlag', label: 'Screen', type: 'text' }]),
+      col('Lutron', [{ key: 'lutronFlag', label: 'Lutron', type: 'text' }]),
+      col('Check', [{ key: 'checkFlag', label: 'Check', type: 'text' }]),
     ],
   },
   {
