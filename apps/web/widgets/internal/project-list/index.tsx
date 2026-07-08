@@ -69,10 +69,6 @@ const rowsN = (count: number, keyPrefix: string, label: string): FieldDef[] =>
 
 const rows5 = (keyPrefix: string, label: string): FieldDef[] => rowsN(5, keyPrefix, label)
 
-/** Override the label (keeping the numeric shortLabel) of one row produced by rowsN/rows5. */
-const withLabel = (fields: FieldDef[], rowNumber: number, label: string): FieldDef[] =>
-  fields.map((f, i) => (i === rowNumber - 1 ? { ...f, label } : f))
-
 const GROUPS: GroupDef[] = [
   {
     title: 'Order Info',
@@ -143,7 +139,9 @@ const GROUPS: GroupDef[] = [
     title: 'Install & Job Status',
     columns: [
       // Row 2 is always the Order Date, regardless of the generic per-row label.
-      col('Job Status / Order Date', withLabel(rowsN(3, 'jobStatusOrderDate', 'Job Status / Order Date'), 2, 'Order Date'), { width: 190 }),
+      col('Job Status / Order Date', rowsN(3, 'jobStatusOrderDate', 'Job Status / Order Date').map((f, i) =>
+        i === 1 ? { ...f, computed: true } : f
+      ), { width: 190 }),
       col('On-Hold Units', [{ key: 'onHoldUnits', label: 'On-Hold Units', type: 'number' }]),
     ],
   },
@@ -255,10 +253,19 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       const computedFactory = oppFlat?.supplier_or_suppliers
         ? String(oppFlat.supplier_or_suppliers).split(';').filter(Boolean).join(', ')
         : ''
-      setComputedValues({ projectSalesman: computedSalesman, projectLocation: computedLocation, factory: computedFactory })
+      // Row 2 of the Job Status / Order Date stack always auto-fills to the literal
+      // text "Order Date" (still overridable, like the other computed fields above).
+      const computedJobStatusRow2 = 'Order Date'
+      setComputedValues({
+        projectSalesman: computedSalesman,
+        projectLocation: computedLocation,
+        factory: computedFactory,
+        jobStatusOrderDateRow2: computedJobStatusRow2,
+      })
       next.projectSalesman = next.projectSalesman || computedSalesman
       next.projectLocation = next.projectLocation || computedLocation
       next.factory = next.factory || computedFactory
+      next.jobStatusOrderDateRow2 = next.jobStatusOrderDateRow2 || computedJobStatusRow2
 
       setValues(next)
       setInitialValues(next)
