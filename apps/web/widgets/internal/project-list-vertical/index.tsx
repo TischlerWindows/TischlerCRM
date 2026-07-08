@@ -11,6 +11,7 @@
  * sync with `../project-list/index.tsx` if that widget's data model changes.
  */
 import { useState, useEffect, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { Loader2, AlertCircle, Save, LayoutList } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService } from '@/lib/records-service'
@@ -176,6 +177,22 @@ function toDateInputValue(v: unknown): string {
   const s = String(v)
   const m = s.match(/^(\d{4}-\d{2}-\d{2})/)
   return m ? m[1]! : ''
+}
+
+/**
+ * One label+input row within a section. Declared at module scope (not inside
+ * the widget component) so it keeps a stable identity across renders — if it
+ * were redefined on every render, React would treat it as a brand-new
+ * component type on every keystroke and remount the input, which drops focus
+ * after a single character.
+ */
+function FormRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 px-4 py-2.5 border-b border-gray-100 last:border-b-0 items-start">
+      <label className="text-xs font-medium text-gray-600 sm:pt-2">{label}</label>
+      <div className="sm:col-span-2">{children}</div>
+    </div>
+  )
 }
 
 export default function ProjectListVerticalWidget({ record, object }: WidgetProps) {
@@ -354,14 +371,6 @@ export default function ProjectListVerticalWidget({ record, object }: WidgetProp
     )
   }
 
-  /** One label+input row within a section. */
-  const FormRow = ({ label, field }: { label: string; field: FieldDef }) => (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 px-4 py-2.5 border-b border-gray-100 last:border-b-0 items-start">
-      <label className="text-xs font-medium text-gray-600 sm:pt-2">{label}</label>
-      <div className="sm:col-span-2">{renderInput(field)}</div>
-    </div>
-  )
-
   return (
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center justify-between border-b border-gray-200 pb-3">
@@ -397,9 +406,9 @@ export default function ProjectListVerticalWidget({ record, object }: WidgetProp
           <div>
             {group.columns.map(column =>
               column.fields.length === 1 ? (
-                <FormRow key={column.key} label={column.title} field={column.fields[0]!} />
+                <FormRow key={column.key} label={column.title}>{renderInput(column.fields[0]!)}</FormRow>
               ) : (
-                column.fields.map(f => <FormRow key={f.key} label={f.label} field={f} />)
+                column.fields.map(f => <FormRow key={f.key} label={f.label}>{renderInput(f)}</FormRow>)
               )
             )}
           </div>
