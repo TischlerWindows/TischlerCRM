@@ -120,6 +120,8 @@ function getWidgetLabel(config: WidgetConfig): string {
       return 'Summary'
     case 'DropboxFiles':
       return 'Dropbox Files'
+    case 'ProjectList':
+      return 'Project List'
     default:
       return 'Widget'
   }

@@ -28,9 +28,13 @@ import {
   GripVertical,
   Upload,
   Link2,
+  Table2,
+  Printer,
+  Loader2,
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import CsvImportDialog from '@/components/csv-import-dialog';
+import ProjectListReportModal from './_components/project-list-report-modal';
 import { LayoutErrorDialog } from '@/components/layout-error-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
@@ -103,6 +107,7 @@ export default function ProjectsPage() {
   >(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showProjectListReport, setShowProjectListReport] = useState(false);
   const [showOppPicker, setShowOppPicker] = useState(false);
   const [oppPickerSearch, setOppPickerSearch] = useState('');
   const [oppList, setOppList] = useState<any[]>([]);
@@ -756,6 +761,13 @@ export default function ProjectsPage() {
               </button>
             )}
             <button
+              onClick={() => setShowProjectListReport(true)}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Table2 className="w-5 h-5 mr-2" />
+              Project List Report
+            </button>
+            <button
               onClick={() => setShowFilterSettings(true)}
               className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
@@ -1196,6 +1208,13 @@ export default function ProjectsPage() {
         objectLabel="Project"
         onImportComplete={() => fetchProjects()}
       />
+
+      {showProjectListReport && (
+        <ProjectListReportModal
+          projects={projects as unknown as Record<string, any>[]}
+          onClose={() => setShowProjectListReport(false)}
+        />
+      )}
 
       </div>
     </div>

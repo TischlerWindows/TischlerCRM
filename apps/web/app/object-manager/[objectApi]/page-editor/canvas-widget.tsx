@@ -102,6 +102,8 @@ function summarizeWidget(widget: LayoutWidget): string {
     }
     case 'InstallationCostGrid':
       return 'Weekly cost tracking and technician labor expenses';
+    case 'ProjectList':
+      return 'Shop drawings, loading list, and completion sign-off for this Project';
     default:
       return '';
   }

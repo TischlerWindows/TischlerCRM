@@ -17,6 +17,7 @@ import {
   Puzzle,
   Sparkles,
   StretchHorizontal,
+  Table,
   UserCheck,
 } from 'lucide-react';
 import type { ElementType } from 'react';
@@ -32,6 +33,7 @@ const LUCIDE_ICON_MAP: Record<string, ElementType> = {
   Puzzle,
   Sparkles,
   StretchHorizontal,
+  Table,
   UserCheck,
 };
 
@@ -57,6 +59,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'installation-cost-grid': 'InstallationCostGrid',
   'summary': 'Summary',
   'dropbox-files': 'DropboxFiles',
+  'project-list': 'ProjectList',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {

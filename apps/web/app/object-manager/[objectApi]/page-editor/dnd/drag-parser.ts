@@ -66,6 +66,7 @@ const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'InstallationCostGrid',
   'Summary',
   'DropboxFiles',
+  'ProjectList',
 ]);
 
 export function isWidgetType(value: string): value is WidgetType {
