@@ -113,12 +113,12 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Shop Drawings',
     columns: [
-      col('Set 1', rows5('set1', 'Set 1'), { width: 58 }),
-      col('Set 2', rows5('set2', 'Set 2'), { width: 58 }),
-      col('Set 3', rows5('set3', 'Set 3'), { width: 58 }),
-      col('Set 4', rows5('set4', 'Set 4'), { width: 58 }),
-      col('Final', rows5('finalSet', 'Final'), { width: 58 }),
-      col('Install Set', rows5('installSet', 'Install Set'), { width: 58 }),
+      col('Set 1', rows5('set1', 'Set 1'), { width: 170 }),
+      col('Set 2', rows5('set2', 'Set 2'), { width: 170 }),
+      col('Set 3', rows5('set3', 'Set 3'), { width: 170 }),
+      col('Set 4', rows5('set4', 'Set 4'), { width: 170 }),
+      col('Final', rows5('finalSet', 'Final'), { width: 170 }),
+      col('Install Set', rows5('installSet', 'Install Set'), { width: 170 }),
     ],
   },
   {
@@ -147,9 +147,9 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Loading List',
     columns: [
-      col('RF', rows5('loadingListRF', 'RF'), { width: 53 }),
-      col('RS', rows5('loadingListRS', 'RS'), { width: 53 }),
-      col('OF', rows5('loadingListOF', 'OF'), { width: 53 }),
+      col('RF', rows5('loadingListRF', 'RF'), { width: 170 }),
+      col('RS', rows5('loadingListRS', 'RS'), { width: 170 }),
+      col('OF', rows5('loadingListOF', 'OF'), { width: 170 }),
     ],
   },
   {
