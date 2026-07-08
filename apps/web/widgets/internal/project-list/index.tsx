@@ -98,11 +98,13 @@ const GROUPS: GroupDef[] = [
     columns: [
       col('Tischler PM', [{ key: 'tischlerPM', label: 'Tischler PM', type: 'text' }]),
       col('Factory PM', [{ key: 'factoryPM', label: 'Factory PM', type: 'text' }]),
-      // Derived (read-only): the Opportunity this Project is attached to (via the
-      // `opportunity` lookup field), showing who created that Opportunity.
+      // Auto-filled (overridable): who created the Opportunity this Project is
+      // attached to (via the `opportunity`/`OpportunityId` lookup field). Editing
+      // and saving this cell stores an explicit override that always wins.
       col('Salesman', [{ key: 'projectSalesman', label: 'Salesman', type: 'text', computed: true }]),
-      // Derived (read-only): the state/province of the Property this Project is
-      // attached to (via the `property` lookup field).
+      // Auto-filled (overridable): the state/province of the Property this Project
+      // is attached to (via the `property`/`PropertyId` lookup field). Editing and
+      // saving this cell stores an explicit override that always wins.
       col('Location', [{ key: 'projectLocation', label: 'Location', type: 'text', computed: true }]),
     ],
   },
@@ -172,9 +174,7 @@ const GROUPS: GroupDef[] = [
 ]
 
 const ALL_COLUMNS: ColumnDef[] = GROUPS.flatMap(g => g.columns)
-// Computed fields (Salesman, Location) are derived from related records, not
-// edited/saved directly, so they're excluded from the load/save-diff keys.
-const ALL_KEYS = ALL_COLUMNS.flatMap(c => c.fields.filter(f => !f.computed).map(f => f.key))
+const ALL_KEYS = ALL_COLUMNS.flatMap(c => c.fields.map(f => f.key))
 
 /** Fixed pixel width for the leading, read-only "Project Name" column (sticky, not part of GROUPS/ALL_KEYS). */
 const PROJECT_NAME_WIDTH = 170
@@ -227,11 +227,11 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       const flat = recordsService.flattenRecord(rec)
       const next: Record<string, any> = {}
       for (const key of ALL_KEYS) next[key] = flat[key] ?? ''
-      setValues(next)
-      setInitialValues(next)
       setProjectName(flat.projectName || '')
 
-      // Resolve computed columns from the Project's related Opportunity/Property.
+      // Auto-fill Salesman/Location from the Project's related Opportunity/Property,
+      // but only when the Project doesn't already have its own saved value — users can
+      // freely overwrite the auto-filled value, and their override wins on every later load.
       // Older/imported Project records store the lookup under legacy
       // `OpportunityId`/`PropertyId` keys instead of the current `opportunity`/
       // `property` lookup field keys — check both.
@@ -243,10 +243,14 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       ])
       const oppFlat = oppRec ? recordsService.flattenRecord(oppRec) : null
       const propFlat = propRec ? recordsService.flattenRecord(propRec) : null
-      setComputedValues({
-        projectSalesman: oppFlat?.createdBy || '',
-        projectLocation: propFlat?.state || '',
-      })
+      const computedSalesman = oppFlat?.createdBy || ''
+      const computedLocation = propFlat?.state || ''
+      setComputedValues({ projectSalesman: computedSalesman, projectLocation: computedLocation })
+      next.projectSalesman = next.projectSalesman || computedSalesman
+      next.projectLocation = next.projectLocation || computedLocation
+
+      setValues(next)
+      setInitialValues(next)
     } catch (err: any) {
       setError(err?.message || 'Failed to load project data')
     } finally {
@@ -348,7 +352,8 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
         type={f.type === 'number' ? 'number' : 'text'}
         value={values[f.key] ?? ''}
         onChange={e => setField(f.key, e.target.value)}
-        className={`w-full border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-navy ${size}`}
+        title={f.computed ? 'Auto-filled from the linked Opportunity/Property — edit to override' : undefined}
+        className={`w-full border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-navy ${size} ${f.computed && values[f.key] && values[f.key] === computedValues[f.key] ? 'text-gray-500 italic' : ''}`}
       />
     )
   }
@@ -356,13 +361,6 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
   const renderCell = (column: ColumnDef) => {
     if (column.fields.length === 1) {
       const f = column.fields[0]!
-      if (f.computed) {
-        return (
-          <div className="w-full text-xs px-1.5 py-1 text-gray-700 truncate" title={computedValues[f.key] || ''}>
-            {computedValues[f.key] || '—'}
-          </div>
-        )
-      }
       if (column.tall) {
         return (
           <textarea
