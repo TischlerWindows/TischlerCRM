@@ -168,6 +168,9 @@ const GROUPS: GroupDef[] = [
 const ALL_COLUMNS: ColumnDef[] = GROUPS.flatMap(g => g.columns)
 const ALL_KEYS = ALL_COLUMNS.flatMap(c => c.fields.map(f => f.key))
 
+/** Fixed pixel width for the leading, read-only "Project Name" column (sticky, not part of GROUPS/ALL_KEYS). */
+const PROJECT_NAME_WIDTH = 170
+
 function toDateInputValue(v: unknown): string {
   if (!v) return ''
   const s = String(v)
@@ -378,6 +381,13 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
 
       <div className="overflow-x-auto border border-gray-200 rounded-lg" role="table">
         <div className="flex" role="row">
+          <div
+            role="columnheader"
+            style={{ width: PROJECT_NAME_WIDTH, flex: `0 0 auto` }}
+            className="sticky left-0 top-0 z-20 bg-gray-100 border-b border-r border-gray-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap overflow-hidden"
+          >
+            Project
+          </div>
           {GROUPS.map((group, i) => (
             <div
               key={`${group.title}-${i}`}
@@ -390,6 +400,13 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
           ))}
         </div>
         <div className="flex" role="row">
+          <div
+            role="columnheader"
+            style={{ width: PROJECT_NAME_WIDTH, flex: `0 0 auto` }}
+            className="sticky left-0 top-[22px] z-20 bg-gray-50 border-b border-r border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis"
+          >
+            Project Name
+          </div>
           {ALL_COLUMNS.map(column => (
             <div
               key={column.key}
@@ -402,6 +419,14 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
           ))}
         </div>
         <div className="flex" role="row">
+          <div
+            role="cell"
+            style={{ width: PROJECT_NAME_WIDTH, flex: `0 0 auto` }}
+            className="sticky left-0 z-10 bg-white border-r border-b border-gray-100 px-2 py-1.5 text-xs text-gray-700 truncate"
+            title={projectName}
+          >
+            {projectName || '—'}
+          </div>
           {ALL_COLUMNS.map(column => (
             <div
               key={column.key}
