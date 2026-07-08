@@ -232,9 +232,14 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       setProjectName(flat.projectName || '')
 
       // Resolve computed columns from the Project's related Opportunity/Property.
+      // Older/imported Project records store the lookup under legacy
+      // `OpportunityId`/`PropertyId` keys instead of the current `opportunity`/
+      // `property` lookup field keys — check both.
+      const opportunityId = flat.opportunity || flat.OpportunityId
+      const propertyId = flat.property || flat.PropertyId
       const [oppRec, propRec] = await Promise.all([
-        flat.opportunity ? recordsService.getRecord('Opportunity', String(flat.opportunity)).catch(() => null) : Promise.resolve(null),
-        flat.property ? recordsService.getRecord('Property', String(flat.property)).catch(() => null) : Promise.resolve(null),
+        opportunityId ? recordsService.getRecord('Opportunity', String(opportunityId)).catch(() => null) : Promise.resolve(null),
+        propertyId ? recordsService.getRecord('Property', String(propertyId)).catch(() => null) : Promise.resolve(null),
       ])
       const oppFlat = oppRec ? recordsService.flattenRecord(oppRec) : null
       const propFlat = propRec ? recordsService.flattenRecord(propRec) : null
