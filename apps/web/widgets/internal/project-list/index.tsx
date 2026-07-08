@@ -10,6 +10,13 @@
  * "Customer" (the sheet's first column) is intentionally NOT duplicated
  * here — it maps 1:1 to the Project's own `projectName` field, shown
  * read-only at the top of this widget.
+ *
+ * Rendered as a single horizontally-scrollable table row (one segment of
+ * the master sheet). Some source-sheet columns bundle several related
+ * values into one cell (e.g. Shop Drawings' Set 1-4 + Final dates, Loading
+ * List's RF/RS/OF) — those are modeled as "compound" columns below, whose
+ * cell stacks each sub-field as its own labeled subrow instead of spanning
+ * multiple top-level table columns.
  */
 import { useState, useEffect, useCallback } from 'react'
 import { Loader2, AlertCircle, Save, Table2 } from 'lucide-react'
@@ -21,123 +28,176 @@ type FieldType = 'text' | 'textarea' | 'date' | 'number' | 'checkbox' | 'select'
 interface FieldDef {
   key: string
   label: string
+  shortLabel?: string
   type: FieldType
   options?: string[]
 }
 
-interface FieldGroup {
+interface ColumnDef {
+  key: string
   title: string
   fields: FieldDef[]
+  /** Render the (single) field as a taller multi-line box instead of a one-line input. */
+  tall?: boolean
+  width?: string
 }
 
-const GROUPS: FieldGroup[] = [
+interface GroupDef {
+  title: string
+  columns: ColumnDef[]
+}
+
+const col = (title: string, fields: FieldDef[], opts?: { tall?: boolean; width?: string }): ColumnDef => ({
+  key: fields[0]!.key,
+  title,
+  fields,
+  tall: opts?.tall,
+  width: opts?.width,
+})
+
+const GROUPS: GroupDef[] = [
   {
     title: 'Order Info',
-    fields: [
-      { key: 'tusOrderNumber', label: 'TUS Order #', type: 'text' },
-      { key: 'factory', label: 'Factory', type: 'text' },
-      { key: 'tischlerPM', label: 'Tischler PM', type: 'text' },
-      { key: 'factoryPM', label: 'Factory PM', type: 'text' },
-      { key: 'projectSalesman', label: 'Salesman', type: 'text' },
-      { key: 'projectLocation', label: 'Location', type: 'text' },
+    columns: [
+      col('TUS Order #', [{ key: 'tusOrderNumber', label: 'TUS Order #', type: 'text' }]),
+      col('Factory', [{ key: 'factory', label: 'Factory', type: 'text' }]),
+      col('Tischler PM', [{ key: 'tischlerPM', label: 'Tischler PM', type: 'text' }]),
+      col('Factory PM', [{ key: 'factoryPM', label: 'Factory PM', type: 'text' }]),
+      col('Salesman', [{ key: 'projectSalesman', label: 'Salesman', type: 'text' }]),
+      col('Location', [{ key: 'projectLocation', label: 'Location', type: 'text' }]),
     ],
   },
   {
     title: 'Product Type',
-    fields: [
-      { key: 'standardProductType', label: 'ST (Standard)', type: 'checkbox' },
-      { key: 'dadeCountyProductType', label: 'DC (Dade County)', type: 'checkbox' },
-      { key: 'doubleHungProductType', label: 'DH (Double Hung)', type: 'checkbox' },
-      { key: 'rollSystem', label: 'Roll System', type: 'text' },
+    columns: [
+      col('ST (Standard)', [{ key: 'standardProductType', label: 'ST (Standard)', type: 'checkbox' }]),
+      col('DC (Dade County)', [{ key: 'dadeCountyProductType', label: 'DC (Dade County)', type: 'checkbox' }]),
+      col('DH (Double Hung)', [{ key: 'doubleHungProductType', label: 'DH (Double Hung)', type: 'checkbox' }]),
+      col('Roll System', [{ key: 'rollSystem', label: 'Roll System', type: 'text' }]),
     ],
   },
   {
     title: 'Materials',
-    fields: [
-      { key: 'woodSpecies', label: 'Wood Species', type: 'text' },
-      { key: 'finishColor', label: 'Finish Color', type: 'text' },
-      { key: 'dcSilicone', label: 'DC Silicone', type: 'checkbox' },
-      { key: 'solarControl', label: 'Solar Ctrl', type: 'checkbox' },
-      { key: 'screenFlag', label: 'Screen', type: 'checkbox' },
-      { key: 'lutronFlag', label: 'Lutron', type: 'checkbox' },
-      { key: 'checkFlag', label: 'Check', type: 'checkbox' },
+    columns: [
+      col('Wood Species', [{ key: 'woodSpecies', label: 'Wood Species', type: 'text' }]),
+      col('Finish Color', [{ key: 'finishColor', label: 'Finish Color', type: 'text' }]),
+      col('DC Silicone', [{ key: 'dcSilicone', label: 'DC Silicone', type: 'checkbox' }]),
+      col('Solar Ctrl', [{ key: 'solarControl', label: 'Solar Ctrl', type: 'checkbox' }]),
+      col('Screen', [{ key: 'screenFlag', label: 'Screen', type: 'checkbox' }]),
+      col('Lutron', [{ key: 'lutronFlag', label: 'Lutron', type: 'checkbox' }]),
+      col('Check', [{ key: 'checkFlag', label: 'Check', type: 'checkbox' }]),
     ],
   },
   {
     title: 'Change Orders',
-    fields: [
-      { key: 'changeOrderEstimToClient', label: 'Change Order in Estim / To Client', type: 'textarea' },
-      { key: 'coDownDate', label: 'CO Down Date', type: 'date' },
-      { key: 'coOutDate', label: 'CO Out Date', type: 'date' },
-      { key: 'coBackDate', label: 'CO Back Date', type: 'date' },
+    columns: [
+      col(
+        'Change Order in Estim / To Client',
+        [{ key: 'changeOrderEstimToClient', label: 'Change Order in Estim / To Client', type: 'textarea' }],
+        { tall: true, width: 'w-[220px]' }
+      ),
+      col('CO Down Date', [{ key: 'coDownDate', label: 'CO Down Date', type: 'date' }]),
+      col('CO Out Date', [{ key: 'coOutDate', label: 'CO Out Date', type: 'date' }]),
+      col('CO Back Date', [{ key: 'coBackDate', label: 'CO Back Date', type: 'date' }]),
     ],
   },
   {
     title: 'Shop Drawings',
-    fields: [
-      { key: 'shopDrawingsStatus', label: 'Status', type: 'select', options: ['Not Started', 'In Progress', 'Done'] },
-      { key: 'set1OrderDate', label: 'Set 1 — Order', type: 'date' },
-      { key: 'set1BackDate', label: 'Set 1 — Back', type: 'date' },
-      { key: 'set1DueDate', label: 'Set 1 — Due', type: 'date' },
-      { key: 'set2OrderDate', label: 'Set 2 — Order', type: 'date' },
-      { key: 'set2BackDate', label: 'Set 2 — Back', type: 'date' },
-      { key: 'set2DueDate', label: 'Set 2 — Due', type: 'date' },
-      { key: 'set3OrderDate', label: 'Set 3 — Order', type: 'date' },
-      { key: 'set3BackDate', label: 'Set 3 — Back', type: 'date' },
-      { key: 'set3DueDate', label: 'Set 3 — Due', type: 'date' },
-      { key: 'set4OrderDate', label: 'Set 4 — Order', type: 'date' },
-      { key: 'set4BackDate', label: 'Set 4 — Back', type: 'date' },
-      { key: 'set4DueDate', label: 'Set 4 — Due', type: 'date' },
-      { key: 'finalSetOrderDate', label: 'Final — Order', type: 'date' },
-      { key: 'finalSetBackDate', label: 'Final — Back', type: 'date' },
-      { key: 'finalSetDueDate', label: 'Final — Due', type: 'date' },
+    columns: [
+      col(
+        'Shop Drawings',
+        [
+          { key: 'shopDrawingsStatus', label: 'Status', shortLabel: 'Status', type: 'select', options: ['Not Started', 'In Progress', 'Done'] },
+          { key: 'set1OrderDate', label: 'Set 1 — Order', shortLabel: 'Set 1 · Order', type: 'date' },
+          { key: 'set1BackDate', label: 'Set 1 — Back', shortLabel: 'Set 1 · Back', type: 'date' },
+          { key: 'set1DueDate', label: 'Set 1 — Due', shortLabel: 'Set 1 · Due', type: 'date' },
+          { key: 'set2OrderDate', label: 'Set 2 — Order', shortLabel: 'Set 2 · Order', type: 'date' },
+          { key: 'set2BackDate', label: 'Set 2 — Back', shortLabel: 'Set 2 · Back', type: 'date' },
+          { key: 'set2DueDate', label: 'Set 2 — Due', shortLabel: 'Set 2 · Due', type: 'date' },
+          { key: 'set3OrderDate', label: 'Set 3 — Order', shortLabel: 'Set 3 · Order', type: 'date' },
+          { key: 'set3BackDate', label: 'Set 3 — Back', shortLabel: 'Set 3 · Back', type: 'date' },
+          { key: 'set3DueDate', label: 'Set 3 — Due', shortLabel: 'Set 3 · Due', type: 'date' },
+          { key: 'set4OrderDate', label: 'Set 4 — Order', shortLabel: 'Set 4 · Order', type: 'date' },
+          { key: 'set4BackDate', label: 'Set 4 — Back', shortLabel: 'Set 4 · Back', type: 'date' },
+          { key: 'set4DueDate', label: 'Set 4 — Due', shortLabel: 'Set 4 · Due', type: 'date' },
+          { key: 'finalSetOrderDate', label: 'Final — Order', shortLabel: 'Final · Order', type: 'date' },
+          { key: 'finalSetBackDate', label: 'Final — Back', shortLabel: 'Final · Back', type: 'date' },
+          { key: 'finalSetDueDate', label: 'Final — Due', shortLabel: 'Final · Due', type: 'date' },
+        ],
+        { width: 'w-[220px]' }
+      ),
     ],
   },
   {
     title: 'Install & Job Status',
-    fields: [
-      { key: 'installSetDate', label: 'Install Set Date', type: 'date' },
-      { key: 'jobStatusDetail', label: 'Job Status', type: 'select', options: ['To be scheduled', 'Ordered', 'Shipped', 'Delivered'] },
-      { key: 'jobOrderDate', label: 'Job Order Date', type: 'date' },
-      { key: 'percentComplete', label: '% Complete', type: 'number' },
-      { key: 'onHoldUnits', label: 'On-Hold Units', type: 'number' },
+    columns: [
+      col('Install Set Date', [{ key: 'installSetDate', label: 'Install Set Date', type: 'date' }]),
+      col(
+        'Job Status / Order Date',
+        [
+          { key: 'jobStatusDetail', label: 'Job Status', shortLabel: 'Status', type: 'select', options: ['To be scheduled', 'Ordered', 'Shipped', 'Delivered'] },
+          { key: 'jobOrderDate', label: 'Job Order Date', shortLabel: 'Order Date', type: 'date' },
+        ],
+        { width: 'w-[190px]' }
+      ),
+      col('% Complete', [{ key: 'percentComplete', label: '% Complete', type: 'number' }]),
+      col('On-Hold Units', [{ key: 'onHoldUnits', label: 'On-Hold Units', type: 'number' }]),
     ],
   },
   {
     title: 'Hardware & Installation',
-    fields: [
-      { key: 'customHardware', label: 'Custom Hardware', type: 'text' },
-      { key: 'factoryOC', label: 'Factory O.C.', type: 'text' },
-      { key: 'installationMaterialNotes', label: 'Installation Material', type: 'textarea' },
-      { key: 'installationInstructionNotes', label: 'Installation Instruction', type: 'textarea' },
+    columns: [
+      col('Custom Hardware', [{ key: 'customHardware', label: 'Custom Hardware', type: 'text' }]),
+      col('Factory O.C.', [{ key: 'factoryOC', label: 'Factory O.C.', type: 'textarea' }], { tall: true, width: 'w-[180px]' }),
+      col('Installation Material', [{ key: 'installationMaterialNotes', label: 'Installation Material', type: 'textarea' }], { tall: true, width: 'w-[220px]' }),
+      col('Installation Instruction', [{ key: 'installationInstructionNotes', label: 'Installation Instruction', type: 'textarea' }], { tall: true, width: 'w-[220px]' }),
     ],
   },
   {
     title: 'Shipping',
-    fields: [
-      { key: 'shippingWeek', label: 'Shipping Week', type: 'number' },
-      { key: 'estimatedDeliveryWeek', label: 'Estimated Delivery Wk', type: 'number' },
+    columns: [
+      col(
+        'Shipping',
+        [
+          { key: 'shippingWeek', label: 'Shipping Week', shortLabel: 'Ship Wk', type: 'number' },
+          { key: 'estimatedDeliveryWeek', label: 'Estimated Delivery Wk', shortLabel: 'Est. Delivery Wk', type: 'number' },
+        ],
+        { width: 'w-[170px]' }
+      ),
     ],
   },
   {
     title: 'Loading List',
-    fields: [
-      { key: 'loadingListRF', label: 'RF (Received from Factory)', type: 'date' },
-      { key: 'loadingListRS', label: 'RS (Received from Site)', type: 'date' },
-      { key: 'loadingListOF', label: 'OF (Out to Factory)', type: 'date' },
+    columns: [
+      col(
+        'Loading List',
+        [
+          { key: 'loadingListRF', label: 'RF (Received from Factory)', shortLabel: 'RF', type: 'date' },
+          { key: 'loadingListRS', label: 'RS (Received from Site)', shortLabel: 'RS', type: 'date' },
+          { key: 'loadingListOF', label: 'OF (Out to Factory)', shortLabel: 'OF', type: 'date' },
+        ],
+        { width: 'w-[190px]' }
+      ),
     ],
   },
   {
     title: 'Completion Sign-off',
-    fields: [
-      { key: 'completionSignOffOrdered', label: 'Ordered', type: 'date' },
-      { key: 'completionSignOffComplete', label: 'Complete', type: 'date' },
-      { key: 'completionSignOffBilled', label: 'Billed', type: 'date' },
+    columns: [
+      col(
+        'Completion Sign-off',
+        [
+          { key: 'completionSignOffOrdered', label: 'Ordered', shortLabel: 'Ordered', type: 'date' },
+          { key: 'completionSignOffComplete', label: 'Complete', shortLabel: 'Complete', type: 'date' },
+          { key: 'completionSignOffBilled', label: 'Billed', shortLabel: 'Billed', type: 'date' },
+        ],
+        { width: 'w-[190px]' }
+      ),
     ],
   },
 ]
 
-const ALL_KEYS = GROUPS.flatMap(g => g.fields.map(f => f.key))
+const ALL_COLUMNS: ColumnDef[] = GROUPS.flatMap(g => g.columns)
+const ALL_KEYS = ALL_COLUMNS.flatMap(c => c.fields.map(f => f.key))
 
 function toDateInputValue(v: unknown): string {
   if (!v) return ''
@@ -146,8 +206,10 @@ function toDateInputValue(v: unknown): string {
   return m ? m[1]! : ''
 }
 
-function widthClass(type: FieldType): string {
-  switch (type) {
+function defaultWidthClass(column: ColumnDef): string {
+  if (column.width) return column.width
+  if (column.fields.length > 1) return 'w-[180px]'
+  switch (column.fields[0]!.type) {
     case 'checkbox':
       return 'w-[52px]'
     case 'date':
@@ -156,8 +218,6 @@ function widthClass(type: FieldType): string {
       return 'w-[92px]'
     case 'select':
       return 'w-[150px]'
-    case 'textarea':
-      return 'w-[220px]'
     default:
       return 'w-[140px]'
   }
@@ -246,6 +306,87 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
     )
   }
 
+  const renderInput = (f: FieldDef, compact: boolean) => {
+    const size = compact ? 'text-xs px-1.5 py-1' : 'text-xs px-1.5 py-1'
+    if (f.type === 'checkbox') {
+      return (
+        <div className="flex items-center justify-center">
+          <input
+            type="checkbox"
+            checked={!!values[f.key]}
+            onChange={e => setField(f.key, e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
+          />
+        </div>
+      )
+    }
+    if (f.type === 'select') {
+      return (
+        <select
+          value={values[f.key] || ''}
+          onChange={e => setField(f.key, e.target.value)}
+          className={`w-full border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-navy ${size}`}
+        >
+          <option value="" />
+          {f.options?.map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      )
+    }
+    if (f.type === 'date') {
+      return (
+        <input
+          type="date"
+          value={toDateInputValue(values[f.key])}
+          onChange={e => setField(f.key, e.target.value)}
+          className={`w-full border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-navy ${size}`}
+        />
+      )
+    }
+    return (
+      <input
+        type={f.type === 'number' ? 'number' : 'text'}
+        value={values[f.key] ?? ''}
+        onChange={e => setField(f.key, e.target.value)}
+        className={`w-full border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-navy ${size}`}
+      />
+    )
+  }
+
+  const renderCell = (column: ColumnDef) => {
+    if (column.fields.length === 1) {
+      const f = column.fields[0]!
+      if (column.tall) {
+        return (
+          <textarea
+            value={values[f.key] || ''}
+            onChange={e => setField(f.key, e.target.value)}
+            rows={2}
+            className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 resize-none focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          />
+        )
+      }
+      return renderInput(f, true)
+    }
+    // Compound column: stack each sub-field as its own labeled subrow within the cell.
+    return (
+      <div className="flex flex-col gap-1">
+        {column.fields.map(f => (
+          <div key={f.key} className="flex items-center gap-1.5">
+            <span
+              className="text-[9px] font-medium text-gray-400 w-[52px] shrink-0 truncate"
+              title={f.label}
+            >
+              {f.shortLabel || f.label}
+            </span>
+            <div className="flex-1 min-w-0">{renderInput(f, true)}</div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between border-b border-gray-200 pb-3">
@@ -273,7 +414,7 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
               {GROUPS.map(group => (
                 <th
                   key={group.title}
-                  colSpan={group.fields.length}
+                  colSpan={group.columns.length}
                   className="sticky top-0 z-10 bg-gray-100 border-b border-r border-gray-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 text-left whitespace-nowrap"
                 >
                   {group.title}
@@ -281,65 +422,26 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
               ))}
             </tr>
             <tr>
-              {GROUPS.flatMap(group => group.fields.map(f => (
+              {ALL_COLUMNS.map(column => (
                 <th
-                  key={f.key}
-                  className={`sticky top-[22px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-500 text-left whitespace-nowrap ${widthClass(f.type)}`}
+                  key={column.key}
+                  className={`sticky top-[22px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-500 text-left align-bottom whitespace-nowrap ${defaultWidthClass(column)}`}
                 >
-                  {f.label}
+                  {column.title}
                 </th>
-              )))}
+              ))}
             </tr>
           </thead>
           <tbody>
             <tr>
-              {GROUPS.flatMap(group => group.fields.map(f => (
-                <td key={f.key} className={`border-r border-b border-gray-100 px-1.5 py-1.5 align-middle ${widthClass(f.type)}`}>
-                  {f.type === 'checkbox' ? (
-                    <div className="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={!!values[f.key]}
-                        onChange={e => setField(f.key, e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
-                      />
-                    </div>
-                  ) : f.type === 'select' ? (
-                    <select
-                      value={values[f.key] || ''}
-                      onChange={e => setField(f.key, e.target.value)}
-                      className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-navy"
-                    >
-                      <option value="" />
-                      {f.options?.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  ) : f.type === 'textarea' ? (
-                    <input
-                      type="text"
-                      title={values[f.key] || ''}
-                      value={values[f.key] || ''}
-                      onChange={e => setField(f.key, e.target.value)}
-                      className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-navy"
-                    />
-                  ) : f.type === 'date' ? (
-                    <input
-                      type="date"
-                      value={toDateInputValue(values[f.key])}
-                      onChange={e => setField(f.key, e.target.value)}
-                      className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-navy"
-                    />
-                  ) : (
-                    <input
-                      type={f.type === 'number' ? 'number' : 'text'}
-                      value={values[f.key] ?? ''}
-                      onChange={e => setField(f.key, e.target.value)}
-                      className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-navy"
-                    />
-                  )}
+              {ALL_COLUMNS.map(column => (
+                <td
+                  key={column.key}
+                  className={`border-r border-b border-gray-100 px-1.5 py-1.5 align-top ${defaultWidthClass(column)}`}
+                >
+                  {renderCell(column)}
                 </td>
-              )))}
+              ))}
             </tr>
           </tbody>
         </table>
