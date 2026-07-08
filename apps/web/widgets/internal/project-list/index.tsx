@@ -73,10 +73,6 @@ const GROUPS: GroupDef[] = [
     columns: [
       col('TUS Order #', [{ key: 'tusOrderNumber', label: 'TUS Order #', type: 'text' }]),
       col('Factory', [{ key: 'factory', label: 'Factory', type: 'text' }]),
-      col('Tischler PM', [{ key: 'tischlerPM', label: 'Tischler PM', type: 'text' }]),
-      col('Factory PM', [{ key: 'factoryPM', label: 'Factory PM', type: 'text' }]),
-      col('Salesman', [{ key: 'projectSalesman', label: 'Salesman', type: 'text' }]),
-      col('Location', [{ key: 'projectLocation', label: 'Location', type: 'text' }]),
     ],
   },
   {
@@ -93,6 +89,15 @@ const GROUPS: GroupDef[] = [
       col('Screen', [{ key: 'screenFlag', label: 'Screen', type: 'checkbox' }]),
       col('Lutron', [{ key: 'lutronFlag', label: 'Lutron', type: 'checkbox' }]),
       col('Check', [{ key: 'checkFlag', label: 'Check', type: 'checkbox' }]),
+    ],
+  },
+  {
+    title: 'Order Info',
+    columns: [
+      col('Tischler PM', [{ key: 'tischlerPM', label: 'Tischler PM', type: 'text' }]),
+      col('Factory PM', [{ key: 'factoryPM', label: 'Factory PM', type: 'text' }]),
+      col('Salesman', [{ key: 'projectSalesman', label: 'Salesman', type: 'text' }]),
+      col('Location', [{ key: 'projectLocation', label: 'Location', type: 'text' }]),
     ],
   },
   {
@@ -373,9 +378,9 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
 
       <div className="overflow-x-auto border border-gray-200 rounded-lg" role="table">
         <div className="flex" role="row">
-          {GROUPS.map(group => (
+          {GROUPS.map((group, i) => (
             <div
-              key={group.title}
+              key={`${group.title}-${i}`}
               role="columnheader"
               style={{ width: group.columns.reduce((sum, c) => sum + columnWidthPx(c), 0), flex: `0 0 auto` }}
               className="sticky top-0 z-10 bg-gray-100 border-b border-r border-gray-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 whitespace-nowrap overflow-hidden"
