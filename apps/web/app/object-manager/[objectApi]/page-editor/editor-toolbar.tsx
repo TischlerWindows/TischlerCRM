@@ -4,10 +4,27 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Eye, Plus, Redo2, Save, Settings, Undo2, Wand2, X } from 'lucide-react';
+import { ArrowLeft, Eye, GripVertical, Plus, Redo2, Save, Settings, Undo2, Wand2, X } from 'lucide-react';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useEditorStore } from './editor-store';
 import { selectUndoCount, selectRedoCount } from './store';
-import type { PageLayout } from './types';
+import type { LayoutTab, PageLayout } from './types';
 import { useSchemaStore } from '@/lib/schema-store';
 
 export function EditorToolbar({
@@ -41,6 +58,7 @@ export function EditorToolbar({
   const setActiveTab = useEditorStore((s) => s.setActiveTab);
   const addTab = useEditorStore((s) => s.addTab);
   const removeTab = useEditorStore((s) => s.removeTab);
+  const reorderTabs = useEditorStore((s) => s.reorderTabs);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const pushUndo = useEditorStore((s) => s.pushUndo);
   const undo = useEditorStore((s) => s.undo);
@@ -192,6 +210,20 @@ export function EditorToolbar({
     setEditingTabId(null);
   }, [draftTabLabel, pushUndo, sortedTabs]);
 
+  const tabSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleTabDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = sortedTabs.findIndex((t) => t.id === active.id);
+    const newIndex = sortedTabs.findIndex((t) => t.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    reorderTabs(arrayMove(sortedTabs, oldIndex, newIndex).map((t) => t.id));
+  }, [reorderTabs, sortedTabs]);
+
   const handleToggleRole = useCallback(
     (roleId: string) => {
       const roles = layout.roles ?? [];
@@ -306,94 +338,40 @@ export function EditorToolbar({
         </div>
 
         <div className="min-w-0 flex-1 overflow-x-auto">
-          <div className="flex min-w-max items-center gap-2 px-1">
-            {sortedTabs.map((tab) => {
-              const isActiveTab = tab.id === activeTabId;
-              return (
-                <div key={tab.id} className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    onDoubleClick={!isActiveTab ? (e) => {
-                      e.stopPropagation();
-                      setDraftTabLabel(tab.label);
-                      setEditingTabId(tab.id);
-                    } : undefined}
-                    className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                      isActiveTab
-                        ? 'border-brand-navy bg-brand-navy text-white'
-                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {isActiveTab ? (
-                      editingTabId === tab.id ? (
-                        <input
-                          autoFocus
-                          value={draftTabLabel}
-                          onChange={(e) => setDraftTabLabel(e.target.value)}
-                          onBlur={() => commitTabRename(tab.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
-                            if (e.key === 'Escape') { e.preventDefault(); setEditingTabId(null); }
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-24 bg-transparent text-sm font-medium text-white outline-none"
-                        />
-                      ) : (
-                        <span className="inline-flex items-center gap-1">
-                          <span
-                            onDoubleClick={(e) => {
-                              e.stopPropagation();
-                              setDraftTabLabel(tab.label);
-                              setEditingTabId(tab.id);
-                            }}
-                            title="Double-click to rename"
-                          >
-                            {tab.label}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedElement({ type: 'tab', id: tab.id });
-                            }}
-                            className="ml-0.5 rounded p-0.5 opacity-60 hover:opacity-100 transition-opacity"
-                            aria-label={`${tab.label} tab settings`}
-                            title="Tab properties"
-                          >
-                            <Settings className="h-3 w-3" />
-                          </button>
-                        </span>
-                      )
-                    ) : (
-                      <span>{tab.label}</span>
-                    )}
-                  </button>
-                  {!isActiveTab && sortedTabs.length > 1 ? (
-                    <button
-                      type="button"
-                      aria-label={`Close ${tab.label} tab`}
-                      className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white group-hover:flex group-focus-within:flex"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        removeTab(tab.id);
-                      }}
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => addTab()}
-              className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 hover:text-gray-900"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Tab
-            </button>
-          </div>
+          <DndContext sensors={tabSensors} collisionDetection={closestCenter} onDragEnd={handleTabDragEnd}>
+            <SortableContext items={sortedTabs.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
+              <div className="flex min-w-max items-center gap-2 px-1">
+                {sortedTabs.map((tab) => (
+                  <SortableTabPill
+                    key={tab.id}
+                    tab={tab}
+                    isActiveTab={tab.id === activeTabId}
+                    canClose={sortedTabs.length > 1}
+                    editingTabId={editingTabId}
+                    draftTabLabel={draftTabLabel}
+                    onSetDraftTabLabel={setDraftTabLabel}
+                    onStartEditing={(tabId, label) => {
+                      setDraftTabLabel(label);
+                      setEditingTabId(tabId);
+                    }}
+                    onCancelEditing={() => setEditingTabId(null)}
+                    onCommitRename={commitTabRename}
+                    onActivate={setActiveTab}
+                    onOpenSettings={(tabId) => setSelectedElement({ type: 'tab', id: tabId })}
+                    onRemove={removeTab}
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addTab()}
+                  className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50 hover:text-gray-900"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Tab
+                </button>
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -561,6 +539,125 @@ export function EditorToolbar({
         variant="destructive"
         onConfirm={() => { void handleForceActivate(); }}
       />
+    </div>
+  );
+}
+
+function SortableTabPill({
+  tab,
+  isActiveTab,
+  canClose,
+  editingTabId,
+  draftTabLabel,
+  onSetDraftTabLabel,
+  onStartEditing,
+  onCancelEditing,
+  onCommitRename,
+  onActivate,
+  onOpenSettings,
+  onRemove,
+}: {
+  tab: LayoutTab;
+  isActiveTab: boolean;
+  canClose: boolean;
+  editingTabId: string | null;
+  draftTabLabel: string;
+  onSetDraftTabLabel: (value: string) => void;
+  onStartEditing: (tabId: string, label: string) => void;
+  onCancelEditing: () => void;
+  onCommitRename: (tabId: string) => void;
+  onActivate: (tabId: string) => void;
+  onOpenSettings: (tabId: string) => void;
+  onRemove: (tabId: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tab.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group relative ${isDragging ? 'z-10 opacity-70' : ''}`}
+      {...attributes}
+      {...listeners}
+    >
+      <button
+        type="button"
+        onClick={() => onActivate(tab.id)}
+        onDoubleClick={!isActiveTab ? (e) => {
+          e.stopPropagation();
+          onStartEditing(tab.id, tab.label);
+        } : undefined}
+        className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm transition ${
+          isActiveTab
+            ? 'border-brand-navy bg-brand-navy text-white'
+            : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+        }`}
+      >
+        <GripVertical className="h-3 w-3 shrink-0 cursor-grab opacity-40 group-hover:opacity-70 active:cursor-grabbing" />
+        {isActiveTab ? (
+          editingTabId === tab.id ? (
+            <input
+              autoFocus
+              value={draftTabLabel}
+              onChange={(e) => onSetDraftTabLabel(e.target.value)}
+              onBlur={() => onCommitRename(tab.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+                if (e.key === 'Escape') { e.preventDefault(); onCancelEditing(); }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="w-24 bg-transparent text-sm font-medium text-white outline-none"
+            />
+          ) : (
+            <span className="inline-flex items-center gap-1">
+              <span
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onStartEditing(tab.id, tab.label);
+                }}
+                title="Double-click to rename"
+              >
+                {tab.label}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenSettings(tab.id);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="ml-0.5 rounded p-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                aria-label={`${tab.label} tab settings`}
+                title="Tab properties"
+              >
+                <Settings className="h-3 w-3" />
+              </button>
+            </span>
+          )
+        ) : (
+          <span>{tab.label}</span>
+        )}
+      </button>
+      {!isActiveTab && canClose ? (
+        <button
+          type="button"
+          aria-label={`Close ${tab.label} tab`}
+          className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white group-hover:flex group-focus-within:flex"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove(tab.id);
+          }}
+        >
+          <X className="h-2.5 w-2.5" />
+        </button>
+      ) : null}
     </div>
   );
 }

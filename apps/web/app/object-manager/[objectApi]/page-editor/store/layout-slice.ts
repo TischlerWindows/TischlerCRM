@@ -135,6 +135,7 @@ export interface LayoutSlice {
   addTab: (label?: string) => void;
   updateTab: (tabId: string, patch: Partial<LayoutTab>) => void;
   removeTab: (tabId: string) => void;
+  reorderTabs: (orderedTabIds: string[]) => void;
 
   // Formatting rules
   setFormattingRules: (rules: FormattingRule[]) => void;
@@ -711,6 +712,22 @@ export const createLayoutSlice: StateCreator<
         layout: { ...s.layout, tabs: remaining },
         activeTabId:
           s.activeTabId === tabId ? (remaining[0]?.id ?? '') : s.activeTabId,
+      };
+    });
+  },
+
+  reorderTabs: (orderedTabIds) => {
+    get().pushUndo();
+    set((s) => {
+      const byId = new Map(s.layout.tabs.map((t) => [t.id, t]));
+      const reordered = orderedTabIds
+        .map((id) => byId.get(id))
+        .filter((t): t is LayoutTab => !!t);
+      // Safety net: keep any tabs not present in orderedTabIds (shouldn't normally
+      // happen) appended at the end so no tab is ever silently dropped.
+      const missing = s.layout.tabs.filter((t) => !orderedTabIds.includes(t.id));
+      return {
+        layout: { ...s.layout, tabs: reindexOrder([...reordered, ...missing]) },
       };
     });
   },
