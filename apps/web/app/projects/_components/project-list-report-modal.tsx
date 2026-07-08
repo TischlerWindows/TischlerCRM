@@ -150,7 +150,7 @@ export default function ProjectListReportModal({
                 {COLUMNS.map(col => (
                   <th
                     key={col.kind === 'simple' ? col.key : col.keyPrefix}
-                    className="text-left font-semibold text-gray-600 px-3 py-2 border border-gray-300 whitespace-nowrap"
+                    className="text-left font-semibold text-gray-600 px-3 py-2 border border-gray-300 whitespace-nowrap align-middle"
                   >
                     {col.label}
                   </th>
@@ -176,7 +176,7 @@ export default function ProjectListReportModal({
                           <td
                             key={col.key}
                             rowSpan={subRows}
-                            className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-top"
+                            className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
                           >
                             {formatCell(p[col.key])}
                           </td>
@@ -186,7 +186,7 @@ export default function ProjectListReportModal({
                       return (
                         <td
                           key={col.keyPrefix}
-                          className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700"
+                          className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
                         >
                           {formatCell(value)}
                         </td>
