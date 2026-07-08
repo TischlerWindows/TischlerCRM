@@ -146,6 +146,23 @@ function toDateInputValue(v: unknown): string {
   return m ? m[1]! : ''
 }
 
+function widthClass(type: FieldType): string {
+  switch (type) {
+    case 'checkbox':
+      return 'w-[52px]'
+    case 'date':
+      return 'w-[136px]'
+    case 'number':
+      return 'w-[92px]'
+    case 'select':
+      return 'w-[150px]'
+    case 'textarea':
+      return 'w-[220px]'
+    default:
+      return 'w-[140px]'
+  }
+}
+
 export default function ProjectListWidget({ record, object }: WidgetProps) {
   const recordId = record?.id ? String(record.id) : undefined
   const [values, setValues] = useState<Record<string, any>>({})
@@ -230,7 +247,7 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div className="flex items-center justify-between border-b border-gray-200 pb-3">
         <div className="flex items-center gap-2">
           <Table2 className="w-5 h-5 text-brand-navy" />
@@ -249,58 +266,84 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
         </button>
       </div>
 
-      {GROUPS.map(group => (
-        <div key={group.title}>
-          <h4 className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">{group.title}</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {group.fields.map(f => (
-              <label key={f.key} className={f.type === 'textarea' ? 'col-span-2 md:col-span-4' : ''}>
-                <span className="block text-[11px] font-medium text-gray-500 mb-1">{f.label}</span>
-                {f.type === 'checkbox' ? (
-                  <input
-                    type="checkbox"
-                    checked={!!values[f.key]}
-                    onChange={e => setField(f.key, e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
-                  />
-                ) : f.type === 'select' ? (
-                  <select
-                    value={values[f.key] || ''}
-                    onChange={e => setField(f.key, e.target.value)}
-                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-navy"
-                  >
-                    <option value="" />
-                    {f.options?.map(opt => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                ) : f.type === 'textarea' ? (
-                  <textarea
-                    value={values[f.key] || ''}
-                    onChange={e => setField(f.key, e.target.value)}
-                    rows={2}
-                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-navy"
-                  />
-                ) : f.type === 'date' ? (
-                  <input
-                    type="date"
-                    value={toDateInputValue(values[f.key])}
-                    onChange={e => setField(f.key, e.target.value)}
-                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-navy"
-                  />
-                ) : (
-                  <input
-                    type={f.type === 'number' ? 'number' : 'text'}
-                    value={values[f.key] ?? ''}
-                    onChange={e => setField(f.key, e.target.value)}
-                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-navy"
-                  />
-                )}
-              </label>
-            ))}
-          </div>
-        </div>
-      ))}
+      <div className="overflow-x-auto border border-gray-200 rounded-lg">
+        <table className="border-collapse text-sm w-max">
+          <thead>
+            <tr>
+              {GROUPS.map(group => (
+                <th
+                  key={group.title}
+                  colSpan={group.fields.length}
+                  className="sticky top-0 z-10 bg-gray-100 border-b border-r border-gray-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 text-left whitespace-nowrap"
+                >
+                  {group.title}
+                </th>
+              ))}
+            </tr>
+            <tr>
+              {GROUPS.flatMap(group => group.fields.map(f => (
+                <th
+                  key={f.key}
+                  className={`sticky top-[22px] z-10 bg-gray-50 border-b border-r border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-500 text-left whitespace-nowrap ${widthClass(f.type)}`}
+                >
+                  {f.label}
+                </th>
+              )))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {GROUPS.flatMap(group => group.fields.map(f => (
+                <td key={f.key} className={`border-r border-b border-gray-100 px-1.5 py-1.5 align-middle ${widthClass(f.type)}`}>
+                  {f.type === 'checkbox' ? (
+                    <div className="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={!!values[f.key]}
+                        onChange={e => setField(f.key, e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
+                      />
+                    </div>
+                  ) : f.type === 'select' ? (
+                    <select
+                      value={values[f.key] || ''}
+                      onChange={e => setField(f.key, e.target.value)}
+                      className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-navy"
+                    >
+                      <option value="" />
+                      {f.options?.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  ) : f.type === 'textarea' ? (
+                    <input
+                      type="text"
+                      title={values[f.key] || ''}
+                      value={values[f.key] || ''}
+                      onChange={e => setField(f.key, e.target.value)}
+                      className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-navy"
+                    />
+                  ) : f.type === 'date' ? (
+                    <input
+                      type="date"
+                      value={toDateInputValue(values[f.key])}
+                      onChange={e => setField(f.key, e.target.value)}
+                      className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-navy"
+                    />
+                  ) : (
+                    <input
+                      type={f.type === 'number' ? 'number' : 'text'}
+                      value={values[f.key] ?? ''}
+                      onChange={e => setField(f.key, e.target.value)}
+                      className="w-full text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-brand-navy"
+                    />
+                  )}
+                </td>
+              )))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       {isDirty && (
         <div className="flex items-center justify-between px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
