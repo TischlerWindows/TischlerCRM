@@ -126,6 +126,13 @@ function isRotatedHeader(column: Column): boolean {
   return columnKey(column) !== 'projectName';
 }
 
+/** Screen/Lutron/Check (the "Roll System" umbrella's sub-headers) also
+ * rotate, matching the web report; other umbrella sub-headers (ST/DC/DH,
+ * Set 1-6, RF/RS/OF) stay horizontal. */
+function isRotatedSubHeader(column: Column): boolean {
+  return ['screenFlag', 'lutronFlag', 'checkFlag'].includes(columnKey(column));
+}
+
 function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'Y' : '';
@@ -252,10 +259,17 @@ function drawHeader(doc: PDFKit.PDFDocument, columns: Column[], x0: number, y0: 
       let sx = x;
       for (const col of group.columns) {
         cellRect(doc, sx, y0 + HEADER_ROW1_HEIGHT, col.width, HEADER_ROW2_HEIGHT, HEADER_FILL);
-        cellText(doc, col.label, sx, y0 + HEADER_ROW1_HEIGHT, col.width, HEADER_ROW2_HEIGHT, {
-          bold: true,
-          fontSize: HEADER_FONT_SIZE,
-        });
+        if (isRotatedSubHeader(col)) {
+          cellTextRotated(doc, col.label, sx, y0 + HEADER_ROW1_HEIGHT, col.width, HEADER_ROW2_HEIGHT, {
+            bold: true,
+            fontSize: HEADER_FONT_SIZE,
+          });
+        } else {
+          cellText(doc, col.label, sx, y0 + HEADER_ROW1_HEIGHT, col.width, HEADER_ROW2_HEIGHT, {
+            bold: true,
+            fontSize: HEADER_FONT_SIZE,
+          });
+        }
         sx += col.width;
       }
     } else {

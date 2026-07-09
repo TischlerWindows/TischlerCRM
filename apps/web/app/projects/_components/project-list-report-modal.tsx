@@ -308,16 +308,21 @@ export default function ProjectListReportModal({
               </tr>
               <tr>
                 {HEADER_GROUPS.filter(group => group.umbrella).flatMap(group =>
-                  group.columns.map(column => (
-                    <th
-                      key={columnKey(column)}
-                      className="font-semibold text-gray-600 px-3 py-1.5 border border-gray-300"
-                    >
-                      <div className="flex items-center justify-center text-center">
-                        <span style={HORIZONTAL_HEADER_STYLE}>{wrapLabel(column.label)}</span>
-                      </div>
-                    </th>
-                  ))
+                  group.columns.map(column => {
+                    const rotated = ['screenFlag', 'lutronFlag', 'checkFlag'].includes(columnKey(column));
+                    return (
+                      <th
+                        key={columnKey(column)}
+                        className="font-semibold text-gray-600 px-3 py-1.5 border border-gray-300"
+                      >
+                        <div className="flex items-center justify-center text-center">
+                          <span style={rotated ? VERTICAL_HEADER_STYLE : HORIZONTAL_HEADER_STYLE}>
+                            {wrapLabel(column.label)}
+                          </span>
+                        </div>
+                      </th>
+                    );
+                  })
                 )}
               </tr>
             </thead>
