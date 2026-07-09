@@ -5,14 +5,12 @@
  * apps/web/app/projects/_components/project-list-report-modal.tsx — keep
  * the two in sync when the Project List fields change.
  *
- * The report has ~35 columns, far more than fit on one landscape page at a
- * readable size, so columns are split into "page-groups" (like Excel print
- * areas): a handful of identity columns (Customer, TUS Order #, Factory)
- * repeat on every page-group, and the remaining columns are chunked to fit
- * the page width without splitting an umbrella-grouped set of sub-columns
- * (e.g. Shop Drawings' Set 1-4/Final/Install Set) across two page-groups.
- * Each page-group then paginates vertically through every project, never
- * splitting a single project's block of sub-rows across a page break.
+ * All ~36 columns render on one landscape page: every standalone column
+ * header except "Customer" is rotated 90° (matching the web report's
+ * VERTICAL_HEADER_STYLE), which frees up enough horizontal space for every
+ * column to fit at once instead of needing to paginate horizontally.
+ * Columns still paginate vertically through every project, never splitting
+ * a single project's block of sub-rows across a page break.
  */
 import PDFDocument from 'pdfkit';
 
@@ -37,14 +35,13 @@ interface HeaderGroup {
   columns: Column[];
 }
 
-const WIDE = 95;
-const MEDIUM = 60;
-const NARROW = 30;
-// Width for the TUS Order # column, whose header is rotated (see
-// isRotatedHeader below) — the header text no longer needs full horizontal
-// width once it's drawn sideways, so this is narrower than MEDIUM while
-// still leaving room for its (short, numeric) data values.
-const COMPACT = 32;
+// "Customer" is the only column whose header reads normally (horizontally),
+// so it keeps a wide base width; every other column's header is rotated
+// (see isRotatedHeader below), so they only need to be wide enough for
+// their (short) data values, not their label.
+const WIDE = 70;
+const NARROW = 16;
+const ROTATED = 20;
 
 const simple = (key: string, label: string, width: number, umbrella?: string): SimpleColumn => ({
   kind: 'simple',
@@ -65,49 +62,46 @@ const stacked = (
 // with an added `width` per column since the PDF has no scroll/auto-layout.
 const COLUMNS: Column[] = [
   simple('projectName', 'Customer', WIDE),
-  simple('tusOrderNumber', 'TUS Order #', COMPACT),
-  simple('factory', 'Factory', MEDIUM),
+  simple('tusOrderNumber', 'TUS Order #', ROTATED),
+  simple('factory', 'Factory', ROTATED),
   simple('standardProductType', 'ST', NARROW, 'Product Type'),
   simple('dadeCountyProductType', 'DC', NARROW, 'Product Type'),
   simple('doubleHungProductType', 'DH', NARROW, 'Product Type'),
   simple('screenFlag', 'Screen', NARROW, 'Roll System'),
   simple('lutronFlag', 'Lutron', NARROW, 'Roll System'),
   simple('checkFlag', 'Check', NARROW, 'Roll System'),
-  simple('tischlerPM', 'Tischler PM', WIDE),
-  simple('factoryPM', 'Factory PM', WIDE),
-  simple('projectSalesman', 'Salesman', WIDE),
-  simple('projectLocation', 'Location', WIDE),
-  simple('woodSpecies', 'Wood Species', WIDE),
-  simple('dcSilicone', 'DC Silicone', MEDIUM),
-  simple('solarControl', 'Solar Ctrl', MEDIUM),
-  simple('finishColor', 'Finish Color', WIDE),
-  stacked('changeOrder', 'Change Order in Estim. / To Client', 4, MEDIUM),
+  simple('tischlerPM', 'Tischler PM', ROTATED),
+  simple('factoryPM', 'Factory PM', ROTATED),
+  simple('projectSalesman', 'Salesman', ROTATED),
+  simple('projectLocation', 'Location', ROTATED),
+  simple('woodSpecies', 'Wood Species', ROTATED),
+  simple('dcSilicone', 'DC Silicone', ROTATED),
+  simple('solarControl', 'Solar Ctrl', ROTATED),
+  simple('finishColor', 'Finish Color', ROTATED),
+  stacked('changeOrder', 'Change Order in Estim. / To Client', 4, ROTATED),
   stacked('set1', 'Set 1', 5, NARROW, 'Shop Drawings'),
   stacked('set2', 'Set 2', 5, NARROW, 'Shop Drawings'),
   stacked('set3', 'Set 3', 5, NARROW, 'Shop Drawings'),
   stacked('set4', 'Set 4', 5, NARROW, 'Shop Drawings'),
   stacked('finalSet', 'Final', 5, NARROW, 'Shop Drawings'),
   stacked('installSet', 'Install Set', 5, NARROW, 'Shop Drawings'),
-  stacked('jobStatusOrderDate', 'Job Status / Order Date', 3, MEDIUM),
-  simple('onHoldUnits', 'On-Hold Units', MEDIUM),
-  simple('customHardware', 'Custom Hardware', MEDIUM),
-  stacked('factoryOC', 'Factory O.C.', 2, MEDIUM),
-  stacked('installationMaterial', 'Installation Material', 2, MEDIUM),
-  stacked('installationInstruction', 'Installation Instruction', 3, MEDIUM),
-  stacked('shippingWeek', 'Shipping Week', 5, MEDIUM),
-  stacked('estimatedDeliveryWeek', 'Estimated Delivery Wk', 5, MEDIUM),
+  stacked('jobStatusOrderDate', 'Job Status / Order Date', 3, ROTATED),
+  simple('onHoldUnits', 'On-Hold Units', ROTATED),
+  simple('customHardware', 'Custom Hardware', ROTATED),
+  stacked('factoryOC', 'Factory O.C.', 2, ROTATED),
+  stacked('installationMaterial', 'Installation Material', 2, ROTATED),
+  stacked('installationInstruction', 'Installation Instruction', 3, ROTATED),
+  stacked('shippingWeek', 'Shipping Week', 5, ROTATED),
+  stacked('estimatedDeliveryWeek', 'Estimated Delivery Wk', 5, ROTATED),
   stacked('loadingListRF', 'RF', 5, NARROW, 'Loading List'),
   stacked('loadingListRS', 'RS', 5, NARROW, 'Loading List'),
   stacked('loadingListOF', 'OF', 5, NARROW, 'Loading List'),
-  simple('completionSignOff', 'Completion Sign-off', MEDIUM),
+  simple('completionSignOff', 'Completion Sign-off', ROTATED),
 ];
-
-/** Customer, TUS Order #, Factory — repeated as the first columns of every page-group. */
-const FROZEN_COUNT = 3;
 
 const ROW_HEIGHT = 13;
 const HEADER_ROW1_HEIGHT = 14;
-const HEADER_ROW2_HEIGHT = 26;
+const HEADER_ROW2_HEIGHT = 34;
 const HEADER_HEIGHT = HEADER_ROW1_HEIGHT + HEADER_ROW2_HEIGHT;
 const TITLE_HEIGHT = 22;
 const FONT_SIZE = 6.5;
@@ -123,10 +117,13 @@ function columnKey(column: Column): string {
   return column.kind === 'simple' ? column.key : column.keyPrefix;
 }
 
-/** Only the TUS Order # header is rotated to save horizontal space; every
- * other column's header reads normally (horizontally). */
+/** "Customer" is the only standalone column whose header reads normally
+ * (horizontally); every other standalone column is rotated to save
+ * horizontal space — matches the web report's VERTICAL_HEADER_STYLE.
+ * Umbrella-grouped sub-columns (ST/DC/DH, Set 1-6, RF/RS/OF, ...) are
+ * handled separately in drawHeader and always stay horizontal. */
 function isRotatedHeader(column: Column): boolean {
-  return columnKey(column) === 'tusOrderNumber';
+  return columnKey(column) !== 'projectName';
 }
 
 function formatCell(value: unknown): string {
@@ -165,41 +162,13 @@ function headerGroupsFor(columns: Column[]): HeaderGroup[] {
   return groups;
 }
 
-/** Splits the non-frozen columns into page-groups that fit `usableWidth`
- * once the frozen columns' width is reserved, never splitting an
- * umbrella-grouped set of sub-columns across two page-groups. */
-function buildPageGroups(usableWidth: number): Column[][] {
-  const frozen = COLUMNS.slice(0, FROZEN_COUNT);
-  const rest = COLUMNS.slice(FROZEN_COUNT);
-  const frozenWidth = frozen.reduce((sum, c) => sum + c.width, 0);
-  const budget = usableWidth - frozenWidth;
-
-  const restGroups = headerGroupsFor(rest);
-  const chunks: Column[][] = [];
-  let current: Column[] = [];
-  let currentWidth = 0;
-  for (const group of restGroups) {
-    const groupWidth = group.columns.reduce((sum, c) => sum + c.width, 0);
-    if (current.length > 0 && currentWidth + groupWidth > budget) {
-      chunks.push(current);
-      current = [];
-      currentWidth = 0;
-    }
-    current.push(...group.columns);
-    currentWidth += groupWidth;
-  }
-  if (current.length > 0) chunks.push(current);
-
-  // Stretch every page-group's columns (frozen + its chunk) so the table
-  // always fills the full page width instead of leaving the right side of
-  // the page blank — the base widths above only decide how many columns
-  // fit per group, not the final rendered width.
-  return chunks.map(chunk => {
-    const columns = [...frozen, ...chunk];
-    const naturalWidth = columns.reduce((sum, c) => sum + c.width, 0);
-    const scale = usableWidth / naturalWidth;
-    return columns.map(c => ({ ...c, width: c.width * scale }));
-  });
+/** Scales every column's base width so the whole table (all columns, on one
+ * page) exactly fills `usableWidth` instead of leaving space unused or
+ * overflowing the page. */
+function scaledColumns(usableWidth: number): Column[] {
+  const naturalWidth = COLUMNS.reduce((sum, c) => sum + c.width, 0);
+  const scale = usableWidth / naturalWidth;
+  return COLUMNS.map(c => ({ ...c, width: c.width * scale }));
 }
 
 function cellRect(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number, fill?: string): void {
@@ -258,23 +227,12 @@ function cellTextRotated(
   doc.restore();
 }
 
-function drawTitle(
-  doc: PDFKit.PDFDocument,
-  groupIndex: number,
-  groupCount: number,
-  projectCount: number,
-): void {
+function drawTitle(doc: PDFKit.PDFDocument, projectCount: number): void {
   const { left, top } = doc.page.margins;
   doc.font('Helvetica-Bold').fontSize(11).fillColor(TITLE_COLOR);
   doc.text(`Project List Report — ${projectCount} project${projectCount === 1 ? '' : 's'}`, left, top, {
     continued: false,
   });
-  doc.font('Helvetica').fontSize(8).fillColor('#6b7280');
-  doc.text(
-    groupCount > 1 ? `Columns ${groupIndex + 1} of ${groupCount}` : '',
-    left,
-    doc.y,
-  );
   doc.y = top + TITLE_HEIGHT;
 }
 
@@ -367,30 +325,27 @@ export async function renderProjectListPDF(projects: Array<Record<string, unknow
 
       const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
       const bottom = doc.page.height - doc.page.margins.bottom;
-      const pageGroups = buildPageGroups(usableWidth);
+      const columns = scaledColumns(usableWidth);
 
-      pageGroups.forEach((columns, gi) => {
-        if (gi > 0) doc.addPage();
-        drawTitle(doc, gi, pageGroups.length, projects.length);
-        let y = drawHeader(doc, columns, doc.page.margins.left, doc.y);
+      drawTitle(doc, projects.length);
+      let y = drawHeader(doc, columns, doc.page.margins.left, doc.y);
 
-        if (projects.length === 0) {
-          cellRect(doc, doc.page.margins.left, y, usableWidth, ROW_HEIGHT * 2, undefined);
-          cellText(doc, 'No projects found.', doc.page.margins.left, y, usableWidth, ROW_HEIGHT * 2, {
-            color: '#9ca3af',
-          });
-        }
-
-        projects.forEach((project, pi) => {
-          const subRows = subRowCountFor(project);
-          const blockHeight = subRows * ROW_HEIGHT;
-          if (y + blockHeight > bottom) {
-            doc.addPage();
-            drawTitle(doc, gi, pageGroups.length, projects.length);
-            y = drawHeader(doc, columns, doc.page.margins.left, doc.y);
-          }
-          y = drawProjectBlock(doc, columns, project, pi, doc.page.margins.left, y, subRows);
+      if (projects.length === 0) {
+        cellRect(doc, doc.page.margins.left, y, usableWidth, ROW_HEIGHT * 2, undefined);
+        cellText(doc, 'No projects found.', doc.page.margins.left, y, usableWidth, ROW_HEIGHT * 2, {
+          color: '#9ca3af',
         });
+      }
+
+      projects.forEach((project, pi) => {
+        const subRows = subRowCountFor(project);
+        const blockHeight = subRows * ROW_HEIGHT;
+        if (y + blockHeight > bottom) {
+          doc.addPage();
+          drawTitle(doc, projects.length);
+          y = drawHeader(doc, columns, doc.page.margins.left, doc.y);
+        }
+        y = drawProjectBlock(doc, columns, project, pi, doc.page.margins.left, y, subRows);
       });
 
       // Footer page numbers across every buffered page.
@@ -403,7 +358,9 @@ export async function renderProjectListPDF(projects: Array<Record<string, unknow
           .fillColor('#9ca3af')
           .text(`Page ${i + 1} of ${range.count}`, doc.page.margins.left, doc.page.height - doc.page.margins.bottom + 8, {
             width: doc.page.width - doc.page.margins.left - doc.page.margins.right,
+            height: 20,
             align: 'right',
+            lineBreak: false,
           });
       }
 
