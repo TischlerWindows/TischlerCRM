@@ -164,21 +164,31 @@ function buildPageGroups(usableWidth: number): Column[][] {
   const budget = usableWidth - frozenWidth;
 
   const restGroups = headerGroupsFor(rest);
-  const pageGroups: Column[][] = [];
+  const chunks: Column[][] = [];
   let current: Column[] = [];
   let currentWidth = 0;
   for (const group of restGroups) {
     const groupWidth = group.columns.reduce((sum, c) => sum + c.width, 0);
     if (current.length > 0 && currentWidth + groupWidth > budget) {
-      pageGroups.push(current);
+      chunks.push(current);
       current = [];
       currentWidth = 0;
     }
     current.push(...group.columns);
     currentWidth += groupWidth;
   }
-  if (current.length > 0) pageGroups.push(current);
-  return pageGroups.map(cols => [...frozen, ...cols]);
+  if (current.length > 0) chunks.push(current);
+
+  // Stretch every page-group's columns (frozen + its chunk) so the table
+  // always fills the full page width instead of leaving the right side of
+  // the page blank — the base widths above only decide how many columns
+  // fit per group, not the final rendered width.
+  return chunks.map(chunk => {
+    const columns = [...frozen, ...chunk];
+    const naturalWidth = columns.reduce((sum, c) => sum + c.width, 0);
+    const scale = usableWidth / naturalWidth;
+    return columns.map(c => ({ ...c, width: c.width * scale }));
+  });
 }
 
 function cellRect(doc: PDFKit.PDFDocument, x: number, y: number, w: number, h: number, fill?: string): void {
