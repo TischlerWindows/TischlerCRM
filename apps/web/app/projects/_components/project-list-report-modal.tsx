@@ -186,7 +186,7 @@ export default function ProjectListReportModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="project-list-report-title"
-        className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] max-h-[90vh] flex flex-col print:max-w-full print:max-h-full print:shadow-none print:rounded-none"
+        className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] max-h-[90vh] flex flex-col print:max-w-full print:h-auto print:max-h-none print:shadow-none print:rounded-none"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 print:hidden">
           <h2 id="project-list-report-title" className="text-lg font-bold text-brand-navy">
@@ -210,9 +210,9 @@ export default function ProjectListReportModal({
           </div>
         </div>
 
-        <div className="overflow-auto flex-1">
+        <div className="overflow-auto flex-1 print:overflow-visible print:flex-none print:h-auto">
           <table className="min-w-full text-xs border-collapse">
-            <thead className="sticky top-0 bg-gray-100 z-10">
+            <thead className="sticky top-0 bg-gray-100 z-10 print:static">
               <tr>
                 {HEADER_GROUPS.map((group, gi) =>
                   group.umbrella ? (
@@ -257,52 +257,56 @@ export default function ProjectListReportModal({
                 )}
               </tr>
             </thead>
-            <tbody>
-              {projects.map((p, pi) => {
-                const subRows = subRowCountFor(p);
-                return Array.from({ length: subRows }, (_, ri) => (
-                  <tr
-                    key={`${p.id ?? pi}-${ri}`}
-                    className={`${pi % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${
-                      ri === subRows - 1 ? 'border-b-2 border-b-gray-400' : ''
-                    }`}
-                  >
-                    {COLUMNS.map(col => {
-                      if (col.kind === 'simple') {
-                        // Simple columns only carry one value per project — render it
-                        // once, visually spanning every sub-row in the project's block.
-                        if (ri !== 0) return null;
+            {projects.map((p, pi) => {
+              const subRows = subRowCountFor(p);
+              return (
+                <tbody key={p.id ?? pi} className="print:break-inside-avoid">
+                  {Array.from({ length: subRows }, (_, ri) => (
+                    <tr
+                      key={`${p.id ?? pi}-${ri}`}
+                      className={`${pi % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${
+                        ri === subRows - 1 ? 'border-b-2 border-b-gray-400' : ''
+                      }`}
+                    >
+                      {COLUMNS.map(col => {
+                        if (col.kind === 'simple') {
+                          // Simple columns only carry one value per project — render it
+                          // once, visually spanning every sub-row in the project's block.
+                          if (ri !== 0) return null;
+                          return (
+                            <td
+                              key={col.key}
+                              rowSpan={subRows}
+                              className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
+                            >
+                              {formatCell(p[col.key])}
+                            </td>
+                          );
+                        }
+                        const value = ri < col.rowCount ? p[`${col.keyPrefix}Row${ri + 1}`] : undefined;
                         return (
                           <td
-                            key={col.key}
-                            rowSpan={subRows}
+                            key={col.keyPrefix}
                             className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
                           >
-                            {formatCell(p[col.key])}
+                            {formatCell(value)}
                           </td>
                         );
-                      }
-                      const value = ri < col.rowCount ? p[`${col.keyPrefix}Row${ri + 1}`] : undefined;
-                      return (
-                        <td
-                          key={col.keyPrefix}
-                          className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
-                        >
-                          {formatCell(value)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ));
-              })}
-              {projects.length === 0 && (
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              );
+            })}
+            {projects.length === 0 && (
+              <tbody>
                 <tr>
                   <td colSpan={COLUMNS.length} className="px-3 py-8 text-center text-gray-400">
                     No projects found.
                   </td>
                 </tr>
-              )}
-            </tbody>
+              </tbody>
+            )}
           </table>
         </div>
       </div>
