@@ -372,7 +372,7 @@ export default function ProjectListVerticalWidget({ record, object }: WidgetProp
   }
 
   return (
-    <div className="space-y-4 max-w-3xl">
+    <div className="space-y-4 w-full max-w-6xl">
       <div className="flex items-center justify-between border-b border-gray-200 pb-3">
         <div className="flex items-center gap-2">
           <LayoutList className="w-5 h-5 text-brand-navy" />
@@ -398,22 +398,24 @@ export default function ProjectListVerticalWidget({ record, object }: WidgetProp
         <div className="px-4 py-2.5 text-sm text-gray-700">{projectName || '—'}</div>
       </div>
 
-      {GROUPS.map((group, i) => (
-        <div key={`${group.title}-${i}`} className="rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-4 py-2 bg-gray-100 text-[11px] font-bold uppercase tracking-wide text-gray-500">
-            {group.title}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        {GROUPS.map((group, i) => (
+          <div key={`${group.title}-${i}`} className="rounded-lg border border-gray-200 overflow-hidden">
+            <div className="px-4 py-2 bg-gray-100 text-[11px] font-bold uppercase tracking-wide text-gray-500">
+              {group.title}
+            </div>
+            <div>
+              {group.columns.map(column =>
+                column.fields.length === 1 ? (
+                  <FormRow key={column.key} label={column.title}>{renderInput(column.fields[0]!)}</FormRow>
+                ) : (
+                  column.fields.map(f => <FormRow key={f.key} label={f.label}>{renderInput(f)}</FormRow>)
+                )
+              )}
+            </div>
           </div>
-          <div>
-            {group.columns.map(column =>
-              column.fields.length === 1 ? (
-                <FormRow key={column.key} label={column.title}>{renderInput(column.fields[0]!)}</FormRow>
-              ) : (
-                column.fields.map(f => <FormRow key={f.key} label={f.label}>{renderInput(f)}</FormRow>)
-              )
-            )}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
       {isDirty && (
         <div className="flex items-center justify-between px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
