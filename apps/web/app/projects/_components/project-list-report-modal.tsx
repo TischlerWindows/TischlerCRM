@@ -16,8 +16,10 @@
  * non-stacked ("simple") columns visually merged (rowSpan) down the
  * project's whole block, matching the master spreadsheet's layout.
  */
+import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { X, Printer } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 /** A column whose value is a single field, shown once per project (spans all sub-rows). */
 interface SimpleColumn {
@@ -180,6 +182,52 @@ export default function ProjectListReportModal({
   projects: Record<string, any>[];
   onClose: () => void;
 }) {
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  const handlePrintPDF = async () => {
+    if (generatingPdf) return;
+
+    // Open the tab synchronously inside the click handler so popup blockers
+    // don't kill it after the await (matches the proposal PDF flow).
+    const previewWindow = window.open('', '_blank');
+    setGeneratingPdf(true);
+    setPdfError(null);
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const token = apiClient.getToken();
+      const response = await fetch(`${apiBase}/project-list-pdf/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ projects }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(detail.error || `Failed to render PDF (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url;
+      } else {
+        // Popup blocker killed the synchronous open — fall back to a download.
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'Project_List_Report.pdf';
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: unknown) {
+      previewWindow?.close();
+      setPdfError(err instanceof Error ? err.message : 'Failed to generate Project List Report PDF');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 print:relative print:bg-white print:p-0">
       <div
@@ -193,12 +241,16 @@ export default function ProjectListReportModal({
             Project List Report ({projects.length})
           </h2>
           <div className="flex items-center gap-2">
+            {pdfError && (
+              <span role="alert" className="text-xs text-red-600">{pdfError}</span>
+            )}
             <button
-              onClick={() => window.print()}
-              className="inline-flex items-center px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={handlePrintPDF}
+              disabled={generatingPdf}
+              className="inline-flex items-center px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
               <Printer className="w-4 h-4 mr-1.5" />
-              Print
+              {generatingPdf ? 'Preparing PDF…' : 'Print'}
             </button>
             <button
               onClick={onClose}
