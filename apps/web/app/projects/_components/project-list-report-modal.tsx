@@ -16,6 +16,7 @@
  * non-stacked ("simple") columns visually merged (rowSpan) down the
  * project's whole block, matching the master spreadsheet's layout.
  */
+import type { CSSProperties } from 'react';
 import { X, Printer } from 'lucide-react';
 
 /** A column whose value is a single field, shown once per project (spans all sub-rows). */
@@ -23,6 +24,9 @@ interface SimpleColumn {
   kind: 'simple';
   key: string;
   label: string;
+  /** If set, this column's header is nested under a shared umbrella header
+   * spanning every column with the same umbrella (e.g. "Product Type" over ST/DC/DH). */
+  umbrella?: string;
 }
 
 /** A column stacking `rowCount` physical sheet rows into keys `${keyPrefix}Row1..Row{rowCount}`. */
@@ -31,28 +35,35 @@ interface StackedColumn {
   keyPrefix: string;
   label: string;
   rowCount: number;
+  umbrella?: string;
 }
 
 type Column = SimpleColumn | StackedColumn;
 
-const simple = (key: string, label: string): SimpleColumn => ({ kind: 'simple', key, label });
-const stacked = (keyPrefix: string, label: string, rowCount: number): StackedColumn => ({
+const simple = (key: string, label: string, umbrella?: string): SimpleColumn => ({
+  kind: 'simple',
+  key,
+  label,
+  umbrella,
+});
+const stacked = (keyPrefix: string, label: string, rowCount: number, umbrella?: string): StackedColumn => ({
   kind: 'stacked',
   keyPrefix,
   label,
   rowCount,
+  umbrella,
 });
 
 const COLUMNS: Column[] = [
   simple('projectName', 'Customer'),
   simple('tusOrderNumber', 'TUS Order #'),
   simple('factory', 'Factory'),
-  simple('standardProductType', 'ST'),
-  simple('dadeCountyProductType', 'DC'),
-  simple('doubleHungProductType', 'DH'),
-  simple('screenFlag', 'Screen'),
-  simple('lutronFlag', 'Lutron'),
-  simple('checkFlag', 'Check'),
+  simple('standardProductType', 'ST', 'Product Type'),
+  simple('dadeCountyProductType', 'DC', 'Product Type'),
+  simple('doubleHungProductType', 'DH', 'Product Type'),
+  simple('screenFlag', 'Screen', 'Roll System'),
+  simple('lutronFlag', 'Lutron', 'Roll System'),
+  simple('checkFlag', 'Check', 'Roll System'),
   simple('tischlerPM', 'Tischler PM'),
   simple('factoryPM', 'Factory PM'),
   simple('projectSalesman', 'Salesman'),
@@ -61,26 +72,56 @@ const COLUMNS: Column[] = [
   simple('dcSilicone', 'DC Silicone'),
   simple('solarControl', 'Solar Ctrl'),
   simple('finishColor', 'Finish Color'),
-  stacked('changeOrder', 'Change Order', 4),
-  stacked('set1', 'Set 1', 5),
-  stacked('set2', 'Set 2', 5),
-  stacked('set3', 'Set 3', 5),
-  stacked('set4', 'Set 4', 5),
-  stacked('finalSet', 'Final', 5),
-  stacked('installSet', 'Install Set', 5),
+  stacked('changeOrder', 'Change Order in Estim. / To Client', 4),
+  stacked('set1', 'Set 1', 5, 'Shop Drawings'),
+  stacked('set2', 'Set 2', 5, 'Shop Drawings'),
+  stacked('set3', 'Set 3', 5, 'Shop Drawings'),
+  stacked('set4', 'Set 4', 5, 'Shop Drawings'),
+  stacked('finalSet', 'Final', 5, 'Shop Drawings'),
+  stacked('installSet', 'Install Set', 5, 'Shop Drawings'),
   stacked('jobStatusOrderDate', 'Job Status / Order Date', 3),
   simple('onHoldUnits', 'On-Hold Units'),
   simple('customHardware', 'Custom Hardware'),
   stacked('factoryOC', 'Factory O.C.', 2),
   stacked('installationMaterial', 'Installation Material', 2),
   stacked('installationInstruction', 'Installation Instruction', 3),
-  stacked('shippingWeek', 'Shipping Wk', 5),
-  stacked('estimatedDeliveryWeek', 'Est. Delivery Wk', 5),
-  stacked('loadingListRF', 'RF', 5),
-  stacked('loadingListRS', 'RS', 5),
-  stacked('loadingListOF', 'OF', 5),
+  stacked('shippingWeek', 'Shipping Week', 5),
+  stacked('estimatedDeliveryWeek', 'Estimated Delivery Wk', 5),
+  stacked('loadingListRF', 'RF', 5, 'Loading List'),
+  stacked('loadingListRS', 'RS', 5, 'Loading List'),
+  stacked('loadingListOF', 'OF', 5, 'Loading List'),
   simple('completionSignOff', 'Completion Sign-off'),
 ];
+
+/** Consecutive columns sharing the same `umbrella` are rendered under one
+ * shared header cell (colSpan = group size); columns without an umbrella
+ * render as their own standalone, row-spanning header. */
+interface HeaderGroup {
+  umbrella: string | null;
+  columns: Column[];
+}
+
+const HEADER_GROUPS: HeaderGroup[] = (() => {
+  const groups: HeaderGroup[] = [];
+  for (const column of COLUMNS) {
+    const prev = groups[groups.length - 1];
+    if (column.umbrella && prev?.umbrella === column.umbrella) {
+      prev.columns.push(column);
+    } else {
+      groups.push({ umbrella: column.umbrella ?? null, columns: [column] });
+    }
+  }
+  return groups;
+})();
+
+/** "Customer" is the only standalone column whose header reads normally
+ * (horizontally); every other standalone column is rotated to save
+ * horizontal space, matching the master spreadsheet. */
+const VERTICAL_HEADER_STYLE: CSSProperties = { writingMode: 'vertical-rl', transform: 'rotate(180deg)' };
+
+function columnKey(column: Column): string {
+  return column.kind === 'simple' ? column.key : column.keyPrefix;
+}
 
 function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -147,14 +188,40 @@ export default function ProjectListReportModal({
           <table className="min-w-full text-xs border-collapse">
             <thead className="sticky top-0 bg-gray-100 z-10">
               <tr>
-                {COLUMNS.map(col => (
-                  <th
-                    key={col.kind === 'simple' ? col.key : col.keyPrefix}
-                    className="text-left font-semibold text-gray-600 px-3 py-2 border border-gray-300 whitespace-nowrap align-middle"
-                  >
-                    {col.label}
-                  </th>
-                ))}
+                {HEADER_GROUPS.map((group, gi) =>
+                  group.umbrella ? (
+                    <th
+                      key={`${group.umbrella}-${gi}`}
+                      colSpan={group.columns.length}
+                      className="text-center font-semibold text-gray-600 px-3 py-2 border border-gray-300 whitespace-nowrap align-middle"
+                    >
+                      {group.umbrella}
+                    </th>
+                  ) : (
+                    <th
+                      key={columnKey(group.columns[0]!)}
+                      rowSpan={2}
+                      className={`font-semibold text-gray-600 px-2 py-2 border border-gray-300 whitespace-nowrap align-bottom ${
+                        columnKey(group.columns[0]!) === 'projectName' ? 'text-left' : 'text-center'
+                      }`}
+                      style={columnKey(group.columns[0]!) === 'projectName' ? undefined : VERTICAL_HEADER_STYLE}
+                    >
+                      {group.columns[0]!.label}
+                    </th>
+                  )
+                )}
+              </tr>
+              <tr>
+                {HEADER_GROUPS.filter(group => group.umbrella).flatMap(group =>
+                  group.columns.map(column => (
+                    <th
+                      key={columnKey(column)}
+                      className="text-center font-semibold text-gray-600 px-3 py-2 border border-gray-300 whitespace-nowrap align-middle"
+                    >
+                      {column.label}
+                    </th>
+                  ))
+                )}
               </tr>
             </thead>
             <tbody>
