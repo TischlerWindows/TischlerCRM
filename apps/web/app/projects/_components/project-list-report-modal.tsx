@@ -130,6 +130,14 @@ const VERTICAL_HEADER_STYLE: CSSProperties = {
 };
 const HORIZONTAL_HEADER_STYLE: CSSProperties = { whiteSpace: 'pre-line' };
 
+/** TUS Order # data values are rotated sideways (not the header) to let that
+ * column stay narrow and save horizontal space. */
+const VERTICAL_CELL_STYLE: CSSProperties = {
+  writingMode: 'vertical-rl',
+  transform: 'rotate(180deg)',
+  display: 'inline-block',
+};
+
 /** Long header labels are split across two lines (at the space closest to the
  * middle of the string) instead of one long line, so rotated headers don't
  * need excessive height to fit the whole label in a single vertical run. */
@@ -333,9 +341,13 @@ export default function ProjectListReportModal({
                             <td
                               key={col.key}
                               rowSpan={subRows}
-                              className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
+                              className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle text-center"
                             >
-                              {formatCell(p[col.key])}
+                              {col.key === 'tusOrderNumber' ? (
+                                <span style={VERTICAL_CELL_STYLE}>{formatCell(p[col.key])}</span>
+                              ) : (
+                                formatCell(p[col.key])
+                              )}
                             </td>
                           );
                         }
