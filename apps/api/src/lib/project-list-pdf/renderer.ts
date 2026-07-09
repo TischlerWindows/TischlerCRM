@@ -40,6 +40,11 @@ interface HeaderGroup {
 const WIDE = 95;
 const MEDIUM = 60;
 const NARROW = 30;
+// Width for standalone columns whose header is rotated (see isRotatedHeader
+// below) — the header text no longer needs full horizontal width once it's
+// drawn sideways, so these are narrower than their un-rotated MEDIUM/WIDE
+// equivalents while still leaving room for their (short) data values.
+const COMPACT = 45;
 
 const simple = (key: string, label: string, width: number, umbrella?: string): SimpleColumn => ({
   kind: 'simple',
@@ -60,22 +65,22 @@ const stacked = (
 // with an added `width` per column since the PDF has no scroll/auto-layout.
 const COLUMNS: Column[] = [
   simple('projectName', 'Customer', WIDE),
-  simple('tusOrderNumber', 'TUS Order #', MEDIUM),
-  simple('factory', 'Factory', MEDIUM),
+  simple('tusOrderNumber', 'TUS Order #', NARROW),
+  simple('factory', 'Factory', COMPACT),
   simple('standardProductType', 'ST', NARROW, 'Product Type'),
   simple('dadeCountyProductType', 'DC', NARROW, 'Product Type'),
   simple('doubleHungProductType', 'DH', NARROW, 'Product Type'),
   simple('screenFlag', 'Screen', NARROW, 'Roll System'),
   simple('lutronFlag', 'Lutron', NARROW, 'Roll System'),
   simple('checkFlag', 'Check', NARROW, 'Roll System'),
-  simple('tischlerPM', 'Tischler PM', WIDE),
-  simple('factoryPM', 'Factory PM', WIDE),
-  simple('projectSalesman', 'Salesman', WIDE),
-  simple('projectLocation', 'Location', WIDE),
-  simple('woodSpecies', 'Wood Species', WIDE),
-  simple('dcSilicone', 'DC Silicone', MEDIUM),
-  simple('solarControl', 'Solar Ctrl', MEDIUM),
-  simple('finishColor', 'Finish Color', WIDE),
+  simple('tischlerPM', 'Tischler PM', NARROW),
+  simple('factoryPM', 'Factory PM', NARROW),
+  simple('projectSalesman', 'Salesman', NARROW),
+  simple('projectLocation', 'Location', COMPACT),
+  simple('woodSpecies', 'Wood Species', COMPACT),
+  simple('dcSilicone', 'DC Silicone', NARROW),
+  simple('solarControl', 'Solar Ctrl', NARROW),
+  simple('finishColor', 'Finish Color', COMPACT),
   stacked('changeOrder', 'Change Order in Estim. / To Client', 4, MEDIUM),
   stacked('set1', 'Set 1', 5, NARROW, 'Shop Drawings'),
   stacked('set2', 'Set 2', 5, NARROW, 'Shop Drawings'),
@@ -116,6 +121,13 @@ const TITLE_COLOR = '#1e3a5f';
 
 function columnKey(column: Column): string {
   return column.kind === 'simple' ? column.key : column.keyPrefix;
+}
+
+/** "Customer" is the only standalone column whose header reads normally
+ * (horizontally); every other standalone column is rotated to save
+ * horizontal space — matches the web report's VERTICAL_HEADER_STYLE. */
+function isRotatedHeader(column: Column): boolean {
+  return columnKey(column) !== 'projectName';
 }
 
 function formatCell(value: unknown): string {
@@ -217,6 +229,36 @@ function cellText(
   doc.text(text, x + 2, ty, { width: innerW, align: 'center', lineBreak: true });
 }
 
+/** Draws `text` rotated 90° (reading bottom-to-top) centered within the
+ * (x, y, w, h) cell — used for standalone header columns to save
+ * horizontal space, matching the web report's rotated headers. */
+function cellTextRotated(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  opts: { fontSize?: number; bold?: boolean; color?: string } = {},
+): void {
+  const fontSize = opts.fontSize ?? FONT_SIZE;
+  doc.font(opts.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fontSize).fillColor(opts.color ?? TEXT_COLOR);
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  // The text's reading-direction run becomes vertical after rotation, so its
+  // available length is the cell's height (not its width).
+  const runLength = Math.max(1, h - 4);
+  doc.save();
+  doc.rotate(-90, { origin: [cx, cy] });
+  doc.text(text, cx - runLength / 2, cy - fontSize / 2, {
+    width: runLength,
+    align: 'center',
+    lineBreak: false,
+    ellipsis: true,
+  });
+  doc.restore();
+}
+
 function drawTitle(
   doc: PDFKit.PDFDocument,
   groupIndex: number,
@@ -262,10 +304,17 @@ function drawHeader(doc: PDFKit.PDFDocument, columns: Column[], x0: number, y0: 
     } else {
       const col = group.columns[0]!;
       cellRect(doc, x, y0, col.width, HEADER_HEIGHT, HEADER_FILL);
-      cellText(doc, col.label, x, y0, col.width, HEADER_HEIGHT, {
-        bold: true,
-        fontSize: HEADER_FONT_SIZE,
-      });
+      if (isRotatedHeader(col)) {
+        cellTextRotated(doc, col.label, x, y0, col.width, HEADER_HEIGHT, {
+          bold: true,
+          fontSize: HEADER_FONT_SIZE,
+        });
+      } else {
+        cellText(doc, col.label, x, y0, col.width, HEADER_HEIGHT, {
+          bold: true,
+          fontSize: HEADER_FONT_SIZE,
+        });
+      }
     }
     x += groupWidth;
   }

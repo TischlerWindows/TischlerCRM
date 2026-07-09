@@ -123,6 +123,10 @@ const VERTICAL_HEADER_STYLE: CSSProperties = {
   writingMode: 'vertical-rl',
   transform: 'rotate(180deg)',
   whiteSpace: 'pre-line',
+  // `writing-mode` has no effect on non-atomic inline boxes (e.g. a plain
+  // <span>) per the CSS spec — it must be an atomic inline (or block) box
+  // for the rotation to actually apply.
+  display: 'inline-block',
 };
 const HORIZONTAL_HEADER_STYLE: CSSProperties = { whiteSpace: 'pre-line' };
 
