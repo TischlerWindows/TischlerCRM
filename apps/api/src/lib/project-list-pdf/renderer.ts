@@ -40,11 +40,11 @@ interface HeaderGroup {
 const WIDE = 95;
 const MEDIUM = 60;
 const NARROW = 30;
-// Width for standalone columns whose header is rotated (see isRotatedHeader
-// below) — the header text no longer needs full horizontal width once it's
-// drawn sideways, so these are narrower than their un-rotated MEDIUM/WIDE
-// equivalents while still leaving room for their (short) data values.
-const COMPACT = 45;
+// Width for the TUS Order # column, whose header is rotated (see
+// isRotatedHeader below) — the header text no longer needs full horizontal
+// width once it's drawn sideways, so this is narrower than MEDIUM while
+// still leaving room for its (short, numeric) data values.
+const COMPACT = 32;
 
 const simple = (key: string, label: string, width: number, umbrella?: string): SimpleColumn => ({
   kind: 'simple',
@@ -65,22 +65,22 @@ const stacked = (
 // with an added `width` per column since the PDF has no scroll/auto-layout.
 const COLUMNS: Column[] = [
   simple('projectName', 'Customer', WIDE),
-  simple('tusOrderNumber', 'TUS Order #', NARROW),
-  simple('factory', 'Factory', COMPACT),
+  simple('tusOrderNumber', 'TUS Order #', COMPACT),
+  simple('factory', 'Factory', MEDIUM),
   simple('standardProductType', 'ST', NARROW, 'Product Type'),
   simple('dadeCountyProductType', 'DC', NARROW, 'Product Type'),
   simple('doubleHungProductType', 'DH', NARROW, 'Product Type'),
   simple('screenFlag', 'Screen', NARROW, 'Roll System'),
   simple('lutronFlag', 'Lutron', NARROW, 'Roll System'),
   simple('checkFlag', 'Check', NARROW, 'Roll System'),
-  simple('tischlerPM', 'Tischler PM', NARROW),
-  simple('factoryPM', 'Factory PM', NARROW),
-  simple('projectSalesman', 'Salesman', NARROW),
-  simple('projectLocation', 'Location', COMPACT),
-  simple('woodSpecies', 'Wood Species', COMPACT),
-  simple('dcSilicone', 'DC Silicone', NARROW),
-  simple('solarControl', 'Solar Ctrl', NARROW),
-  simple('finishColor', 'Finish Color', COMPACT),
+  simple('tischlerPM', 'Tischler PM', WIDE),
+  simple('factoryPM', 'Factory PM', WIDE),
+  simple('projectSalesman', 'Salesman', WIDE),
+  simple('projectLocation', 'Location', WIDE),
+  simple('woodSpecies', 'Wood Species', WIDE),
+  simple('dcSilicone', 'DC Silicone', MEDIUM),
+  simple('solarControl', 'Solar Ctrl', MEDIUM),
+  simple('finishColor', 'Finish Color', WIDE),
   stacked('changeOrder', 'Change Order in Estim. / To Client', 4, MEDIUM),
   stacked('set1', 'Set 1', 5, NARROW, 'Shop Drawings'),
   stacked('set2', 'Set 2', 5, NARROW, 'Shop Drawings'),
@@ -123,11 +123,10 @@ function columnKey(column: Column): string {
   return column.kind === 'simple' ? column.key : column.keyPrefix;
 }
 
-/** "Customer" is the only standalone column whose header reads normally
- * (horizontally); every other standalone column is rotated to save
- * horizontal space — matches the web report's VERTICAL_HEADER_STYLE. */
+/** Only the TUS Order # header is rotated to save horizontal space; every
+ * other column's header reads normally (horizontally). */
 function isRotatedHeader(column: Column): boolean {
-  return columnKey(column) !== 'projectName';
+  return columnKey(column) === 'tusOrderNumber';
 }
 
 function formatCell(value: unknown): string {
