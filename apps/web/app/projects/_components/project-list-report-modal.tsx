@@ -117,7 +117,33 @@ const HEADER_GROUPS: HeaderGroup[] = (() => {
 /** "Customer" is the only standalone column whose header reads normally
  * (horizontally); every other standalone column is rotated to save
  * horizontal space, matching the master spreadsheet. */
-const VERTICAL_HEADER_STYLE: CSSProperties = { writingMode: 'vertical-rl', transform: 'rotate(180deg)' };
+const VERTICAL_HEADER_STYLE: CSSProperties = {
+  writingMode: 'vertical-rl',
+  transform: 'rotate(180deg)',
+  whiteSpace: 'pre-line',
+};
+const HORIZONTAL_HEADER_STYLE: CSSProperties = { whiteSpace: 'pre-line' };
+
+/** Long header labels are split across two lines (at the space closest to the
+ * middle of the string) instead of one long line, so rotated headers don't
+ * need excessive height to fit the whole label in a single vertical run. */
+function wrapLabel(label: string, threshold = 14): string {
+  if (label.length <= threshold) return label;
+  const mid = Math.floor(label.length / 2);
+  let bestIndex = -1;
+  let bestDistance = Infinity;
+  for (let i = 0; i < label.length; i++) {
+    if (label[i] === ' ') {
+      const distance = Math.abs(i - mid);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i;
+      }
+    }
+  }
+  if (bestIndex === -1) return label;
+  return `${label.slice(0, bestIndex)}\n${label.slice(bestIndex + 1)}`;
+}
 
 function columnKey(column: Column): string {
   return column.kind === 'simple' ? column.key : column.keyPrefix;
@@ -193,20 +219,24 @@ export default function ProjectListReportModal({
                     <th
                       key={`${group.umbrella}-${gi}`}
                       colSpan={group.columns.length}
-                      className="text-center font-semibold text-gray-600 px-3 py-2 border border-gray-300 whitespace-nowrap align-middle"
+                      className="font-semibold text-gray-600 px-3 py-1.5 border border-gray-300"
                     >
-                      {group.umbrella}
+                      <div className="h-full flex items-center justify-center text-center" style={HORIZONTAL_HEADER_STYLE}>
+                        {wrapLabel(group.umbrella)}
+                      </div>
                     </th>
                   ) : (
                     <th
                       key={columnKey(group.columns[0]!)}
                       rowSpan={2}
-                      className={`font-semibold text-gray-600 px-2 py-2 border border-gray-300 whitespace-nowrap align-bottom ${
-                        columnKey(group.columns[0]!) === 'projectName' ? 'text-left' : 'text-center'
-                      }`}
-                      style={columnKey(group.columns[0]!) === 'projectName' ? undefined : VERTICAL_HEADER_STYLE}
+                      className="font-semibold text-gray-600 px-1.5 py-1.5 border border-gray-300"
                     >
-                      {group.columns[0]!.label}
+                      <div
+                        className="h-full flex items-center justify-center text-center"
+                        style={columnKey(group.columns[0]!) === 'projectName' ? HORIZONTAL_HEADER_STYLE : VERTICAL_HEADER_STYLE}
+                      >
+                        {wrapLabel(group.columns[0]!.label)}
+                      </div>
                     </th>
                   )
                 )}
@@ -216,9 +246,11 @@ export default function ProjectListReportModal({
                   group.columns.map(column => (
                     <th
                       key={columnKey(column)}
-                      className="text-center font-semibold text-gray-600 px-3 py-2 border border-gray-300 whitespace-nowrap align-middle"
+                      className="font-semibold text-gray-600 px-3 py-1.5 border border-gray-300"
                     >
-                      {column.label}
+                      <div className="h-full flex items-center justify-center text-center" style={HORIZONTAL_HEADER_STYLE}>
+                        {wrapLabel(column.label)}
+                      </div>
                     </th>
                   ))
                 )}
