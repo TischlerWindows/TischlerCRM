@@ -221,8 +221,8 @@ export default function ProjectListReportModal({
                       colSpan={group.columns.length}
                       className="font-semibold text-gray-600 px-3 py-1.5 border border-gray-300"
                     >
-                      <div className="h-full flex items-center justify-center text-center" style={HORIZONTAL_HEADER_STYLE}>
-                        {wrapLabel(group.umbrella)}
+                      <div className="flex items-center justify-center text-center">
+                        <span style={HORIZONTAL_HEADER_STYLE}>{wrapLabel(group.umbrella)}</span>
                       </div>
                     </th>
                   ) : (
@@ -231,11 +231,12 @@ export default function ProjectListReportModal({
                       rowSpan={2}
                       className="font-semibold text-gray-600 px-1.5 py-1.5 border border-gray-300"
                     >
-                      <div
-                        className="h-full flex items-center justify-center text-center"
-                        style={columnKey(group.columns[0]!) === 'projectName' ? HORIZONTAL_HEADER_STYLE : VERTICAL_HEADER_STYLE}
-                      >
-                        {wrapLabel(group.columns[0]!.label)}
+                      <div className="flex items-center justify-center text-center">
+                        <span
+                          style={columnKey(group.columns[0]!) === 'projectName' ? HORIZONTAL_HEADER_STYLE : VERTICAL_HEADER_STYLE}
+                        >
+                          {wrapLabel(group.columns[0]!.label)}
+                        </span>
                       </div>
                     </th>
                   )
@@ -248,8 +249,8 @@ export default function ProjectListReportModal({
                       key={columnKey(column)}
                       className="font-semibold text-gray-600 px-3 py-1.5 border border-gray-300"
                     >
-                      <div className="h-full flex items-center justify-center text-center" style={HORIZONTAL_HEADER_STYLE}>
-                        {wrapLabel(column.label)}
+                      <div className="flex items-center justify-center text-center">
+                        <span style={HORIZONTAL_HEADER_STYLE}>{wrapLabel(column.label)}</span>
                       </div>
                     </th>
                   ))
