@@ -40,6 +40,9 @@ interface ColumnDef {
 interface GroupDef {
   title: string
   columns: ColumnDef[]
+  /** Render each column as its own separate card (sharing the group's title as
+   * its header) instead of stacking every column's rows inside one shared card. */
+  splitColumns?: boolean
 }
 
 const col = (title: string, fields: FieldDef[], opts?: { tall?: boolean; width?: number }): ColumnDef => ({
@@ -118,6 +121,7 @@ const GROUPS: GroupDef[] = [
   },
   {
     title: 'Shop Drawings',
+    splitColumns: true,
     columns: [
       col('Set 1', rows5('set1', 'Set 1'), { width: 170 }),
       col('Set 2', rows5('set2', 'Set 2'), { width: 170 }),
@@ -148,6 +152,7 @@ const GROUPS: GroupDef[] = [
   },
   {
     title: 'Shipping',
+    splitColumns: true,
     columns: [
       col('Shipping Week', rowsN(5, 'shippingWeek', 'Shipping Week'), { width: 190 }),
       col('Estimated Delivery Wk', rowsN(5, 'estimatedDeliveryWeek', 'Estimated Delivery Wk'), { width: 190 }),
@@ -155,6 +160,7 @@ const GROUPS: GroupDef[] = [
   },
   {
     title: 'Loading List',
+    splitColumns: true,
     columns: [
       col('RF', rows5('loadingListRF', 'RF'), { width: 170 }),
       col('RS', rows5('loadingListRS', 'RS'), { width: 170 }),
@@ -399,22 +405,40 @@ export default function ProjectListVerticalWidget({ record, object }: WidgetProp
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        {GROUPS.map((group, i) => (
-          <div key={`${group.title}-${i}`} className="rounded-lg border border-gray-200 overflow-hidden">
-            <div className="px-4 py-2 bg-gray-100 text-[11px] font-bold uppercase tracking-wide text-gray-500">
-              {group.title}
-            </div>
-            <div>
-              {group.columns.map(column =>
-                column.fields.length === 1 ? (
-                  <FormRow key={column.key} label={column.title}>{renderInput(column.fields[0]!)}</FormRow>
-                ) : (
-                  column.fields.map(f => <FormRow key={f.key} label={f.label}>{renderInput(f)}</FormRow>)
-                )
-              )}
-            </div>
-          </div>
-        ))}
+        {GROUPS.flatMap((group, i) =>
+          group.splitColumns
+            ? group.columns.map((column, ci) => (
+                <div
+                  key={`${group.title}-${i}-${column.key}-${ci}`}
+                  className="rounded-lg border border-gray-200 overflow-hidden"
+                >
+                  <div className="px-4 py-2 bg-gray-100 text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    {group.title}
+                  </div>
+                  <div>
+                    {column.fields.map(f => (
+                      <FormRow key={f.key} label={f.label}>{renderInput(f)}</FormRow>
+                    ))}
+                  </div>
+                </div>
+              ))
+            : [
+                <div key={`${group.title}-${i}`} className="rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="px-4 py-2 bg-gray-100 text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                    {group.title}
+                  </div>
+                  <div>
+                    {group.columns.map(column =>
+                      column.fields.length === 1 ? (
+                        <FormRow key={column.key} label={column.title}>{renderInput(column.fields[0]!)}</FormRow>
+                      ) : (
+                        column.fields.map(f => <FormRow key={f.key} label={f.label}>{renderInput(f)}</FormRow>)
+                      )
+                    )}
+                  </div>
+                </div>,
+              ]
+        )}
       </div>
 
       {isDirty && (
