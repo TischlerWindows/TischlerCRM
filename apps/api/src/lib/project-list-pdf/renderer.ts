@@ -201,6 +201,44 @@ function stackedRowSpans(rowCount: number, subRows: number): Array<[start: numbe
   return spans;
 }
 
+/** Computes the actual height (pt) for each of a project's `subRows` grid
+ * rows, growing any row that needs more room to fully fit its wrapped text
+ * (instead of truncating or letting it overflow into the next row). Every
+ * column is measured against its final assigned span before this is used to
+ * draw anything, so grid rows stay perfectly aligned across every column. */
+function computeRowHeights(doc: PDFKit.PDFDocument, columns: Column[], project: Record<string, unknown>, subRows: number): number[] {
+  const rowHeights = new Array(subRows).fill(ROW_HEIGHT);
+
+  for (const column of columns) {
+    if (column.kind === 'stacked') {
+      const effectiveRowCount = Math.min(column.rowCount, subRows);
+      const spans = stackedRowSpans(effectiveRowCount, subRows);
+      for (let ri = 0; ri < effectiveRowCount; ri++) {
+        const [start, span] = spans[ri]!;
+        const value = column.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, ri)
+          : column.keyPrefix === 'jobStatusOrderDate' ? jobStatusOrderDateCellValue(project, ri)
+          : project[`${column.keyPrefix}Row${ri + 1}`];
+        const needed = measuredTextHeight(doc, formatCell(value), column.width);
+        const perRow = Math.ceil(needed / span);
+        for (let gridRow = start; gridRow < start + span; gridRow++) {
+          rowHeights[gridRow] = Math.max(rowHeights[gridRow], perRow);
+        }
+      }
+    } else {
+      const needed = measuredTextHeight(doc, formatCell(project[column.key]), column.width);
+      const currentSum = rowHeights.reduce((a: number, b: number) => a + b, 0);
+      if (needed > currentSum) {
+        const extraPerRow = (needed - currentSum) / subRows;
+        for (let gridRow = 0; gridRow < subRows; gridRow++) {
+          rowHeights[gridRow] += extraPerRow;
+        }
+      }
+    }
+  }
+
+  return rowHeights;
+}
+
 function headerGroupsFor(columns: Column[]): HeaderGroup[] {
   const groups: HeaderGroup[] = [];
   for (const column of columns) {
@@ -244,12 +282,21 @@ function cellText(
   const fontSize = opts.fontSize ?? FONT_SIZE;
   doc.font(opts.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fontSize).fillColor(opts.color ?? TEXT_COLOR);
   const innerW = Math.max(1, w - 4);
-  // Single line + ellipsis (never wrap): a wrapped multi-line value has no
-  // height clamp here, so it silently overflows past `h` into the row below
-  // — this is what caused Change Order's longer default text ("Shop Dwg
-  // Subm", "CO Down", ...) to bleed/garble across adjacent rows.
-  const ty = y + Math.max(1, (h - fontSize) / 2);
-  doc.text(text, x + 2, ty, { width: innerW, align: 'center', lineBreak: false, ellipsis: true });
+  // Rows are sized in advance (see computeRowHeights) so wrapped text always
+  // fits within `h` — no more truncating with ellipsis or silently
+  // overflowing into the row below.
+  const textHeight = doc.heightOfString(text, { width: innerW, align: 'center' });
+  const ty = y + Math.max(1, (h - textHeight) / 2);
+  doc.text(text, x + 2, ty, { width: innerW, align: 'center', lineBreak: true });
+}
+
+/** Height (pt) a value would need to fully wrap within `width` at the given
+ * font size — used to grow a row's height instead of truncating/overflowing
+ * when a cell's text doesn't fit the default row height. */
+function measuredTextHeight(doc: PDFKit.PDFDocument, text: string, width: number, fontSize: number = FONT_SIZE): number {
+  doc.font('Helvetica').fontSize(fontSize);
+  const innerW = Math.max(1, width - 4);
+  return doc.heightOfString(text, { width: innerW, align: 'center' });
 }
 
 /** Draws `text` rotated 90° (reading bottom-to-top) centered within the
@@ -341,7 +388,9 @@ function drawHeader(doc: PDFKit.PDFDocument, columns: Column[], x0: number, y0: 
 }
 
 /** Draws one project's block of sub-rows (simple columns visually merged
- * down the whole block, stacked columns showing one value per sub-row). */
+ * down the whole block, stacked columns showing one value per sub-row).
+ * `rowHeights` (from computeRowHeights) gives each grid row's actual height,
+ * already grown to fit its tallest cell — never a fixed ROW_HEIGHT. */
 function drawProjectBlock(
   doc: PDFKit.PDFDocument,
   columns: Column[],
@@ -350,9 +399,13 @@ function drawProjectBlock(
   x0: number,
   y0: number,
   subRows: number,
+  rowHeights: number[],
 ): number {
   const zebra = projectIndex % 2 === 1 ? ZEBRA_FILL : undefined;
-  const blockHeight = subRows * ROW_HEIGHT;
+  const blockHeight = rowHeights.reduce((a, b) => a + b, 0);
+  // Cumulative y-offset (relative to y0) that grid row `n` starts at.
+  const rowOffsets: number[] = [0];
+  for (let n = 0; n < subRows; n++) rowOffsets.push(rowOffsets[n]! + rowHeights[n]!);
 
   let x = x0;
   for (const column of columns) {
@@ -374,8 +427,8 @@ function drawProjectBlock(
       const spans = stackedRowSpans(effectiveRowCount, subRows);
       for (let ri = 0; ri < effectiveRowCount; ri++) {
         const [start, span] = spans[ri]!;
-        const rowY = y0 + start * ROW_HEIGHT;
-        const rowHeight = span * ROW_HEIGHT;
+        const rowY = y0 + rowOffsets[start]!;
+        const rowHeight = rowOffsets[start + span]! - rowOffsets[start]!;
         const value = column.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, ri)
           : column.keyPrefix === 'jobStatusOrderDate' ? jobStatusOrderDateCellValue(project, ri)
           : project[`${column.keyPrefix}Row${ri + 1}`];
@@ -421,13 +474,14 @@ export async function renderProjectListPDF(projects: Array<Record<string, unknow
 
       projects.forEach((project, pi) => {
         const subRows = subRowCountFor(project);
-        const blockHeight = subRows * ROW_HEIGHT;
+        const rowHeights = computeRowHeights(doc, columns, project, subRows);
+        const blockHeight = rowHeights.reduce((a, b) => a + b, 0);
         if (y + blockHeight > bottom) {
           doc.addPage();
           drawTitle(doc, projects.length);
           y = drawHeader(doc, columns, doc.page.margins.left, doc.y);
         }
-        y = drawProjectBlock(doc, columns, project, pi, doc.page.margins.left, y, subRows);
+        y = drawProjectBlock(doc, columns, project, pi, doc.page.margins.left, y, subRows, rowHeights);
       });
 
       // Footer page numbers across every buffered page.
