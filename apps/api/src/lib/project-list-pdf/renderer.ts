@@ -143,7 +143,7 @@ function formatCell(value: unknown): string {
  * Submission rows, then CO Down/Out/Back) that auto-fill in the Project List
  * widget when a project has no saved override. Mirrored here (and in the web
  * report modal) so the PDF shows the same values instead of blank dashes. */
-const CHANGE_ORDER_ROW_DEFAULTS = ['Shop Drawing Submissions', 'Shop Drawing Submissions', 'CO Down', 'CO Out', 'CO Back'];
+const CHANGE_ORDER_ROW_DEFAULTS = ['Shop Dwg Subm', 'Shop Dwg Subm', 'CO Down', 'CO Out', 'CO Back'];
 
 function changeOrderCellValue(project: Record<string, unknown>, rowIndex: number): unknown {
   const raw = project[`changeOrderRow${rowIndex + 1}`];

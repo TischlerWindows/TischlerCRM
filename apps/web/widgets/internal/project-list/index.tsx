@@ -264,8 +264,8 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       // Change Order's 5 rows always auto-fill to these fixed sheet row identities
       // (still overridable) — 2 Shop Drawing Submission rows, then CO Down/Out/Back.
       const computedChangeOrderRows: Record<string, string> = {
-        changeOrderRow1: 'Shop Drawing Submissions',
-        changeOrderRow2: 'Shop Drawing Submissions',
+        changeOrderRow1: 'Shop Dwg Subm',
+        changeOrderRow2: 'Shop Dwg Subm',
         changeOrderRow3: 'CO Down',
         changeOrderRow4: 'CO Out',
         changeOrderRow5: 'CO Back',
