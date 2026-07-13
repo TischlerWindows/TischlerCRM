@@ -43,10 +43,6 @@ interface ColumnDef {
   tall?: boolean
   /** Fixed column width in pixels, applied via <colgroup> so multi-column groups don't get auto-shrunk. */
   width?: number
-  /** Width (px) of the per-row label marker in a compound column. Defaults to
-   * a narrow numeric-only marker (see renderCell); set this when a compound
-   * column's rows have fixed descriptive labels instead of bare numbers. */
-  labelWidth?: number
 }
 
 interface GroupDef {
@@ -54,13 +50,12 @@ interface GroupDef {
   columns: ColumnDef[]
 }
 
-const col = (title: string, fields: FieldDef[], opts?: { tall?: boolean; width?: number; labelWidth?: number }): ColumnDef => ({
+const col = (title: string, fields: FieldDef[], opts?: { tall?: boolean; width?: number }): ColumnDef => ({
   key: fields[0]!.key,
   title,
   fields,
   tall: opts?.tall,
   width: opts?.width,
-  labelWidth: opts?.labelWidth,
 })
 
 /** Build `count` stacked free-text subrows a column holds (one per physical sheet row). */
@@ -124,17 +119,14 @@ const GROUPS: GroupDef[] = [
     ],
   },
   {
-    // Row identities are fixed (not free-typed by the user) — the sheet
-    // always has 2 Shop Drawing Submission rows followed by CO Down/Out/Back.
+    // Values (not labels) are auto-filled on load with the sheet's fixed row
+    // identities — 2 Shop Drawing Submission rows then CO Down/Out/Back — same
+    // "computed but overridable" pattern as Salesman/Location/Factory below.
     title: 'Change Order in Estim / To Client',
     columns: [
-      col('Change Order in Estim / To Client', [
-        { key: 'changeOrderRow1', label: 'Change Order — Shop Drawing Submissions (1)', shortLabel: 'Shop Drawing Submissions', type: 'text' },
-        { key: 'changeOrderRow2', label: 'Change Order — Shop Drawing Submissions (2)', shortLabel: 'Shop Drawing Submissions', type: 'text' },
-        { key: 'changeOrderRow3', label: 'Change Order — CO Down', shortLabel: 'CO Down', type: 'text' },
-        { key: 'changeOrderRow4', label: 'Change Order — CO Out', shortLabel: 'CO Out', type: 'text' },
-        { key: 'changeOrderRow5', label: 'Change Order — CO Back', shortLabel: 'CO Back', type: 'text' },
-      ], { width: 320, labelWidth: 132 }),
+      col('Change Order in Estim / To Client', rowsN(5, 'changeOrder', 'Change Order').map(f => (
+        { ...f, computed: true }
+      )), { width: 200 }),
     ],
   },
   {
@@ -269,16 +261,29 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       // Row 2 of the Job Status / Order Date stack always auto-fills to the literal
       // text "Order Date" (still overridable, like the other computed fields above).
       const computedJobStatusRow2 = 'Order Date'
+      // Change Order's 5 rows always auto-fill to these fixed sheet row identities
+      // (still overridable) — 2 Shop Drawing Submission rows, then CO Down/Out/Back.
+      const computedChangeOrderRows: Record<string, string> = {
+        changeOrderRow1: 'Shop Drawing Submissions',
+        changeOrderRow2: 'Shop Drawing Submissions',
+        changeOrderRow3: 'CO Down',
+        changeOrderRow4: 'CO Out',
+        changeOrderRow5: 'CO Back',
+      }
       setComputedValues({
         projectSalesman: computedSalesman,
         projectLocation: computedLocation,
         factory: computedFactory,
         jobStatusOrderDateRow2: computedJobStatusRow2,
+        ...computedChangeOrderRows,
       })
       next.projectSalesman = next.projectSalesman || computedSalesman
       next.projectLocation = next.projectLocation || computedLocation
       next.factory = next.factory || computedFactory
       next.jobStatusOrderDateRow2 = next.jobStatusOrderDateRow2 || computedJobStatusRow2
+      for (const key of Object.keys(computedChangeOrderRows)) {
+        next[key] = next[key] || computedChangeOrderRows[key]
+      }
 
       setValues(next)
       setInitialValues(next)
@@ -412,8 +417,7 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
         {column.fields.map(f => (
           <div key={f.key} className="flex items-center gap-1">
             <span
-              className={`text-[9px] font-medium text-gray-400 shrink-0 ${column.labelWidth ? 'text-left leading-tight' : 'w-2.5 text-center'}`}
-              style={column.labelWidth ? { width: column.labelWidth } : undefined}
+              className="text-[9px] font-medium text-gray-400 w-2.5 shrink-0 text-center"
               title={f.label}
             >
               {f.shortLabel || f.label}
