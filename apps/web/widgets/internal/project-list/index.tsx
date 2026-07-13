@@ -43,6 +43,10 @@ interface ColumnDef {
   tall?: boolean
   /** Fixed column width in pixels, applied via <colgroup> so multi-column groups don't get auto-shrunk. */
   width?: number
+  /** Width (px) of the per-row label marker in a compound column. Defaults to
+   * a narrow numeric-only marker (see renderCell); set this when a compound
+   * column's rows have fixed descriptive labels instead of bare numbers. */
+  labelWidth?: number
 }
 
 interface GroupDef {
@@ -50,12 +54,13 @@ interface GroupDef {
   columns: ColumnDef[]
 }
 
-const col = (title: string, fields: FieldDef[], opts?: { tall?: boolean; width?: number }): ColumnDef => ({
+const col = (title: string, fields: FieldDef[], opts?: { tall?: boolean; width?: number; labelWidth?: number }): ColumnDef => ({
   key: fields[0]!.key,
   title,
   fields,
   tall: opts?.tall,
   width: opts?.width,
+  labelWidth: opts?.labelWidth,
 })
 
 /** Build `count` stacked free-text subrows a column holds (one per physical sheet row). */
@@ -119,9 +124,17 @@ const GROUPS: GroupDef[] = [
     ],
   },
   {
+    // Row identities are fixed (not free-typed by the user) — the sheet
+    // always has 2 Shop Drawing Submission rows followed by CO Down/Out/Back.
     title: 'Change Order in Estim / To Client',
     columns: [
-      col('Change Order in Estim / To Client', rowsN(4, 'changeOrder', 'Change Order'), { width: 200 }),
+      col('Change Order in Estim / To Client', [
+        { key: 'changeOrderRow1', label: 'Change Order — Shop Drawing Submissions (1)', shortLabel: 'Shop Drawing Submissions', type: 'text' },
+        { key: 'changeOrderRow2', label: 'Change Order — Shop Drawing Submissions (2)', shortLabel: 'Shop Drawing Submissions', type: 'text' },
+        { key: 'changeOrderRow3', label: 'Change Order — CO Down', shortLabel: 'CO Down', type: 'text' },
+        { key: 'changeOrderRow4', label: 'Change Order — CO Out', shortLabel: 'CO Out', type: 'text' },
+        { key: 'changeOrderRow5', label: 'Change Order — CO Back', shortLabel: 'CO Back', type: 'text' },
+      ], { width: 320, labelWidth: 132 }),
     ],
   },
   {
@@ -392,12 +405,15 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       return renderInput(f, true)
     }
     // Compound column: stack each sub-field as its own labeled subrow within the cell.
+    // Columns with fixed descriptive row labels (e.g. Change Order's "CO Down") set
+    // `labelWidth` so the marker can hold real text instead of just a row number.
     return (
       <div className="flex flex-col gap-1">
         {column.fields.map(f => (
           <div key={f.key} className="flex items-center gap-1">
             <span
-              className="text-[9px] font-medium text-gray-400 w-2.5 shrink-0 text-center"
+              className={`text-[9px] font-medium text-gray-400 shrink-0 ${column.labelWidth ? 'text-left leading-tight' : 'w-2.5 text-center'}`}
+              style={column.labelWidth ? { width: column.labelWidth } : undefined}
               title={f.label}
             >
               {f.shortLabel || f.label}

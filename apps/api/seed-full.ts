@@ -135,6 +135,7 @@ const CORE_OBJECTS = [
       { apiName: 'changeOrderRow2', label: 'Change Order in Estim / To Client — Row 2', type: 'Text' },
       { apiName: 'changeOrderRow3', label: 'Change Order in Estim / To Client — Row 3', type: 'Text' },
       { apiName: 'changeOrderRow4', label: 'Change Order in Estim / To Client — Row 4', type: 'Text' },
+      { apiName: 'changeOrderRow5', label: 'Change Order in Estim / To Client — Row 5', type: 'Text' },
       { apiName: 'set1Row1', label: 'Set 1 — Row 1', type: 'Text' },
       { apiName: 'set1Row2', label: 'Set 1 — Row 2', type: 'Text' },
       { apiName: 'set1Row3', label: 'Set 1 — Row 3', type: 'Text' },

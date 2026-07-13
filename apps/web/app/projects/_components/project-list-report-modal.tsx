@@ -74,7 +74,7 @@ const COLUMNS: Column[] = [
   simple('dcSilicone', 'DC Silicone'),
   simple('solarControl', 'Solar Ctrl'),
   simple('finishColor', 'Finish Color'),
-  stacked('changeOrder', 'Change Order in Estim. / To Client', 4),
+  stacked('changeOrder', 'Change Order in Estim. / To Client', 5),
   stacked('set1', 'Set 1', 5, 'Shop Drawings'),
   stacked('set2', 'Set 2', 5, 'Shop Drawings'),
   stacked('set3', 'Set 3', 5, 'Shop Drawings'),

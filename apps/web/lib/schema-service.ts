@@ -3752,7 +3752,7 @@ class LocalStorageSchemaService implements SchemaService {
       { id: generateId(), apiName: 'dcSilicone', label: 'DC Silicone', type: 'Checkbox', custom: true } as FieldDef,
       { id: generateId(), apiName: 'solarControl', label: 'Solar Ctrl', type: 'Checkbox', custom: true } as FieldDef,
       text('finishColor', 'Finish Color'),
-      ...rows('changeOrder', 'Change Order in Estim. / To Client', 4),
+      ...rows('changeOrder', 'Change Order in Estim. / To Client', 5),
       ...rows('set1', 'Shop Drawings: Set 1', 5),
       ...rows('set2', 'Shop Drawings: Set 2', 5),
       ...rows('set3', 'Shop Drawings: Set 3', 5),
