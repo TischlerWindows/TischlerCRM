@@ -330,12 +330,19 @@ function drawProjectBlock(
       cellRect(doc, x, y0, column.width, blockHeight, zebra);
       cellText(doc, formatCell(project[column.key]), x, y0, column.width, blockHeight);
     } else {
-      for (let ri = 0; ri < subRows; ri++) {
-        const value = ri < column.rowCount
-          ? (column.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, ri) : project[`${column.keyPrefix}Row${ri + 1}`])
-          : undefined;
+      // Only draw the column's own real sub-rows individually; if the
+      // project's block needs MORE sub-rows than this column has (driven by
+      // some other column, e.g. Change Order always needing 5), merge the
+      // remainder into one blank cell instead of padding with repeated "—"
+      // rows — matches the web report and the widget's own row count.
+      const realRows = Math.min(column.rowCount, subRows);
+      for (let ri = 0; ri < realRows; ri++) {
+        const value = column.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, ri) : project[`${column.keyPrefix}Row${ri + 1}`];
         cellRect(doc, x, y0 + ri * ROW_HEIGHT, column.width, ROW_HEIGHT, zebra);
         cellText(doc, formatCell(value), x, y0 + ri * ROW_HEIGHT, column.width, ROW_HEIGHT);
+      }
+      if (subRows > realRows) {
+        cellRect(doc, x, y0 + realRows * ROW_HEIGHT, column.width, (subRows - realRows) * ROW_HEIGHT, zebra);
       }
     }
     x += column.width;

@@ -368,6 +368,21 @@ export default function ProjectListReportModal({
                             </td>
                           );
                         }
+                        // Stacked columns only have `col.rowCount` real sub-rows (e.g.
+                        // Factory O.C. only has 2); once a project's block needs more
+                        // sub-rows than that (driven by some OTHER column, e.g. Change
+                        // Order always needing 5), merge the remaining rows into one
+                        // blank cell instead of padding them with repeated "—" rows.
+                        if (ri === col.rowCount && subRows > col.rowCount) {
+                          return (
+                            <td
+                              key={col.keyPrefix}
+                              rowSpan={subRows - col.rowCount}
+                              className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
+                            />
+                          );
+                        }
+                        if (ri > col.rowCount) return null;
                         const value = ri < col.rowCount
                           ? (col.keyPrefix === 'changeOrder' ? changeOrderCellValue(p, ri) : p[`${col.keyPrefix}Row${ri + 1}`])
                           : undefined;
