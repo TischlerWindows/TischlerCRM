@@ -358,7 +358,10 @@ function drawProjectBlock(
 export async function renderProjectListPDF(projects: Array<Record<string, unknown>>): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ size: 'LETTER', layout: 'landscape', margin: 28, bufferPages: true });
+      // TABLOID (11x17in) landscape = 1224x792pt — ~55% wider than LETTER
+      // landscape (792x612pt), giving the ~35-column table much more room
+      // per column before scaledColumns() has to shrink everything to fit.
+      const doc = new PDFDocument({ size: 'TABLOID', layout: 'landscape', margin: 28, bufferPages: true });
       const chunks: Buffer[] = [];
       doc.on('data', chunk => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
