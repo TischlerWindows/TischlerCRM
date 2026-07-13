@@ -169,6 +169,18 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
+/** Change Order's 5 rows are fixed sheet row identities (2 Shop Drawing
+ * Submission rows, then CO Down/Out/Back) that auto-fill in the Project List
+ * widget when a project has no saved override — see `computedChangeOrderRows`
+ * in apps/web/widgets/internal/project-list/index.tsx. Mirrored here so the
+ * report shows the same values instead of blank dashes for un-overridden rows. */
+const CHANGE_ORDER_ROW_DEFAULTS = ['Shop Drawing Submissions', 'Shop Drawing Submissions', 'CO Down', 'CO Out', 'CO Back'];
+
+function changeOrderCellValue(project: Record<string, any>, rowIndex: number): unknown {
+  const raw = project[`changeOrderRow${rowIndex + 1}`];
+  return raw !== null && raw !== undefined && raw !== '' ? raw : CHANGE_ORDER_ROW_DEFAULTS[rowIndex];
+}
+
 /** How many sub-rows a project's block needs: the highest Row index across all
  * stacked columns that actually has a value, at least 1 (never fewer than 1
  * so every project gets at least one row). */
@@ -177,7 +189,7 @@ function subRowCountFor(project: Record<string, any>): number {
   for (const col of COLUMNS) {
     if (col.kind !== 'stacked') continue;
     for (let n = col.rowCount; n >= 1; n--) {
-      const v = project[`${col.keyPrefix}Row${n}`];
+      const v = col.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, n - 1) : project[`${col.keyPrefix}Row${n}`];
       if (v !== null && v !== undefined && v !== '') {
         if (n > max) max = n;
         break;
@@ -356,7 +368,9 @@ export default function ProjectListReportModal({
                             </td>
                           );
                         }
-                        const value = ri < col.rowCount ? p[`${col.keyPrefix}Row${ri + 1}`] : undefined;
+                        const value = ri < col.rowCount
+                          ? (col.keyPrefix === 'changeOrder' ? changeOrderCellValue(p, ri) : p[`${col.keyPrefix}Row${ri + 1}`])
+                          : undefined;
                         return (
                           <td
                             key={col.keyPrefix}

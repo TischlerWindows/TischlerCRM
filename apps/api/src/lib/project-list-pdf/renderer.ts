@@ -139,6 +139,17 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
+/** Change Order's 5 rows are fixed sheet row identities (2 Shop Drawing
+ * Submission rows, then CO Down/Out/Back) that auto-fill in the Project List
+ * widget when a project has no saved override. Mirrored here (and in the web
+ * report modal) so the PDF shows the same values instead of blank dashes. */
+const CHANGE_ORDER_ROW_DEFAULTS = ['Shop Drawing Submissions', 'Shop Drawing Submissions', 'CO Down', 'CO Out', 'CO Back'];
+
+function changeOrderCellValue(project: Record<string, unknown>, rowIndex: number): unknown {
+  const raw = project[`changeOrderRow${rowIndex + 1}`];
+  return raw !== null && raw !== undefined && raw !== '' ? raw : CHANGE_ORDER_ROW_DEFAULTS[rowIndex];
+}
+
 /** Same rule as the web report: the highest Row index across all stacked
  * columns that actually has a value, at least 1. */
 function subRowCountFor(project: Record<string, unknown>): number {
@@ -146,7 +157,7 @@ function subRowCountFor(project: Record<string, unknown>): number {
   for (const col of COLUMNS) {
     if (col.kind !== 'stacked') continue;
     for (let n = col.rowCount; n >= 1; n--) {
-      const v = project[`${col.keyPrefix}Row${n}`];
+      const v = col.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, n - 1) : project[`${col.keyPrefix}Row${n}`];
       if (v !== null && v !== undefined && v !== '') {
         if (n > max) max = n;
         break;
@@ -313,7 +324,9 @@ function drawProjectBlock(
       cellText(doc, formatCell(project[column.key]), x, y0, column.width, blockHeight);
     } else {
       for (let ri = 0; ri < subRows; ri++) {
-        const value = ri < column.rowCount ? project[`${column.keyPrefix}Row${ri + 1}`] : undefined;
+        const value = ri < column.rowCount
+          ? (column.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, ri) : project[`${column.keyPrefix}Row${ri + 1}`])
+          : undefined;
         cellRect(doc, x, y0 + ri * ROW_HEIGHT, column.width, ROW_HEIGHT, zebra);
         cellText(doc, formatCell(value), x, y0 + ri * ROW_HEIGHT, column.width, ROW_HEIGHT);
       }
