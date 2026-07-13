@@ -5,8 +5,18 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 
 const isPublicRoute = (pathname: string) => {
-  // Only login and signup are fully public
-  return pathname === '/login' || pathname === '/signup';
+  // Routes reachable by someone who is NOT logged in: the login/signup
+  // screens, plus every pre-auth account-setup flow (invite acceptance,
+  // forgot/reset password). All of these are meant to work in a fresh
+  // browser/incognito session — a brand-new invitee is by definition
+  // logged out when they click their invite link.
+  return (
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/auth/accept-invite' ||
+    pathname === '/auth/forgot-password' ||
+    pathname === '/auth/reset-password'
+  );
 };
 
 export function ProtectedRouteWrapper({ children }: { children: React.ReactNode }) {
