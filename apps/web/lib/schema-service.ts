@@ -187,6 +187,7 @@ class LocalStorageSchemaService implements SchemaService {
         migratedSchema = this.ensureLeadTemplateLayout(migratedSchema);
         migratedSchema = this.ensureOpportunityTemplateLayout(migratedSchema);
         migratedSchema = this.ensureInstallationCostObjects(migratedSchema);
+        migratedSchema = this.ensureProjectListReportFields(migratedSchema);
 
         // Universal: ensure every object has at least one layout with populated fields
         migratedSchema = this.ensureAllObjectsHavePopulatedLayout(migratedSchema);
@@ -3706,6 +3707,75 @@ class LocalStorageSchemaService implements SchemaService {
     ]);
 
     if (!updated) return schema;
+    return { ...schema, objects, updatedAt: now };
+  }
+
+  /** Registers every field the Project List Report / Project List widget
+   * reads and writes (apps/web/app/projects/_components/project-list-report-modal.tsx
+   * + apps/web/widgets/internal/project-list/index.tsx) as real Project
+   * CustomFields, so they show up in Object Manager. Field apiNames are
+   * intentionally bare (no `Project__` prefix) to match the widget's
+   * existing keys — Record.data already stores values under these exact
+   * keys, so the apiName here must match precisely. Umbrella-grouped
+   * fields get an "Umbrella: Sub-label" field label; multi-row ("stacked")
+   * columns register one field per physical sheet row (`${key}Row{N}`),
+   * matching how the data is actually stored. */
+  private ensureProjectListReportFields(schema: OrgSchema): OrgSchema {
+    const objects = [...schema.objects];
+    const now = new Date().toISOString();
+    const projectIdx = objects.findIndex(o => o.apiName === 'Project');
+    if (projectIdx < 0) return schema;
+
+    const project = objects[projectIdx]!;
+    const existingApiNames = new Set(project.fields.map((f: FieldDef) => f.apiName));
+
+    const text = (apiName: string, label: string): FieldDef =>
+      ({ id: generateId(), apiName, label, type: 'Text', custom: true });
+    const rows = (keyPrefix: string, label: string, count: number, type: 'Text' | 'Number' = 'Text'): FieldDef[] =>
+      Array.from({ length: count }, (_, i) => i + 1).map(n =>
+        ({ id: generateId(), apiName: `${keyPrefix}Row${n}`, label: `${label} — Row ${n}`, type, custom: true }));
+
+    const newFields: FieldDef[] = [
+      text('tusOrderNumber', 'TUS Order #'),
+      text('factory', 'Factory'),
+      text('standardProductType', 'Product Type: ST'),
+      text('dadeCountyProductType', 'Product Type: DC'),
+      text('doubleHungProductType', 'Product Type: DH'),
+      text('screenFlag', 'Roll System: Screen'),
+      text('lutronFlag', 'Roll System: Lutron'),
+      text('checkFlag', 'Roll System: Check'),
+      text('tischlerPM', 'Tischler PM'),
+      text('factoryPM', 'Factory PM'),
+      text('projectSalesman', 'Salesman'),
+      text('projectLocation', 'Location'),
+      text('woodSpecies', 'Wood Species'),
+      { id: generateId(), apiName: 'dcSilicone', label: 'DC Silicone', type: 'Checkbox', custom: true } as FieldDef,
+      { id: generateId(), apiName: 'solarControl', label: 'Solar Ctrl', type: 'Checkbox', custom: true } as FieldDef,
+      text('finishColor', 'Finish Color'),
+      ...rows('changeOrder', 'Change Order in Estim. / To Client', 4),
+      ...rows('set1', 'Shop Drawings: Set 1', 5),
+      ...rows('set2', 'Shop Drawings: Set 2', 5),
+      ...rows('set3', 'Shop Drawings: Set 3', 5),
+      ...rows('set4', 'Shop Drawings: Set 4', 5),
+      ...rows('finalSet', 'Shop Drawings: Final', 5),
+      ...rows('installSet', 'Shop Drawings: Install Set', 5),
+      ...rows('jobStatusOrderDate', 'Job Status / Order Date', 3),
+      { id: generateId(), apiName: 'onHoldUnits', label: 'On-Hold Units', type: 'Number', custom: true } as FieldDef,
+      text('customHardware', 'Custom Hardware'),
+      ...rows('factoryOC', 'Factory O.C.', 2),
+      ...rows('installationMaterial', 'Installation Material', 2),
+      ...rows('installationInstruction', 'Installation Instruction', 3),
+      ...rows('shippingWeek', 'Shipping Week', 5),
+      ...rows('estimatedDeliveryWeek', 'Estimated Delivery Wk', 5),
+      ...rows('loadingListRF', 'Loading List: RF', 5),
+      ...rows('loadingListRS', 'Loading List: RS', 5),
+      ...rows('loadingListOF', 'Loading List: OF', 5),
+      { id: generateId(), apiName: 'completionSignOff', label: 'Completion Sign-off', type: 'TextArea', custom: true } as FieldDef,
+    ].filter(f => !existingApiNames.has(f.apiName));
+
+    if (newFields.length === 0) return schema;
+
+    objects[projectIdx] = { ...project, fields: [...project.fields, ...newFields], updatedAt: now };
     return { ...schema, objects, updatedAt: now };
   }
 }
