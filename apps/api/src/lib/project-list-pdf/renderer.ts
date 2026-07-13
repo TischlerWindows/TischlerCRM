@@ -117,6 +117,9 @@ const HEADER_FILL = '#f3f4f6';
 const ZEBRA_FILL = '#f9fafb';
 const TEXT_COLOR = '#374151';
 const TITLE_COLOR = '#1e3a5f';
+// Opaque red highlight for a project's whole row block when it has no real
+// Order Date (row 3 of Job Status / Order Date) — matches the web report.
+const MISSING_ORDER_DATE_FILL = '#fecaca';
 
 function columnKey(column: Column): string {
   return column.kind === 'simple' ? column.key : column.keyPrefix;
@@ -401,7 +404,8 @@ function drawProjectBlock(
   subRows: number,
   rowHeights: number[],
 ): number {
-  const zebra = projectIndex % 2 === 1 ? ZEBRA_FILL : undefined;
+  const missingOrderDate = project.jobStatusOrderDateRow3 === null || project.jobStatusOrderDateRow3 === undefined || project.jobStatusOrderDateRow3 === '';
+  const zebra = missingOrderDate ? MISSING_ORDER_DATE_FILL : (projectIndex % 2 === 1 ? ZEBRA_FILL : undefined);
   const blockHeight = rowHeights.reduce((a, b) => a + b, 0);
   // Cumulative y-offset (relative to y0) that grid row `n` starts at.
   const rowOffsets: number[] = [0];
@@ -416,7 +420,9 @@ function drawProjectBlock(
       if (column.key === 'tusOrderNumber') {
         cellTextRotated(doc, formatCell(project[column.key]), x, y0, column.width, blockHeight);
       } else {
-        cellText(doc, formatCell(project[column.key]), x, y0, column.width, blockHeight);
+        cellText(doc, formatCell(project[column.key]), x, y0, column.width, blockHeight, {
+          bold: missingOrderDate && column.key === 'projectName',
+        });
       }
     } else {
       // Stretch the column's own real rows evenly across the whole block's

@@ -369,12 +369,16 @@ export default function ProjectListReportModal({
             </thead>
             {projects.map((p, pi) => {
               const subRows = subRowCountFor(p);
+              // Flag projects missing an actual Order Date (row 3 of Job Status /
+              // Order Date — the literal date, not the "Order Date" label in row 2)
+              // with a red row highlight and bold Customer cell.
+              const missingOrderDate = p.jobStatusOrderDateRow3 === null || p.jobStatusOrderDateRow3 === undefined || p.jobStatusOrderDateRow3 === '';
               return (
                 <tbody key={p.id ?? pi} className="print:break-inside-avoid">
                   {Array.from({ length: subRows }, (_, ri) => (
                     <tr
                       key={`${p.id ?? pi}-${ri}`}
-                      className={`${pi % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${
+                      className={`${missingOrderDate ? 'bg-red-200' : (pi % 2 === 0 ? 'bg-white' : 'bg-gray-50')} ${
                         ri === subRows - 1 ? 'border-b-2 border-b-gray-400' : ''
                       }`}
                     >
@@ -387,7 +391,9 @@ export default function ProjectListReportModal({
                             <td
                               key={col.key}
                               rowSpan={subRows}
-                              className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle text-center"
+                              className={`px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle text-center ${
+                                missingOrderDate && col.key === 'projectName' ? 'font-bold' : ''
+                              }`}
                             >
                               {col.key === 'tusOrderNumber' ? (
                                 <span style={VERTICAL_CELL_STYLE}>{formatCell(p[col.key])}</span>
