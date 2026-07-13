@@ -43,6 +43,9 @@ const WIDE = 70;
 const NARROW = 16;
 const ROTATED = 20;
 const CHANGE_ORDER_WIDTH = 55; // Change Order's values ("Shop Dwg Subm", "CO Down", ...) are longer text than other ROTATED columns' short codes/dates
+const SHOP_DRAWINGS_WIDTH = 34; // Set 1-4/Final/Install Set values (dates, "None", etc.) need more room than NARROW's single-character codes
+const FACTORY_OC_WIDTH = 34;
+const INSTALLATION_MATERIAL_WIDTH = 42; // values like "ACQ: Yes" are longer than other ROTATED columns' short codes
 
 const simple = (key: string, label: string, width: number, umbrella?: string): SimpleColumn => ({
   kind: 'simple',
@@ -80,17 +83,17 @@ const COLUMNS: Column[] = [
   simple('solarControl', 'Solar Ctrl', ROTATED),
   simple('finishColor', 'Finish Color', ROTATED),
   stacked('changeOrder', 'Change Order in Estim. / To Client', 5, CHANGE_ORDER_WIDTH),
-  stacked('set1', 'Set 1', 5, NARROW, 'Shop Drawings'),
-  stacked('set2', 'Set 2', 5, NARROW, 'Shop Drawings'),
-  stacked('set3', 'Set 3', 5, NARROW, 'Shop Drawings'),
-  stacked('set4', 'Set 4', 5, NARROW, 'Shop Drawings'),
-  stacked('finalSet', 'Final', 5, NARROW, 'Shop Drawings'),
-  stacked('installSet', 'Install Set', 5, NARROW, 'Shop Drawings'),
+  stacked('set1', 'Set 1', 5, SHOP_DRAWINGS_WIDTH, 'Shop Drawings'),
+  stacked('set2', 'Set 2', 5, SHOP_DRAWINGS_WIDTH, 'Shop Drawings'),
+  stacked('set3', 'Set 3', 5, SHOP_DRAWINGS_WIDTH, 'Shop Drawings'),
+  stacked('set4', 'Set 4', 5, SHOP_DRAWINGS_WIDTH, 'Shop Drawings'),
+  stacked('finalSet', 'Final', 5, SHOP_DRAWINGS_WIDTH, 'Shop Drawings'),
+  stacked('installSet', 'Install Set', 5, SHOP_DRAWINGS_WIDTH, 'Shop Drawings'),
   stacked('jobStatusOrderDate', 'Job Status / Order Date', 3, ROTATED),
   simple('onHoldUnits', 'On-Hold Units', ROTATED),
   simple('customHardware', 'Custom Hardware', ROTATED),
-  stacked('factoryOC', 'Factory O.C.', 2, ROTATED),
-  stacked('installationMaterial', 'Installation Material', 2, ROTATED),
+  stacked('factoryOC', 'Factory O.C.', 2, FACTORY_OC_WIDTH),
+  stacked('installationMaterial', 'Installation Material', 2, INSTALLATION_MATERIAL_WIDTH),
   stacked('installationInstruction', 'Installation Instruction', 3, ROTATED),
   stacked('shippingWeek', 'Shipping Week', 5, ROTATED),
   stacked('estimatedDeliveryWeek', 'Estimated Delivery Wk', 5, ROTATED),
