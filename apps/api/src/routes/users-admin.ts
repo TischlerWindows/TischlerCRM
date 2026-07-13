@@ -5,7 +5,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { hashPassword, signJwt } from '../auth.js';
 import { loadEnv } from '../config.js';
-import { logAudit, extractIp } from '../audit.js';
+import { logAudit, extractIp, DELETED_USER_PLACEHOLDER_ID } from '../audit.js';
 import * as notifications from '../notifications.js';
 
 const createUserSchema = z.object({
@@ -80,7 +80,12 @@ export async function usersAdminRoutes(app: FastifyInstance) {
   app.get('/admin/users', async (req, reply) => {
     const qParsed = listQuerySchema.safeParse(req.query);
     const includeDeleted = qParsed.success && qParsed.data.includeDeleted === 'true';
-    const where = includeDeleted ? {} : { deletedAt: null };
+    // The "Deleted User" system placeholder (see audit.ts) is never a real,
+    // manageable account — hide it from this list regardless of includeDeleted.
+    const where = {
+      id: { not: DELETED_USER_PLACEHOLDER_ID },
+      ...(includeDeleted ? {} : { deletedAt: null }),
+    };
 
     const users = await prisma.user.findMany({
       where,

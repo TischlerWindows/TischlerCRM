@@ -29,6 +29,33 @@ export function extractIp(req: FastifyRequest): string {
     || 'unknown';
 }
 
+// ── Deleted-user placeholder ────────────────────────────────────────────
+// AuditLog.actorId is a required, non-cascading FK (audit rows must never
+// lose their actor), so a user with any audit history can't be permanently
+// deleted outright. Instead, their historical audit rows are reassigned to
+// this singleton system account before the delete, so the record shows
+// "Deleted User" instead of blocking the delete. Fixed well-known id (not a
+// random generateId()) so every caller reassigns to/recognizes the same row.
+// Not soft-deleted (deletedAt stays null) so it never shows up in the
+// Recycle Bin; isActive: false + excluded by id from the admin Users list
+// (see users-admin.ts) so it never shows up as a real, assignable user.
+export const DELETED_USER_PLACEHOLDER_ID = '011000000000000';
+
+export async function getOrCreateDeletedUserPlaceholder(): Promise<{ id: string }> {
+  return prisma.user.upsert({
+    where: { id: DELETED_USER_PLACEHOLDER_ID },
+    update: {},
+    create: {
+      id: DELETED_USER_PLACEHOLDER_ID,
+      email: 'deleted-user@system.local',
+      name: 'Deleted User',
+      role: 'USER',
+      isActive: false,
+    },
+    select: { id: true },
+  });
+}
+
 export type AuditAction =
   | 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE'
   | 'FREEZE' | 'UNFREEZE' | 'RESET_PASSWORD';

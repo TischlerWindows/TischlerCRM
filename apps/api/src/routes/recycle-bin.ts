@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { z } from 'zod';
-import { logAudit, extractIp } from '../audit';
+import { logAudit, extractIp, getOrCreateDeletedUserPlaceholder, DELETED_USER_PLACEHOLDER_ID } from '../audit';
 
 const idParam = z.object({ id: z.string().min(1) });
 
@@ -210,27 +210,39 @@ export async function recycleBinRoutes(app: FastifyInstance) {
   });
 
   // ── Permanently delete a user ──
-  // Only allowed once the user is already soft-deleted. Historical activity
-  // (records created/modified, audit log entries, tickets, etc.) is preserved
-  // by design — the DB foreign keys will reject the delete (P2003) if any
-  // exist, and we surface that as a clear 409 instead of a raw DB error.
+  // Only allowed once the user is already soft-deleted. Most historical
+  // references (records created/modified, tickets, layouts, etc.) already
+  // null out automatically (onDelete: SetNull). AuditLog.actorId is the one
+  // required, non-nullable exception — audit rows must never lose their
+  // actor — so any audit history belonging to this user is reassigned to a
+  // singleton "Deleted User" system account first, then the user is deleted.
   app.delete('/admin/recycle-bin/users/:id', async (req, reply) => {
     if (!req.user || req.user.role !== 'ADMIN') {
       return reply.code(403).send({ error: 'Insufficient permissions' });
     }
     const parsed = idParam.safeParse(req.params);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid user ID' });
+    if (parsed.data.id === DELETED_USER_PLACEHOLDER_ID) {
+      return reply.code(400).send({ error: 'This system account cannot be deleted' });
+    }
 
     const user = await prisma.user.findUnique({ where: { id: parsed.data.id } });
     if (!user) return reply.code(404).send({ error: 'User not found' });
     if (!user.deletedAt) return reply.code(400).send({ error: 'User is not in the recycle bin' });
 
     try {
-      await prisma.user.delete({ where: { id: parsed.data.id } });
+      const placeholder = await getOrCreateDeletedUserPlaceholder();
+      await prisma.$transaction([
+        prisma.auditLog.updateMany({
+          where: { actorId: user.id },
+          data: { actorId: placeholder.id },
+        }),
+        prisma.user.delete({ where: { id: parsed.data.id } }),
+      ]);
     } catch (err: any) {
       if (err?.code === 'P2003') {
         return reply.code(409).send({
-          error: 'Cannot permanently delete this user: they have historical activity (records, audit log entries, tickets, etc.) that must be preserved. The account will remain in the Recycle Bin.',
+          error: 'Cannot permanently delete this user: they have historical activity (records, tickets, etc.) that must be preserved. The account will remain in the Recycle Bin.',
         });
       }
       throw err;
