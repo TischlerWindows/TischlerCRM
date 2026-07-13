@@ -46,6 +46,7 @@ const CHANGE_ORDER_WIDTH = 55; // Change Order's values ("Shop Dwg Subm", "CO Do
 const SHOP_DRAWINGS_WIDTH = 34; // Set 1-4/Final/Install Set values (dates, "None", etc.) need more room than NARROW's single-character codes
 const FACTORY_OC_WIDTH = 34;
 const INSTALLATION_MATERIAL_WIDTH = 42; // values like "ACQ: Yes" are longer than other ROTATED columns' short codes
+const JOB_STATUS_WIDTH = 40; // values like "Ordered"/"Delivered"/"5/8/26" are longer than other ROTATED columns' short codes
 
 const simple = (key: string, label: string, width: number, umbrella?: string): SimpleColumn => ({
   kind: 'simple',
@@ -89,7 +90,7 @@ const COLUMNS: Column[] = [
   stacked('set4', 'Set 4', 5, SHOP_DRAWINGS_WIDTH, 'Shop Drawings'),
   stacked('finalSet', 'Final', 5, SHOP_DRAWINGS_WIDTH, 'Shop Drawings'),
   stacked('installSet', 'Install Set', 5, SHOP_DRAWINGS_WIDTH, 'Shop Drawings'),
-  stacked('jobStatusOrderDate', 'Job Status / Order Date', 3, ROTATED),
+  stacked('jobStatusOrderDate', 'Job Status / Order Date', 3, JOB_STATUS_WIDTH),
   simple('onHoldUnits', 'On-Hold Units', ROTATED),
   simple('customHardware', 'Custom Hardware', ROTATED),
   stacked('factoryOC', 'Factory O.C.', 2, FACTORY_OC_WIDTH),
@@ -357,7 +358,13 @@ function drawProjectBlock(
   for (const column of columns) {
     if (column.kind === 'simple') {
       cellRect(doc, x, y0, column.width, blockHeight, zebra);
-      cellText(doc, formatCell(project[column.key]), x, y0, column.width, blockHeight);
+      // TUS Order #'s value is rotated sideways, matching the web report's
+      // VERTICAL_CELL_STYLE treatment of this same column.
+      if (column.key === 'tusOrderNumber') {
+        cellTextRotated(doc, formatCell(project[column.key]), x, y0, column.width, blockHeight);
+      } else {
+        cellText(doc, formatCell(project[column.key]), x, y0, column.width, blockHeight);
+      }
     } else {
       // Stretch the column's own real rows evenly across the whole block's
       // vertical space (matching the web report), rather than anchoring them
