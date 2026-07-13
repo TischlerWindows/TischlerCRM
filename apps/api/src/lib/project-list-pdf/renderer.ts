@@ -42,6 +42,7 @@ interface HeaderGroup {
 const WIDE = 70;
 const NARROW = 16;
 const ROTATED = 20;
+const CHANGE_ORDER_WIDTH = 55; // Change Order's values ("Shop Dwg Subm", "CO Down", ...) are longer text than other ROTATED columns' short codes/dates
 
 const simple = (key: string, label: string, width: number, umbrella?: string): SimpleColumn => ({
   kind: 'simple',
@@ -78,7 +79,7 @@ const COLUMNS: Column[] = [
   simple('dcSilicone', 'DC Silicone', ROTATED),
   simple('solarControl', 'Solar Ctrl', ROTATED),
   simple('finishColor', 'Finish Color', ROTATED),
-  stacked('changeOrder', 'Change Order in Estim. / To Client', 5, ROTATED),
+  stacked('changeOrder', 'Change Order in Estim. / To Client', 5, CHANGE_ORDER_WIDTH),
   stacked('set1', 'Set 1', 5, NARROW, 'Shop Drawings'),
   stacked('set2', 'Set 2', 5, NARROW, 'Shop Drawings'),
   stacked('set3', 'Set 3', 5, NARROW, 'Shop Drawings'),
@@ -210,9 +211,12 @@ function cellText(
   const fontSize = opts.fontSize ?? FONT_SIZE;
   doc.font(opts.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fontSize).fillColor(opts.color ?? TEXT_COLOR);
   const innerW = Math.max(1, w - 4);
-  const textHeight = doc.heightOfString(text, { width: innerW, align: 'center' });
-  const ty = y + Math.max(1, (h - textHeight) / 2);
-  doc.text(text, x + 2, ty, { width: innerW, align: 'center', lineBreak: true });
+  // Single line + ellipsis (never wrap): a wrapped multi-line value has no
+  // height clamp here, so it silently overflows past `h` into the row below
+  // — this is what caused Change Order's longer default text ("Shop Dwg
+  // Subm", "CO Down", ...) to bleed/garble across adjacent rows.
+  const ty = y + Math.max(1, (h - fontSize) / 2);
+  doc.text(text, x + 2, ty, { width: innerW, align: 'center', lineBreak: false, ellipsis: true });
 }
 
 /** Draws `text` rotated 90° (reading bottom-to-top) centered within the
