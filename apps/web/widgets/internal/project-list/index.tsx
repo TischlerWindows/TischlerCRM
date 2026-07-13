@@ -277,12 +277,17 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
         jobStatusOrderDateRow2: computedJobStatusRow2,
         ...computedChangeOrderRows,
       })
-      next.projectSalesman = next.projectSalesman || computedSalesman
-      next.projectLocation = next.projectLocation || computedLocation
-      next.factory = next.factory || computedFactory
-      next.jobStatusOrderDateRow2 = next.jobStatusOrderDateRow2 || computedJobStatusRow2
+      // Only fall back to the computed default when the field has genuinely
+      // never been saved (undefined/null in the raw record) — NOT when it's an
+      // empty string, which means the user explicitly cleared it and that
+      // clear must stick on every later load, not get silently refilled.
+      const applyIfUnset = (raw: any, computed: string) => (raw === undefined || raw === null) ? computed : raw
+      next.projectSalesman = applyIfUnset(flat.projectSalesman, computedSalesman)
+      next.projectLocation = applyIfUnset(flat.projectLocation, computedLocation)
+      next.factory = applyIfUnset(flat.factory, computedFactory)
+      next.jobStatusOrderDateRow2 = applyIfUnset(flat.jobStatusOrderDateRow2, computedJobStatusRow2)
       for (const key of Object.keys(computedChangeOrderRows)) {
-        next[key] = next[key] || computedChangeOrderRows[key]
+        next[key] = applyIfUnset(flat[key], computedChangeOrderRows[key]!)
       }
 
       setValues(next)

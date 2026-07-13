@@ -173,12 +173,23 @@ function formatCell(value: unknown): string {
  * Submission rows, then CO Down/Out/Back) that auto-fill in the Project List
  * widget when a project has no saved override — see `computedChangeOrderRows`
  * in apps/web/widgets/internal/project-list/index.tsx. Mirrored here so the
- * report shows the same values instead of blank dashes for un-overridden rows. */
+ * report shows the same values instead of blank dashes for un-overridden rows.
+ * Only genuinely unsaved (null/undefined) values fall back to the default —
+ * an explicitly-cleared empty string must stay blank, not get refilled. */
 const CHANGE_ORDER_ROW_DEFAULTS = ['Shop Dwg Subm', 'Shop Dwg Subm', 'CO Down', 'CO Out', 'CO Back'];
 
 function changeOrderCellValue(project: Record<string, any>, rowIndex: number): unknown {
   const raw = project[`changeOrderRow${rowIndex + 1}`];
-  return raw !== null && raw !== undefined && raw !== '' ? raw : CHANGE_ORDER_ROW_DEFAULTS[rowIndex];
+  return raw !== null && raw !== undefined ? raw : CHANGE_ORDER_ROW_DEFAULTS[rowIndex];
+}
+
+/** Row 2 of Job Status / Order Date always auto-fills to the literal text
+ * "Order Date" in the widget (see `computedJobStatusRow2`) when unsaved.
+ * Mirrored here for the same reason as Change Order above. */
+function jobStatusOrderDateCellValue(project: Record<string, any>, rowIndex: number): unknown {
+  const raw = project[`jobStatusOrderDateRow${rowIndex + 1}`];
+  if (rowIndex !== 1) return raw;
+  return raw !== null && raw !== undefined ? raw : 'Order Date';
 }
 
 /** How many sub-rows a project's block needs: the highest Row index across all
@@ -189,7 +200,9 @@ function subRowCountFor(project: Record<string, any>): number {
   for (const col of COLUMNS) {
     if (col.kind !== 'stacked') continue;
     for (let n = col.rowCount; n >= 1; n--) {
-      const v = col.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, n - 1) : project[`${col.keyPrefix}Row${n}`];
+      const v = col.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, n - 1)
+        : col.keyPrefix === 'jobStatusOrderDate' ? jobStatusOrderDateCellValue(project, n - 1)
+        : project[`${col.keyPrefix}Row${n}`];
       if (v !== null && v !== undefined && v !== '') {
         if (n > max) max = n;
         break;
@@ -396,6 +409,8 @@ export default function ProjectListReportModal({
                         const [, rowSpan] = spans[spanIndex]!;
                         const value = col.keyPrefix === 'changeOrder'
                           ? changeOrderCellValue(p, spanIndex)
+                          : col.keyPrefix === 'jobStatusOrderDate'
+                          ? jobStatusOrderDateCellValue(p, spanIndex)
                           : p[`${col.keyPrefix}Row${spanIndex + 1}`];
                         return (
                           <td

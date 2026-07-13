@@ -146,12 +146,23 @@ function formatCell(value: unknown): string {
 /** Change Order's 5 rows are fixed sheet row identities (2 Shop Drawing
  * Submission rows, then CO Down/Out/Back) that auto-fill in the Project List
  * widget when a project has no saved override. Mirrored here (and in the web
- * report modal) so the PDF shows the same values instead of blank dashes. */
+ * report modal) so the PDF shows the same values instead of blank dashes.
+ * Only genuinely unsaved (null/undefined) values fall back to the default —
+ * an explicitly-cleared empty string must stay blank, not get refilled. */
 const CHANGE_ORDER_ROW_DEFAULTS = ['Shop Dwg Subm', 'Shop Dwg Subm', 'CO Down', 'CO Out', 'CO Back'];
 
 function changeOrderCellValue(project: Record<string, unknown>, rowIndex: number): unknown {
   const raw = project[`changeOrderRow${rowIndex + 1}`];
-  return raw !== null && raw !== undefined && raw !== '' ? raw : CHANGE_ORDER_ROW_DEFAULTS[rowIndex];
+  return raw !== null && raw !== undefined ? raw : CHANGE_ORDER_ROW_DEFAULTS[rowIndex];
+}
+
+/** Row 2 of Job Status / Order Date always auto-fills to the literal text
+ * "Order Date" in the widget (see `computedJobStatusRow2`) when unsaved.
+ * Mirrored here for the same reason as Change Order above. */
+function jobStatusOrderDateCellValue(project: Record<string, unknown>, rowIndex: number): unknown {
+  const raw = project[`jobStatusOrderDateRow${rowIndex + 1}`];
+  if (rowIndex !== 1) return raw;
+  return raw !== null && raw !== undefined ? raw : 'Order Date';
 }
 
 /** Same rule as the web report: the highest Row index across all stacked
@@ -161,7 +172,9 @@ function subRowCountFor(project: Record<string, unknown>): number {
   for (const col of COLUMNS) {
     if (col.kind !== 'stacked') continue;
     for (let n = col.rowCount; n >= 1; n--) {
-      const v = col.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, n - 1) : project[`${col.keyPrefix}Row${n}`];
+      const v = col.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, n - 1)
+        : col.keyPrefix === 'jobStatusOrderDate' ? jobStatusOrderDateCellValue(project, n - 1)
+        : project[`${col.keyPrefix}Row${n}`];
       if (v !== null && v !== undefined && v !== '') {
         if (n > max) max = n;
         break;
@@ -356,7 +369,9 @@ function drawProjectBlock(
         const [start, span] = spans[ri]!;
         const rowY = y0 + start * ROW_HEIGHT;
         const rowHeight = span * ROW_HEIGHT;
-        const value = column.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, ri) : project[`${column.keyPrefix}Row${ri + 1}`];
+        const value = column.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, ri)
+          : column.keyPrefix === 'jobStatusOrderDate' ? jobStatusOrderDateCellValue(project, ri)
+          : project[`${column.keyPrefix}Row${ri + 1}`];
         cellRect(doc, x, rowY, column.width, rowHeight, zebra);
         cellText(doc, formatCell(value), x, rowY, column.width, rowHeight);
       }
