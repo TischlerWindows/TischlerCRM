@@ -114,9 +114,14 @@ const GROUPS: GroupDef[] = [
     ],
   },
   {
+    // Values (not labels) are auto-filled on load with the sheet's fixed row
+    // identities — 2 Shop Drawing Submission rows then CO Down/Out/Back — same
+    // "computed but overridable" pattern as Salesman/Location/Factory below.
     title: 'Change Order in Estim / To Client',
     columns: [
-      col('Change Order in Estim / To Client', rowsN(4, 'changeOrder', 'Change Order'), { width: 200 }),
+      col('Change Order in Estim / To Client', rowsN(5, 'changeOrder', 'Change Order').map(f => (
+        { ...f, computed: true }
+      )), { width: 200 }),
     ],
   },
   {
@@ -170,7 +175,7 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Completion Sign-off',
     columns: [
-      col('Completion Sign-off', [{ key: 'completionSignOff', label: 'Completion Sign-off', type: 'textarea' }], { tall: true, width: 180 }),
+      col('Completion Sign-off', rowsN(2, 'completionSignOff', 'Completion Sign-off'), { width: 170 }),
     ],
   },
 ]
@@ -250,16 +255,29 @@ export default function ProjectListVerticalWidget({ record, object }: WidgetProp
       // Row 2 of the Job Status / Order Date stack always auto-fills to the literal
       // text "Order Date" (still overridable, like the other computed fields above).
       const computedJobStatusRow2 = 'Order Date'
+      // Change Order's 5 rows always auto-fill to these fixed sheet row identities
+      // (still overridable) — 2 Shop Drawing Submission rows, then CO Down/Out/Back.
+      const computedChangeOrderRows: Record<string, string> = {
+        changeOrderRow1: 'Shop Dwg Subm',
+        changeOrderRow2: 'Shop Dwg Subm',
+        changeOrderRow3: 'CO Down',
+        changeOrderRow4: 'CO Out',
+        changeOrderRow5: 'CO Back',
+      }
       setComputedValues({
         projectSalesman: computedSalesman,
         projectLocation: computedLocation,
         factory: computedFactory,
         jobStatusOrderDateRow2: computedJobStatusRow2,
+        ...computedChangeOrderRows,
       })
       next.projectSalesman = next.projectSalesman || computedSalesman
       next.projectLocation = next.projectLocation || computedLocation
       next.factory = next.factory || computedFactory
       next.jobStatusOrderDateRow2 = next.jobStatusOrderDateRow2 || computedJobStatusRow2
+      for (const key of Object.keys(computedChangeOrderRows)) {
+        next[key] = next[key] || computedChangeOrderRows[key]
+      }
 
       setValues(next)
       setInitialValues(next)

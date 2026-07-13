@@ -203,7 +203,8 @@ const CORE_OBJECTS = [
       { apiName: 'loadingListOFRow3', label: 'OF — Row 3', type: 'Text' },
       { apiName: 'loadingListOFRow4', label: 'OF — Row 4', type: 'Text' },
       { apiName: 'loadingListOFRow5', label: 'OF — Row 5', type: 'Text' },
-      { apiName: 'completionSignOff', label: 'Completion Sign-off', type: 'TextArea' },
+      { apiName: 'completionSignOffRow1', label: 'Completion Sign-off — Row 1', type: 'Text' },
+      { apiName: 'completionSignOffRow2', label: 'Completion Sign-off — Row 2', type: 'Text' },
     ],
   },
   {

@@ -92,7 +92,7 @@ const COLUMNS: Column[] = [
   stacked('loadingListRF', 'RF', 5, 'Loading List'),
   stacked('loadingListRS', 'RS', 5, 'Loading List'),
   stacked('loadingListOF', 'OF', 5, 'Loading List'),
-  simple('completionSignOff', 'Completion Sign-off'),
+  stacked('completionSignOff', 'Completion Sign-off', 2),
 ];
 
 /** Consecutive columns sharing the same `umbrella` are rendered under one
@@ -197,6 +197,22 @@ function subRowCountFor(project: Record<string, any>): number {
     }
   }
   return max;
+}
+
+/** Distributes a stacked column's `rowCount` real rows evenly across the
+ * project block's `subRows` grid rows (rather than anchoring them at the
+ * top and leaving the remainder blank) — e.g. Factory O.C.'s 2 rows each
+ * stretch to fill half of a 5-row block instead of just the first two grid
+ * rows. Returns, for each real row, the [startRow, rowSpan] to render at. */
+function stackedRowSpans(rowCount: number, subRows: number): Array<[start: number, span: number]> {
+  const spans: Array<[number, number]> = [];
+  let prevBoundary = 0;
+  for (let i = 1; i <= rowCount; i++) {
+    const boundary = Math.round((i / rowCount) * subRows);
+    spans.push([prevBoundary, boundary - prevBoundary]);
+    prevBoundary = boundary;
+  }
+  return spans;
 }
 
 export default function ProjectListReportModal({
@@ -368,27 +384,23 @@ export default function ProjectListReportModal({
                             </td>
                           );
                         }
-                        // Stacked columns only have `col.rowCount` real sub-rows (e.g.
-                        // Factory O.C. only has 2); once a project's block needs more
-                        // sub-rows than that (driven by some OTHER column, e.g. Change
-                        // Order always needing 5), merge the remaining rows into one
-                        // blank cell instead of padding them with repeated "—" rows.
-                        if (ri === col.rowCount && subRows > col.rowCount) {
-                          return (
-                            <td
-                              key={col.keyPrefix}
-                              rowSpan={subRows - col.rowCount}
-                              className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
-                            />
-                          );
-                        }
-                        if (ri > col.rowCount) return null;
-                        const value = ri < col.rowCount
-                          ? (col.keyPrefix === 'changeOrder' ? changeOrderCellValue(p, ri) : p[`${col.keyPrefix}Row${ri + 1}`])
-                          : undefined;
+                        // Stacked columns' real rows (e.g. Factory O.C.'s 2) are
+                        // stretched to spread evenly across the project block's full
+                        // vertical space instead of being anchored at the top with
+                        // blank space left below (subRows can exceed col.rowCount when
+                        // some OTHER column, e.g. Change Order, needs more rows).
+                        const effectiveRowCount = Math.min(col.rowCount, subRows);
+                        const spans = stackedRowSpans(effectiveRowCount, subRows);
+                        const spanIndex = spans.findIndex(([start]) => start === ri);
+                        if (spanIndex === -1) return null;
+                        const [, rowSpan] = spans[spanIndex]!;
+                        const value = col.keyPrefix === 'changeOrder'
+                          ? changeOrderCellValue(p, spanIndex)
+                          : p[`${col.keyPrefix}Row${spanIndex + 1}`];
                         return (
                           <td
                             key={col.keyPrefix}
+                            rowSpan={rowSpan}
                             className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
                           >
                             {formatCell(value)}

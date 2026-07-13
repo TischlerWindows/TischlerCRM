@@ -177,7 +177,7 @@ const GROUPS: GroupDef[] = [
   {
     title: 'Completion Sign-off',
     columns: [
-      col('Completion Sign-off', [{ key: 'completionSignOff', label: 'Completion Sign-off', type: 'textarea' }], { tall: true, width: 180 }),
+      col('Completion Sign-off', rowsN(2, 'completionSignOff', 'Completion Sign-off'), { width: 170 }),
     ],
   },
 ]

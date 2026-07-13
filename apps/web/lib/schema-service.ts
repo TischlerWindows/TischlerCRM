@@ -3770,7 +3770,7 @@ class LocalStorageSchemaService implements SchemaService {
       ...rows('loadingListRF', 'Loading List: RF', 5),
       ...rows('loadingListRS', 'Loading List: RS', 5),
       ...rows('loadingListOF', 'Loading List: OF', 5),
-      { id: generateId(), apiName: 'completionSignOff', label: 'Completion Sign-off', type: 'TextArea', custom: true } as FieldDef,
+      ...rows('completionSignOff', 'Completion Sign-off', 2),
     ].filter(f => !existingApiNames.has(f.apiName));
 
     if (newFields.length === 0) return schema;

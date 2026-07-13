@@ -100,7 +100,7 @@ const COLUMNS: Column[] = [
   stacked('loadingListRF', 'RF', 5, NARROW, 'Loading List'),
   stacked('loadingListRS', 'RS', 5, NARROW, 'Loading List'),
   stacked('loadingListOF', 'OF', 5, NARROW, 'Loading List'),
-  simple('completionSignOff', 'Completion Sign-off', ROTATED),
+  stacked('completionSignOff', 'Completion Sign-off', 2, ROTATED),
 ];
 
 const ROW_HEIGHT = 13;
@@ -169,6 +169,22 @@ function subRowCountFor(project: Record<string, unknown>): number {
     }
   }
   return max;
+}
+
+/** Distributes a stacked column's real rows evenly across the project
+ * block's full vertical space (matching the web report), instead of
+ * anchoring them at the top with blank space left below — e.g. Factory
+ * O.C.'s 2 rows each stretch to fill half of a 5-row-tall block. Returns,
+ * for each real row, the [startRow, rowSpan] (in grid-row units) to draw at. */
+function stackedRowSpans(rowCount: number, subRows: number): Array<[start: number, span: number]> {
+  const spans: Array<[number, number]> = [];
+  let prevBoundary = 0;
+  for (let i = 1; i <= rowCount; i++) {
+    const boundary = Math.round((i / rowCount) * subRows);
+    spans.push([prevBoundary, boundary - prevBoundary]);
+    prevBoundary = boundary;
+  }
+  return spans;
 }
 
 function headerGroupsFor(columns: Column[]): HeaderGroup[] {
@@ -330,19 +346,19 @@ function drawProjectBlock(
       cellRect(doc, x, y0, column.width, blockHeight, zebra);
       cellText(doc, formatCell(project[column.key]), x, y0, column.width, blockHeight);
     } else {
-      // Only draw the column's own real sub-rows individually; if the
-      // project's block needs MORE sub-rows than this column has (driven by
-      // some other column, e.g. Change Order always needing 5), merge the
-      // remainder into one blank cell instead of padding with repeated "—"
-      // rows — matches the web report and the widget's own row count.
-      const realRows = Math.min(column.rowCount, subRows);
-      for (let ri = 0; ri < realRows; ri++) {
+      // Stretch the column's own real rows evenly across the whole block's
+      // vertical space (matching the web report), rather than anchoring them
+      // at the top and leaving a blank gap below — e.g. Factory O.C.'s 2 rows
+      // each fill half of a 5-row-tall block.
+      const effectiveRowCount = Math.min(column.rowCount, subRows);
+      const spans = stackedRowSpans(effectiveRowCount, subRows);
+      for (let ri = 0; ri < effectiveRowCount; ri++) {
+        const [start, span] = spans[ri]!;
+        const rowY = y0 + start * ROW_HEIGHT;
+        const rowHeight = span * ROW_HEIGHT;
         const value = column.keyPrefix === 'changeOrder' ? changeOrderCellValue(project, ri) : project[`${column.keyPrefix}Row${ri + 1}`];
-        cellRect(doc, x, y0 + ri * ROW_HEIGHT, column.width, ROW_HEIGHT, zebra);
-        cellText(doc, formatCell(value), x, y0 + ri * ROW_HEIGHT, column.width, ROW_HEIGHT);
-      }
-      if (subRows > realRows) {
-        cellRect(doc, x, y0 + realRows * ROW_HEIGHT, column.width, (subRows - realRows) * ROW_HEIGHT, zebra);
+        cellRect(doc, x, rowY, column.width, rowHeight, zebra);
+        cellText(doc, formatCell(value), x, rowY, column.width, rowHeight);
       }
     }
     x += column.width;
