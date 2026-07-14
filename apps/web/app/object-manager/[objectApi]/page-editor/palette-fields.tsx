@@ -120,7 +120,11 @@ function DraggableFieldChip({
   isPlaced: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `palette-field-${field.apiName}${isPlaced ? `-${Date.now()}` : ''}`,
+    // No timestamp/uniqueness suffix here — `data.fieldApiName` below is what
+    // actually gets used to build the dropped field (see parseActiveDrag);
+    // this `id` is only dnd-kit's bookkeeping key, distinct from
+    // canvas fields' `field-*` ids so the two never collide.
+    id: `palette-field-${field.apiName}`,
     data: {
       type: 'palette-field',
       fieldApiName: field.apiName,

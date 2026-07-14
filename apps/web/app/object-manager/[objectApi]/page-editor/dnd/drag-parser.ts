@@ -111,17 +111,6 @@ export function parseActiveDrag(active: Active, layout: EditorState['layout']): 
     };
   }
 
-  if (activeId.startsWith('palette-field-') || activeId.startsWith('field-')) {
-    const fieldApiName = activeId.replace(/^(?:palette-)?field-/, '');
-    const label =
-      typeof data.field === 'object' &&
-      data.field !== null &&
-      typeof (data.field as { label?: unknown }).label === 'string'
-        ? ((data.field as { label: string }).label ?? fieldApiName)
-        : fieldApiName;
-    return { kind: 'palette-field', fieldApiName, label };
-  }
-
   if (data.type === 'palette-panel') {
     const cols = data.columns;
     if (cols !== 1 && cols !== 2 && cols !== 3 && cols !== 4) return null;
