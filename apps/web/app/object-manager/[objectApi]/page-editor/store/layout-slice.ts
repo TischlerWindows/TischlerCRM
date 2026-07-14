@@ -742,7 +742,15 @@ export const createLayoutSlice: StateCreator<
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   loadLayout: (layout) => {
-    const seen = new Set<string>();
+    // De-dupe only WITHIN each individual panel (a field accidentally dropped
+    // twice into the same panel) — NOT across the whole layout. The `seen`
+    // set previously lived outside the tabs/panels loop, so a field already
+    // placed on one tab (e.g. "Details") would silently get stripped from
+    // every other tab's panel that also referenced it (e.g. "Warranty &
+    // Spec") on every load — including the reload right after a successful
+    // save — even though the save itself persisted both placements correctly.
+    // Reusing the same field across different tabs/panels is intentional and
+    // must be preserved.
     const sanitized = {
       ...layout,
       formattingRules: layout.formattingRules ?? [],
@@ -750,14 +758,17 @@ export const createLayoutSlice: StateCreator<
         ...tab,
         regions: tab.regions.map((region) => ({
           ...region,
-          panels: region.panels.map((panel) => ({
-            ...panel,
-            fields: panel.fields.filter((f) => {
-              if (seen.has(f.fieldApiName)) return false;
-              seen.add(f.fieldApiName);
-              return true;
-            }),
-          })),
+          panels: region.panels.map((panel) => {
+            const seen = new Set<string>();
+            return {
+              ...panel,
+              fields: panel.fields.filter((f) => {
+                if (seen.has(f.fieldApiName)) return false;
+                seen.add(f.fieldApiName);
+                return true;
+              }),
+            };
+          }),
         })),
       })),
     };
