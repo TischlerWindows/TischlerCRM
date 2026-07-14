@@ -51,9 +51,29 @@ const FUNCTIONS = {
   },
   'NOW': () => new Date(),
   'TODAY': () => new Date().toISOString().split('T')[0],
-  'YEAR': (date: string | Date) => new Date(date).getFullYear(),
-  'MONTH': (date: string | Date) => new Date(date).getMonth() + 1,
-  'DAY': (date: string | Date) => new Date(date).getDate(),
+  /** Extracts the calendar year/month/day from a date value. For a plain
+   * date-only string ("YYYY-MM-DD", how Date-type fields are stored), the
+   * digits are read directly from the string instead of going through
+   * `new Date(str)` — that constructor parses date-only strings as UTC
+   * midnight, but formulas evaluate in the user's browser, so reading it
+   * back with local getters (getFullYear/getMonth/getDate) rolls the date
+   * back a day for any timezone behind UTC (e.g. US Eastern in July:
+   * "2026-07-24" → UTC midnight → 2026-07-23 20:00 local → DAY() = 23).
+   * Real timestamps (with a "T") and Date objects still use local getters,
+   * which is correct since they represent a specific instant, not a
+   * timezone-less calendar date. */
+  'YEAR': (date: string | Date) => {
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)) return Number(date.slice(0, 4));
+    return new Date(date).getFullYear();
+  },
+  'MONTH': (date: string | Date) => {
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)) return Number(date.slice(5, 7));
+    return new Date(date).getMonth() + 1;
+  },
+  'DAY': (date: string | Date) => {
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)) return Number(date.slice(8, 10));
+    return new Date(date).getDate();
+  },
   'ISNULL': (value: any) => value == null,
   'ISBLANK': (value: any) => value == null || String(value).trim() === '',
   'NOT': (value: boolean) => !value,
