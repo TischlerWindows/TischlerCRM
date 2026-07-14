@@ -325,7 +325,7 @@ export default function ProjectListReportModal({
         </div>
 
         <div className="overflow-auto flex-1 print:overflow-visible print:flex-none print:h-auto">
-          <table className="min-w-full text-xs print:text-sm border-collapse">
+          <table className="min-w-full text-xs print:text-base border-collapse">
             <thead className="sticky top-0 bg-gray-100 z-10 print:static">
               <tr>
                 {HEADER_GROUPS.map((group, gi) =>
