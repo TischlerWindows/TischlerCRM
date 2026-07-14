@@ -282,7 +282,16 @@ export default function ProjectListReportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 print:relative print:bg-white print:p-0">
+    <>
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: landscape;
+            margin: 0.25in;
+          }
+        }
+      `}</style>
+      <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 print:relative print:bg-white print:p-0">
       <div
         role="dialog"
         aria-modal="true"
@@ -316,7 +325,7 @@ export default function ProjectListReportModal({
         </div>
 
         <div className="overflow-auto flex-1 print:overflow-visible print:flex-none print:h-auto">
-          <table className="min-w-full text-xs border-collapse">
+          <table className="min-w-full text-xs print:text-sm border-collapse">
             <thead className="sticky top-0 bg-gray-100 z-10 print:static">
               <tr>
                 {HEADER_GROUPS.map((group, gi) =>
@@ -446,6 +455,7 @@ export default function ProjectListReportModal({
         </div>
       </div>
     </div>
+    </>
   );
 }
 
