@@ -91,7 +91,15 @@ class ExpressionParser {
   parse(expression: string): ParsedExpression {
     this.tokens = this.tokenize(expression);
     this.position = 0;
-    return this.parseExpression();
+    const result = this.parseExpression();
+    // A well-formed expression must consume every token. Leftover tokens
+    // (e.g. a stray extra closing paren, or two expressions with no operator
+    // between them) previously passed validation silently because nothing
+    // checked the parser actually reached the end of the token stream.
+    if (this.position < this.tokens.length) {
+      throw new Error(`Unexpected trailing token: '${this.currentToken()}'`);
+    }
+    return result;
   }
 
   private tokenize(expression: string): string[] {
@@ -254,14 +262,18 @@ class ExpressionParser {
     if (token === '[') {
       this.consume('[');
       const elements: ParsedExpression[] = [];
-      
-      while (this.currentToken() !== ']') {
+
+      if (this.currentToken() !== ']') {
         elements.push(this.parseExpression());
-        if (this.currentToken() === ',') {
+        while (this.currentToken() === ',') {
           this.consume(',');
+          elements.push(this.parseExpression());
         }
       }
-      
+
+      if (this.currentToken() !== ']') {
+        throw new Error(`Expected ',' or ']' in array literal, got '${this.currentToken()}'`);
+      }
       this.consume(']');
       return {
         type: 'literal',
@@ -330,13 +342,20 @@ class ExpressionParser {
     this.consume('(');
 
     const args: ParsedExpression[] = [];
-    while (this.currentToken() !== ')') {
+    if (this.currentToken() !== ')') {
       args.push(this.parseExpression());
-      if (this.currentToken() === ',') {
+      // A comma is required between arguments — without this check, a
+      // missing comma (e.g. "CONCAT(a b)") was silently treated as two
+      // separate arguments instead of a syntax error.
+      while (this.currentToken() === ',') {
         this.consume(',');
+        args.push(this.parseExpression());
       }
     }
 
+    if (this.currentToken() !== ')') {
+      throw new Error(`Expected ',' or ')' in arguments to ${funcName}, got '${this.currentToken()}'`);
+    }
     this.consume(')');
 
     return {
