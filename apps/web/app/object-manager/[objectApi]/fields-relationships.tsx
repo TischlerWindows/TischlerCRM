@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useSchemaStore } from '@/lib/schema-store';
 import { FieldDef, FieldType } from '@/lib/schema';
+import { expressionEngine } from '@/lib/expressions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,6 +37,8 @@ import { Textarea } from '@/components/ui/textarea';
   AlertCircle,
   User,
   Cloud,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 interface FieldsRelationshipsProps {
   objectApiName: string;
@@ -102,6 +105,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
   const [selectedType, setSelectedType] = useState<FieldType | null>(null);
   const [showTypeSelector, setShowTypeSelector] = useState(true);
   const [showVisibilityEditor, setShowVisibilityEditor] = useState(false);
+  const [syntaxCheck, setSyntaxCheck] = useState<{ ok: boolean; message: string } | null>(null);
   
   const [formData, setFormData] = useState({
     label: '',
@@ -175,11 +179,70 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     setShowTypeSelector(false);
   };
 
+  /** Validates a Formula field's expression: parse-level syntax, referenced
+   * field API names actually existing on this object (or the target object
+   * for cross-object `Lookup.Field` refs), and a trial evaluation with dummy
+   * values to catch runtime-only errors (unknown function, bad operator use). */
+  const handleCheckSyntax = () => {
+    const expr = formData.formulaExpr.trim();
+    if (!expr) {
+      setSyntaxCheck({ ok: false, message: 'Enter a formula expression first.' });
+      return;
+    }
+
+    const parseResult = expressionEngine.validate(expr);
+    if (!parseResult.isValid) {
+      setSyntaxCheck({ ok: false, message: parseResult.error ?? 'Invalid formula syntax.' });
+      return;
+    }
+
+    const refs = expressionEngine.getFieldReferences(expr);
+    const dummyContext: Record<string, any> = {};
+    for (const ref of refs) {
+      if (ref.includes('.')) {
+        // Cross-object reference — the part before the first dot must be a
+        // Lookup/ExternalLookup/LookupUser field on this object.
+        const [lookupApiName] = ref.split('.');
+        const lookupField = fields.find((f) => f.apiName === lookupApiName);
+        if (!lookupField) {
+          setSyntaxCheck({ ok: false, message: `Unknown field "${lookupApiName}" referenced in formula.` });
+          return;
+        }
+        if (!['Lookup', 'ExternalLookup', 'LookupUser', 'PicklistLookup'].includes(lookupField.type)) {
+          setSyntaxCheck({ ok: false, message: `"${lookupApiName}" is not a Lookup field, so "${ref}" can't be used.` });
+          return;
+        }
+        dummyContext[ref] = 'sample';
+      } else {
+        const fieldDef = fields.find((f) => f.apiName === ref);
+        if (!fieldDef) {
+          setSyntaxCheck({ ok: false, message: `Unknown field "${ref}" referenced in formula.` });
+          return;
+        }
+        dummyContext[ref] = ['Number', 'Currency', 'Percent'].includes(fieldDef.type)
+          ? 1
+          : fieldDef.type === 'Checkbox'
+          ? true
+          : fieldDef.type === 'Date' || fieldDef.type === 'DateTime'
+          ? new Date().toISOString()
+          : 'sample';
+      }
+    }
+
+    try {
+      expressionEngine.evaluate(expr, dummyContext);
+      setSyntaxCheck({ ok: true, message: 'Formula is valid.' });
+    } catch (err) {
+      setSyntaxCheck({ ok: false, message: err instanceof Error ? err.message : 'Formula failed to evaluate.' });
+    }
+  };
+
   const handleCreateField = () => {
     setShowCreateDialog(true);
     setEditingField(null);
     setSelectedType(null);
     setShowTypeSelector(true);
+    setSyntaxCheck(null);
     setFormData({
       label: '',
       apiName: '',
@@ -240,6 +303,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       displayFields: (cloned as any).displayFields ? [...(cloned as any).displayFields] : [],
       subFields: cloned.subFields ? cloned.subFields.map(sf => ({ ...sf })) : [],
     });
+    setSyntaxCheck(null);
     setShowCreateDialog(true);
   };
 
@@ -741,11 +805,33 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                       <Textarea
                         id="formulaExpr"
                         value={formData.formulaExpr}
-                        onChange={(e) => setFormData({ ...formData, formulaExpr: e.target.value })}
+                        onChange={(e) => {
+                          setFormData({ ...formData, formulaExpr: e.target.value });
+                          setSyntaxCheck(null);
+                        }}
                         placeholder="e.g., Amount * 0.1 or primaryContact.phone"
                         rows={3}
                       />
-                      <div className="text-xs text-gray-500 mt-1 space-y-1">
+                      <div className="mt-2 flex items-center gap-3">
+                        <Button type="button" variant="outline" size="sm" onClick={handleCheckSyntax}>
+                          Check Syntax
+                        </Button>
+                        {syntaxCheck && (
+                          <span
+                            className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                              syntaxCheck.ok ? 'text-green-700' : 'text-red-600'
+                            }`}
+                          >
+                            {syntaxCheck.ok ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5 shrink-0" />
+                            )}
+                            {syntaxCheck.message}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-2 space-y-1">
                         <p>Use field API names to reference values on this record. Supports math operators (+, -, *, /), functions (IF, CONCAT, UPPER, LOWER, etc.), and comparisons.</p>
                         <p><strong>Cross-object formulas:</strong> Pull values from related records using dot notation — <code className="bg-gray-100 px-1 rounded">LookupFieldName.TargetFieldName</code></p>
                         <p className="text-gray-400">Examples: <code className="bg-gray-100 px-1 rounded">primaryContact.phone</code>, <code className="bg-gray-100 px-1 rounded">CONCAT(accountLookup.accountName, " — ", stage)</code></p>
