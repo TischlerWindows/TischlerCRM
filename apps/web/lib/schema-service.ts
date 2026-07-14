@@ -709,6 +709,14 @@ class LocalStorageSchemaService implements SchemaService {
    * so field definition changes propagate automatically.
    */
   private enrichLayoutFieldDefs(schema: OrgSchema): OrgSchema {
+    // Track whether anything actually changed so the result can be persisted.
+    // This function mutates `panel.fields` in place, but if it always
+    // returned the SAME top-level `schema` reference, the caller's
+    // `migratedSchema !== schema` check would never see a change and would
+    // never save the enrichment — meaning a panel field that's missing its
+    // embedded FieldDef props (e.g. after a fieldApiName repair) would get
+    // silently re-enriched in memory on every load without ever sticking.
+    let changed = false;
     for (const obj of schema.objects) {
       const fieldMap = new Map(obj.fields.map(f => [f.apiName, f]));
       for (const layout of obj.pageLayouts || []) {
@@ -721,20 +729,22 @@ class LocalStorageSchemaService implements SchemaService {
                 // Enrich the PanelField with full FieldDef props so DynamicForm
                 // can render without cross-referencing object.fields.
                 const { apiName, ...rest } = fieldDef;
-                return {
+                const enriched = {
                   ...rest,
                   ...pf,
                   type: normalizeFieldType(fieldDef.type),
                   lookupObject: fieldDef.lookupObject,
                   relationshipName: fieldDef.relationshipName,
                 } as any;
+                if (JSON.stringify(enriched) !== JSON.stringify(pf)) changed = true;
+                return enriched;
               });
             }
           }
         }
       }
     }
-    return schema;
+    return changed ? { ...schema, updatedAt: new Date().toISOString() } : schema;
   }
 
   /**
