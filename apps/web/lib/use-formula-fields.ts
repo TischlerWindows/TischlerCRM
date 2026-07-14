@@ -203,7 +203,14 @@ export function useFormulaFields(
     for (const field of formulaFields) {
       const formula = field.formulaExpr!;
 
-      // Build context with same-record fields (use bare apiName keys)
+      // Build context with same-record fields (use bare apiName keys).
+      // Record data isn't consistent about which form a key is stored under —
+      // some fields are saved bare (e.g. "wood_delivery_date") while the
+      // field's real apiName (as referenced by formulas) is prefixed
+      // ("Project__wood_delivery_date"). Only stripping a prefix off
+      // already-prefixed keys never produces the prefixed alias for keys
+      // stored bare, so formulas referencing the prefixed name silently
+      // resolved to `undefined`. Add both directions.
       const context: ExpressionContext = {};
       if (record) {
         for (const [key, val] of Object.entries(record)) {
@@ -211,6 +218,10 @@ export function useFormulaFields(
           context[key] = val as any;
           const bare = key.replace(/^[A-Za-z]+__/, '');
           if (bare !== key) context[bare] = val as any;
+          if (objectDef?.apiName) {
+            const prefixed = `${objectDef.apiName}__${bare}`;
+            if (!(prefixed in context) || context[prefixed] == null) context[prefixed] = val as any;
+          }
         }
       }
 
