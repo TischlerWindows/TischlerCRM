@@ -189,11 +189,23 @@ export function useEditorLifecycle(): EditorLifecycle {
 
   useEffect(() => {
     if (!object) return;
-    if (didLoadLayoutRef.current === routeKey) return;
+    // `schema` is seeded synchronously from a localStorage cache (see
+    // schema-store.ts's getCachedSchema) before the fresh network fetch
+    // resolves. Without re-checking `object.updatedAt`, this effect's
+    // one-shot `routeKey` guard would load that STALE cached layout into the
+    // editor and then never re-sync once the real fetch completes — even a
+    // hard refresh doesn't clear localStorage, so this could persist
+    // indefinitely. Re-load whenever the object's updatedAt actually changes,
+    // as long as the user hasn't started editing yet (isDirty).
+    const objectUpdatedAt = object.updatedAt ?? null;
+    if (didLoadLayoutRef.current === routeKey) {
+      if (isDirty) return;
+      if (loadedUpdatedAtRef.current === objectUpdatedAt) return;
+    }
     didLoadLayoutRef.current = routeKey;
 
     // Capture the object's updatedAt so we can detect concurrent edits on save.
-    loadedUpdatedAtRef.current = object.updatedAt ?? null;
+    loadedUpdatedAtRef.current = objectUpdatedAt;
 
     if (layoutId === 'new') {
       loadLayout(createBlankLayout(objectApiName));
@@ -211,7 +223,7 @@ export function useEditorLifecycle(): EditorLifecycle {
     }
 
     loadLayout(createBlankLayout(objectApiName));
-  }, [layoutId, loadLayout, object, objectApiName, routeKey]);
+  }, [isDirty, layoutId, loadLayout, object, objectApiName, routeKey]);
 
   /* ---- Beforeunload guard ---- */
   useEffect(() => {
