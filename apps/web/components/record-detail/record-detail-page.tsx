@@ -21,6 +21,7 @@ import { useRecordSetupContext } from '@/lib/record-setup-context';
 import { collectDefaultCollapsedWidgetIds } from '@/lib/widget-collapse-defaults';
 import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
 import { RecordTabRenderer } from './record-tab-renderer';
+import { InlineEditProvider, InlineEditToolbar } from './inline-edit-context';
 import { RecordActions } from './record-actions';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -298,9 +299,9 @@ export default function RecordDetailPage({
     setRecord(flat);
   }, []);
 
-  // ── Callback for a single field saved via inline editing ─────────────
-  const handleInlineFieldSaved = useCallback((apiName: string, newValue: unknown) => {
-    setRecord((prev) => (prev ? { ...prev, [apiName]: newValue } : prev));
+  // ── Callback for a batched inline-edit save (every changed field at once) ─
+  const handleInlineFieldsSaved = useCallback((changed: Record<string, unknown>) => {
+    setRecord((prev) => (prev ? { ...prev, ...changed } : prev));
   }, []);
 
   // ── Loading state ────────────────────────────────────────────────────
@@ -485,7 +486,13 @@ export default function RecordDetailPage({
 
         {/* Layout-driven field rendering */}
         {pageLayout ? (
-          <div className="space-y-4">
+          <InlineEditProvider
+            objectApiName={objectDef?.apiName ?? ''}
+            recordId={record?.id as string | undefined}
+            onSaved={handleInlineFieldsSaved}
+          >
+            <div className="space-y-4">
+              <InlineEditToolbar />
             {/* Tab navigation */}
             {pageLayout.tabs.length > 1 && (() => {
               const sortedTabsForNav = [...pageLayout.tabs]
@@ -548,7 +555,6 @@ export default function RecordDetailPage({
                       togglePanelCollapse={togglePanelCollapse}
                       collapsedWidgetIds={collapsedWidgetIds}
                       toggleWidgetCollapse={toggleWidgetCollapse}
-                      onFieldSaved={handleInlineFieldSaved}
                     />
                   );
                 })()
@@ -575,11 +581,11 @@ export default function RecordDetailPage({
                     togglePanelCollapse={togglePanelCollapse}
                     collapsedWidgetIds={collapsedWidgetIds}
                     toggleWidgetCollapse={toggleWidgetCollapse}
-                    onFieldSaved={handleInlineFieldSaved}
                   />
                 ))
             }
-          </div>
+            </div>
+          </InlineEditProvider>
         ) : (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-500">
             No page layout configured for this record.

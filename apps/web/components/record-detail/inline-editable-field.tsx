@@ -1,11 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { Check, Loader2, Pencil, X } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import type { FieldDef } from '@/lib/schema';
-import { recordsService } from '@/lib/records-service';
-import { useToast } from '@/components/toast';
-import { cn } from '@/lib/utils';
+import { useInlineEdit } from './inline-edit-context';
 
 /**
  * Field types safe to edit inline (a simple, single-value input/select).
@@ -31,102 +28,55 @@ export function isInlineEditableField(fieldDef: FieldDef | undefined, readOnly?:
 }
 
 interface InlineEditableFieldProps {
-  objectApiName: string;
-  recordId: string | undefined;
   fieldDef: FieldDef;
   /** Current raw (unformatted) value, used to seed the editor. */
   value: unknown;
   /** The normally-rendered read-only display (e.g. <MemoizedFieldValue />). */
   children: React.ReactNode;
-  /** Called after a successful save so the parent can update its local record state. */
-  onSaved: (apiName: string, newValue: unknown) => void;
 }
 
 /**
- * Wraps a field's read-only display with a hover-revealed pencil icon.
- * Clicking it swaps the display for a type-appropriate inline input, with
- * Save/Cancel controls (or Enter/Escape) — saving PATCHes just this one
- * field via recordsService.updateRecord instead of opening the full Edit form.
+ * Wraps a field's read-only display with an always-visible pencil icon.
+ * Clicking ANY field's pencil switches every inline-editable field on the
+ * record into edit mode at once (via the shared InlineEditProvider context)
+ * — there's no per-field Save/Cancel; one umbrella <InlineEditToolbar>
+ * commits (or discards) every field's draft in a single batched update.
  */
-export function InlineEditableField({ objectApiName, recordId, fieldDef, value, children, onSaved }: InlineEditableFieldProps) {
-  const { showToast } = useToast();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<unknown>(value);
-  const [saving, setSaving] = useState(false);
+export function InlineEditableField({ fieldDef, value, children }: InlineEditableFieldProps) {
+  const inlineEdit = useInlineEdit();
 
-  if (!isInlineEditableField(fieldDef) || !recordId) {
+  if (!inlineEdit || !isInlineEditableField(fieldDef)) {
     return <>{children}</>;
   }
 
-  const startEdit = () => {
-    setDraft(value ?? (fieldDef.type === 'Checkbox' ? false : ''));
-    setEditing(true);
-  };
+  const { editingAll, getDraft, setDraft, startEditAll, cancelEditAll, saveAll } = inlineEdit;
 
-  const cancel = () => setEditing(false);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await recordsService.updateRecord(objectApiName, recordId, { data: { [fieldDef.apiName]: draft } });
-      onSaved(fieldDef.apiName, draft);
-      setEditing(false);
-    } catch (err: any) {
-      showToast(err?.message || `Failed to save ${fieldDef.label}`, 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && fieldDef.type !== 'TextArea' && fieldDef.type !== 'LongTextArea') {
-      e.preventDefault();
-      void save();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      cancel();
-    }
-  };
-
-  if (editing) {
+  if (editingAll) {
+    const draft = getDraft(fieldDef.apiName, value ?? (fieldDef.type === 'Checkbox' ? false : ''));
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && fieldDef.type !== 'TextArea' && fieldDef.type !== 'LongTextArea') {
+        e.preventDefault();
+        void saveAll();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelEditAll();
+      }
+    };
     return (
-      <div className="flex items-start gap-1.5">
-        <div className="min-w-0 flex-1">{renderEditor(fieldDef, draft, setDraft, handleKeyDown)}</div>
-        <div className="flex shrink-0 items-center gap-1 pt-0.5">
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={saving}
-            aria-label={`Save ${fieldDef.label}`}
-            className="rounded p-1 text-green-600 hover:bg-green-50 disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-          </button>
-          <button
-            type="button"
-            onClick={cancel}
-            disabled={saving}
-            aria-label="Cancel"
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 disabled:opacity-50"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+      <div className="min-w-0">
+        {renderEditor(fieldDef, draft, (v) => setDraft(fieldDef.apiName, v), handleKeyDown)}
       </div>
     );
   }
 
   return (
-    <div className="group/inline-edit flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5">
       <div className="min-w-0 flex-1">{children}</div>
       <button
         type="button"
-        onClick={startEdit}
+        onClick={startEditAll}
         aria-label={`Edit ${fieldDef.label}`}
-        className={cn(
-          'shrink-0 rounded p-1 text-gray-300 opacity-0 transition-opacity',
-          'hover:bg-gray-100 hover:text-brand-navy group-hover/inline-edit:opacity-100 focus-visible:opacity-100',
-        )}
+        className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-brand-navy"
       >
         <Pencil className="h-3 w-3" />
       </button>

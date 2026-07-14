@@ -27,6 +27,7 @@ import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { useEnabledWidgetIds } from '@/lib/use-widget-settings';
 import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
 import { InlineEditableField, isInlineEditableField } from './inline-editable-field';
+import { useInlineEdit } from './inline-edit-context';
 import { TeamMemberSlotField } from '@/widgets/internal/team-member-slot/TeamMemberSlotField';
 import { useSchemaStore } from '@/lib/schema-store';
 import { recordsService } from '@/lib/records-service';
@@ -144,10 +145,6 @@ export interface RecordTabRendererProps {
   /** Widget-level collapse state */
   collapsedWidgetIds: Set<string>;
   toggleWidgetCollapse: (widgetId: string) => void;
-  /** Called after a field is saved via inline editing, so the parent can
-   * update its local record state without a full reload. If omitted, the
-   * inline pencil icon / editor is not offered for any field in this tab. */
-  onFieldSaved?: (apiName: string, newValue: unknown) => void;
 }
 
 interface InternalRendererProps extends RecordTabRendererProps {
@@ -265,8 +262,9 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
     collapsedWidgetIds,
     toggleWidgetCollapse,
     enabledWidgetIds,
-    onFieldSaved,
   } = props;
+
+  const inlineEdit = useInlineEdit();
 
   const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
   const regions = (tab as any).regions as LayoutSection[];
@@ -545,14 +543,8 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                           {displayLabel}
                         </div>
                         <div className="text-sm text-gray-900" style={valueStyle}>
-                          {onFieldSaved && isInlineEditableField(fd, fieldIsReadOnly) ? (
-                            <InlineEditableField
-                              objectApiName={objectDef?.apiName ?? ''}
-                              recordId={record?.id as string | undefined}
-                              fieldDef={fd}
-                              value={raw}
-                              onSaved={onFieldSaved}
-                            >
+                          {inlineEdit && isInlineEditableField(fd, fieldIsReadOnly) ? (
+                            <InlineEditableField fieldDef={fd} value={raw}>
                               {valueNode}
                             </InlineEditableField>
                           ) : (

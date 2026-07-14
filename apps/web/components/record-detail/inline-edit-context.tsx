@@ -1,0 +1,122 @@
+'use client';
+
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { Check, Loader2 } from 'lucide-react';
+import { recordsService } from '@/lib/records-service';
+import { useToast } from '@/components/toast';
+
+interface InlineEditContextValue {
+  /** True once any field's pencil icon has been clicked — every inline-editable
+   * field on the record switches into edit mode simultaneously. */
+  editingAll: boolean;
+  saving: boolean;
+  getDraft: (apiName: string, fallback: unknown) => unknown;
+  setDraft: (apiName: string, value: unknown) => void;
+  startEditAll: () => void;
+  cancelEditAll: () => void;
+  saveAll: () => Promise<void>;
+}
+
+const InlineEditContext = createContext<InlineEditContextValue | null>(null);
+
+/** Returns null when not inside an <InlineEditProvider> — callers use this
+ * to decide whether inline editing is enabled at all in this render tree. */
+export function useInlineEdit(): InlineEditContextValue | null {
+  return useContext(InlineEditContext);
+}
+
+interface InlineEditProviderProps {
+  objectApiName: string;
+  recordId: string | undefined;
+  /** Called once after a successful bulk save with every changed field's new value. */
+  onSaved: (changed: Record<string, unknown>) => void;
+  children: React.ReactNode;
+}
+
+/**
+ * Coordinates "edit every inline-editable field at once" across all
+ * <InlineEditableField> instances rendered beneath it. Clicking any single
+ * field's pencil icon puts every field on the record into edit mode; one
+ * umbrella Save/Cancel (rendered via <InlineEditToolbar>) commits every
+ * field's draft in a single batched update, or discards them all.
+ */
+export function InlineEditProvider({ objectApiName, recordId, onSaved, children }: InlineEditProviderProps) {
+  const { showToast } = useToast();
+  const [editingAll, setEditingAll] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, unknown>>({});
+
+  const getDraft = useCallback(
+    (apiName: string, fallback: unknown) => (apiName in drafts ? drafts[apiName] : fallback),
+    [drafts],
+  );
+
+  const setDraft = useCallback((apiName: string, value: unknown) => {
+    setDrafts((prev) => ({ ...prev, [apiName]: value }));
+  }, []);
+
+  const startEditAll = useCallback(() => {
+    setDrafts({});
+    setEditingAll(true);
+  }, []);
+
+  const cancelEditAll = useCallback(() => {
+    setDrafts({});
+    setEditingAll(false);
+  }, []);
+
+  const saveAll = useCallback(async () => {
+    if (!recordId) return;
+    if (Object.keys(drafts).length === 0) {
+      setEditingAll(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await recordsService.updateRecord(objectApiName, recordId, { data: drafts });
+      onSaved(drafts);
+      setDrafts({});
+      setEditingAll(false);
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to save changes', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }, [objectApiName, recordId, drafts, onSaved, showToast]);
+
+  const value = useMemo<InlineEditContextValue>(
+    () => ({ editingAll, saving, getDraft, setDraft, startEditAll, cancelEditAll, saveAll }),
+    [editingAll, saving, getDraft, setDraft, startEditAll, cancelEditAll, saveAll],
+  );
+
+  return <InlineEditContext.Provider value={value}>{children}</InlineEditContext.Provider>;
+}
+
+/** Sticky "Save" / "Cancel" bar shown only once bulk edit mode is active. */
+export function InlineEditToolbar() {
+  const ctx = useInlineEdit();
+  if (!ctx || !ctx.editingAll) return null;
+
+  return (
+    <div className="sticky top-0 z-10 flex items-center gap-2 rounded-lg border border-brand-navy/20 bg-brand-navy/5 px-4 py-2.5">
+      <span className="mr-auto text-sm font-medium text-brand-navy">Editing fields&hellip;</span>
+      <button
+        type="button"
+        onClick={ctx.cancelEditAll}
+        disabled={ctx.saving}
+        className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={() => void ctx.saveAll()}
+        disabled={ctx.saving}
+        className="inline-flex items-center gap-1.5 rounded-md bg-brand-navy px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-navy/90 disabled:opacity-50"
+      >
+        {ctx.saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+        Save
+      </button>
+    </div>
+  );
+}
