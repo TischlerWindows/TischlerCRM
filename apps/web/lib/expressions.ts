@@ -57,7 +57,31 @@ const FUNCTIONS = {
   'ISNULL': (value: any) => value == null,
   'ISBLANK': (value: any) => value == null || String(value).trim() === '',
   'NOT': (value: boolean) => !value,
-  'IF': (condition: boolean, trueValue: any, falseValue: any) => condition ? trueValue : falseValue
+  'IF': (condition: boolean, trueValue: any, falseValue: any) => condition ? trueValue : falseValue,
+  /** DATE(year, month, day) — month is 1-indexed, matching YEAR/MONTH/DAY's
+   * output, so DATE(YEAR(d), MONTH(d), DAY(d)) round-trips. Returns an ISO
+   * "YYYY-MM-DD" string (JS Date normalizes an out-of-range day/month, e.g.
+   * DATE(2026, 13, 1) rolls over to 2027-01-01, same as Salesforce). */
+  'DATE': (year: any, month: any, day: any) => {
+    const y = Number(year), m = Number(month), d = Number(day);
+    if (!isFinite(y) || !isFinite(m) || !isFinite(d)) return null;
+    const date = new Date(y, m - 1, d);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  },
+  /** CASE(expression, val1, result1, val2, result2, ..., defaultResult) —
+   * compares `expression` against each val in order and returns the matching
+   * result; a trailing unpaired argument is the default when nothing matches
+   * (pass NULL there to return null, matching Salesforce's CASE()). */
+  'CASE': (...args: any[]) => {
+    if (args.length === 0) return null;
+    const [value, ...rest] = args;
+    let i = 0;
+    for (; i + 1 < rest.length; i += 2) {
+      if (rest[i] === value) return rest[i + 1];
+    }
+    return i < rest.length ? rest[i] : null;
+  },
 };
 
 class ExpressionParser {
@@ -71,8 +95,13 @@ class ExpressionParser {
   }
 
   private tokenize(expression: string): string[] {
-    // Simple tokenizer that handles strings, numbers, operators, and identifiers
-    const tokenRegex = /("([^"\\]|\\.)*")|(\d+\.?\d*)|([<>=!&|]+)|([\w_]+(?:\.[\w_]+)*)|([()\[\],])/g;
+    // Simple tokenizer that handles strings, numbers, operators, and identifiers.
+    // NOTE: the [+\-*/%] group is required — without it, arithmetic operators
+    // are silently dropped (not just left unmatched but skipped entirely by
+    // the global regex scan), which used to make expressions like
+    // "YEAR(d) + CASE(...)" parse as two unrelated top-level arguments
+    // instead of one additive expression.
+    const tokenRegex = /("([^"\\]|\\.)*")|(\d+\.?\d*)|([<>=!&|]+)|([+\-*/%])|([\w_]+(?:\.[\w_]+)*)|([()\[\],])/g;
     const tokens: string[] = [];
     let match;
 
@@ -262,15 +291,20 @@ class ExpressionParser {
       };
     }
 
-    if (token === 'true' || token === 'false') {
+    // Boolean/null literals are matched case-insensitively (TRUE/True/true,
+    // NULL/Null/null) — formulas conventionally write function-like keywords
+    // in caps (matching CONCAT, IF, etc.), and a case-sensitive-only check
+    // silently mis-parsed e.g. "NULL" as a (nonexistent) field reference
+    // instead of the null literal.
+    if (token.toLowerCase() === 'true' || token.toLowerCase() === 'false') {
       this.advance();
       return {
         type: 'literal',
-        value: token === 'true'
+        value: token.toLowerCase() === 'true'
       };
     }
 
-    if (token === 'null') {
+    if (token.toLowerCase() === 'null') {
       this.advance();
       return {
         type: 'literal',
