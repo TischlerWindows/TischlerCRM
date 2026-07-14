@@ -298,6 +298,11 @@ export default function RecordDetailPage({
     setRecord(flat);
   }, []);
 
+  // ── Callback for a single field saved via inline editing ─────────────
+  const handleInlineFieldSaved = useCallback((apiName: string, newValue: unknown) => {
+    setRecord((prev) => (prev ? { ...prev, [apiName]: newValue } : prev));
+  }, []);
+
   // ── Loading state ────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -543,6 +548,7 @@ export default function RecordDetailPage({
                       togglePanelCollapse={togglePanelCollapse}
                       collapsedWidgetIds={collapsedWidgetIds}
                       toggleWidgetCollapse={toggleWidgetCollapse}
+                      onFieldSaved={handleInlineFieldSaved}
                     />
                   );
                 })()
@@ -569,6 +575,7 @@ export default function RecordDetailPage({
                     togglePanelCollapse={togglePanelCollapse}
                     collapsedWidgetIds={collapsedWidgetIds}
                     toggleWidgetCollapse={toggleWidgetCollapse}
+                    onFieldSaved={handleInlineFieldSaved}
                   />
                 ))
             }

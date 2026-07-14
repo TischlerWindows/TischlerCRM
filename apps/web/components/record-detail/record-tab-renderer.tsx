@@ -26,6 +26,7 @@ import {
 import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { useEnabledWidgetIds } from '@/lib/use-widget-settings';
 import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
+import { InlineEditableField, isInlineEditableField } from './inline-editable-field';
 import { TeamMemberSlotField } from '@/widgets/internal/team-member-slot/TeamMemberSlotField';
 import { useSchemaStore } from '@/lib/schema-store';
 import { recordsService } from '@/lib/records-service';
@@ -143,6 +144,10 @@ export interface RecordTabRendererProps {
   /** Widget-level collapse state */
   collapsedWidgetIds: Set<string>;
   toggleWidgetCollapse: (widgetId: string) => void;
+  /** Called after a field is saved via inline editing, so the parent can
+   * update its local record state without a full reload. If omitted, the
+   * inline pencil icon / editor is not offered for any field in this tab. */
+  onFieldSaved?: (apiName: string, newValue: unknown) => void;
 }
 
 interface InternalRendererProps extends RecordTabRendererProps {
@@ -260,6 +265,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
     collapsedWidgetIds,
     toggleWidgetCollapse,
     enabledWidgetIds,
+    onFieldSaved,
   } = props;
 
   const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
@@ -525,6 +531,11 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                       fontSize: f.valueStyle?.fontSize ? `${f.valueStyle.fontSize}px` : undefined,
                     };
                     const displayLabel = f.labelOverride || fd.label;
+                    const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
+                    const fieldIsReadOnly = f.behavior === 'readOnly' || !!fFx?.readOnly;
+                    const valueNode = (
+                      <MemoizedFieldValue apiName={f.fieldApiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} objectApiName={objectDef?.apiName} />
+                    );
                     return (
                       <div
                         key={f.fieldApiName}
@@ -534,7 +545,19 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                           {displayLabel}
                         </div>
                         <div className="text-sm text-gray-900" style={valueStyle}>
-                          <MemoizedFieldValue apiName={f.fieldApiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} objectApiName={objectDef?.apiName} />
+                          {onFieldSaved && isInlineEditableField(fd, fieldIsReadOnly) ? (
+                            <InlineEditableField
+                              objectApiName={objectDef?.apiName ?? ''}
+                              recordId={record?.id as string | undefined}
+                              fieldDef={fd}
+                              value={raw}
+                              onSaved={onFieldSaved}
+                            >
+                              {valueNode}
+                            </InlineEditableField>
+                          ) : (
+                            valueNode
+                          )}
                         </div>
                       </div>
                     );
