@@ -231,11 +231,19 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
     setSaving(true);
     setError(null);
     try {
-      await apiClient.updateProfile(id, {
-        label: formLabel,
-        description: formDescription || null,
-        grantsAdminAccess: formGrantsAdmin,
-      });
+      // System profiles reject any change to label/description/grantsAdminAccess
+      // (403 from the API) even if those fields are unchanged from their current
+      // value — the backend only checks whether the field was *sent*, not whether
+      // it differs. Since those fields are locked/hidden for system profiles
+      // anyway, skip this call entirely for them so permission-only edits (the
+      // only thing actually editable on a system profile) aren't blocked by it.
+      if (!profile.isSystem) {
+        await apiClient.updateProfile(id, {
+          label: formLabel,
+          description: formDescription || null,
+          grantsAdminAccess: formGrantsAdmin,
+        });
+      }
       await apiClient.updateProfilePermissions(id, { objects: perms.objects, app: perms.app });
       setSuccess('Profile saved');
       setDirty(false);
