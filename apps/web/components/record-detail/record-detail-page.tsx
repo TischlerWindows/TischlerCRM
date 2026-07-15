@@ -194,14 +194,14 @@ export default function RecordDetailPage({
   }, [params?.id, objectApiName]);
 
   // ── Resolve layout ───────────────────────────────────────────────────
-  const pageLayout = useMemo(() => {
-    if (!record || !objectDef) return null;
+  const [pageLayout, layoutError] = useMemo((): [PageLayout | null, string | null] => {
+    if (!record || !objectDef) return [null, null];
     const result = resolveLayoutForUser(
       objectDef,
       { profileId: authUser?.profileId ?? null },
       { layoutType: 'edit' },
     );
-    if (result.kind !== 'resolved') return null;
+    if (result.kind !== 'resolved') return [null, result.message];
     let raw: PageLayout = result.layout;
     // Migrate legacy layouts (sections → regions/panels/fields)
     if (isLegacyLayout(raw)) {
@@ -209,9 +209,9 @@ export default function RecordDetailPage({
     }
     const editorTabs = (raw.extensions as any)?.editorTabs;
     if (Array.isArray(editorTabs) && editorTabs.length > 0) {
-      return { ...raw, tabs: editorTabs as any } as PageLayout;
+      return [{ ...raw, tabs: editorTabs as any } as PageLayout, null];
     }
-    return raw;
+    return [raw, null];
   }, [record, objectDef, authUser?.profileId]);
 
   useEffect(() => {
@@ -588,7 +588,7 @@ export default function RecordDetailPage({
           </InlineEditProvider>
         ) : (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-500">
-            No page layout configured for this record.
+            {layoutError || 'No page layout configured for this record.'}
           </div>
         )}
       </div>
