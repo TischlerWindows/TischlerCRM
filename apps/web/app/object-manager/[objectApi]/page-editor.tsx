@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SetLayoutActiveResult } from '@/lib/schema-store';
 import { useSchemaStore } from '@/lib/schema-store';
+import { apiClient, type Profile } from '@/lib/api-client';
 import { LayoutListView } from './page-editor/layout-list-view';
 
 interface PageEditorProps {
@@ -27,6 +28,20 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Layout role assignment must target real Profile records (matched against
+  // the viewer's actual profileId at render time in layout-resolver.ts) —
+  // previously this used a hardcoded ['Admin','Manager','Sales'] placeholder
+  // list that never corresponded to any real Profile.id, so assigning a
+  // layout to e.g. the "Read Only" profile (or any custom profile) wasn't
+  // even offered as an option, and any role checked here could never actually
+  // match a real user.
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  useEffect(() => {
+    apiClient.getProfiles().then(setProfiles).catch((err) => {
+      console.error('Failed to load profiles for layout role assignment:', err);
+    });
   }, []);
 
   const onCreate = () => {
@@ -129,14 +144,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     }
   };
 
-  const availableRoles = Array.from(
-    new Set([
-      'Admin',
-      'Manager',
-      'Sales',
-      ...(object?.pageLayouts || []).flatMap((layout) => layout.roles || []),
-    ]),
-  );
+  const availableRoles = profiles.map((p) => ({ id: p.id, label: p.label }));
 
   if (isMobile) {
     return (

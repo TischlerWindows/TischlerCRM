@@ -16,6 +16,11 @@ import type { PageLayout } from '@/lib/schema';
 import type { SetLayoutActiveResult } from '@/lib/schema-store';
 import { Copy, Layout, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 
+interface RoleOption {
+  id: string;
+  label: string;
+}
+
 interface LayoutListViewProps {
   objectLabel?: string;
   layouts: PageLayout[];
@@ -29,7 +34,10 @@ interface LayoutListViewProps {
   ) => Promise<SetLayoutActiveResult>;
   onSetDefault: (layoutId: string) => Promise<void>;
   onSetRoles: (layoutId: string, roles: string[]) => Promise<void>;
-  availableRoles: string[];
+  /** Real Profile records (id + label) a layout can be assigned to — NOT
+   * arbitrary strings. `layout.roles` stores profile ids, matched against
+   * the viewer's actual `profileId` in layout-resolver.ts. */
+  availableRoles: RoleOption[];
   onDuplicate?: (layoutId: string) => void | Promise<void>;
 }
 
@@ -67,9 +75,26 @@ export function LayoutListView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const roleOptions = useMemo(
-    () => Array.from(new Set(availableRoles.filter(Boolean))),
+    () => {
+      const seen = new Set<string>();
+      const opts: RoleOption[] = [];
+      for (const r of availableRoles) {
+        if (!r?.id || seen.has(r.id)) continue;
+        seen.add(r.id);
+        opts.push(r);
+      }
+      return opts;
+    },
     [availableRoles],
   );
+  const roleLabelById = useMemo(
+    () => new Map(roleOptions.map((r) => [r.id, r.label])),
+    [roleOptions],
+  );
+  /** Falls back to the raw stored id when it doesn't match a known profile
+   * (e.g. a deleted profile, or a stale placeholder role from before layout
+   * roles were tied to real profiles) so the reference isn't silently hidden. */
+  const roleLabel = (roleId: string) => roleLabelById.get(roleId) ?? roleId;
 
   const editingLayout = layouts.find((layout) => layout.id === rolesLayoutId);
 
@@ -240,9 +265,9 @@ export function LayoutListView({
                               className="rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-100"
                               onClick={() => openRolesDialog(layout)}
                               title="Edit assigned roles"
-                              aria-label={`Edit roles for ${layout.name}. Selected role ${role}`}
+                              aria-label={`Edit roles for ${layout.name}. Selected role ${roleLabel(role)}`}
                             >
-                              {role}
+                              {roleLabel(role)}
                             </button>
                           ))
                         ) : (
@@ -339,20 +364,20 @@ export function LayoutListView({
           </DialogHeader>
           <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
             {roleOptions.length === 0 ? (
-              <p className="text-sm text-gray-500">No roles available.</p>
+              <p className="text-sm text-gray-500">No profiles available. Create one under Settings &gt; Profiles.</p>
             ) : (
               roleOptions.map((role) => {
-                const checked = selectedRoles.includes(role);
+                const checked = selectedRoles.includes(role.id);
                 return (
                   <label
-                    key={role}
+                    key={role.id}
                     className="flex cursor-pointer items-center justify-between rounded border border-gray-200 px-3 py-2 text-sm hover:bg-gray-50"
                   >
-                    <span>{role}</span>
+                    <span>{role.label}</span>
                     <input
                       type="checkbox"
                       checked={checked}
-                      onChange={() => toggleRole(role)}
+                      onChange={() => toggleRole(role.id)}
                       disabled={savingRoles}
                     />
                   </label>
