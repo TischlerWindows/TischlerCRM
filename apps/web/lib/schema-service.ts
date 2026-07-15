@@ -136,7 +136,11 @@ class LocalStorageSchemaService implements SchemaService {
               required: false,
               helpText: 'Auto-generated unique identifier for the contact',
             });
-            await this.saveSchema(schema);
+            // A failed auto-persist (e.g. 403 for a non-admin-role viewer) must
+            // not prevent returning the already-computed, correct in-memory
+            // schema — only the outer catch used to see this error, which then
+            // discarded this schema entirely and substituted a blank default.
+            try { await this.saveSchema(schema); } catch (saveErr) { console.warn('[Schema] Could not persist Contact__contactNumber migration (continuing with in-memory schema):', saveErr); }
             return schema;
           }
 
@@ -158,7 +162,7 @@ class LocalStorageSchemaService implements SchemaService {
             };
             const systemFieldCount = contactObj.fields.filter((f: any) => SYSTEM_FIELDS.some(sf => sf.apiName === f.apiName)).length;
             contactObj.fields.splice(systemFieldCount, 0, nameField);
-            await this.saveSchema(schema);
+            try { await this.saveSchema(schema); } catch (saveErr) { console.warn('[Schema] Could not persist Contact__name migration (continuing with in-memory schema):', saveErr); }
             return schema;
           } else if (nameFieldIndex >= 0 && contactObj.fields[nameFieldIndex].type !== 'CompositeText') {
             contactObj.fields[nameFieldIndex] = {
@@ -172,7 +176,7 @@ class LocalStorageSchemaService implements SchemaService {
                 { apiName: 'Contact__name_lastName', label: 'Last Name', type: 'Text' }
               ]
             };
-            await this.saveSchema(schema);
+            try { await this.saveSchema(schema); } catch (saveErr) { console.warn('[Schema] Could not persist Contact__name type-fix migration (continuing with in-memory schema):', saveErr); }
             return schema;
           }
         }
@@ -212,7 +216,15 @@ class LocalStorageSchemaService implements SchemaService {
         }
 
         if (migratedSchema !== schema || addedMissingObjects) {
-          await this.saveSchema(migratedSchema);
+          // Same rationale as above: a write failure here (most commonly a 403
+          // for a viewer whose role isn't literally "ADMIN", e.g. any
+          // Profile-based restricted role) must not discard the schema this
+          // function already successfully fetched and migrated in-memory.
+          try {
+            await this.saveSchema(migratedSchema);
+          } catch (saveErr) {
+            console.warn('[Schema] Could not persist schema migrations (continuing with in-memory schema):', saveErr);
+          }
         }
         
         return migratedSchema;
