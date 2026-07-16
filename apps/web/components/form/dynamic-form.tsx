@@ -55,6 +55,7 @@ import { FieldInput, LookupFieldsDisplay, getFieldIcon } from './field-input';
 import { getRecordLabel, getLookupTargetApi } from './lookup-search';
 import { MissingRequiredModal } from './missing-required-modal';
 import { useToast } from '@/components/toast';
+import { findDuplicates, type DuplicateMatch } from '@/lib/duplicate-check';
 
 // ── DynamicFormProps ─────────────────────────────────────────────────
 
@@ -215,6 +216,11 @@ export default function DynamicForm({
   const [missingRequiredLabels, setMissingRequiredLabels] = useState<string[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // "Don't Allow Duplicates": when set, the confirmation dialog is showing
+  // and the actual submit is on hold until the user confirms or cancels.
+  const [duplicateMatches, setDuplicateMatches] = useState<DuplicateMatch[] | null>(null);
+  const [pendingSubmitData, setPendingSubmitData] = useState<Record<string, any> | null>(null);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(0);
@@ -774,6 +780,90 @@ export default function DynamicForm({
     if (currentStep > 0) setCurrentStep(currentStep - 1);
   };
 
+  /** Actually persists the record (calls the parent's onSubmit + pending
+   * widget/slot follow-up work). Split out from `submitForm` so the
+   * "Don't Allow Duplicates" confirmation dialog can defer this until the
+   * user confirms, without duplicating the save logic. */
+  const performSubmit = async (completeData: Record<string, any>) => {
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      // Snapshot pending widgets BEFORE awaiting the parent POST.
+      //
+      // Why: during the awaited POST the form may re-render (e.g. the
+      // parent page calls fetchProperties() which setProperties()s and
+      // cascades a re-render through the form), which can change the
+      // memoized PendingWidget context value's identity. Pending widgets
+      // (PendingTeamMemberPoolProvider) include `pendingCtx` in their
+      // useEffect deps; a context-value identity change fires their
+      // cleanup, which unregisters the widget BEFORE we get a chance to
+      // flush its rows. Snapshotting up-front means we hold direct
+      // references to each registration's savePendingData closure, which
+      // still reads from live React refs for the row state — even after
+      // the registration map has been emptied.
+      //
+      // Round-3 QA on the deployed app saw exactly this: console showed
+      // "Pending widget data was present pre-submit but missing
+      // post-submit" while zero TeamMember POSTs fired. The snapshot
+      // pattern below fixes that.
+      const pendingSnapshot = pendingCtx?.snapshotPendingWidgets() ?? [];
+      // Snapshot staged-slot applyChanges functions BEFORE calling onSubmit.
+      // The parent's onSubmit handler may close the dialog (e.g. setShowEditForm(false))
+      // which unmounts this form and sets all slotRef.current to null. Capturing the
+      // functions up front — exactly the same pattern used for pendingSnapshot above —
+      // lets us still call them even if the components have been unmounted.
+      const stagedSlotApplyFns: Array<() => Promise<void>> = layoutType === 'edit'
+        ? Array.from(slotRefsRef.current.values())
+            .map(r => r.current?.applyChanges)
+            .filter((fn): fn is () => Promise<void> => typeof fn === 'function')
+        : [];
+      const result = await onSubmit(completeData, layoutId);
+      // Edit mode: apply staged TeamMemberSlot changes now that the main record saved.
+      if (layoutType === 'edit') {
+        for (const applyFn of stagedSlotApplyFns) {
+          await applyFn();
+        }
+      }
+      const recordId = typeof result === 'string' ? result : undefined;
+      if (recordId && pendingSnapshot.length > 0 && pendingCtx) {
+        const { errors: pendingErrors } = await pendingCtx.saveSnapshot(
+          pendingSnapshot,
+          recordId,
+        );
+        if (pendingErrors.length > 0) {
+          console.warn(
+            '[DynamicForm] Some pending widget data failed to save:',
+            pendingErrors,
+          );
+          // Surface the failure so the user knows to manually add the
+          // missing rows on the detail page rather than silently losing
+          // them (the record is already created — no rollback).
+          const summary = pendingErrors.slice(0, 3).join('; ');
+          const more =
+            pendingErrors.length > 3 ? ` (+${pendingErrors.length - 3} more)` : '';
+          setSubmitError(
+            `Record was saved, but some related data could not be attached: ${summary}${more}. Please add it on the detail page.`,
+          );
+        }
+      }
+      // Call onCreated for post-save navigation (avoids navigating before pending saves finish)
+      if (recordId && onCreated) {
+        onCreated(recordId);
+      }
+      // Signal the parent dialog that all save work (record + slots + widgets) is done.
+      // For edit mode, the parent should close the dialog here rather than inside onSubmit,
+      // so that staged slot refs remain valid throughout the full save sequence.
+      onSaved?.();
+    } catch (error) {
+      const msg =
+        error instanceof Error ? error.message : 'Failed to save record';
+      setSubmitError(msg);
+      showToast(msg, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // ── Submit ────────────────────────────────────────────────────
   const submitForm = async () => {
     if (runFullValidation()) {
@@ -822,83 +912,35 @@ export default function DynamicForm({
       for (const key of Object.keys(completeData)) {
         if (key.includes('.') && !key.startsWith('_')) delete completeData[key];
       }
-      setSubmitError(null);
-      setIsSubmitting(true);
-      try {
-        // Snapshot pending widgets BEFORE awaiting the parent POST.
-        //
-        // Why: during the awaited POST the form may re-render (e.g. the
-        // parent page calls fetchProperties() which setProperties()s and
-        // cascades a re-render through the form), which can change the
-        // memoized PendingWidget context value's identity. Pending widgets
-        // (PendingTeamMemberPoolProvider) include `pendingCtx` in their
-        // useEffect deps; a context-value identity change fires their
-        // cleanup, which unregisters the widget BEFORE we get a chance to
-        // flush its rows. Snapshotting up-front means we hold direct
-        // references to each registration's savePendingData closure, which
-        // still reads from live React refs for the row state — even after
-        // the registration map has been emptied.
-        //
-        // Round-3 QA on the deployed app saw exactly this: console showed
-        // "Pending widget data was present pre-submit but missing
-        // post-submit" while zero TeamMember POSTs fired. The snapshot
-        // pattern below fixes that.
-        const pendingSnapshot = pendingCtx?.snapshotPendingWidgets() ?? [];
-        // Snapshot staged-slot applyChanges functions BEFORE calling onSubmit.
-        // The parent's onSubmit handler may close the dialog (e.g. setShowEditForm(false))
-        // which unmounts this form and sets all slotRef.current to null. Capturing the
-        // functions up front — exactly the same pattern used for pendingSnapshot above —
-        // lets us still call them even if the components have been unmounted.
-        const stagedSlotApplyFns: Array<() => Promise<void>> = layoutType === 'edit'
-          ? Array.from(slotRefsRef.current.values())
-              .map(r => r.current?.applyChanges)
-              .filter((fn): fn is () => Promise<void> => typeof fn === 'function')
-          : [];
-        const result = await onSubmit(completeData, layoutId);
-        // Edit mode: apply staged TeamMemberSlot changes now that the main record saved.
-        if (layoutType === 'edit') {
-          for (const applyFn of stagedSlotApplyFns) {
-            await applyFn();
+
+      // "Don't Allow Duplicates" — only on record creation. If the object
+      // has a duplicate rule configured, check the candidate's match fields
+      // against existing records before saving; an exact or close match
+      // pauses the submit and shows a confirmation dialog instead.
+      const duplicateRule = object?.duplicateRule;
+      if (isCreateMode && duplicateRule?.enabled && (duplicateRule.matchFields?.length ?? 0) > 0 && object) {
+        setCheckingDuplicates(true);
+        try {
+          const existingRaw = await recordsService.getRecords(objectApiName, { limit: 500 });
+          const existingFlat = existingRaw.map((r) => recordsService.flattenRecord(r));
+          const matchFieldDefs = duplicateRule.matchFields
+            .map((apiName) => object.fields.find((f) => f.apiName === apiName))
+            .filter((f): f is FieldDef => !!f)
+            .map((f) => ({ apiName: f.apiName, label: f.label }));
+          const matches = findDuplicates(completeData, existingFlat, matchFieldDefs);
+          if (matches.length > 0) {
+            setDuplicateMatches(matches);
+            setPendingSubmitData(completeData);
+            return;
           }
+        } catch (err) {
+          console.error('Duplicate check failed (continuing with submit):', err);
+        } finally {
+          setCheckingDuplicates(false);
         }
-        const recordId = typeof result === 'string' ? result : undefined;
-        if (recordId && pendingSnapshot.length > 0 && pendingCtx) {
-          const { errors: pendingErrors } = await pendingCtx.saveSnapshot(
-            pendingSnapshot,
-            recordId,
-          );
-          if (pendingErrors.length > 0) {
-            console.warn(
-              '[DynamicForm] Some pending widget data failed to save:',
-              pendingErrors,
-            );
-            // Surface the failure so the user knows to manually add the
-            // missing rows on the detail page rather than silently losing
-            // them (the record is already created — no rollback).
-            const summary = pendingErrors.slice(0, 3).join('; ');
-            const more =
-              pendingErrors.length > 3 ? ` (+${pendingErrors.length - 3} more)` : '';
-            setSubmitError(
-              `Record was saved, but some related data could not be attached: ${summary}${more}. Please add it on the detail page.`,
-            );
-          }
-        }
-        // Call onCreated for post-save navigation (avoids navigating before pending saves finish)
-        if (recordId && onCreated) {
-          onCreated(recordId);
-        }
-        // Signal the parent dialog that all save work (record + slots + widgets) is done.
-        // For edit mode, the parent should close the dialog here rather than inside onSubmit,
-        // so that staged slot refs remain valid throughout the full save sequence.
-        onSaved?.();
-      } catch (error) {
-        const msg =
-          error instanceof Error ? error.message : 'Failed to save record';
-        setSubmitError(msg);
-        showToast(msg, 'error');
-      } finally {
-        setIsSubmitting(false);
       }
+
+      await performSubmit(completeData);
     }
   };
 
@@ -1883,14 +1925,72 @@ export default function DynamicForm({
               <Button
                 type="button"
                 onClick={submitForm}
-                disabled={isSubmitting}
+                disabled={isSubmitting || checkingDuplicates}
               >
-                {isSubmitting ? 'Saving...' : 'Save'}
+                {checkingDuplicates ? 'Checking for duplicates...' : isSubmitting ? 'Saving...' : 'Save'}
               </Button>
             </div>
           </div>
         )}
       </form>
+
+      {/* "Don't Allow Duplicates" confirmation */}
+      <Dialog
+        open={duplicateMatches !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDuplicateMatches(null);
+            setPendingSubmitData(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Possible duplicate record</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-gray-700">
+            <p>
+              {duplicateMatches?.length === 1
+                ? 'A record with a matching or very similar value already exists:'
+                : `${duplicateMatches?.length} records with a matching or very similar value already exist:`}
+            </p>
+            <ul className="max-h-56 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
+              {duplicateMatches?.map((m, i) => (
+                <li key={`${m.recordId}-${m.fieldApiName}-${i}`} className="text-sm">
+                  <span className="font-semibold text-gray-900">"{m.recordLabel}"</span>{' '}
+                  <span className="text-gray-500">
+                    already exists ({m.matchType === 'exact' ? 'exact match' : 'close match'} on {m.fieldLabel})
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-gray-600">Are you sure you want to create this record?</p>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDuplicateMatches(null);
+                setPendingSubmitData(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                const data = pendingSubmitData;
+                setDuplicateMatches(null);
+                setPendingSubmitData(null);
+                if (data) await performSubmit(data);
+              }}
+            >
+              Create Anyway
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Inline record creation -- auto-resolve active layout (no picker) */}
       {inlineCreateTarget &&

@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ObjectManagerTopBar } from '@/components/object-manager/object-manager-top-bar';
 import { useSetupHistoryTracking } from '@/lib/use-setup-history-tracking';
-import { 
+import {
   Database, 
   ChevronLeft, 
   Settings,
@@ -19,6 +19,7 @@ import {
   Code,
   GitBranch,
   CheckCircle2,
+  Copy,
   Palette,
   Zap
 } from 'lucide-react';
@@ -28,6 +29,7 @@ import PageEditor from './page-editor';
 import HomeLayoutEditor from './home-layout-editor';
 import FieldsRelationships from './fields-relationships';
 import SearchSettings from './search-settings';
+import DuplicateRules from './duplicate-rules';
 import WorkflowTriggers from './workflow-triggers';
 import Paths from './paths';
 import ConditionalFormatting from './conditional-formatting';
@@ -55,6 +57,14 @@ const SIDEBAR_SECTIONS = [
     icon: List,
     description: 'Reusable field groups',
     category: 'Data Model'
+  },
+  {
+    id: 'duplicate-rules',
+    label: "Don't Allow Duplicates",
+    icon: Copy,
+    description: 'Warn users about duplicate records on create',
+    category: 'Data Model',
+    featured: true
   },
   { 
     id: 'lookup-filters', 
@@ -435,6 +445,10 @@ export default function ObjectDetailPage() {
             <SearchSettings objectApiName={objectApi} />
           )}
 
+          {activeSection === 'duplicate-rules' && (
+            <DuplicateRules objectApiName={objectApi} />
+          )}
+
           {activeSection === 'workflow-rules' && (
             <div className="px-6 py-6">
               <WorkflowTriggers objectApiName={objectApi} />
@@ -451,7 +465,7 @@ export default function ObjectDetailPage() {
             <ConditionalFormatting objectApiName={objectApi} />
           )}
 
-          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && activeSection !== 'home-layout' && activeSection !== 'search-settings' && activeSection !== 'workflow-rules' && activeSection !== 'paths' && activeSection !== 'conditional-formatting' && (
+          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && activeSection !== 'home-layout' && activeSection !== 'search-settings' && activeSection !== 'duplicate-rules' && activeSection !== 'workflow-rules' && activeSection !== 'paths' && activeSection !== 'conditional-formatting' && (
             <div className="max-w-6xl">
               <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">

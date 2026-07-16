@@ -760,6 +760,13 @@ export interface ObjectDef {
     lookupDialogFields: string[];
     listViewFields: string[];
   };
+  /** Duplicate-prevention: when enabled, creating a new record checks
+   * `matchFields` against existing records and warns the user before they
+   * save if an exact or close (fuzzy) match is found. */
+  duplicateRule?: {
+    enabled: boolean;
+    matchFields: string[];
+  };
   compactLayout?: {
     fieldApiNames: string[];
   };
