@@ -456,21 +456,28 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                 >
                   {visibleFields.map((f: any) => {
                     // Synthetic TeamMemberSlot fields render through their own cell.
-                    // In non-readOnly (live) mode, TeamMemberSlotField already saves
-                    // immediately on selection via fillSlot/clearRow — no umbrella
-                    // Save needed, so it just tracks bulk-edit mode for its own toggle.
+                    // During bulk edit, render in `staged` mode (like the full edit
+                    // form does) so selections are buffered locally instead of
+                    // hitting the API immediately — that way Cancel actually
+                    // discards them, and Save (via the registered ref's
+                    // applyChanges()) is what persists them.
                     if (f.kind === 'teamMemberSlot' && f.slotConfig) {
+                      const slotRef = inlineEdit?.editingAll
+                        ? inlineEdit.registerSlotRef(f.fieldApiName)
+                        : undefined;
                       return (
                         <div
                           key={f.fieldApiName}
                           style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
                         >
                           <TeamMemberSlotField
+                            ref={slotRef}
                             parentObjectApiName={objectDef?.apiName ?? ''}
                             parentRecordId={(record?.id as string | undefined) ?? null}
                             slotConfig={f.slotConfig}
                             panelField={f}
                             readOnly={!inlineEdit?.editingAll}
+                            staged={inlineEdit?.editingAll}
                             singleCardinalityRoles={singleCardinalityRoles}
                           />
                         </div>

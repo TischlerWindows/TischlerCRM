@@ -1,9 +1,10 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { recordsService } from '@/lib/records-service';
 import { useToast } from '@/components/toast';
+import type { TeamMemberSlotHandle } from '@/widgets/internal/team-member-slot/TeamMemberSlotField';
 
 interface InlineEditContextValue {
   /** True once any field's pencil icon has been clicked — every inline-editable
@@ -15,6 +16,11 @@ interface InlineEditContextValue {
   startEditAll: () => void;
   cancelEditAll: () => void;
   saveAll: () => Promise<void>;
+  /** Returns a stable ref for a TeamMemberSlot field (creating it on first
+   * call). Slot widgets render in `staged` mode during bulk edit — they
+   * buffer changes locally instead of saving immediately — and `saveAll()`
+   * calls each registered ref's `applyChanges()` to actually persist them. */
+  registerSlotRef: (apiName: string) => React.RefObject<TeamMemberSlotHandle>;
 }
 
 const InlineEditContext = createContext<InlineEditContextValue | null>(null);
@@ -45,6 +51,14 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
   const [editingAll, setEditingAll] = useState(false);
   const [saving, setSaving] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
+  const slotRefsRef = useRef<Map<string, React.RefObject<TeamMemberSlotHandle>>>(new Map());
+
+  const registerSlotRef = useCallback((apiName: string) => {
+    if (!slotRefsRef.current.has(apiName)) {
+      slotRefsRef.current.set(apiName, { current: null });
+    }
+    return slotRefsRef.current.get(apiName)!;
+  }, []);
 
   const getDraft = useCallback(
     (apiName: string, fallback: unknown) => (apiName in drafts ? drafts[apiName] : fallback),
@@ -67,14 +81,19 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
 
   const saveAll = useCallback(async () => {
     if (!recordId) return;
-    if (Object.keys(drafts).length === 0) {
-      setEditingAll(false);
-      return;
-    }
     setSaving(true);
     try {
-      await recordsService.updateRecord(objectApiName, recordId, { data: drafts });
-      onSaved(drafts);
+      if (Object.keys(drafts).length > 0) {
+        await recordsService.updateRecord(objectApiName, recordId, { data: drafts });
+        onSaved(drafts);
+      }
+      // Apply any staged TeamMemberSlot changes now that the main record save
+      // (if any) succeeded — mirrors the full edit form's save sequence.
+      for (const slotRef of slotRefsRef.current.values()) {
+        if (slotRef.current?.applyChanges) {
+          await slotRef.current.applyChanges();
+        }
+      }
       setDrafts({});
       setEditingAll(false);
     } catch (err: any) {
@@ -85,8 +104,8 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
   }, [objectApiName, recordId, drafts, onSaved, showToast]);
 
   const value = useMemo<InlineEditContextValue>(
-    () => ({ editingAll, saving, getDraft, setDraft, startEditAll, cancelEditAll, saveAll }),
-    [editingAll, saving, getDraft, setDraft, startEditAll, cancelEditAll, saveAll],
+    () => ({ editingAll, saving, getDraft, setDraft, startEditAll, cancelEditAll, saveAll, registerSlotRef }),
+    [editingAll, saving, getDraft, setDraft, startEditAll, cancelEditAll, saveAll, registerSlotRef],
   );
 
   return <InlineEditContext.Provider value={value}>{children}</InlineEditContext.Provider>;
