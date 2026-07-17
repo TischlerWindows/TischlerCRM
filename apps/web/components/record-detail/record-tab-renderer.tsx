@@ -456,6 +456,9 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                 >
                   {visibleFields.map((f: any) => {
                     // Synthetic TeamMemberSlot fields render through their own cell.
+                    // In non-readOnly (live) mode, TeamMemberSlotField already saves
+                    // immediately on selection via fillSlot/clearRow — no umbrella
+                    // Save needed, so it just tracks bulk-edit mode for its own toggle.
                     if (f.kind === 'teamMemberSlot' && f.slotConfig) {
                       return (
                         <div
@@ -467,7 +470,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                             parentRecordId={(record?.id as string | undefined) ?? null}
                             slotConfig={f.slotConfig}
                             panelField={f}
-                            readOnly
+                            readOnly={!inlineEdit?.editingAll}
                             singleCardinalityRoles={singleCardinalityRoles}
                           />
                         </div>

@@ -98,25 +98,29 @@ export function InlineEditToolbar() {
   if (!ctx || !ctx.editingAll) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 flex items-center gap-3 border-t border-brand-navy/20 bg-white px-6 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
-      <span className="mr-auto text-base font-medium text-brand-navy">Editing fields&hellip;</span>
-      <button
-        type="button"
-        onClick={ctx.cancelEditAll}
-        disabled={ctx.saving}
-        className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-      >
-        Cancel
-      </button>
-      <button
-        type="button"
-        onClick={() => void ctx.saveAll()}
-        disabled={ctx.saving}
-        className="inline-flex items-center gap-2 rounded-lg bg-brand-navy px-6 py-3 text-base font-medium text-white hover:bg-brand-navy/90 disabled:opacity-50"
-      >
-        {ctx.saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
-        Save
-      </button>
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-brand-navy/20 bg-white px-6 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+      <div className="relative flex items-center justify-center">
+        <span className="absolute left-0 text-base font-medium text-brand-navy">Editing fields&hellip;</span>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={ctx.cancelEditAll}
+            disabled={ctx.saving}
+            className="min-w-[160px] rounded-lg border border-gray-300 bg-white px-10 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void ctx.saveAll()}
+            disabled={ctx.saving}
+            className="inline-flex min-w-[160px] items-center justify-center gap-2 rounded-lg bg-brand-navy px-10 py-3 text-base font-medium text-white hover:bg-brand-navy/90 disabled:opacity-50"
+          >
+            {ctx.saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+            Save
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
