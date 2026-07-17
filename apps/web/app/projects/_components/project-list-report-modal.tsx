@@ -172,41 +172,35 @@ function formatCell(value: unknown): string {
 }
 
 /**
- * Click-to-edit cell: shows the formatted display value; clicking swaps it
- * for a checkbox (boolean values) or text input (everything else), saving
- * on blur/Enter via `onSave` (a direct PATCH of just this one field on the
- * underlying Project record — see callers) and discarding on Escape.
+ * Click-to-edit cell: shows the current value (a pending draft, if any,
+ * else the saved value); clicking swaps it for a checkbox (boolean values)
+ * or text input (everything else). Committing (blur/Enter) just hands the
+ * new value to `onCommit`, which stores it as a pending draft in the parent
+ * — nothing is persisted until the umbrella Save button is clicked, and
+ * Escape/closing without committing leaves the draft untouched.
  */
 function EditableCell({
-  rawValue,
-  onSave,
+  value,
+  hasDraft,
+  onCommit,
 }: {
-  rawValue: unknown;
-  onSave: (newValue: unknown) => Promise<void>;
+  value: unknown;
+  hasDraft: boolean;
+  onCommit: (newValue: unknown) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<unknown>(rawValue);
-  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<unknown>(value);
 
-  const isBoolean = typeof rawValue === 'boolean';
+  const isBoolean = typeof value === 'boolean';
 
   const startEdit = () => {
-    setDraft(rawValue ?? (isBoolean ? false : ''));
+    setDraft(value ?? (isBoolean ? false : ''));
     setEditing(true);
   };
 
-  const commit = async (value: unknown) => {
-    if (value === rawValue) {
-      setEditing(false);
-      return;
-    }
-    setSaving(true);
-    try {
-      await onSave(value);
-    } finally {
-      setSaving(false);
-      setEditing(false);
-    }
+  const commit = (newValue: unknown) => {
+    setEditing(false);
+    if (newValue !== value) onCommit(newValue);
   };
 
   if (editing) {
@@ -215,9 +209,8 @@ function EditableCell({
         <input
           type="checkbox"
           checked={!!draft}
-          disabled={saving}
           autoFocus
-          onChange={(e) => void commit(e.target.checked)}
+          onChange={(e) => commit(e.target.checked)}
           onBlur={() => setEditing(false)}
           className="h-4 w-4"
         />
@@ -227,12 +220,11 @@ function EditableCell({
       <input
         type="text"
         value={typeof draft === 'string' || typeof draft === 'number' ? String(draft) : ''}
-        disabled={saving}
         autoFocus
         onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => void commit(draft)}
+        onBlur={() => commit(draft)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); void commit(draft); }
+          if (e.key === 'Enter') { e.preventDefault(); commit(draft); }
           else if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
         }}
         className="w-full min-w-[3rem] border border-brand-navy/40 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
@@ -244,10 +236,10 @@ function EditableCell({
     <button
       type="button"
       onClick={startEdit}
-      className="w-full text-left hover:bg-brand-navy/5 rounded px-0.5 -mx-0.5"
-      title="Click to edit"
+      className={`w-full text-left rounded px-0.5 -mx-0.5 hover:bg-brand-navy/5 ${hasDraft ? 'bg-amber-100 hover:bg-amber-200' : ''}`}
+      title={hasDraft ? 'Unsaved change — click to edit further' : 'Click to edit'}
     >
-      {formatCell(rawValue)}
+      {formatCell(value)}
     </button>
   );
 }
@@ -321,23 +313,57 @@ export default function ProjectListReportModal({
   const { showToast } = useToast();
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-  // Local copy so an inline edit's saved value shows immediately without
-  // needing the parent page to refetch; re-synced whenever the parent hands
-  // us a new `projects` array (e.g. after it reloads/filters).
+  // Local copy so a saved edit shows immediately without needing the parent
+  // page to refetch; re-synced whenever the parent hands us a new `projects`
+  // array (e.g. after it reloads/filters).
   const [projectsData, setProjectsData] = useState(projects);
   useEffect(() => {
     setProjectsData(projects);
   }, [projects]);
 
-  const saveField = async (projectId: string | undefined, fieldKey: string, value: unknown) => {
+  // Pending, unsaved cell edits — keyed by `${projectId}::${fieldKey}`.
+  // Nothing is persisted until "Save" is clicked; "Cancel" just clears this.
+  const [drafts, setDrafts] = useState<Record<string, unknown>>({});
+  const [saving, setSaving] = useState(false);
+  const dirty = Object.keys(drafts).length > 0;
+
+  const draftKey = (projectId: string, fieldKey: string) => `${projectId}::${fieldKey}`;
+
+  const setDraftValue = (projectId: string | undefined, fieldKey: string, value: unknown) => {
     if (!projectId) return;
+    setDrafts((prev) => ({ ...prev, [draftKey(projectId, fieldKey)]: value }));
+  };
+
+  const cancelEdits = () => setDrafts({});
+
+  const saveEdits = async () => {
+    if (!dirty) return;
+    setSaving(true);
     try {
-      await recordsService.updateRecord('Project', projectId, { data: { [fieldKey]: value } });
+      // Group by project so each changed project gets ONE batched PATCH
+      // instead of one request per edited cell.
+      const byProject = new Map<string, Record<string, unknown>>();
+      for (const [key, value] of Object.entries(drafts)) {
+        const sep = key.indexOf('::');
+        const projectId = key.slice(0, sep);
+        const fieldKey = key.slice(sep + 2);
+        if (!byProject.has(projectId)) byProject.set(projectId, {});
+        byProject.get(projectId)![fieldKey] = value;
+      }
+      for (const [projectId, fields] of byProject) {
+        await recordsService.updateRecord('Project', projectId, { data: fields });
+      }
       setProjectsData((prev) =>
-        prev.map((p) => (p.id === projectId ? { ...p, [fieldKey]: value } : p)),
+        prev.map((p) => {
+          const fields = p.id ? byProject.get(p.id) : undefined;
+          return fields ? { ...p, ...fields } : p;
+        }),
       );
+      setDrafts({});
     } catch (err: any) {
-      showToast(err?.message || `Failed to save ${fieldKey}`, 'error');
+      showToast(err?.message || 'Failed to save changes', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -507,13 +533,21 @@ export default function ProjectListReportModal({
                                 missingOrderDate && col.key === 'projectName' ? 'font-bold' : ''
                               }`}
                             >
-                              {col.key === 'tusOrderNumber' ? (
-                                <span style={VERTICAL_CELL_STYLE}>
-                                  <EditableCell rawValue={p[col.key]} onSave={(v) => saveField(p.id, col.key, v)} />
-                                </span>
-                              ) : (
-                                <EditableCell rawValue={p[col.key]} onSave={(v) => saveField(p.id, col.key, v)} />
-                              )}
+                            {(() => {
+                              const key = p.id ? draftKey(p.id, col.key) : '';
+                              const hasDraft = key in drafts;
+                              const cellValue = hasDraft ? drafts[key] : p[col.key];
+                              const cell = (
+                                <EditableCell
+                                  value={cellValue}
+                                  hasDraft={hasDraft}
+                                  onCommit={(v) => setDraftValue(p.id, col.key, v)}
+                                />
+                              );
+                              return col.key === 'tusOrderNumber' ? (
+                                <span style={VERTICAL_CELL_STYLE}>{cell}</span>
+                              ) : cell;
+                            })()}
                             </td>
                           );
                         }
@@ -533,13 +567,20 @@ export default function ProjectListReportModal({
                           ? jobStatusOrderDateCellValue(p, spanIndex)
                           : p[`${col.keyPrefix}Row${spanIndex + 1}`];
                         const stackedFieldKey = `${col.keyPrefix}Row${spanIndex + 1}`;
+                        const stackedDraftKey = p.id ? draftKey(p.id, stackedFieldKey) : '';
+                        const stackedHasDraft = stackedDraftKey in drafts;
+                        const stackedCellValue = stackedHasDraft ? drafts[stackedDraftKey] : value;
                         return (
                           <td
                             key={col.keyPrefix}
                             rowSpan={rowSpan}
                             className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
                           >
-                            <EditableCell rawValue={value} onSave={(v) => saveField(p.id, stackedFieldKey, v)} />
+                            <EditableCell
+                              value={stackedCellValue}
+                              hasDraft={stackedHasDraft}
+                              onCommit={(v) => setDraftValue(p.id, stackedFieldKey, v)}
+                            />
                           </td>
                         );
                       })}
@@ -559,6 +600,27 @@ export default function ProjectListReportModal({
             )}
           </table>
         </div>
+
+        {dirty && (
+          <div className="flex items-center justify-center gap-4 border-t border-brand-navy/20 bg-white px-6 py-4 print:hidden">
+            <button
+              type="button"
+              onClick={cancelEdits}
+              disabled={saving}
+              className="min-w-[160px] rounded-lg border border-gray-300 bg-white px-10 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void saveEdits()}
+              disabled={saving}
+              className="min-w-[160px] rounded-lg bg-brand-navy px-10 py-3 text-base font-medium text-white hover:bg-brand-navy/90 disabled:opacity-50"
+            >
+              {saving ? 'Saving\u2026' : 'Save'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
     </>
