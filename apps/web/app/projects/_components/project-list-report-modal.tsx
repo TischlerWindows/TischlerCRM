@@ -176,14 +176,19 @@ function formatCell(value: unknown): string {
  * cell must always edit as a checkbox — regardless of whether the CURRENT
  * value happens to be set. Determining this from `typeof value === 'boolean'`
  * breaks for any project where the field is still null/undefined (unset),
- * silently falling through to a text input instead. Two of these
- * (dcSilicone, solarControl) are schema type Checkbox; the other three
- * (screenFlag, lutronFlag, checkFlag) are schema type Text but always store
- * real booleans in practice (see formatCell's ✓ rendering above) — a legacy
- * schema/data mismatch — so they're listed explicitly rather than trusting
- * the schema's declared type.
+ * silently falling through to a text input instead.
+ *
+ * IMPORTANT: `screenFlag`/`lutronFlag`/`checkFlag` are schema type Text and,
+ * despite frequently holding true/false, are NOT reliably boolean in
+ * production — at least one live project stores a real count in one of
+ * these ("33"), not a flag. Forcing them into checkbox mode previously
+ * caused unchecking to silently overwrite that data with `false` (verified
+ * live: `dcSilicone`/`solarControl` are the only two of this group that are
+ * genuinely schema type Checkbox everywhere). Only those two are listed —
+ * the other three keep editing as free text so a real value like "33" can't
+ * be clobbered.
  */
-const BOOLEAN_FIELD_KEYS = new Set(['screenFlag', 'lutronFlag', 'checkFlag', 'dcSilicone', 'solarControl']);
+const BOOLEAN_FIELD_KEYS = new Set(['dcSilicone', 'solarControl']);
 
 /**
  * Click-to-edit cell: shows the current value (a pending draft, if any,

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil } from 'lucide-react';
 import { PageLayout, FieldDef, type LayoutSection, type PageField } from '@/lib/schema';
 import type { LookupFieldsConfig } from '@/lib/schema';
 import type { ObjectDef } from '@/lib/schema';
@@ -465,21 +465,38 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                       const slotRef = inlineEdit?.editingAll
                         ? inlineEdit.registerSlotRef(f.fieldApiName)
                         : undefined;
+                      const slotField = (
+                        <TeamMemberSlotField
+                          ref={slotRef}
+                          parentObjectApiName={objectDef?.apiName ?? ''}
+                          parentRecordId={(record?.id as string | undefined) ?? null}
+                          slotConfig={f.slotConfig}
+                          panelField={f}
+                          readOnly={!inlineEdit?.editingAll}
+                          staged={inlineEdit?.editingAll}
+                          singleCardinalityRoles={singleCardinalityRoles}
+                        />
+                      );
                       return (
                         <div
                           key={f.fieldApiName}
                           style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
                         >
-                          <TeamMemberSlotField
-                            ref={slotRef}
-                            parentObjectApiName={objectDef?.apiName ?? ''}
-                            parentRecordId={(record?.id as string | undefined) ?? null}
-                            slotConfig={f.slotConfig}
-                            panelField={f}
-                            readOnly={!inlineEdit?.editingAll}
-                            staged={inlineEdit?.editingAll}
-                            singleCardinalityRoles={singleCardinalityRoles}
-                          />
+                          {inlineEdit && !inlineEdit.editingAll ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="min-w-0 flex-1">{slotField}</div>
+                              <button
+                                type="button"
+                                onClick={inlineEdit.startEditAll}
+                                aria-label={`Edit ${f.labelOverride || f.label || 'field'}`}
+                                className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-brand-navy"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            slotField
+                          )}
                         </div>
                       );
                     }
