@@ -172,8 +172,22 @@ function formatCell(value: unknown): string {
 }
 
 /**
+ * Fields whose displayed checkmark (✓) represents a real boolean, so their
+ * cell must always edit as a checkbox — regardless of whether the CURRENT
+ * value happens to be set. Determining this from `typeof value === 'boolean'`
+ * breaks for any project where the field is still null/undefined (unset),
+ * silently falling through to a text input instead. Two of these
+ * (dcSilicone, solarControl) are schema type Checkbox; the other three
+ * (screenFlag, lutronFlag, checkFlag) are schema type Text but always store
+ * real booleans in practice (see formatCell's ✓ rendering above) — a legacy
+ * schema/data mismatch — so they're listed explicitly rather than trusting
+ * the schema's declared type.
+ */
+const BOOLEAN_FIELD_KEYS = new Set(['screenFlag', 'lutronFlag', 'checkFlag', 'dcSilicone', 'solarControl']);
+
+/**
  * Click-to-edit cell: shows the current value (a pending draft, if any,
- * else the saved value); clicking swaps it for a checkbox (boolean values)
+ * else the saved value); clicking swaps it for a checkbox (boolean fields)
  * or text input (everything else). Committing (blur/Enter) just hands the
  * new value to `onCommit`, which stores it as a pending draft in the parent
  * — nothing is persisted until the umbrella Save button is clicked, and
@@ -181,17 +195,17 @@ function formatCell(value: unknown): string {
  */
 function EditableCell({
   value,
+  isBoolean,
   hasDraft,
   onCommit,
 }: {
   value: unknown;
+  isBoolean: boolean;
   hasDraft: boolean;
   onCommit: (newValue: unknown) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<unknown>(value);
-
-  const isBoolean = typeof value === 'boolean';
 
   const startEdit = () => {
     setDraft(value ?? (isBoolean ? false : ''));
@@ -306,9 +320,15 @@ function stackedRowSpans(rowCount: number, subRows: number): Array<[start: numbe
 export default function ProjectListReportModal({
   projects,
   onClose,
+  onSaved,
 }: {
   projects: Record<string, any>[];
   onClose: () => void;
+  /** Called after edits are successfully persisted, so the parent page can
+   * refetch its own project list — without this, the parent's in-memory
+   * `projects` state (passed back in as this modal's `projects` prop) stays
+   * stale until a full page reload, even though the save itself succeeded. */
+  onSaved?: () => void;
 }) {
   const { showToast } = useToast();
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -360,6 +380,7 @@ export default function ProjectListReportModal({
         }),
       );
       setDrafts({});
+      onSaved?.();
     } catch (err: any) {
       showToast(err?.message || 'Failed to save changes', 'error');
     } finally {
@@ -540,6 +561,7 @@ export default function ProjectListReportModal({
                               const cell = (
                                 <EditableCell
                                   value={cellValue}
+                                  isBoolean={BOOLEAN_FIELD_KEYS.has(col.key)}
                                   hasDraft={hasDraft}
                                   onCommit={(v) => setDraftValue(p.id, col.key, v)}
                                 />
@@ -578,6 +600,7 @@ export default function ProjectListReportModal({
                           >
                             <EditableCell
                               value={stackedCellValue}
+                              isBoolean={false}
                               hasDraft={stackedHasDraft}
                               onCommit={(v) => setDraftValue(p.id, stackedFieldKey, v)}
                             />

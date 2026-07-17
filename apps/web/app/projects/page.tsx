@@ -1213,6 +1213,7 @@ export default function ProjectsPage() {
         <ProjectListReportModal
           projects={projects as unknown as Record<string, any>[]}
           onClose={() => setShowProjectListReport(false)}
+          onSaved={() => fetchProjects()}
         />
       )}
 
