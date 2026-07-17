@@ -16,10 +16,12 @@
  * non-stacked ("simple") columns visually merged (rowSpan) down the
  * project's whole block, matching the master spreadsheet's layout.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { X, Printer } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { recordsService } from '@/lib/records-service';
+import { useToast } from '@/components/toast';
 
 /** A column whose value is a single field, shown once per project (spans all sub-rows). */
 interface SimpleColumn {
@@ -169,6 +171,87 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
+/**
+ * Click-to-edit cell: shows the formatted display value; clicking swaps it
+ * for a checkbox (boolean values) or text input (everything else), saving
+ * on blur/Enter via `onSave` (a direct PATCH of just this one field on the
+ * underlying Project record — see callers) and discarding on Escape.
+ */
+function EditableCell({
+  rawValue,
+  onSave,
+}: {
+  rawValue: unknown;
+  onSave: (newValue: unknown) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<unknown>(rawValue);
+  const [saving, setSaving] = useState(false);
+
+  const isBoolean = typeof rawValue === 'boolean';
+
+  const startEdit = () => {
+    setDraft(rawValue ?? (isBoolean ? false : ''));
+    setEditing(true);
+  };
+
+  const commit = async (value: unknown) => {
+    if (value === rawValue) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(value);
+    } finally {
+      setSaving(false);
+      setEditing(false);
+    }
+  };
+
+  if (editing) {
+    if (isBoolean) {
+      return (
+        <input
+          type="checkbox"
+          checked={!!draft}
+          disabled={saving}
+          autoFocus
+          onChange={(e) => void commit(e.target.checked)}
+          onBlur={() => setEditing(false)}
+          className="h-4 w-4"
+        />
+      );
+    }
+    return (
+      <input
+        type="text"
+        value={typeof draft === 'string' || typeof draft === 'number' ? String(draft) : ''}
+        disabled={saving}
+        autoFocus
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => void commit(draft)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); void commit(draft); }
+          else if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
+        }}
+        className="w-full min-w-[3rem] border border-brand-navy/40 rounded px-1 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={startEdit}
+      className="w-full text-left hover:bg-brand-navy/5 rounded px-0.5 -mx-0.5"
+      title="Click to edit"
+    >
+      {formatCell(rawValue)}
+    </button>
+  );
+}
+
 /** Change Order's 5 rows are fixed sheet row identities (2 Shop Drawing
  * Submission rows, then CO Down/Out/Back) that auto-fill in the Project List
  * widget when a project has no saved override — see `computedChangeOrderRows`
@@ -235,8 +318,28 @@ export default function ProjectListReportModal({
   projects: Record<string, any>[];
   onClose: () => void;
 }) {
+  const { showToast } = useToast();
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  // Local copy so an inline edit's saved value shows immediately without
+  // needing the parent page to refetch; re-synced whenever the parent hands
+  // us a new `projects` array (e.g. after it reloads/filters).
+  const [projectsData, setProjectsData] = useState(projects);
+  useEffect(() => {
+    setProjectsData(projects);
+  }, [projects]);
+
+  const saveField = async (projectId: string | undefined, fieldKey: string, value: unknown) => {
+    if (!projectId) return;
+    try {
+      await recordsService.updateRecord('Project', projectId, { data: { [fieldKey]: value } });
+      setProjectsData((prev) =>
+        prev.map((p) => (p.id === projectId ? { ...p, [fieldKey]: value } : p)),
+      );
+    } catch (err: any) {
+      showToast(err?.message || `Failed to save ${fieldKey}`, 'error');
+    }
+  };
 
   const handlePrintPDF = async () => {
     if (generatingPdf) return;
@@ -255,7 +358,7 @@ export default function ProjectListReportModal({
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ projects }),
+        body: JSON.stringify({ projects: projectsData }),
       });
       if (!response.ok) {
         const detail = await response.json().catch(() => ({ error: response.statusText }));
@@ -376,7 +479,7 @@ export default function ProjectListReportModal({
                 )}
               </tr>
             </thead>
-            {projects.map((p, pi) => {
+            {projectsData.map((p, pi) => {
               const subRows = subRowCountFor(p);
               // Flag projects missing an actual Order Date (row 3 of Job Status /
               // Order Date — the literal date, not the "Order Date" label in row 2)
@@ -405,9 +508,11 @@ export default function ProjectListReportModal({
                               }`}
                             >
                               {col.key === 'tusOrderNumber' ? (
-                                <span style={VERTICAL_CELL_STYLE}>{formatCell(p[col.key])}</span>
+                                <span style={VERTICAL_CELL_STYLE}>
+                                  <EditableCell rawValue={p[col.key]} onSave={(v) => saveField(p.id, col.key, v)} />
+                                </span>
                               ) : (
-                                formatCell(p[col.key])
+                                <EditableCell rawValue={p[col.key]} onSave={(v) => saveField(p.id, col.key, v)} />
                               )}
                             </td>
                           );
@@ -427,13 +532,14 @@ export default function ProjectListReportModal({
                           : col.keyPrefix === 'jobStatusOrderDate'
                           ? jobStatusOrderDateCellValue(p, spanIndex)
                           : p[`${col.keyPrefix}Row${spanIndex + 1}`];
+                        const stackedFieldKey = `${col.keyPrefix}Row${spanIndex + 1}`;
                         return (
                           <td
                             key={col.keyPrefix}
                             rowSpan={rowSpan}
                             className="px-3 py-1.5 border border-gray-200 whitespace-nowrap text-gray-700 align-middle"
                           >
-                            {formatCell(value)}
+                            <EditableCell rawValue={value} onSave={(v) => saveField(p.id, stackedFieldKey, v)} />
                           </td>
                         );
                       })}
@@ -442,7 +548,7 @@ export default function ProjectListReportModal({
                 </tbody>
               );
             })}
-            {projects.length === 0 && (
+            {projectsData.length === 0 && (
               <tbody>
                 <tr>
                   <td colSpan={COLUMNS.length} className="px-3 py-8 text-center text-gray-400">
