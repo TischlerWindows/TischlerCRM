@@ -14,8 +14,8 @@ import {
   DropdownWithCustomInput,
   PicklistTextDropdown,
   filterPicklistValues,
-} from './picklist-fields';
-import { LookupSearch, LookupUserSearch, getLookupTargetApi, getRecordLabel } from './lookup-search';
+} from '../form/picklist-fields';
+import { LookupSearch, LookupUserSearch, getLookupTargetApi, getRecordLabel } from '../form/lookup-search';
 import type { VisibilityContext } from '@/lib/field-visibility';
 
 /**
