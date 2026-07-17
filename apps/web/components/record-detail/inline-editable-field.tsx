@@ -134,7 +134,6 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.checked)}
           onKeyDown={onKeyDown}
           className="h-4 w-4 rounded border-gray-300"
-          autoFocus
         />
       );
 
@@ -207,7 +206,6 @@ function FieldEditor({
           onKeyDown={onKeyDown}
           rows={3}
           className={common}
-          autoFocus
         />
       );
     case 'RichTextArea':
@@ -218,7 +216,6 @@ function FieldEditor({
           onKeyDown={onKeyDown}
           rows={6}
           className={common}
-          autoFocus
         />
       );
     case 'EncryptedText':
@@ -229,7 +226,6 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           className={common}
-          autoFocus
         />
       );
     case 'Number':
@@ -242,7 +238,6 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.value === '' ? '' : Number(e.target.value))}
           onKeyDown={onKeyDown}
           className={common}
-          autoFocus
         />
       );
     case 'Date':
@@ -253,7 +248,6 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           className={common}
-          autoFocus
         />
       );
     case 'DateTime':
@@ -264,7 +258,6 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           className={common}
-          autoFocus
         />
       );
     case 'Time':
@@ -275,7 +268,6 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           className={common}
-          autoFocus
         />
       );
     case 'Email':
@@ -286,7 +278,6 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           className={common}
-          autoFocus
         />
       );
     case 'Phone':
@@ -297,7 +288,6 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           className={common}
-          autoFocus
         />
       );
     case 'URL':
@@ -308,7 +298,6 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           className={common}
-          autoFocus
         />
       );
     default:
@@ -319,7 +308,6 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           className={common}
-          autoFocus
         />
       );
   }

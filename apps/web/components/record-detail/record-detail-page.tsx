@@ -21,7 +21,7 @@ import { useRecordSetupContext } from '@/lib/record-setup-context';
 import { collectDefaultCollapsedWidgetIds } from '@/lib/widget-collapse-defaults';
 import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
 import { RecordTabRenderer } from './record-tab-renderer';
-import { InlineEditProvider, InlineEditToolbar } from './inline-edit-context';
+import { InlineEditProvider, InlineEditToolbar, InlineEditBottomSpacer } from './inline-edit-context';
 import { RecordActions } from './record-actions';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -584,6 +584,7 @@ export default function RecordDetailPage({
                   />
                 ))
             }
+            <InlineEditBottomSpacer />
             </div>
           </InlineEditProvider>
         ) : (

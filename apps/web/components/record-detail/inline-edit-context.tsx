@@ -92,19 +92,19 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
   return <InlineEditContext.Provider value={value}>{children}</InlineEditContext.Provider>;
 }
 
-/** Sticky "Save" / "Cancel" bar shown only once bulk edit mode is active. */
+/** Fixed bottom "Save" / "Cancel" bar shown only once bulk edit mode is active. */
 export function InlineEditToolbar() {
   const ctx = useInlineEdit();
   if (!ctx || !ctx.editingAll) return null;
 
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-2 rounded-lg border border-brand-navy/20 bg-brand-navy/5 px-4 py-2.5">
-      <span className="mr-auto text-sm font-medium text-brand-navy">Editing fields&hellip;</span>
+    <div className="fixed inset-x-0 bottom-0 z-50 flex items-center gap-3 border-t border-brand-navy/20 bg-white px-6 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+      <span className="mr-auto text-base font-medium text-brand-navy">Editing fields&hellip;</span>
       <button
         type="button"
         onClick={ctx.cancelEditAll}
         disabled={ctx.saving}
-        className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        className="rounded-lg border border-gray-300 bg-white px-6 py-3 text-base font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
       >
         Cancel
       </button>
@@ -112,11 +112,19 @@ export function InlineEditToolbar() {
         type="button"
         onClick={() => void ctx.saveAll()}
         disabled={ctx.saving}
-        className="inline-flex items-center gap-1.5 rounded-md bg-brand-navy px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-navy/90 disabled:opacity-50"
+        className="inline-flex items-center gap-2 rounded-lg bg-brand-navy px-6 py-3 text-base font-medium text-white hover:bg-brand-navy/90 disabled:opacity-50"
       >
-        {ctx.saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+        {ctx.saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
         Save
       </button>
     </div>
   );
+}
+
+/** Reserves space at the bottom of the page while <InlineEditToolbar> is
+ * fixed over the content, so it doesn't cover the last panel's fields. */
+export function InlineEditBottomSpacer() {
+  const ctx = useInlineEdit();
+  if (!ctx || !ctx.editingAll) return null;
+  return <div className="h-20" aria-hidden="true" />;
 }
