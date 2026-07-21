@@ -355,11 +355,11 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
             };
 
             return (
-              <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+              <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm">
                 <button
                   type="button"
                   onClick={() => togglePanelCollapse(panel.id)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left rounded-t-lg overflow-hidden"
                   style={headerStyle}
                   aria-label={isPanelCollapsed ? `Expand ${panel.label} panel` : `Collapse ${panel.label} panel`}
                   aria-expanded={!isPanelCollapsed}
@@ -431,11 +431,11 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
 
           const isPanelCollapsed = collapsedPanelIds.has(panel.id);
           return (
-            <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm">
               <button
                 type="button"
                 onClick={() => togglePanelCollapse(panel.id)}
-                className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left rounded-t-lg overflow-hidden"
                 style={headerStyle}
                 aria-label={isPanelCollapsed ? `Expand ${panel.label} panel` : `Collapse ${panel.label} panel`}
                 aria-expanded={!isPanelCollapsed}
@@ -764,12 +764,12 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
     return (
       <div
         key={section.id}
-        className="bg-white rounded-lg border border-gray-200 overflow-hidden min-w-0"
+        className="bg-white rounded-lg border border-gray-200 min-w-0"
       >
         <button
           type="button"
           onClick={toggleSection}
-          className="w-full flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200 hover:bg-gray-100 transition-colors"
+          className="w-full flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200 hover:bg-gray-100 transition-colors rounded-t-lg overflow-hidden"
           aria-label={isCollapsed ? `Expand ${section.label} section` : `Collapse ${section.label} section`}
           aria-expanded={!isCollapsed}
         >
