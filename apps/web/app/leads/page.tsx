@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useIsMobileViewport } from '@/lib/use-is-mobile-viewport';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -89,6 +90,7 @@ export default function LeadsPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const isMobile = useIsMobileViewport();
   const [searchTerm, setSearchTerm] = useState('');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
@@ -586,21 +588,23 @@ export default function LeadsPage() {
   return (
     <div className="flex flex-1 overflow-hidden bg-gray-50 relative">
         {/* Mobile sidebar backdrop */}
-        {mobileSidebarOpen && (
-          <div className="fixed inset-0 bg-black/30 z-20 md:hidden" onClick={() => setMobileSidebarOpen(false)} />
+        {mobileSidebarOpen && isMobile && (
+          <div className="fixed inset-0 bg-black/30 z-20" onClick={() => setMobileSidebarOpen(false)} />
         )}
         {/* Mobile sidebar open tab */}
-        {!mobileSidebarOpen && (
-          <button onClick={() => setMobileSidebarOpen(true)} className="md:hidden fixed left-0 top-1/2 -translate-y-1/2 z-30 bg-white border border-l-0 border-gray-200 rounded-r-md px-0.5 py-3 shadow-sm" aria-label="Open sidebar">
+        {isMobile && !mobileSidebarOpen && (
+          <button onClick={() => setMobileSidebarOpen(true)} className="fixed left-0 top-1/2 -translate-y-1/2 z-30 bg-white border border-l-0 border-gray-200 rounded-r-md px-0.5 py-3 shadow-sm" aria-label="Open sidebar">
             <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
           </button>
         )}
         {/* Sidebar */}
-        <div className={`fixed md:relative top-[88px] md:top-auto bottom-0 md:bottom-auto left-0 w-44 md:w-64 bg-white border-r border-gray-200 p-4 md:p-6 overflow-y-auto flex-shrink-0 z-30 md:z-auto transition-transform duration-200 ease-in-out ${mobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full md:translate-x-0'}`}>
+        <div className={`${isMobile ? 'fixed top-[88px] bottom-0 w-44 z-30' : 'relative w-64'} left-0 bg-white border-r border-gray-200 ${isMobile ? 'p-4' : 'p-6'} overflow-y-auto flex-shrink-0 transition-transform duration-200 ease-in-out ${isMobile ? (mobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full') : 'translate-x-0'}`}>
           {/* Mobile close arrow */}
-          <button onClick={() => setMobileSidebarOpen(false)} className="md:hidden absolute right-2 top-2 p-1 rounded-md hover:bg-gray-100 text-gray-400" aria-label="Close sidebar">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+          {isMobile && (
+            <button onClick={() => setMobileSidebarOpen(false)} className="absolute right-2 top-2 p-1 rounded-md hover:bg-gray-100 text-gray-400" aria-label="Close sidebar">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
           <div className="pb-6 border-b border-gray-200 mb-6">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
