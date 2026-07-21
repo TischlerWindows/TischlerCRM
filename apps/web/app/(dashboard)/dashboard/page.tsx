@@ -2852,7 +2852,7 @@ export default function DashboardPage() {
               <ChevronLeft className="w-4 h-4" />
             </button>
           )}
-          <div className="mb-6" style={isLandscapeMobile ? { zoom: 0.85 } : undefined}>
+          <div className="mb-6" style={isLandscapeMobile ? { transform: 'scale(0.85)', transformOrigin: 'top left' } : undefined}>
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
                 <LayoutDashboard className="w-6 h-6 text-brand-navy" />

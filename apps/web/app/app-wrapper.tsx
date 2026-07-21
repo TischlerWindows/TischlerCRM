@@ -140,6 +140,31 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     installGlobalErrorHandler();
   }, []);
 
+  // One-time cleanup: this app has never shipped a service worker (no
+  // next-pwa config, no public/sw.js), but some browsers still have a stale
+  // "workbox-*.js" service worker registered from a past deployment that did.
+  // That orphaned worker intercepts fetches — including the long-lived SSE
+  // notifications stream — and its caching strategy doesn't know how to
+  // handle a streaming response, producing repeated
+  // "no-response :: notifications/stream" console errors and net::ERR_FAILED
+  // on the request itself. Unregister any leftover service worker so the
+  // browser stops intercepting requests through it.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister().catch(() => {});
+      }
+    }).catch(() => {});
+    if ('caches' in window) {
+      caches.keys().then((keys) => {
+        for (const key of keys) {
+          if (key.startsWith('workbox')) caches.delete(key).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
   useEffect(() => {
     if (!user) return;
     (async () => {
