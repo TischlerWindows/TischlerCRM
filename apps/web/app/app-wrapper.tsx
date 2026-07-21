@@ -285,7 +285,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-brand-light overflow-hidden">
+    <div className="h-dvh flex flex-col bg-brand-light overflow-hidden">
       {/* Impersonation banner */}
       {isImpersonating && (
         <div className="bg-amber-500 text-white text-xs font-semibold px-4 py-1.5 flex items-center justify-between z-[60]">
