@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useIsMobileViewport } from '@/lib/use-is-mobile-viewport';
+import { useIsMobileViewport, useIsLandscapeMobile } from '@/lib/use-is-mobile-viewport';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -110,6 +110,7 @@ export default function ServicePage() {
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobileViewport();
+  const isLandscapeMobile = useIsLandscapeMobile();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -553,7 +554,10 @@ export default function ServicePage() {
           </button>
         )}
         {/* Sidebar */}
-        <div className={`${isMobile ? 'fixed top-[88px] bottom-0 w-44 z-30' : 'relative w-64'} left-0 bg-white border-r border-gray-200 ${isMobile ? 'p-4' : 'p-6'} overflow-y-auto flex-shrink-0 transition-transform duration-200 ease-in-out ${isMobile ? (mobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full') : 'translate-x-0'}`}>
+        <div
+          className={`${isMobile ? `fixed ${isLandscapeMobile ? 'top-14' : 'top-[88px]'} bottom-0 w-44 z-30` : 'relative w-64'} left-0 bg-white border-r border-gray-200 ${isMobile ? 'p-4' : 'p-6'} overflow-y-auto flex-shrink-0 transition-transform duration-200 ease-in-out ${isMobile ? (mobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full') : 'translate-x-0'}`}
+          style={isLandscapeMobile ? { zoom: 0.85 } : undefined}
+        >
           {/* Mobile close arrow */}
           {isMobile && (
             <button onClick={() => setMobileSidebarOpen(false)} className="absolute right-2 top-2 p-1 rounded-md hover:bg-gray-100 text-gray-400" aria-label="Close sidebar">

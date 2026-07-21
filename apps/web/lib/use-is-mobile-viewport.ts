@@ -37,3 +37,32 @@ export function useIsMobileViewport(breakpoint: number = DEFAULT_BREAKPOINT): bo
 
   return isMobile;
 }
+
+/**
+ * True when the device is classified as mobile (see useIsMobileViewport)
+ * AND currently rotated into landscape orientation. Used to shrink/reflow
+ * mobile drawer UI (sidebars, etc.) that would otherwise look oversized or
+ * positioned too low when the available viewport height shrinks in
+ * landscape.
+ */
+export function useIsLandscapeMobile(breakpoint: number = DEFAULT_BREAKPOINT): boolean {
+  const [isLandscapeMobile, setIsLandscapeMobile] = useState(false);
+
+  useEffect(() => {
+    const compute = () => {
+      const screenShortSide = Math.min(window.screen.width, window.screen.height);
+      const isMobileDevice = screenShortSide < breakpoint;
+      const isLandscape = window.innerWidth > window.innerHeight;
+      setIsLandscapeMobile(isMobileDevice && isLandscape);
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    window.addEventListener('orientationchange', compute);
+    return () => {
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('orientationchange', compute);
+    };
+  }, [breakpoint]);
+
+  return isLandscapeMobile;
+}
