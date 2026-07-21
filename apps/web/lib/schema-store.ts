@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { OrgSchema, ObjectDef, FieldDef, ValidationRule, WorkflowRule, RecordType, PageLayout, FlowDefinition, CustomLayoutTemplate, PathDef } from './schema';
+import { OrgSchema, ObjectDef, FieldDef, ValidationRule, WorkflowRule, RecordType, PageLayout, FlowDefinition, CustomLayoutTemplate, PathDef, normalizeFieldType } from './schema';
 import { schemaService } from './schema-service';
 import { apiClient } from './api-client';
 import { recordsService } from './records-service';
@@ -411,9 +411,24 @@ export const useSchemaStore = create<SchemaStore>()(
                       // At minimum, update the fieldApiName reference
                       return apiNameChanged ? { ...pf, fieldApiName: newApiName! } : pf;
                     }
+                    // Layout-level overrides on `pf` (custom label, behavior,
+                    // column span, etc.) are preserved, but properties that
+                    // belong to the field definition itself — picklist
+                    // options chief among them — must always reflect the
+                    // latest edit, not whatever was embedded on the layout
+                    // back when the field was first added to it.
                     return {
                       ...pf,
                       fieldApiName: freshField.apiName,
+                      type: normalizeFieldType(freshField.type),
+                      picklistValues: freshField.picklistValues,
+                      maxLength: freshField.maxLength,
+                      precision: freshField.precision,
+                      scale: freshField.scale,
+                      helpText: freshField.helpText,
+                      defaultValue: freshField.defaultValue,
+                      lookupObject: freshField.lookupObject,
+                      relationshipName: freshField.relationshipName,
                     } as any;
                   }),
                 })),

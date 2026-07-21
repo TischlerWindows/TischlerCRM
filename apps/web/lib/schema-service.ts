@@ -740,6 +740,17 @@ class LocalStorageSchemaService implements SchemaService {
                 if (!fieldDef) return pf; // field not found — leave as-is
                 // Enrich the PanelField with full FieldDef props so DynamicForm
                 // can render without cross-referencing object.fields.
+                //
+                // Merge order note: `pf` is spread AFTER `rest` so legitimate
+                // layout-level overrides (custom label, behavior, column
+                // span, etc.) win — but that also means any FieldDef-owned
+                // property that was ever embedded on `pf` (even as an empty
+                // placeholder, e.g. picklistValues: [] before options were
+                // added) would permanently shadow later edits to the field
+                // definition. picklistValues (and similar core field
+                // metadata) must always reflect the current field def, so
+                // they're re-asserted after the `pf` spread — same pattern
+                // already used here for type/lookupObject/relationshipName.
                 const { apiName, ...rest } = fieldDef;
                 const enriched = {
                   ...rest,
@@ -747,6 +758,12 @@ class LocalStorageSchemaService implements SchemaService {
                   type: normalizeFieldType(fieldDef.type),
                   lookupObject: fieldDef.lookupObject,
                   relationshipName: fieldDef.relationshipName,
+                  picklistValues: fieldDef.picklistValues,
+                  maxLength: fieldDef.maxLength,
+                  precision: fieldDef.precision,
+                  scale: fieldDef.scale,
+                  helpText: fieldDef.helpText,
+                  defaultValue: fieldDef.defaultValue,
                 } as any;
                 if (JSON.stringify(enriched) !== JSON.stringify(pf)) changed = true;
                 return enriched;
