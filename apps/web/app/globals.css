@@ -41,6 +41,14 @@ body {
     animation: slide-in-from-right 0.3s ease-out;
   }
 
+  /* iOS Safari requires this for reliable momentum/touch scrolling inside
+     nested overflow containers (sidebars, main content panes, etc). Without
+     it, nested overflow-y-auto regions can be sluggish or fail to capture
+     the scroll gesture at all, letting it bubble up to the document instead. */
+  .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
   /* Removed !important overrides on .bg-gray-50 and .border-gray-200.
      Use bg-surface and border-border-default instead (defined in tailwind.config.js). */
 }

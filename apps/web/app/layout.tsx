@@ -20,7 +20,7 @@ import { ToastProvider } from '@/components/toast';
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen antialiased">
+      <body className="h-dvh antialiased">
         <AuthProvider>
           <PermissionsProvider>
             <ProtectedRouteWrapper>
