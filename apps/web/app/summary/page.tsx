@@ -3284,17 +3284,14 @@ export default function SummaryPage() {
         </button>
       )}
       {/* Sidebar */}
-      <div
-        className={`${isMobile ? 'fixed top-[88px] bottom-0 w-44 z-30' : 'relative w-64'} left-0 bg-white border-r border-gray-200 ${isMobile ? 'p-4' : 'p-6'} overflow-y-auto flex-shrink-0 transition-transform duration-200 ease-in-out ${isMobile ? (mobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full') : 'translate-x-0'}`}
-        style={isLandscapeMobile ? { zoom: 0.85 } : undefined}
-      >
+      <div className={`${isMobile ? 'fixed top-[88px] bottom-0 w-44 z-30' : 'relative w-64'} left-0 bg-white border-r border-gray-200 ${isMobile ? 'p-4' : 'p-6'} overflow-y-auto flex-shrink-0 transition-transform duration-200 ease-in-out ${isMobile ? (mobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full') : 'translate-x-0'}`}>
         {/* Mobile close arrow */}
         {isMobile && (
           <button onClick={() => setMobileSidebarOpen(false)} className="absolute right-2 top-2 p-1 rounded-md hover:bg-gray-100 text-gray-400" aria-label="Close sidebar">
             <ChevronLeft className="w-4 h-4" />
           </button>
         )}
-        <div className="space-y-6">
+        <div className="space-y-6" style={isLandscapeMobile ? { zoom: 0.85 } : undefined}>
           {/* Page Header in Sidebar */}
           <div className="pb-6 border-b border-gray-200">
             <div className="flex items-center gap-3 mb-2">
