@@ -527,7 +527,7 @@ export default function CustomObjectRecordsPage() {
         )}
         {/* Sidebar */}
         <div
-          className={`${isMobile ? `fixed ${isLandscapeMobile ? 'top-14' : 'top-[88px]'} bottom-0 w-44 z-30` : 'relative w-64'} left-0 bg-white border-r border-gray-200 ${isMobile ? 'p-4' : 'p-6'} overflow-y-auto flex-shrink-0 transition-transform duration-200 ease-in-out ${isMobile ? (mobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full') : 'translate-x-0'}`}
+          className={`${isMobile ? 'fixed top-[88px] bottom-0 w-44 z-30' : 'relative w-64'} left-0 bg-white border-r border-gray-200 ${isMobile ? 'p-4' : 'p-6'} overflow-y-auto flex-shrink-0 transition-transform duration-200 ease-in-out ${isMobile ? (mobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full') : 'translate-x-0'}`}
           style={isLandscapeMobile ? { zoom: 0.85 } : undefined}
         >
           {/* Mobile close arrow */}
