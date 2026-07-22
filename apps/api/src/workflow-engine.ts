@@ -6,7 +6,7 @@
 
 import { prisma } from '@crm/db/client';
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
-import { getAppOnlyToken } from './routes/outlook.js';
+import { sendOutlookEmail } from './routes/outlook.js';
 import { logAudit, extractIp } from './audit.js';
 
 // ── Types (mirror schema.ts) ──────────────────────────────────────
@@ -122,33 +122,13 @@ function replaceMergeTokens(template: string, data: Record<string, any>): string
   });
 }
 
-// ── Email sender (reuses MS Graph) ────────────────────────────────
+// ── Email sender (reuses Graph or SMTP depending on how the Outlook
+// integration is configured) ────────────────────────────────────
 
 async function sendWorkflowEmail(to: string, subject: string, body: string): Promise<void> {
-  const result = await getAppOnlyToken();
-  if (!result) {
-    console.error('[workflow] Cannot send email — no MS Graph token');
-    return;
-  }
-  const res = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(result.senderEmail)}/sendMail`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${result.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: {
-          subject,
-          body: { contentType: 'HTML', content: body },
-          toRecipients: [{ emailAddress: { address: to } }],
-        },
-      }),
-    }
-  );
-  if (!res.ok) {
-    console.error(`[workflow] Email send failed: ${res.status}`);
+  const sent = await sendOutlookEmail(to, subject, body);
+  if (!sent) {
+    console.error('[workflow] Email send failed — Outlook integration not configured or send error');
   }
 }
 

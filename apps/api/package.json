@@ -16,13 +16,13 @@
     "db:setup": "pnpm run db:generate && pnpm run db:migrate && pnpm run seed"
   },
   "dependencies": {
+    "@crm/controllers": "workspace:*",
     "@crm/db": "workspace:*",
     "@crm/proposal-assembly": "workspace:*",
     "@crm/storage": "workspace:*",
+    "@crm/triggers": "workspace:*",
     "@crm/types": "workspace:*",
     "@crm/widgets": "workspace:*",
-    "@crm/triggers": "workspace:*",
-    "@crm/controllers": "workspace:*",
     "@fastify/cors": "^11.0.0",
     "@fastify/helmet": "^13.0.0",
     "@fastify/static": "^8.0.0",
@@ -34,6 +34,7 @@
     "dotenv": "16.4.5",
     "fastify": "^5.0.0",
     "node-html-parser": "^6.1.13",
+    "nodemailer": "^9.0.3",
     "pdfkit": "^0.15.0",
     "pg": "^8.20.0",
     "qs": "^6.15.0",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@types/node": "20.11.19",
+    "@types/nodemailer": "^8.0.1",
     "@types/pdfkit": "^0.13.4",
     "dotenv-cli": "7.4.2",
     "esbuild": "0.21.5",

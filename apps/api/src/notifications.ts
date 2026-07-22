@@ -1,4 +1,4 @@
-import { getAppOnlyToken } from './routes/outlook.js';
+import { sendOutlookEmail } from './routes/outlook.js';
 
 function escapeHtml(str: string): string {
   return str
@@ -15,97 +15,55 @@ interface NotifyUser {
   email: string;
 }
 
-async function sendViaMsGraph(token: string, senderEmail: string, to: string, subject: string, body: string): Promise<void> {
-  const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(senderEmail)}/sendMail`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      message: {
-        subject,
-        body: { contentType: 'HTML', content: body },
-        toRecipients: [{ emailAddress: { address: to } }],
-      },
-    }),
-  });
-  if (!res.ok) throw new Error(`Graph sendMail failed: ${res.status}`);
-}
-
 export async function sendInviteEmail(
   user: NotifyUser,
   inviteUrl: string
 ): Promise<{ sent: boolean; inviteUrl: string }> {
-  const result = await getAppOnlyToken();
-  if (!result) return { sent: false, inviteUrl };
   const displayName = escapeHtml(user.name ?? user.email);
-  try {
-    await sendViaMsGraph(
-      result.token,
-      result.senderEmail,
-      user.email,
-      'You have been invited to TischlerCRM',
-      `<p>Hello ${displayName},</p>
+  const sent = await sendOutlookEmail(
+    user.email,
+    'You have been invited to TischlerCRM',
+    `<p>Hello ${displayName},</p>
        <p>You have been added to TischlerCRM. Click the link below to set your password and log in.</p>
        <p><a href="${inviteUrl}">${inviteUrl}</a></p>
-       <p>This link expires in 7 days.</p>`
-    );
-    return { sent: true, inviteUrl };
-  } catch {
-    return { sent: false, inviteUrl };
-  }
+       <p>This link expires in 7 days.</p>`,
+  );
+  return { sent, inviteUrl };
 }
 
 export async function sendSupportTicketAlertEmail(
   admin: NotifyUser,
   ticket: { ticketNumber: number; title: string; descriptionPreview: string; submitterName: string; url: string },
 ): Promise<{ sent: boolean }> {
-  const result = await getAppOnlyToken();
-  if (!result) return { sent: false };
   const displayName = escapeHtml(admin.name ?? admin.email);
   const title = escapeHtml(ticket.title);
   const preview = escapeHtml(ticket.descriptionPreview);
   const submitter = escapeHtml(ticket.submitterName);
-  try {
-    await sendViaMsGraph(
-      result.token,
-      result.senderEmail,
-      admin.email,
-      `New support ticket: #T-${ticket.ticketNumber} — ${ticket.title}`,
-      `<p>Hello ${displayName},</p>
+  const sent = await sendOutlookEmail(
+    admin.email,
+    `New support ticket: #T-${ticket.ticketNumber} — ${ticket.title}`,
+    `<p>Hello ${displayName},</p>
        <p><strong>${submitter}</strong> submitted a new support ticket.</p>
        <p><strong>${title}</strong></p>
        <blockquote style="border-left:3px solid #ccc;padding-left:10px;margin:8px 0;color:#444;">${preview}</blockquote>
-       <p><a href="${ticket.url}">Open ticket #T-${ticket.ticketNumber}</a></p>`
-    );
-    return { sent: true };
-  } catch {
-    return { sent: false };
-  }
+       <p><a href="${ticket.url}">Open ticket #T-${ticket.ticketNumber}</a></p>`,
+  );
+  return { sent };
 }
 
 export async function sendPasswordResetEmail(
   user: NotifyUser,
   resetUrl: string
 ): Promise<{ sent: boolean; resetUrl: string }> {
-  const result = await getAppOnlyToken();
-  if (!result) return { sent: false, resetUrl };
   const displayName = escapeHtml(user.name ?? user.email);
-  try {
-    await sendViaMsGraph(
-      result.token,
-      result.senderEmail,
-      user.email,
-      'Reset your TischlerCRM password',
-      `<p>Hello ${displayName},</p>
+  const sent = await sendOutlookEmail(
+    user.email,
+    'Reset your TischlerCRM password',
+    `<p>Hello ${displayName},</p>
        <p>A password reset was requested for your account. Click the link below to set a new password.</p>
        <p><a href="${resetUrl}">${resetUrl}</a></p>
-       <p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`
-    );
-    return { sent: true, resetUrl };
-  } catch {
-    return { sent: false, resetUrl };
-  }
+       <p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`,
+  );
+  return { sent, resetUrl };
 }
 

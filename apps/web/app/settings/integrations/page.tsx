@@ -223,12 +223,37 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Outlook-only: choice between Microsoft Graph (OAuth, needs a Microsoft 365 /
+  // Azure AD tenant) and plain SMTP (works with any mailbox that supports SMTP
+  // AUTH, including a free outlook.com account — with an app password if 2FA
+  // is enabled on it).
+  const [outlookMethod, setOutlookMethod] = useState<'oauth' | 'smtp'>(
+    integration.config?.authMethod === 'smtp' ? 'smtp' : 'oauth',
+  );
+  const [smtpHost, setSmtpHost] = useState((integration.config?.smtpHost as string) || '');
+  const [smtpPort, setSmtpPort] = useState(String(integration.config?.smtpPort ?? 587));
+  const [smtpSecure, setSmtpSecure] = useState(integration.config?.smtpSecure !== false);
+  const [smtpUsername, setSmtpUsername] = useState((integration.config?.smtpUsername as string) || '');
+
   const handleSave = async () => {
     setSaving(true);
     try {
       const payload: any = { enabled };
 
-      if (authType === 'api_key') {
+      if (isOutlook && outlookMethod === 'smtp') {
+        // SMTP password reuses the apiKey column (Outlook has no OAuth client
+        // secret in this mode).
+        if (apiKey.trim()) payload.apiKey = apiKey.trim();
+        payload.config = {
+          ...(integration.config || {}),
+          authMethod: 'smtp',
+          smtpHost: smtpHost.trim(),
+          smtpPort: Number(smtpPort) || 587,
+          smtpSecure,
+          smtpUsername: smtpUsername.trim(),
+          senderEmail: senderEmail.trim(),
+        };
+      } else if (authType === 'api_key') {
         // Only send apiKey if user typed something new
         if (apiKey.trim()) payload.apiKey = apiKey.trim();
       } else {
@@ -237,9 +262,10 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
       }
 
       // Save Outlook-specific config (tenantId + senderEmail) via config merge
-      if (isOutlook) {
+      if (isOutlook && outlookMethod === 'oauth') {
         payload.config = {
           ...(integration.config || {}),
+          authMethod: 'oauth',
           tenantId: tenantId.trim(),
           senderEmail: senderEmail.trim(),
         };
@@ -294,8 +320,122 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
       <input type="text" name="prevent_autofill_username" autoComplete="username" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
       <input type="password" name="prevent_autofill_password" autoComplete="current-password" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
 
-      {/* Credentials — API key vs OAuth */}
-      {authType === 'api_key' ? (
+      {/* Outlook: choose Graph (OAuth) vs SMTP before showing the relevant fields */}
+      {isOutlook && (
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-brand-dark mb-1.5">Connection Method</label>
+          <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
+            <button
+              type="button"
+              onClick={() => setOutlookMethod('oauth')}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                outlookMethod === 'oauth' ? 'bg-white shadow-sm text-brand-navy' : 'text-brand-gray'
+              }`}
+            >
+              Microsoft Graph (OAuth)
+            </button>
+            <button
+              type="button"
+              onClick={() => setOutlookMethod('smtp')}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                outlookMethod === 'smtp' ? 'bg-white shadow-sm text-brand-navy' : 'text-brand-gray'
+              }`}
+            >
+              SMTP
+            </button>
+          </div>
+          <p className="mt-1.5 text-[11px] text-brand-gray">
+            {outlookMethod === 'oauth'
+              ? 'Requires a Microsoft 365 / Azure AD tenant with an app registration.'
+              : 'Works with any mailbox that supports SMTP AUTH, including a free outlook.com account (use an app password if 2FA is on).'}
+          </p>
+        </div>
+      )}
+
+      {/* Credentials — API key vs OAuth vs (Outlook) SMTP */}
+      {isOutlook && outlookMethod === 'smtp' ? (
+        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs font-medium text-brand-dark mb-1.5">SMTP Host</label>
+              <input
+                type="text"
+                value={smtpHost}
+                onChange={(e) => setSmtpHost(e.target.value)}
+                placeholder="smtp-mail.outlook.com"
+                className="w-full rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-brand-dark mb-1.5">Port</label>
+              <input
+                type="number"
+                value={smtpPort}
+                onChange={(e) => setSmtpPort(e.target.value)}
+                placeholder="587"
+                className="w-full rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+              />
+            </div>
+          </div>
+          <label className="flex items-center gap-2 mb-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={smtpSecure}
+              onChange={(e) => setSmtpSecure(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <span className="text-xs text-brand-dark">Use TLS (STARTTLS on 587, implicit TLS on 465)</span>
+          </label>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-brand-dark mb-1.5">Username</label>
+            <input
+              type="text"
+              value={smtpUsername}
+              onChange={(e) => setSmtpUsername(e.target.value)}
+              autoComplete="new-password"
+              placeholder="donotreply0000001@outlook.com"
+              className="w-full rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+            />
+          </div>
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-brand-dark mb-1.5">Password (or App Password)</label>
+            <div className="relative">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="new-password"
+                placeholder={integration.hasApiKey ? '••••••••  (already set — enter new to replace)' : 'Account password or app password'}
+                className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-3 pr-10 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {integration.hasApiKey && (
+              <p className="mt-1 text-[11px] text-green-600 flex items-center gap-1">
+                <Check className="w-3 h-3" /> Password is configured
+              </p>
+            )}
+          </div>
+          <div className="mb-1">
+            <label className="block text-xs font-medium text-brand-dark mb-1.5">Sender Email</label>
+            <input
+              type="email"
+              value={senderEmail}
+              onChange={(e) => setSenderEmail(e.target.value)}
+              placeholder="donotreply0000001@outlook.com"
+              className="w-full rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+            />
+            <p className="mt-1 text-[10px] text-brand-gray">Usually the same address as Username</p>
+          </div>
+          <OutlookSmtpTestSection integration={integration} />
+        </div>
+      ) : authType === 'api_key' ? (
         <div className="mb-4">
           <label className="block text-xs font-medium text-brand-dark mb-1.5">API Key</label>
           <div className="relative">
@@ -363,7 +503,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
       )}
 
       {/* Outlook-specific: Tenant ID + Sender Email + Test */}
-      {isOutlook && (
+      {isOutlook && outlookMethod === 'oauth' && (
         <OutlookAppOnlySection
           integration={integration}
           tenantId={tenantId}
@@ -400,6 +540,47 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Outlook SMTP test button ────────────────────────────────────────
+
+function OutlookSmtpTestSection({ integration }: { integration: Integration }) {
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  const handleTestEmail = async () => {
+    setSendingTest(true);
+    setTestResult(null);
+    try {
+      const res = await apiClient.sendOutlookTestEmail();
+      setTestResult(res.message || 'Test email sent!');
+    } catch (err: any) {
+      setTestResult(err.message || 'Failed to send test email');
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const canTest = integration.hasApiKey && integration.config?.smtpHost && integration.config?.smtpUsername;
+
+  return (
+    <div className="pt-3 mt-3 border-t border-gray-200">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleTestEmail}
+          disabled={sendingTest || !canTest}
+          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white bg-[#0078D4] hover:bg-[#006CBE] transition disabled:opacity-50"
+        >
+          {sendingTest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+          Send Test Email
+        </button>
+        <span className="text-[11px] text-brand-gray">
+          {canTest ? 'Sends a test to your CRM email' : 'Save your SMTP settings first'}
+        </span>
+      </div>
+      {testResult && <p className="mt-2 text-[11px] text-brand-gray">{testResult}</p>}
     </div>
   );
 }
