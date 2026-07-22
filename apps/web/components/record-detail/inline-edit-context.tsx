@@ -103,6 +103,13 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
       }
       // Apply any staged TeamMemberSlot changes now that the main record save
       // (if any) succeeded — mirrors the full edit form's save sequence.
+      // TEMP DIAGNOSTIC — remove once the "connections not saving" bug is
+      // confirmed fixed.
+      showToast(
+        `[DEBUG] slotRefsRef has ${slotRefsRef.current.size} registered slot(s), ` +
+        `${Array.from(slotRefsRef.current.values()).filter(r => !!r.current?.applyChanges).length} with a live applyChanges`,
+        'success',
+      );
       for (const slotRef of slotRefsRef.current.values()) {
         if (slotRef.current?.applyChanges) {
           await slotRef.current.applyChanges();
