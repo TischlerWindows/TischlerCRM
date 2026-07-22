@@ -386,7 +386,7 @@ function InlineLookupEditor({
       isActive={isActive}
       onQueryChange={setQuery}
       onFocus={() => setIsActive(true)}
-      onBlur={() => setIsActive(false)}
+      onBlur={() => setTimeout(() => setIsActive(false), 150)}
       schemaObjects={schema?.objects}
     />
   );
@@ -415,7 +415,7 @@ function InlineLookupUserEditor({
       isActive={isActive}
       onQueryChange={setQuery}
       onFocus={() => setIsActive(true)}
-      onBlur={() => setIsActive(false)}
+      onBlur={() => setTimeout(() => setIsActive(false), 150)}
     />
   );
 }
