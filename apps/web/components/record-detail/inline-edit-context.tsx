@@ -84,7 +84,21 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
     setSaving(true);
     try {
       if (Object.keys(drafts).length > 0) {
-        await recordsService.updateRecord(objectApiName, recordId, { data: drafts });
+        // Records store field values under the BARE key (the API strips the
+        // "ObjectName__" prefix on write) — dynamic-form.tsx's regular save
+        // path already does this stripping before submitting. Drafts here
+        // are keyed by the field's raw schema apiName, which for
+        // pre-existing prefixed fields (e.g. "Project__architect_contact")
+        // still has that prefix. Sending it as-is silently wrote to the
+        // wrong key, so the record looked unchanged after Save — the value
+        // reads back to a comparison test. Newer "__c"-suffixed fields
+        // (e.g. "Architect__c") have no leading prefix to strip, so they
+        // were unaffected by this specific mismatch.
+        const bareDrafts: Record<string, unknown> = {};
+        for (const [apiName, val] of Object.entries(drafts)) {
+          bareDrafts[apiName.replace(/^[A-Za-z]+__/, '')] = val;
+        }
+        await recordsService.updateRecord(objectApiName, recordId, { data: bareDrafts });
         onSaved(drafts);
       }
       // Apply any staged TeamMemberSlot changes now that the main record save
