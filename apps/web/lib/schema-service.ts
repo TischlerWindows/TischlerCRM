@@ -764,6 +764,8 @@ class LocalStorageSchemaService implements SchemaService {
                   scale: fieldDef.scale,
                   helpText: fieldDef.helpText,
                   defaultValue: fieldDef.defaultValue,
+                  required: fieldDef.required,
+                  unique: fieldDef.unique,
                 } as any;
                 if (JSON.stringify(enriched) !== JSON.stringify(pf)) changed = true;
                 return enriched;

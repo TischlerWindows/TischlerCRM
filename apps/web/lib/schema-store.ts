@@ -429,6 +429,8 @@ export const useSchemaStore = create<SchemaStore>()(
                       defaultValue: freshField.defaultValue,
                       lookupObject: freshField.lookupObject,
                       relationshipName: freshField.relationshipName,
+                      required: freshField.required,
+                      unique: freshField.unique,
                     } as any;
                   }),
                 })),
