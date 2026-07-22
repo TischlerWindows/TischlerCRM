@@ -176,12 +176,24 @@ function TeamMemberSlotField({
   const [stagedRows, setStagedRows] = useState<TeamMemberRow[]>([])
   const [stagedLoading, setStagedLoading] = useState(false)
   const initialRowsRef = useRef<TeamMemberRow[]>([])
+  // True once the user has made any staged edit (fill/clear) before the
+  // initial-rows fetch below resolves. Without this guard, a user who
+  // clicks the pencil icon and immediately picks a connection (faster than
+  // the network round-trip) would have their edit silently overwritten the
+  // moment the fetch's .then() ran and called setStagedRows(matched) with
+  // the stale pre-edit rows — the UI showed a "Connection saved" toast
+  // (the local staged update succeeded), but Save's applyChanges() would
+  // then diff against rows that no longer included the edit, producing
+  // zero adds/clears and silently persisting nothing.
+  const hasStagedEditRef = useRef(false)
 
   useEffect(() => {
     if (!staged || !parentRecordId) {
       setStagedRows([])
+      hasStagedEditRef.current = false
       return
     }
+    hasStagedEditRef.current = false
     setStagedLoading(true)
     fetchFreshRows(parentObjectApiName, parentRecordId)
       .then(rawRows => {
@@ -189,7 +201,12 @@ function TeamMemberSlotField({
           .filter(r => rowMatches(dataOf(r), slotConfig.criterion))
           .map(r => ({ id: String(r.id), isPending: false, data: dataOf(r) } as TeamMemberRow))
         initialRowsRef.current = matched
-        setStagedRows(matched)
+        // Only adopt the fetched rows as the live staged state if the user
+        // hasn't already edited in the meantime — applyChanges() always has
+        // the correct baseline via initialRowsRef regardless.
+        if (!hasStagedEditRef.current) {
+          setStagedRows(matched)
+        }
       })
       .catch(err => console.error('[staged slot] fetch failed:', err))
       .finally(() => setStagedLoading(false))
@@ -202,6 +219,7 @@ function TeamMemberSlotField({
     accountId?: string | null
     role?: string
   }) => {
+    hasStagedEditRef.current = true
     const cur: TeamMemberSlotCriterion = slotConfig.criterion
     const tempId = `staged-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const contactName = input.contactId ? resolveLookupDisplayName(input.contactId, 'Contact') : null
@@ -227,6 +245,7 @@ function TeamMemberSlotField({
   }, [slotConfig.criterion])
 
   const stagedClearRow = useCallback(async (rowId: string) => {
+    hasStagedEditRef.current = true
     setStagedRows(prev => prev.filter(r => r.id !== rowId))
   }, [])
 
