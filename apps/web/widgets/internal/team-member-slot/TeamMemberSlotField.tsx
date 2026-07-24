@@ -337,6 +337,15 @@ function TeamMemberSlotField({
     fontWeight: panelField?.labelStyle?.bold ? 700 : undefined,
     fontStyle: panelField?.labelStyle?.italic ? 'italic' : undefined,
     textTransform: panelField?.labelStyle?.uppercase ? 'uppercase' : undefined,
+    fontSize: panelField?.labelStyle?.fontSize ? `${panelField.labelStyle.fontSize}px` : undefined,
+  }
+
+  const valueStyle: React.CSSProperties = {
+    ...(panelField?.valueStyle?.color ? { color: panelField.valueStyle.color } : {}),
+    ...(panelField?.valueStyle?.background ? { backgroundColor: panelField.valueStyle.background, padding: '2px 6px', borderRadius: 4 } : {}),
+    fontWeight: panelField?.valueStyle?.bold ? 700 : undefined,
+    fontStyle: panelField?.valueStyle?.italic ? 'italic' : undefined,
+    fontSize: panelField?.valueStyle?.fontSize ? `${panelField.valueStyle.fontSize}px` : undefined,
   }
 
   const renderBody = () => {
@@ -345,14 +354,14 @@ function TeamMemberSlotField({
     }
     if (readOnly) {
       if (rows.length === 0) {
-        return <div className="text-sm text-gray-400">—</div>
+        return <div className="text-sm text-gray-400" style={valueStyle}>—</div>
       }
 
       const contactDisplayFields = slotConfig.displayFields?.Contact ?? []
       const accountDisplayFields = slotConfig.displayFields?.Account ?? []
 
       return (
-        <div className="text-sm text-gray-900 space-y-2">
+        <div className="text-sm text-gray-900 space-y-2" style={valueStyle}>
           {rows.map((row) => {
             const { contact, account, contactId, accountId } = resolveRowDisplay(row)
             if (!contact && !account) {
