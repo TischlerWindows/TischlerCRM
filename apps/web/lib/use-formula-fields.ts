@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSchemaStore } from '@/lib/schema-store';
-import { evaluateFormula, extractCrossObjectRefs, ExpressionContext } from '@/lib/expressions';
+import { evaluateFormula, extractCrossObjectRefs, expressionEngine, ExpressionContext } from '@/lib/expressions';
 import { FieldDef, ObjectDef } from '@/lib/schema';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
@@ -202,8 +202,31 @@ export function useFormulaFields(
     const results: Record<string, any> = {};
     const inProgress = new Set<string>();
 
+    // Which OTHER Formula fields (by apiName, both prefixed and bare forms)
+    // are actually referenced by a given formula expression. Used to decide
+    // which sibling formula fields need to be recursively resolved.
+    //
+    // IMPORTANT: this must be reference-scoped, not "resolve every formula
+    // field on the object unconditionally" — the latter caused a real bug:
+    // when Field A's resolution eagerly (and unnecessarily) computes
+    // unrelated Field B, and B's formula happens to reference Field A (which
+    // is still mid-computation, so it's in `inProgress`), the cycle guard
+    // fires and B gets permanently memoized with a wrong/blank result — even
+    // though A and B don't actually depend on each other. Only resolving
+    // fields the formula truly references eliminates this false-positive-
+    // cycle failure mode entirely.
+    const getReferencedNames = (formulaExpr: string): Set<string> => {
+      const names = new Set<string>();
+      for (const ref of expressionEngine.getFieldReferences(formulaExpr)) {
+        if (ref.includes('.')) continue; // cross-object ref, handled separately below
+        names.add(ref);
+        names.add(ref.replace(/^[A-Za-z]+__/, ''));
+      }
+      return names;
+    };
+
     // Build context with same-record fields (use bare apiName keys), plus
-    // every OTHER Formula field's computed value overlaid in. Formula
+    // every REFERENCED Formula field's computed value overlaid in. Formula
     // fields are never persisted in `record`, so a formula referencing
     // another formula field (e.g. EW_Expiration_Date__c referencing
     // Project__unconditional_expiration_date, itself a Formula) would
@@ -216,7 +239,7 @@ export function useFormulaFields(
     // already-prefixed keys never produces the prefixed alias for keys
     // stored bare, so formulas referencing the prefixed name silently
     // resolved to `undefined`. Add both directions.
-    const buildContext = (excludeApiName: string): ExpressionContext => {
+    const buildContext = (excludeApiName: string, referencedNames: Set<string>): ExpressionContext => {
       const context: ExpressionContext = {};
       for (const [key, val] of Object.entries(record_)) {
         context[key] = val as any;
@@ -229,9 +252,10 @@ export function useFormulaFields(
       }
       for (const other of formulaFields) {
         if (other.apiName === excludeApiName) continue;
+        const bare = other.apiName.replace(/^[A-Za-z]+__/, '');
+        if (!referencedNames.has(other.apiName) && !referencedNames.has(bare)) continue;
         const value = computeField(other);
         context[other.apiName] = value as any;
-        const bare = other.apiName.replace(/^[A-Za-z]+__/, '');
         if (bare !== other.apiName) context[bare] = value as any;
       }
       return context;
@@ -242,7 +266,7 @@ export function useFormulaFields(
       if (inProgress.has(field.apiName)) return undefined; // circular reference guard
       inProgress.add(field.apiName);
 
-      const context = buildContext(field.apiName);
+      const context = buildContext(field.apiName, getReferencedNames(field.formulaExpr!));
 
       // Add cross-object resolved values to context
       for (const ref of crossObjectRefs) {

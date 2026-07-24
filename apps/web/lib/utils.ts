@@ -2,7 +2,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
-import { evaluateFormula, extractCrossObjectRefs, ExpressionContext } from '@/lib/expressions';
+import { evaluateFormula, extractCrossObjectRefs, expressionEngine, ExpressionContext } from '@/lib/expressions';
 import { FieldDef, ObjectDef } from '@/lib/schema';
 
 export function cn(...inputs: ClassValue[]) {
@@ -543,11 +543,28 @@ export function evaluateFormulaForRecord(
   // referencing Project__unconditional_expiration_date, itself a Formula)
   // would otherwise see `undefined` for that reference, silently producing
   // NaN → CONCAT's `String(arg || '')` swallows NaN as '' → a blank result.
-  // Recursively resolve every other Formula-type field on the object first
-  // (memoized, with a cycle guard) and overlay their computed values.
+  // Recursively resolve every OTHER Formula-type field that this formula
+  // actually REFERENCES first (memoized, with a cycle guard) and overlay
+  // their computed values.
+  //
+  // IMPORTANT: only resolve fields actually referenced by name, not every
+  // Formula field on the object unconditionally — the latter caused a real
+  // bug: eagerly resolving unrelated sibling fields could transitively
+  // trigger a formula that (correctly) references THIS field while it's
+  // still mid-computation, tripping the cycle guard and permanently
+  // memoizing a wrong/blank result for a pair of fields that don't actually
+  // depend on each other.
   if (objectDef?.fields) {
+    const referencedNames = new Set<string>();
+    for (const ref of expressionEngine.getFieldReferences(formulaExpr)) {
+      if (ref.includes('.')) continue; // cross-object ref, handled separately below
+      referencedNames.add(ref);
+      referencedNames.add(ref.replace(/^[A-Za-z]+__/, ''));
+    }
     for (const fieldDef of objectDef.fields) {
       if (fieldDef.type !== 'Formula' || !fieldDef.formulaExpr) continue;
+      const bare = fieldDef.apiName.replace(/^[A-Za-z]+__/, '');
+      if (!referencedNames.has(fieldDef.apiName) && !referencedNames.has(bare)) continue;
       let value: any;
       if (_memo.has(fieldDef.apiName)) {
         value = _memo.get(fieldDef.apiName);
@@ -560,7 +577,6 @@ export function evaluateFormulaForRecord(
         _memo.set(fieldDef.apiName, value);
       }
       context[fieldDef.apiName] = value as any;
-      const bare = fieldDef.apiName.replace(/^[A-Za-z]+__/, '');
       if (bare !== fieldDef.apiName) context[bare] = value as any;
     }
   }
