@@ -513,7 +513,9 @@ export function formatFieldValue(rawValue: any, fieldType?: string, lookupObject
 export function evaluateFormulaForRecord(
   formulaExpr: string,
   record: Record<string, any>,
-  objectDef?: ObjectDef | null
+  objectDef?: ObjectDef | null,
+  _resolving: Set<string> = new Set(),
+  _memo: Map<string, any> = new Map()
 ): any {
   if (!formulaExpr || !record) return null;
 
@@ -533,6 +535,33 @@ export function evaluateFormulaForRecord(
     if (objectDef?.apiName) {
       const prefixed = `${objectDef.apiName}__${bare}`;
       if (!(prefixed in context) || context[prefixed] == null) context[prefixed] = val as any;
+    }
+  }
+
+  // Formula fields are computed on the fly and never persisted in `record`,
+  // so a formula referencing ANOTHER formula field (e.g. EW_Expiration_Date__c
+  // referencing Project__unconditional_expiration_date, itself a Formula)
+  // would otherwise see `undefined` for that reference, silently producing
+  // NaN → CONCAT's `String(arg || '')` swallows NaN as '' → a blank result.
+  // Recursively resolve every other Formula-type field on the object first
+  // (memoized, with a cycle guard) and overlay their computed values.
+  if (objectDef?.fields) {
+    for (const fieldDef of objectDef.fields) {
+      if (fieldDef.type !== 'Formula' || !fieldDef.formulaExpr) continue;
+      let value: any;
+      if (_memo.has(fieldDef.apiName)) {
+        value = _memo.get(fieldDef.apiName);
+      } else if (_resolving.has(fieldDef.apiName)) {
+        continue; // circular reference — leave unresolved rather than infinite-loop
+      } else {
+        _resolving.add(fieldDef.apiName);
+        value = evaluateFormulaForRecord(fieldDef.formulaExpr, record, objectDef, _resolving, _memo);
+        _resolving.delete(fieldDef.apiName);
+        _memo.set(fieldDef.apiName, value);
+      }
+      context[fieldDef.apiName] = value as any;
+      const bare = fieldDef.apiName.replace(/^[A-Za-z]+__/, '');
+      if (bare !== fieldDef.apiName) context[bare] = value as any;
     }
   }
 
