@@ -197,33 +197,52 @@ export function useFormulaFields(
   // Evaluate all formula fields
   const values = useMemo(() => {
     if (!record || formulaFields.length === 0) return {};
+    const record_ = record; // narrowed non-null alias for use inside nested closures below
 
     const results: Record<string, any> = {};
+    const inProgress = new Set<string>();
 
-    for (const field of formulaFields) {
-      const formula = field.formulaExpr!;
-
-      // Build context with same-record fields (use bare apiName keys).
-      // Record data isn't consistent about which form a key is stored under —
-      // some fields are saved bare (e.g. "wood_delivery_date") while the
-      // field's real apiName (as referenced by formulas) is prefixed
-      // ("Project__wood_delivery_date"). Only stripping a prefix off
-      // already-prefixed keys never produces the prefixed alias for keys
-      // stored bare, so formulas referencing the prefixed name silently
-      // resolved to `undefined`. Add both directions.
+    // Build context with same-record fields (use bare apiName keys), plus
+    // every OTHER Formula field's computed value overlaid in. Formula
+    // fields are never persisted in `record`, so a formula referencing
+    // another formula field (e.g. EW_Expiration_Date__c referencing
+    // Project__unconditional_expiration_date, itself a Formula) would
+    // otherwise see `undefined` for that reference.
+    //
+    // Record data isn't consistent about which form a key is stored under —
+    // some fields are saved bare (e.g. "wood_delivery_date") while the
+    // field's real apiName (as referenced by formulas) is prefixed
+    // ("Project__wood_delivery_date"). Only stripping a prefix off
+    // already-prefixed keys never produces the prefixed alias for keys
+    // stored bare, so formulas referencing the prefixed name silently
+    // resolved to `undefined`. Add both directions.
+    const buildContext = (excludeApiName: string): ExpressionContext => {
       const context: ExpressionContext = {};
-      if (record) {
-        for (const [key, val] of Object.entries(record)) {
-          // Add both prefixed and bare keys to context
-          context[key] = val as any;
-          const bare = key.replace(/^[A-Za-z]+__/, '');
-          if (bare !== key) context[bare] = val as any;
-          if (objectDef?.apiName) {
-            const prefixed = `${objectDef.apiName}__${bare}`;
-            if (!(prefixed in context) || context[prefixed] == null) context[prefixed] = val as any;
-          }
+      for (const [key, val] of Object.entries(record_)) {
+        context[key] = val as any;
+        const bare = key.replace(/^[A-Za-z]+__/, '');
+        if (bare !== key) context[bare] = val as any;
+        if (objectDef?.apiName) {
+          const prefixed = `${objectDef.apiName}__${bare}`;
+          if (!(prefixed in context) || context[prefixed] == null) context[prefixed] = val as any;
         }
       }
+      for (const other of formulaFields) {
+        if (other.apiName === excludeApiName) continue;
+        const value = computeField(other);
+        context[other.apiName] = value as any;
+        const bare = other.apiName.replace(/^[A-Za-z]+__/, '');
+        if (bare !== other.apiName) context[bare] = value as any;
+      }
+      return context;
+    };
+
+    function computeField(field: FieldDef): any {
+      if (field.apiName in results) return results[field.apiName];
+      if (inProgress.has(field.apiName)) return undefined; // circular reference guard
+      inProgress.add(field.apiName);
+
+      const context = buildContext(field.apiName);
 
       // Add cross-object resolved values to context
       for (const ref of crossObjectRefs) {
@@ -239,23 +258,28 @@ export function useFormulaFields(
         const lookupObject = lookupFieldDef.lookupObject || (lookupFieldDef.type === 'LookupUser' ? 'User' : undefined);
         if (!lookupObject) continue;
 
-        let lookupValue = record[lookupFieldDef.apiName] ?? record[lookupFieldDef.apiName.replace(/^[A-Za-z]+__/, '')];
+        let lookupValue = record_[lookupFieldDef.apiName] ?? record_[lookupFieldDef.apiName.replace(/^[A-Za-z]+__/, '')];
         if (lookupFieldDef.type === 'PicklistLookup' && typeof lookupValue === 'object' && lookupValue !== null) {
           lookupValue = lookupValue.lookup;
         }
-        if (!lookupValue) continue;
-
-        const cacheKey = `${lookupObject}:${lookupValue}`;
-        const relatedRecord = resolvedRelated[cacheKey] || relatedRecordCache[cacheKey];
-        if (relatedRecord) {
-          const contextKey = `${ref.lookupField}.${ref.targetField}`;
-          context[contextKey] = getRelatedFieldValue(relatedRecord, ref.targetField);
+        if (lookupValue) {
+          const cacheKey = `${lookupObject}:${lookupValue}`;
+          const relatedRecord = resolvedRelated[cacheKey] || relatedRecordCache[cacheKey];
+          if (relatedRecord) {
+            const contextKey = `${ref.lookupField}.${ref.targetField}`;
+            context[contextKey] = getRelatedFieldValue(relatedRecord, ref.targetField);
+          }
         }
       }
 
-      // Evaluate
-      const result = evaluateFormula(formula, context);
+      const result = evaluateFormula(field.formulaExpr!, context);
+      inProgress.delete(field.apiName);
       results[field.apiName] = result;
+      return result;
+    }
+
+    for (const field of formulaFields) {
+      computeField(field);
     }
 
     void tick; // force recalc when related records finish loading
