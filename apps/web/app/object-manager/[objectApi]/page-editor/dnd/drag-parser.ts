@@ -84,6 +84,7 @@ export function parseActiveDrag(active: Active, layout: EditorState['layout']): 
     return {
       kind: 'existing-field',
       fieldApiName: data.fieldApiName,
+      fieldId: typeof data.fieldId === 'string' ? data.fieldId : undefined,
       fromPanelId: data.panelId,
       label: data.fieldApiName,
     };

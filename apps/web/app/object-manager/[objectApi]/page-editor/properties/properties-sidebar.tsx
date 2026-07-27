@@ -47,7 +47,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
             selectedElement.panelId === panel.id
           ) {
             const field = panel.fields.find(
-              (candidate) => candidate.fieldApiName === selectedElement.id,
+              (candidate) => (candidate.id ?? candidate.fieldApiName) === selectedElement.id,
             );
             if (field) {
               return { kind: 'field', tab, region, panel, field };

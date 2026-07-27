@@ -282,7 +282,7 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
               style={{ gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))` }}
             >
               <SortableContext
-                items={orderedFields.map((f, i) => `field-${f.fieldApiName}-${i}`)}
+                items={orderedFields.map((f, i) => f.id ?? `field-${f.fieldApiName}-${i}`)}
                 strategy={rectSortingStrategy}
               >
                 {orderedFields.length === 0 ? (
@@ -290,17 +290,16 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
                     Drop fields here
                   </div>
                 ) : (
-                  // Key/sortable-id include the field's index, not just fieldApiName —
-                  // two PanelFields CAN legitimately share the same fieldApiName (e.g.
+                  // Key/sortable-id use the field's own stable `id` (backfilled at
+                  // load time in layout-slice.ts), not fieldApiName — two
+                  // PanelFields CAN legitimately share the same fieldApiName (e.g.
                   // a bare + prefixed variant of the same logical field from a messy
                   // data import). Keying purely by fieldApiName caused React and
-                  // dnd-kit to silently collapse the second occurrence: it stayed
-                  // correctly saved in the layout JSON and rendered fine on the real
-                  // record page (which doesn't key by fieldApiName), but vanished
-                  // from the editor canvas.
+                  // dnd-kit to silently collapse the second occurrence, and also
+                  // made selecting/editing one ambiguously affect both.
                   orderedFields.map((field, index) => (
                     <CanvasFieldCard
-                      key={`${field.fieldApiName}-${index}`}
+                      key={field.id ?? `${field.fieldApiName}-${index}`}
                       field={field}
                       index={index}
                       panelId={panel.id}

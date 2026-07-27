@@ -471,7 +471,7 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
 
   const handleToggle = (hide: boolean) => {
     if (selection.kind === 'field') {
-      updateField(selection.field.fieldApiName, selection.panel.id, {
+      updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
         behavior: hide ? 'hidden' : 'none',
       });
     } else if (selection.kind === 'panel') {
@@ -543,7 +543,7 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
               hideOnExisting={source.hideOnExisting}
               onChange={(patch) => {
                 if (selection.kind === 'field') {
-                  updateField(selection.field.fieldApiName, selection.panel.id, patch);
+                  updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, patch);
                 } else if (selection.kind === 'panel') {
                   updatePanel(selection.panel.id, patch);
                 } else if (selection.kind === 'region') {

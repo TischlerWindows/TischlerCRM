@@ -103,8 +103,8 @@ export function CanvasFieldCard({ field, index, panelId, panelColumns }: CanvasF
     transition,
     isDragging,
   } = useSortable({
-    id: `field-${field.fieldApiName}-${index}`,
-    data: { type: 'field', panelId, fieldApiName: field.fieldApiName, index },
+    id: field.id ?? `field-${field.fieldApiName}-${index}`,
+    data: { type: 'field', panelId, fieldApiName: field.fieldApiName, fieldId: field.id, index },
   });
 
   useEffect(() => {
@@ -115,7 +115,7 @@ export function CanvasFieldCard({ field, index, panelId, panelColumns }: CanvasF
 
   const isSelected =
     selectedElement?.type === 'field' &&
-    selectedElement.id === field.fieldApiName &&
+    selectedElement.id === (field.id ?? field.fieldApiName) &&
     selectedElement.panelId === panelId;
 
   const currentSpan = clamp(dragSpan ?? field.colSpan, 1, panelColumns);
@@ -198,7 +198,7 @@ export function CanvasFieldCard({ field, index, panelId, panelColumns }: CanvasF
     if (!session || session.pointerId !== event.pointerId) return;
     const nextSpan = getSpanFromPointer(session.startSpan, session.startX, event.clientX);
     if (nextSpan !== session.startSpan) {
-      resizeField(field.fieldApiName, panelId, nextSpan);
+      resizeField(field.id ?? field.fieldApiName, panelId, nextSpan);
     }
     endResizeGesture(event.currentTarget);
   };
@@ -216,7 +216,7 @@ export function CanvasFieldCard({ field, index, panelId, panelColumns }: CanvasF
     const delta = event.key === 'ArrowRight' ? 1 : -1;
     const nextSpan = clamp(field.colSpan + delta, 1, panelColumns);
     if (nextSpan !== field.colSpan) {
-      resizeField(field.fieldApiName, panelId, nextSpan);
+      resizeField(field.id ?? field.fieldApiName, panelId, nextSpan);
     }
   };
 
@@ -234,7 +234,7 @@ export function CanvasFieldCard({ field, index, panelId, panelColumns }: CanvasF
         event.stopPropagation();
         setSelectedElement({
           type: 'field',
-          id: field.fieldApiName,
+          id: field.id ?? field.fieldApiName,
           panelId,
         });
       }}

@@ -189,8 +189,12 @@ export function dispatchDragEnd(
     const sourcePanel = findPanel(layout, active.fromPanelId);
     if (!sourcePanel) return;
     const sourceOrdered = sortedFields(sourcePanel.panel);
-    const sourceIndex = sourceOrdered.findIndex(
-      (field) => field.fieldApiName === active.fieldApiName,
+    // Match by the field's stable `id` when available — two PanelFields in
+    // the same panel can legitimately share a fieldApiName, and matching by
+    // that alone would always find the FIRST one regardless of which was
+    // actually being dragged.
+    const sourceIndex = sourceOrdered.findIndex((field) =>
+      active.fieldId ? field.id === active.fieldId : field.fieldApiName === active.fieldApiName,
     );
     if (sourceIndex < 0) return;
 
@@ -202,7 +206,7 @@ export function dispatchDragEnd(
       return;
     }
 
-    moveField(active.fieldApiName, active.fromPanelId, targetPanelId, insertionIndex);
+    moveField(active.fieldId ?? active.fieldApiName, active.fromPanelId, targetPanelId, insertionIndex);
     return;
   }
 

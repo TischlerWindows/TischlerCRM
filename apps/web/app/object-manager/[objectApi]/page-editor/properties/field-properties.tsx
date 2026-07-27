@@ -255,7 +255,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
               value={lookupConfig?.sourceLookupApiName ?? ''}
               aria-label="Source lookup field"
               onChange={(e) =>
-                updateField(selection.field.fieldApiName, selection.panel.id, {
+                updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
                   lookupFieldsConfig: {
                     sourceLookupApiName: e.target.value,
                     displayFields: [],
@@ -296,7 +296,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
                           const next = e.target.checked
                             ? [...curr, f.apiName]
                             : curr.filter((n) => n !== f.apiName);
-                          updateField(selection.field.fieldApiName, selection.panel.id, {
+                          updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
                             lookupFieldsConfig: {
                               ...lookupConfig,
                               sourceLookupApiName: lookupConfig?.sourceLookupApiName ?? '',
@@ -350,7 +350,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
           <TeamMemberSlotConfigPanel
             config={selection.field.slotConfig as unknown as Record<string, unknown>}
             onChange={(next) =>
-              updateField(selection.field.fieldApiName, selection.panel.id, {
+              updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
                 slotConfig: next as unknown as TeamMemberSlotConfig,
               })
             }
@@ -368,7 +368,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
 
         const updateDisplayFields = (patch: { Contact?: string[]; Account?: string[] }) => {
           const next = { ...currentDisplayFields, ...patch }
-          updateField(selection.field.fieldApiName, selection.panel.id, {
+          updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
             slotConfig: {
               ...(selection.field.slotConfig as TeamMemberSlotConfig),
               displayFields: next,
@@ -429,7 +429,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
           value={selection.field.behavior}
           aria-label="Field behavior"
           onChange={(e) =>
-            updateField(selection.field.fieldApiName, selection.panel.id, {
+            updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
               behavior: e.target.value as PanelField['behavior'],
             })
           }
@@ -445,7 +445,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
         label="Label color"
         value={selection.field.labelStyle.color}
         onChange={(value) =>
-          updateField(selection.field.fieldApiName, selection.panel.id, {
+          updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
             labelStyle: { ...selection.field.labelStyle, color: value },
           })
         }
@@ -458,7 +458,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
             value={selection.field.labelStyle.fontSize}
             defaultValue={12}
             onChange={(value) =>
-              updateField(selection.field.fieldApiName, selection.panel.id, {
+              updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
                 labelStyle: { ...selection.field.labelStyle, fontSize: value },
               })
             }
@@ -470,7 +470,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
             variant={selection.field.labelStyle.bold ? 'default' : 'outline'}
             aria-pressed={!!selection.field.labelStyle.bold}
             onClick={() =>
-              updateField(selection.field.fieldApiName, selection.panel.id, {
+              updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
                 labelStyle: {
                   ...selection.field.labelStyle,
                   bold: !selection.field.labelStyle.bold,
@@ -486,7 +486,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
             variant={selection.field.labelStyle.italic ? 'default' : 'outline'}
             aria-pressed={!!selection.field.labelStyle.italic}
             onClick={() =>
-              updateField(selection.field.fieldApiName, selection.panel.id, {
+              updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
                 labelStyle: {
                   ...selection.field.labelStyle,
                   italic: !selection.field.labelStyle.italic,
@@ -502,7 +502,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
             variant={selection.field.labelStyle.uppercase ? 'default' : 'outline'}
             aria-pressed={!!selection.field.labelStyle.uppercase}
             onClick={() =>
-              updateField(selection.field.fieldApiName, selection.panel.id, {
+              updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
                 labelStyle: {
                   ...selection.field.labelStyle,
                   uppercase: !selection.field.labelStyle.uppercase,
@@ -519,7 +519,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
         label="Value color"
         value={selection.field.valueStyle.color}
         onChange={(value) =>
-          updateField(selection.field.fieldApiName, selection.panel.id, {
+          updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
             valueStyle: { ...selection.field.valueStyle, color: value },
           })
         }
@@ -529,7 +529,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
         label="Value background"
         value={selection.field.valueStyle.background}
         onChange={(value) =>
-          updateField(selection.field.fieldApiName, selection.panel.id, {
+          updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
             valueStyle: { ...selection.field.valueStyle, background: value },
           })
         }
@@ -542,7 +542,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
             value={selection.field.valueStyle.fontSize}
             defaultValue={14}
             onChange={(value) =>
-              updateField(selection.field.fieldApiName, selection.panel.id, {
+              updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
                 valueStyle: { ...selection.field.valueStyle, fontSize: value },
               })
             }
@@ -554,7 +554,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
             variant={selection.field.valueStyle.bold ? 'default' : 'outline'}
             aria-pressed={!!selection.field.valueStyle.bold}
             onClick={() =>
-              updateField(selection.field.fieldApiName, selection.panel.id, {
+              updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
                 valueStyle: {
                   ...selection.field.valueStyle,
                   bold: !selection.field.valueStyle.bold,
@@ -570,7 +570,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
             variant={selection.field.valueStyle.italic ? 'default' : 'outline'}
             aria-pressed={!!selection.field.valueStyle.italic}
             onClick={() =>
-              updateField(selection.field.fieldApiName, selection.panel.id, {
+              updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
                 valueStyle: {
                   ...selection.field.valueStyle,
                   italic: !selection.field.valueStyle.italic,
@@ -588,7 +588,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
           type="button"
           variant="destructive"
           className="w-full"
-          onClick={() => removeField(selection.field.fieldApiName, selection.panel.id)}
+          onClick={() => removeField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id)}
         >
           Remove from Layout
         </Button>

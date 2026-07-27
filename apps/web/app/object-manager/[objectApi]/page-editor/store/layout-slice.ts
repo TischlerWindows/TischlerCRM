@@ -1,4 +1,5 @@
 import type { StateCreator } from 'zustand';
+import { generateId } from '@/lib/schema';
 import type {
   PageLayout,
   LayoutTab,
@@ -118,11 +119,11 @@ export interface LayoutSlice {
   movePanel: (panelId: string, regionId: string, toIndex: number) => void;
 
   // Field actions
-  updateField: (fieldApiName: string, panelId: string, patch: Partial<PanelField>) => void;
+  updateField: (fieldId: string, panelId: string, patch: Partial<PanelField>) => void;
   addField: (field: PanelField, panelId: string, atIndex?: number) => void;
-  removeField: (fieldApiName: string, panelId: string) => void;
-  moveField: (fieldApiName: string, fromPanelId: string, toPanelId: string, atIndex: number) => void;
-  resizeField: (fieldApiName: string, panelId: string, newColSpan: number) => void;
+  removeField: (fieldId: string, panelId: string) => void;
+  moveField: (fieldId: string, fromPanelId: string, toPanelId: string, atIndex: number) => void;
+  resizeField: (fieldId: string, panelId: string, newColSpan: number) => void;
 
   // Widget actions
   updateWidget: (widgetId: string, patch: Partial<LayoutWidget>) => void;
@@ -386,7 +387,7 @@ export const createLayoutSlice: StateCreator<
 
   // ── Field actions ──────────────────────────────────────────────────────────
 
-  updateField: (fieldApiName, panelId, patch) => {
+  updateField: (fieldId, panelId, patch) => {
     get().pushUndo();
     set((s) => ({
       layout: {
@@ -400,7 +401,7 @@ export const createLayoutSlice: StateCreator<
                 ? {
                     ...panel,
                     fields: panel.fields.map((f) =>
-                      f.fieldApiName === fieldApiName ? { ...f, ...patch } : f,
+                      f.id === fieldId ? { ...f, ...patch } : f,
                     ),
                   }
                 : panel,
@@ -413,6 +414,7 @@ export const createLayoutSlice: StateCreator<
 
   addField: (field, panelId, atIndex) => {
     get().pushUndo();
+    const fieldWithId: PanelField = field.id ? field : { ...field, id: generateId() };
     set((s) => ({
       layout: {
         ...s.layout,
@@ -425,9 +427,9 @@ export const createLayoutSlice: StateCreator<
               const fields = [...panel.fields];
               if (atIndex !== undefined) {
                 const insertionIndex = Math.max(0, Math.min(atIndex, fields.length));
-                fields.splice(insertionIndex, 0, field);
+                fields.splice(insertionIndex, 0, fieldWithId);
               } else {
-                fields.push(field);
+                fields.push(fieldWithId);
               }
               return { ...panel, fields: reindexOrder(fields) };
             }),
@@ -437,7 +439,7 @@ export const createLayoutSlice: StateCreator<
     }));
   },
 
-  removeField: (fieldApiName, panelId) => {
+  removeField: (fieldId, panelId) => {
     get().pushUndo();
     set((s) => ({
       layout: {
@@ -451,7 +453,7 @@ export const createLayoutSlice: StateCreator<
                 ? {
                     ...panel,
                     fields: reindexOrder(
-                      panel.fields.filter((f) => f.fieldApiName !== fieldApiName),
+                      panel.fields.filter((f) => f.id !== fieldId),
                     ),
                   }
                 : panel,
@@ -462,12 +464,12 @@ export const createLayoutSlice: StateCreator<
     }));
   },
 
-  moveField: (fieldApiName, fromPanelId, toPanelId, atIndex) => {
+  moveField: (fieldId, fromPanelId, toPanelId, atIndex) => {
     get().pushUndo();
     set((s) => {
       const entry = findPanelEntry(s.layout, fromPanelId);
       if (!entry) return s;
-      const fieldToMove = entry.panel.fields.find((f) => f.fieldApiName === fieldApiName);
+      const fieldToMove = entry.panel.fields.find((f) => f.id === fieldId);
       if (!fieldToMove) return s;
 
       const captured = fieldToMove;
@@ -484,7 +486,7 @@ export const createLayoutSlice: StateCreator<
               return {
                 ...panel,
                 fields: reindexOrder(
-                  panel.fields.filter((f) => f.fieldApiName !== fieldApiName),
+                  panel.fields.filter((f) => f.id !== fieldId),
                 ),
               };
             }
@@ -495,7 +497,7 @@ export const createLayoutSlice: StateCreator<
               return { ...panel, fields: reindexOrder(fields) };
             }
             if (isSrc && isDst) {
-              const fields = panel.fields.filter((f) => f.fieldApiName !== fieldApiName);
+              const fields = panel.fields.filter((f) => f.id !== fieldId);
               const insertionIndex = Math.max(0, Math.min(atIndex, fields.length));
               fields.splice(insertionIndex, 0, captured);
               return { ...panel, fields: reindexOrder(fields) };
@@ -509,7 +511,7 @@ export const createLayoutSlice: StateCreator<
     });
   },
 
-  resizeField: (fieldApiName, panelId, newColSpan) => {
+  resizeField: (fieldId, panelId, newColSpan) => {
     get().pushUndo();
     set((s) => ({
       layout: {
@@ -523,7 +525,7 @@ export const createLayoutSlice: StateCreator<
                 ? {
                     ...panel,
                     fields: panel.fields.map((f) =>
-                      f.fieldApiName === fieldApiName ? { ...f, colSpan: newColSpan } : f,
+                      f.id === fieldId ? { ...f, colSpan: newColSpan } : f,
                     ),
                   }
                 : panel,
@@ -758,6 +760,20 @@ export const createLayoutSlice: StateCreator<
     const sanitized = {
       ...layout,
       formattingRules: layout.formattingRules ?? [],
+      // Backfill a stable `id` on any PanelField that predates this concept
+      // (all pre-existing saved layouts). Without it, two entries sharing a
+      // fieldApiName in the same panel are indistinguishable — selecting,
+      // editing, or removing one would ambiguously affect both.
+      tabs: layout.tabs.map((tab) => ({
+        ...tab,
+        regions: tab.regions.map((region) => ({
+          ...region,
+          panels: region.panels.map((panel) => ({
+            ...panel,
+            fields: panel.fields.map((f) => (f.id ? f : { ...f, id: generateId() })),
+          })),
+        })),
+      })),
     };
 
     set({

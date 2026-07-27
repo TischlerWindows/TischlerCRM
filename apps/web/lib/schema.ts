@@ -546,6 +546,17 @@ export interface LookupFieldsConfig {
 
 export interface PanelField {
   /**
+   * Stable unique identity for THIS placement, distinct from fieldApiName.
+   * Two PanelField entries in the same panel CAN legitimately share a
+   * fieldApiName (e.g. leftover duplicate data from a messy import, or a
+   * field placed twice on purpose) — without this, selecting/editing/
+   * removing/reordering one of them would ambiguously affect both, since
+   * fieldApiName was previously the only identity available. Backfilled at
+   * load time for older layouts saved before this existed (see
+   * layout-slice.ts's loadLayout).
+   */
+  id?: string;
+  /**
    * Discriminator. Defaults to 'field' when absent (back-compat).
    * - 'field' — fieldApiName references a real FieldDef on the parent object.
    * - 'teamMemberSlot' — fieldApiName is synthetic (e.g. '__tm:flag:quoteRecipient'
