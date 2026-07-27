@@ -282,7 +282,7 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
               style={{ gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))` }}
             >
               <SortableContext
-                items={orderedFields.map((f) => `field-${f.fieldApiName}`)}
+                items={orderedFields.map((f, i) => `field-${f.fieldApiName}-${i}`)}
                 strategy={rectSortingStrategy}
               >
                 {orderedFields.length === 0 ? (
@@ -290,10 +290,19 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
                     Drop fields here
                   </div>
                 ) : (
-                  orderedFields.map((field) => (
+                  // Key/sortable-id include the field's index, not just fieldApiName —
+                  // two PanelFields CAN legitimately share the same fieldApiName (e.g.
+                  // a bare + prefixed variant of the same logical field from a messy
+                  // data import). Keying purely by fieldApiName caused React and
+                  // dnd-kit to silently collapse the second occurrence: it stayed
+                  // correctly saved in the layout JSON and rendered fine on the real
+                  // record page (which doesn't key by fieldApiName), but vanished
+                  // from the editor canvas.
+                  orderedFields.map((field, index) => (
                     <CanvasFieldCard
-                      key={field.fieldApiName}
+                      key={`${field.fieldApiName}-${index}`}
                       field={field}
+                      index={index}
                       panelId={panel.id}
                       panelColumns={panel.columns}
                     />

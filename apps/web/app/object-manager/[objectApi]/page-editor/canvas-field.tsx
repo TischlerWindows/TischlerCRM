@@ -13,6 +13,8 @@ import { getFieldTypeLabel } from '@/lib/schema';
 
 interface CanvasFieldCardProps {
   field: PanelField;
+  /** Index of this field within its panel's fields array — see note in canvas-panel.tsx on why this is needed to disambiguate duplicate fieldApiName entries. */
+  index: number;
   panelId: string;
   panelColumns: number;
 }
@@ -38,7 +40,7 @@ function toBehaviorLabel(behavior: PanelField['behavior']): string {
 
 const EMPTY_RULES: never[] = [];
 
-export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCardProps) {
+export function CanvasFieldCard({ field, index, panelId, panelColumns }: CanvasFieldCardProps) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const resizeField = useEditorStore((s) => s.resizeField);
@@ -101,8 +103,8 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
     transition,
     isDragging,
   } = useSortable({
-    id: `field-${field.fieldApiName}`,
-    data: { type: 'field', panelId, fieldApiName: field.fieldApiName },
+    id: `field-${field.fieldApiName}-${index}`,
+    data: { type: 'field', panelId, fieldApiName: field.fieldApiName, index },
   });
 
   useEffect(() => {
