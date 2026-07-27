@@ -8,6 +8,8 @@ import type {
   PanelField,
   LayoutWidget,
   FormattingRule,
+  LabelStyle,
+  ValueStyle,
 } from '../types';
 import type { HistorySlice } from './history-slice';
 import type { SelectionSlice } from './selection-slice';
@@ -124,6 +126,16 @@ export interface LayoutSlice {
   removeField: (fieldId: string, panelId: string) => void;
   moveField: (fieldId: string, fromPanelId: string, toPanelId: string, atIndex: number) => void;
   resizeField: (fieldId: string, panelId: string, newColSpan: number) => void;
+  /**
+   * Bulk-apply a label/value style patch to EVERY field across every panel
+   * within a region ("section"), in a single undo step. Used by the section
+   * properties panel's "apply to all fields" formatting controls, as an
+   * alternative to editing each field's style individually.
+   */
+  applyStyleToRegionFields: (
+    regionId: string,
+    patch: { labelStyle?: Partial<LabelStyle>; valueStyle?: Partial<ValueStyle> },
+  ) => void;
 
   // Widget actions
   updateWidget: (widgetId: string, patch: Partial<LayoutWidget>) => void;
@@ -531,6 +543,32 @@ export const createLayoutSlice: StateCreator<
                 : panel,
             ),
           })),
+        })),
+      },
+    }));
+  },
+
+  applyStyleToRegionFields: (regionId, patch) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => {
+            if (region.id !== regionId) return region;
+            return {
+              ...region,
+              panels: region.panels.map((panel) => ({
+                ...panel,
+                fields: panel.fields.map((f) => ({
+                  ...f,
+                  labelStyle: patch.labelStyle ? { ...f.labelStyle, ...patch.labelStyle } : f.labelStyle,
+                  valueStyle: patch.valueStyle ? { ...f.valueStyle, ...patch.valueStyle } : f.valueStyle,
+                })),
+              })),
+            };
+          }),
         })),
       },
     }));
