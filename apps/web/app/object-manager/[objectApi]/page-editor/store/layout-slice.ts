@@ -742,35 +742,22 @@ export const createLayoutSlice: StateCreator<
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   loadLayout: (layout) => {
-    // De-dupe only WITHIN each individual panel (a field accidentally dropped
-    // twice into the same panel) — NOT across the whole layout. The `seen`
-    // set previously lived outside the tabs/panels loop, so a field already
-    // placed on one tab (e.g. "Details") would silently get stripped from
-    // every other tab's panel that also referenced it (e.g. "Warranty &
-    // Spec") on every load — including the reload right after a successful
-    // save — even though the save itself persisted both placements correctly.
-    // Reusing the same field across different tabs/panels is intentional and
-    // must be preserved.
+    // NOTE: this used to silently de-dupe panel.fields by fieldApiName
+    // (guarding against an accidental double-drop). That's WRONG for the
+    // general case — two PanelField entries in the same panel CAN
+    // legitimately share a fieldApiName (e.g. a field placed twice on
+    // purpose, or two objects' fields that happen to collide after a messy
+    // data import), and this data is real, already-saved layout content.
+    // Silently stripping it here was actively harmful: `savedBaseline` below
+    // is derived from the (deduped) result, so simply opening the editor and
+    // saving ANY unrelated change would permanently delete the "duplicate"
+    // entry from the database with no warning or user choice. If a real
+    // accidental-double-drop bug needs guarding again, do it at
+    // add-time (drop-handler.ts / addField), not by mutating already-saved
+    // layout data on every load.
     const sanitized = {
       ...layout,
       formattingRules: layout.formattingRules ?? [],
-      tabs: layout.tabs.map((tab) => ({
-        ...tab,
-        regions: tab.regions.map((region) => ({
-          ...region,
-          panels: region.panels.map((panel) => {
-            const seen = new Set<string>();
-            return {
-              ...panel,
-              fields: panel.fields.filter((f) => {
-                if (seen.has(f.fieldApiName)) return false;
-                seen.add(f.fieldApiName);
-                return true;
-              }),
-            };
-          }),
-        })),
-      })),
     };
 
     set({
