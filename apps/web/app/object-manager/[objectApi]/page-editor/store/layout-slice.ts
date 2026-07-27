@@ -127,13 +127,13 @@ export interface LayoutSlice {
   moveField: (fieldId: string, fromPanelId: string, toPanelId: string, atIndex: number) => void;
   resizeField: (fieldId: string, panelId: string, newColSpan: number) => void;
   /**
-   * Bulk-apply a label/value style patch to EVERY field across every panel
-   * within a region ("section"), in a single undo step. Used by the section
-   * properties panel's "apply to all fields" formatting controls, as an
-   * alternative to editing each field's style individually.
+   * Bulk-apply a label/value style patch to EVERY field within a single
+   * panel, in a single undo step. Used by the panel properties panel's
+   * "apply to all fields" formatting controls, as an alternative to editing
+   * each field's style individually.
    */
-  applyStyleToRegionFields: (
-    regionId: string,
+  applyStyleToPanelFields: (
+    panelId: string,
     patch: { labelStyle?: Partial<LabelStyle>; valueStyle?: Partial<ValueStyle> },
   ) => void;
 
@@ -548,27 +548,27 @@ export const createLayoutSlice: StateCreator<
     }));
   },
 
-  applyStyleToRegionFields: (regionId, patch) => {
+  applyStyleToPanelFields: (panelId, patch) => {
     get().pushUndo();
     set((s) => ({
       layout: {
         ...s.layout,
         tabs: s.layout.tabs.map((tab) => ({
           ...tab,
-          regions: tab.regions.map((region) => {
-            if (region.id !== regionId) return region;
-            return {
-              ...region,
-              panels: region.panels.map((panel) => ({
+          regions: tab.regions.map((region) => ({
+            ...region,
+            panels: region.panels.map((panel) => {
+              if (panel.id !== panelId) return panel;
+              return {
                 ...panel,
                 fields: panel.fields.map((f) => ({
                   ...f,
                   labelStyle: patch.labelStyle ? { ...f.labelStyle, ...patch.labelStyle } : f.labelStyle,
                   valueStyle: patch.valueStyle ? { ...f.valueStyle, ...patch.valueStyle } : f.valueStyle,
                 })),
-              })),
-            };
-          }),
+              };
+            }),
+          })),
         })),
       },
     }));

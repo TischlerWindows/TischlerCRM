@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { LayoutTab, LayoutSection } from '../types';
 import { useEditorStore } from '../editor-store';
-import { ColorControl, FontSizeCombobox, REGION_WIDTH_OPTIONS, clamp, createId, withCopyLabel } from './shared';
+import { ColorControl, REGION_WIDTH_OPTIONS, clamp, createId, withCopyLabel } from './shared';
 
 interface RegionPropertiesProps {
   selection: {
@@ -21,19 +21,6 @@ export function RegionProperties({ selection }: RegionPropertiesProps) {
   const removeSection = useEditorStore((s) => s.removeSection);
   const resizeSection = useEditorStore((s) => s.resizeSection);
   const addSection = useEditorStore((s) => s.addSection);
-  const applyStyleToRegionFields = useEditorStore((s) => s.applyStyleToRegionFields);
-
-  const allFields = selection.region.panels.flatMap((p) => p.fields);
-  const commonValue = <T,>(getter: (f: (typeof allFields)[number]) => T | undefined): T | undefined => {
-    if (allFields.length === 0) return undefined;
-    const first = getter(allFields[0]!);
-    return allFields.every((f) => getter(f) === first) ? first : undefined;
-  };
-  const allLabelBold = allFields.length > 0 && allFields.every((f) => !!f.labelStyle.bold);
-  const allLabelItalic = allFields.length > 0 && allFields.every((f) => !!f.labelStyle.italic);
-  const allLabelUppercase = allFields.length > 0 && allFields.every((f) => !!f.labelStyle.uppercase);
-  const allValueBold = allFields.length > 0 && allFields.every((f) => !!f.valueStyle.bold);
-  const allValueItalic = allFields.length > 0 && allFields.every((f) => !!f.valueStyle.italic);
 
   const duplicateSection = () => {
     const source = selection.region;
@@ -172,101 +159,6 @@ export function RegionProperties({ selection }: RegionPropertiesProps) {
           <option value="sm">sm</option>
           <option value="lg">lg</option>
         </select>
-      </div>
-
-      <div className="space-y-2 border-t border-gray-200 pt-3">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-          Bulk Field Formatting
-        </div>
-        <p className="text-[11px] text-gray-400">
-          Applies to every field in this section's panels ({allFields.length} field
-          {allFields.length === 1 ? '' : 's'}) — an alternative to formatting each field individually.
-        </p>
-
-        <div className="space-y-1.5">
-          <Label className="text-xs text-gray-600">Label text</Label>
-          <div className="flex items-center gap-1">
-            <FontSizeCombobox
-              value={commonValue((f) => f.labelStyle.fontSize)}
-              defaultValue={12}
-              onChange={(value) =>
-                applyStyleToRegionFields(selection.region.id, { labelStyle: { fontSize: value } })
-              }
-            />
-            <div className="w-px h-5.5 bg-gray-200 mx-0.5" />
-            <Button
-              type="button"
-              size="sm"
-              variant={allLabelBold ? 'default' : 'outline'}
-              aria-pressed={allLabelBold}
-              onClick={() =>
-                applyStyleToRegionFields(selection.region.id, { labelStyle: { bold: !allLabelBold } })
-              }
-            >
-              Bold
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={allLabelItalic ? 'default' : 'outline'}
-              aria-pressed={allLabelItalic}
-              onClick={() =>
-                applyStyleToRegionFields(selection.region.id, { labelStyle: { italic: !allLabelItalic } })
-              }
-            >
-              Italic
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={allLabelUppercase ? 'default' : 'outline'}
-              aria-pressed={allLabelUppercase}
-              onClick={() =>
-                applyStyleToRegionFields(selection.region.id, {
-                  labelStyle: { uppercase: !allLabelUppercase },
-                })
-              }
-            >
-              Uppercase
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label className="text-xs text-gray-600">Value text</Label>
-          <div className="flex items-center gap-1">
-            <FontSizeCombobox
-              value={commonValue((f) => f.valueStyle.fontSize)}
-              defaultValue={14}
-              onChange={(value) =>
-                applyStyleToRegionFields(selection.region.id, { valueStyle: { fontSize: value } })
-              }
-            />
-            <div className="w-px h-5.5 bg-gray-200 mx-0.5" />
-            <Button
-              type="button"
-              size="sm"
-              variant={allValueBold ? 'default' : 'outline'}
-              aria-pressed={allValueBold}
-              onClick={() =>
-                applyStyleToRegionFields(selection.region.id, { valueStyle: { bold: !allValueBold } })
-              }
-            >
-              Bold
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={allValueItalic ? 'default' : 'outline'}
-              aria-pressed={allValueItalic}
-              onClick={() =>
-                applyStyleToRegionFields(selection.region.id, { valueStyle: { italic: !allValueItalic } })
-              }
-            >
-              Italic
-            </Button>
-          </div>
-        </div>
       </div>
 
       <div className="flex gap-2 border-t border-gray-200 pt-3">
