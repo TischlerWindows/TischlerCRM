@@ -213,6 +213,14 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
           <span className="rounded-full bg-brand-navy/10 px-2 py-0.5 text-xs font-semibold text-brand-navy">
             {isComponentPanel ? 'Components' : `${panel.columns} cols`}
           </span>
+          {!isComponentPanel && (
+            <span
+              className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700"
+              title={orderedFields.map((f) => f.fieldApiName).join(', ')}
+            >
+              DEBUG: {panel.fields.length} fields
+            </span>
+          )}
           {hasVisibilityRule && (
             <span className="flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-600" title="Has visibility rule">
               <Eye className="h-3 w-3" /> Conditional
