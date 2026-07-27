@@ -19,7 +19,19 @@ export interface SetLayoutActiveResult {
 export interface SchemaStore {
   // Current schema state
   schema: OrgSchema | null;
-  
+
+  /**
+   * Whether `schema` currently reflects the synchronous localStorage cache
+   * seed ('cache') or a real network response ('network'). Consumers that
+   * need to react to "the first real fetch just landed" (e.g. the page
+   * editor re-loading its working copy) can't rely on comparing an
+   * object's `updatedAt` alone — if the cache happens to already carry the
+   * same-looking timestamp, that comparison silently no-ops and the editor
+   * gets stuck on stale cached data indefinitely (a hard refresh doesn't
+   * clear localStorage). Watch this flag flip to 'network' instead.
+   */
+  schemaSource: 'cache' | 'network' | null;
+
   // UI state
   loading: boolean;
   saving: boolean;
@@ -148,6 +160,7 @@ export const useSchemaStore = create<SchemaStore>()(
     (set, get) => ({
       // Initial state — use cached schema so labels are correct on first paint
       schema: getCachedSchema(),
+      schemaSource: getCachedSchema() ? 'cache' : null,
       loading: false,
       saving: false,
       error: null,
@@ -160,7 +173,7 @@ export const useSchemaStore = create<SchemaStore>()(
         set({ loading: true, error: null });
         try {
           const schema = await schemaService.loadSchema();
-          set({ schema, loading: false });
+          set({ schema, schemaSource: 'network', loading: false });
         } catch (error) {
           set({ 
             error: error instanceof Error ? error.message : 'Failed to load schema',

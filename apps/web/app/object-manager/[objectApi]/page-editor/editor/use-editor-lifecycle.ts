@@ -151,7 +151,7 @@ export function useEditorLifecycle(): EditorLifecycle {
 
   const returnTo = searchParams.get('returnTo');
 
-  const { schema, updateObject } = useSchemaStore();
+  const { schema, schemaSource, updateObject } = useSchemaStore();
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
 
   /* Editor store selectors */
@@ -179,11 +179,24 @@ export function useEditorLifecycle(): EditorLifecycle {
   const didLoadLayoutRef = useRef<string | null>(null);
   /** Captures `object.updatedAt` at load time for concurrent-edit detection. */
   const loadedUpdatedAtRef = useRef<string | null>(null);
+  /**
+   * Tracks whether we've already force-re-synced once real network schema
+   * data landed for this route. A cache-seeded schema (see schema-store.ts's
+   * getCachedSchema) can carry an `updatedAt` that happens to equal the
+   * freshly-fetched one even though the underlying data differs (e.g. after
+   * an edit made in another tab/session), which silently defeats the
+   * updatedAt-equality check below and leaves the editor stuck showing
+   * stale, localStorage-cached layout data indefinitely — a hard refresh
+   * doesn't clear localStorage. Forcing exactly one reload per route once
+   * `schemaSource` flips to 'network' closes that gap.
+   */
+  const forcedNetworkReloadRef = useRef<string | null>(null);
 
   /* ---- Load layout from schema store ---- */
   useEffect(() => {
     didLoadLayoutRef.current = null;
     loadedUpdatedAtRef.current = null;
+    forcedNetworkReloadRef.current = null;
     setShowTemplateGallery(layoutId === 'new');
   }, [layoutId, routeKey]);
 
@@ -198,9 +211,14 @@ export function useEditorLifecycle(): EditorLifecycle {
     // indefinitely. Re-load whenever the object's updatedAt actually changes,
     // as long as the user hasn't started editing yet (isDirty).
     const objectUpdatedAt = object.updatedAt ?? null;
-    if (didLoadLayoutRef.current === routeKey) {
+    const alreadyLoadedThisRoute = didLoadLayoutRef.current === routeKey;
+    const hasUnconsumedNetworkData = schemaSource === 'network' && forcedNetworkReloadRef.current !== routeKey;
+    if (alreadyLoadedThisRoute) {
       if (isDirty) return;
-      if (loadedUpdatedAtRef.current === objectUpdatedAt) return;
+      if (loadedUpdatedAtRef.current === objectUpdatedAt && !hasUnconsumedNetworkData) return;
+    }
+    if (hasUnconsumedNetworkData) {
+      forcedNetworkReloadRef.current = routeKey;
     }
     didLoadLayoutRef.current = routeKey;
 
@@ -223,7 +241,7 @@ export function useEditorLifecycle(): EditorLifecycle {
     }
 
     loadLayout(createBlankLayout(objectApiName));
-  }, [isDirty, layoutId, loadLayout, object, objectApiName, routeKey]);
+  }, [isDirty, layoutId, loadLayout, object, objectApiName, routeKey, schemaSource]);
 
   /* ---- Beforeunload guard ---- */
   useEffect(() => {
