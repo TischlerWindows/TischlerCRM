@@ -332,6 +332,7 @@ export async function outlookRoutes(app: FastifyInstance) {
     if (!sender?.email) {
       return reply.code(400).send({ error: 'No email found for your account.' });
     }
+    const testRecipient = 'michaela@tischlerwindows.com';
 
     const method = await getAuthMethod();
     let senderLabel: string | undefined;
@@ -362,12 +363,12 @@ export async function outlookRoutes(app: FastifyInstance) {
 
     try {
       const sent = await sendOutlookEmail(
-        sender.email,
+        testRecipient,
         'TischlerCRM - Outlook Connection Test',
         `<p>Hello ${sender.name || sender.email},</p><p>This is a test email confirming your ${method === 'smtp' ? 'SMTP' : method === 'zapier' ? 'Zapier' : 'Outlook'} integration with TischlerCRM is working correctly.</p><p>Emails are sent from <strong>${senderLabel || 'the configured sender'}</strong>.</p>`,
       );
       if (!sent) throw new Error('Send failed — check server logs for details.');
-      reply.send({ sent: true, message: `Test email sent to ${sender.email}${senderLabel ? ` from ${senderLabel}` : ''}` });
+      reply.send({ sent: true, message: `Test email sent to ${testRecipient}${senderLabel ? ` from ${senderLabel}` : ''}` });
     } catch (err: any) {
       req.log.error(err, 'POST /outlook/test-email failed');
       reply.code(500).send({ error: `Failed to send test email: ${err.message}` });
