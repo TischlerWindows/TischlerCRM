@@ -256,16 +256,6 @@ function TeamMemberSlotField({
     // Rows that were cleared (present in initial, absent from staged)
     const stagedRealIds = new Set(stagedRows.filter(r => !r.isPending).map(r => r.id))
     const clearedRows = initialRows.filter(r => !stagedRealIds.has(r.id))
-    // TEMP DIAGNOSTIC — remove once the "connections not saving" bug is
-    // confirmed fixed. Surfaces exactly what applyChanges() sees so we can
-    // tell whether it's even being called with the right data instead of
-    // guessing further.
-    showToast(
-      `[DEBUG] applyChanges: initial=${initialRows.length} staged=${stagedRows.length} ` +
-      `cleared=${clearedRows.length} pending=${stagedRows.filter(r => r.isPending).length} ` +
-      `parentRecordId=${parentRecordId ?? 'null'} parentField=${parentField ?? 'MISSING'}`,
-      'success',
-    )
     for (const row of clearedRows) {
       try {
         if (cur.kind === 'flag') {
@@ -283,10 +273,8 @@ function TeamMemberSlotField({
       try {
         await apiClient.post('/objects/TeamMember/records', { data: payload })
       } catch (e) {
-        // TEMP DIAGNOSTIC — surface any create failure instead of letting
-        // it disappear silently.
         showToast(
-          `[DEBUG] TeamMember POST failed: ${e instanceof Error ? e.message : String(e)}`,
+          `Failed to save connection: ${e instanceof Error ? e.message : String(e)}`,
           'error',
         )
         throw e
