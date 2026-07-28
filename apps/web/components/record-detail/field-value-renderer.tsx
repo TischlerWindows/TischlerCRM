@@ -185,6 +185,18 @@ export function renderValue(
     return addressText;
   }
 
+  // URL fields with a static link (fieldDef.staticUrl) render the same
+  // fixed hyperlink for every record and have no per-record value to
+  // speak of — must be handled BEFORE the generic empty-value guard
+  // below, or a record with no value ever entered would show '-' forever.
+  if (fieldType === 'URL' && fieldDef?.staticUrl) {
+    return (
+      <a href={fieldDef.staticUrl} target="_blank" rel="noopener noreferrer" className="text-brand-navy hover:underline underline-offset-2">
+        {fieldDef.staticUrl}
+      </a>
+    );
+  }
+
   if (value === null || value === undefined || value === '') return '-';
 
   // Lookup → clickable link showing resolved label (not raw UUID)

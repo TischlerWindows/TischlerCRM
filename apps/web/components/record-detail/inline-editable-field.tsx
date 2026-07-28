@@ -40,6 +40,10 @@ export function isInlineEditableField(fieldDef: FieldDef | undefined, readOnly?:
   if (!fieldDef) return false;
   if (readOnly) return false;
   if ((fieldDef as any).readOnly) return false;
+  // A URL field with a static link shows the same fixed hyperlink for
+  // every record (configured once in Object Manager) — there's no
+  // per-record value to edit.
+  if (fieldDef.type === 'URL' && fieldDef.staticUrl) return false;
   return INLINE_EDITABLE_TYPES.has(fieldDef.type);
 }
 
