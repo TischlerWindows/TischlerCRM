@@ -105,10 +105,38 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
 }
 
 /** Which mode is currently configured for the 'outlook' provider. */
-async function getAuthMethod(): Promise<'smtp' | 'oauth'> {
+async function getAuthMethod(): Promise<'smtp' | 'oauth' | 'zapier'> {
   const integration = await prisma.integration.findUnique({ where: { provider: 'outlook' } });
   const cfg = (integration?.config as Record<string, any>) || {};
-  return cfg.authMethod === 'smtp' ? 'smtp' : 'oauth';
+  if (cfg.authMethod === 'smtp') return 'smtp';
+  if (cfg.authMethod === 'zapier') return 'zapier';
+  return 'oauth';
+}
+
+/** Read the Zapier webhook URL from the Integration table's dedicated column. */
+async function getZapierWebhookUrl(): Promise<string | null> {
+  const integration = await prisma.integration.findUnique({ where: { provider: 'outlook' } });
+  if (!integration || !integration.enabled || !integration.webhookUrl) return null;
+  return integration.webhookUrl;
+}
+
+/**
+ * Sends via a Zapier "Catch Hook" webhook. Zapier's Zap then sends the actual
+ * email using a real (delegated) Microsoft account sign-in on the other end
+ * (e.g. Outlook's "Send Email" action) - this sidesteps SMTP AUTH entirely,
+ * which is why it works for personal outlook.com mailboxes that have
+ * SmtpClientAuthentication disabled and can't do app-only Graph mail.
+ */
+async function sendViaZapierWebhook(webhookUrl: string, to: string, subject: string, body: string): Promise<void> {
+  const res = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to, subject, body }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Zapier webhook returned ${res.status}: ${errText}`);
+  }
 }
 
 async function sendViaSmtp(config: SmtpConfig, to: string, subject: string, body: string): Promise<void> {
@@ -135,6 +163,17 @@ async function sendViaSmtp(config: SmtpConfig, to: string, subject: string, body
  */
 export async function sendOutlookEmail(to: string, subject: string, body: string): Promise<boolean> {
   const method = await getAuthMethod();
+  if (method === 'zapier') {
+    const webhookUrl = await getZapierWebhookUrl();
+    if (!webhookUrl) return false;
+    try {
+      await sendViaZapierWebhook(webhookUrl, to, subject, body);
+      return true;
+    } catch (err: any) {
+      console.error('[outlook] Zapier webhook send failed:', err.message);
+      return false;
+    }
+  }
   if (method === 'smtp') {
     const config = await getSmtpConfig();
     if (!config) return false;
@@ -225,13 +264,21 @@ export async function outlookRoutes(app: FastifyInstance) {
       }
 
       const cfg = (integration.config as Record<string, any>) || {};
-      const authMethod: 'smtp' | 'oauth' = cfg.authMethod === 'smtp' ? 'smtp' : 'oauth';
+      const authMethod: 'smtp' | 'oauth' | 'zapier' =
+        cfg.authMethod === 'smtp' ? 'smtp' : cfg.authMethod === 'zapier' ? 'zapier' : 'oauth';
 
       let configured: boolean;
       let connected = false;
       let senderEmail: string | null = null;
 
-      if (authMethod === 'smtp') {
+      if (authMethod === 'zapier') {
+        configured = !!integration.webhookUrl;
+        senderEmail = (cfg.senderEmail as string) ?? null;
+        // We can't "verify" a Zapier webhook without actually triggering a send
+        // (Catch Hook has no ping/health-check endpoint), so treat configured
+        // as connected — use the Send Test Email button to confirm it actually works.
+        connected = configured;
+      } else if (authMethod === 'smtp') {
         const smtp = await getSmtpConfig();
         configured = !!smtp;
         senderEmail = smtp?.senderEmail ?? null;
@@ -287,10 +334,24 @@ export async function outlookRoutes(app: FastifyInstance) {
     }
 
     const method = await getAuthMethod();
-    const senderLabel =
-      method === 'smtp' ? (await getSmtpConfig())?.senderEmail : (await getOutlookConfig())?.senderEmail;
+    let senderLabel: string | undefined;
+    if (method === 'zapier') {
+      const integration = await prisma.integration.findUnique({ where: { provider: 'outlook' } });
+      senderLabel = ((integration?.config as Record<string, any>) || {}).senderEmail;
+    } else if (method === 'smtp') {
+      senderLabel = (await getSmtpConfig())?.senderEmail;
+    } else {
+      senderLabel = (await getOutlookConfig())?.senderEmail;
+    }
 
-    if (!senderLabel) {
+    if (method === 'zapier') {
+      const webhookUrl = await getZapierWebhookUrl();
+      if (!webhookUrl) {
+        return reply.code(400).send({
+          error: 'Zapier is not configured. Please set the Webhook URL in Settings → Integrations.',
+        });
+      }
+    } else if (!senderLabel) {
       return reply.code(400).send({
         error:
           method === 'smtp'
@@ -303,10 +364,10 @@ export async function outlookRoutes(app: FastifyInstance) {
       const sent = await sendOutlookEmail(
         sender.email,
         'TischlerCRM - Outlook Connection Test',
-        `<p>Hello ${sender.name || sender.email},</p><p>This is a test email confirming your ${method === 'smtp' ? 'SMTP' : 'Outlook'} integration with TischlerCRM is working correctly.</p><p>Emails are sent from <strong>${senderLabel}</strong>.</p>`,
+        `<p>Hello ${sender.name || sender.email},</p><p>This is a test email confirming your ${method === 'smtp' ? 'SMTP' : method === 'zapier' ? 'Zapier' : 'Outlook'} integration with TischlerCRM is working correctly.</p><p>Emails are sent from <strong>${senderLabel || 'the configured sender'}</strong>.</p>`,
       );
       if (!sent) throw new Error('Send failed — check server logs for details.');
-      reply.send({ sent: true, message: `Test email sent to ${sender.email} from ${senderLabel}` });
+      reply.send({ sent: true, message: `Test email sent to ${sender.email}${senderLabel ? ` from ${senderLabel}` : ''}` });
     } catch (err: any) {
       req.log.error(err, 'POST /outlook/test-email failed');
       reply.code(500).send({ error: `Failed to send test email: ${err.message}` });

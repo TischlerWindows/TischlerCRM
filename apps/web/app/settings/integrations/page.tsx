@@ -33,6 +33,7 @@ interface Integration {
   hasClientId: boolean;
   hasClientSecret: boolean;
   config: Record<string, any>;
+  webhookUrl?: string | null;
   updatedAt: string;
 }
 
@@ -224,16 +225,24 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
   const [saving, setSaving] = useState(false);
 
   // Outlook-only: choice between Microsoft Graph (OAuth, needs a Microsoft 365 /
-  // Azure AD tenant) and plain SMTP (works with any mailbox that supports SMTP
-  // AUTH, including a free outlook.com account — with an app password if 2FA
-  // is enabled on it).
-  const [outlookMethod, setOutlookMethod] = useState<'oauth' | 'smtp'>(
-    integration.config?.authMethod === 'smtp' ? 'smtp' : 'oauth',
+  // Azure AD tenant), plain SMTP (works with any mailbox that supports SMTP
+  // AUTH — with an app password if 2FA is enabled), or a Zapier "Catch Hook"
+  // webhook (Zapier's Zap sends the actual email via a real, interactively-
+  // signed-in Microsoft account — sidesteps SMTP AUTH entirely, so it works
+  // even for personal outlook.com mailboxes that have SmtpClientAuthentication
+  // disabled and can't use app-only Graph mail).
+  const [outlookMethod, setOutlookMethod] = useState<'oauth' | 'smtp' | 'zapier'>(
+    integration.config?.authMethod === 'smtp'
+      ? 'smtp'
+      : integration.config?.authMethod === 'zapier'
+        ? 'zapier'
+        : 'oauth',
   );
   const [smtpHost, setSmtpHost] = useState((integration.config?.smtpHost as string) || '');
   const [smtpPort, setSmtpPort] = useState(String(integration.config?.smtpPort ?? 587));
   const [smtpSecure, setSmtpSecure] = useState(integration.config?.smtpSecure !== false);
   const [smtpUsername, setSmtpUsername] = useState((integration.config?.smtpUsername as string) || '');
+  const [webhookUrl, setWebhookUrl] = useState(integration.webhookUrl || '');
 
   const handleSave = async () => {
     setSaving(true);
@@ -251,6 +260,13 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
           smtpPort: Number(smtpPort) || 587,
           smtpSecure,
           smtpUsername: smtpUsername.trim(),
+          senderEmail: senderEmail.trim(),
+        };
+      } else if (isOutlook && outlookMethod === 'zapier') {
+        payload.webhookUrl = webhookUrl.trim();
+        payload.config = {
+          ...(integration.config || {}),
+          authMethod: 'zapier',
           senderEmail: senderEmail.trim(),
         };
       } else if (authType === 'api_key') {
@@ -343,11 +359,22 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
             >
               SMTP
             </button>
+            <button
+              type="button"
+              onClick={() => setOutlookMethod('zapier')}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                outlookMethod === 'zapier' ? 'bg-white shadow-sm text-brand-navy' : 'text-brand-gray'
+              }`}
+            >
+              Zapier
+            </button>
           </div>
           <p className="mt-1.5 text-[11px] text-brand-gray">
             {outlookMethod === 'oauth'
               ? 'Requires a Microsoft 365 / Azure AD tenant with an app registration.'
-              : 'Works with any mailbox that supports SMTP AUTH, including a free outlook.com account (use an app password if 2FA is on).'}
+              : outlookMethod === 'smtp'
+                ? 'Works with any mailbox that supports SMTP AUTH, including a free outlook.com account (use an app password if 2FA is on).'
+                : 'Sends via a Zapier "Catch Hook" webhook \u2014 the Zap sends the email using a real, signed-in Microsoft account, which works even when SMTP AUTH is disabled on the mailbox.'}
           </p>
         </div>
       )}
@@ -434,6 +461,36 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
             <p className="mt-1 text-[10px] text-brand-gray">Usually the same address as Username</p>
           </div>
           <OutlookSmtpTestSection integration={integration} />
+        </div>
+      ) : isOutlook && outlookMethod === 'zapier' ? (
+        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-brand-dark mb-1.5">Zapier Webhook URL</label>
+            <input
+              type="text"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://hooks.zapier.com/hooks/catch/xxxxxxx/xxxxxxx/"
+              className="w-full rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+            />
+            <p className="mt-1 text-[10px] text-brand-gray">
+              From your Zap's "Webhooks by Zapier" → "Catch Hook" trigger step (shown on its Test tab).
+            </p>
+          </div>
+          <div className="mb-1">
+            <label className="block text-xs font-medium text-brand-dark mb-1.5">Sender Email (informational)</label>
+            <input
+              type="email"
+              value={senderEmail}
+              onChange={(e) => setSenderEmail(e.target.value)}
+              placeholder="donotreply0000001@outlook.com"
+              className="w-full rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+            />
+            <p className="mt-1 text-[10px] text-brand-gray">
+              Whatever address your Zap's "Send Email" action is signed in as — shown in the UI only, doesn't affect sending.
+            </p>
+          </div>
+          <OutlookZapierTestSection integration={integration} />
         </div>
       ) : authType === 'api_key' ? (
         <div className="mb-4">
@@ -578,6 +635,47 @@ function OutlookSmtpTestSection({ integration }: { integration: Integration }) {
         </button>
         <span className="text-[11px] text-brand-gray">
           {canTest ? 'Sends a test to your CRM email' : 'Save your SMTP settings first'}
+        </span>
+      </div>
+      {testResult && <p className="mt-2 text-[11px] text-brand-gray">{testResult}</p>}
+    </div>
+  );
+}
+
+// ── Outlook Zapier webhook test button ──────────────────────────────
+
+function OutlookZapierTestSection({ integration }: { integration: Integration }) {
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  const handleTestEmail = async () => {
+    setSendingTest(true);
+    setTestResult(null);
+    try {
+      const res = await apiClient.sendOutlookTestEmail();
+      setTestResult(res.message || 'Test email sent!');
+    } catch (err: any) {
+      setTestResult(err.message || 'Failed to send test email');
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const canTest = !!integration.webhookUrl;
+
+  return (
+    <div className="pt-3 mt-3 border-t border-gray-200">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleTestEmail}
+          disabled={sendingTest || !canTest}
+          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white bg-[#FF4A00] hover:bg-[#E64200] transition disabled:opacity-50"
+        >
+          {sendingTest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+          Send Test Email
+        </button>
+        <span className="text-[11px] text-brand-gray">
+          {canTest ? 'Triggers your Zap and sends a test to your CRM email' : 'Save your webhook URL first'}
         </span>
       </div>
       {testResult && <p className="mt-2 text-[11px] text-brand-gray">{testResult}</p>}
