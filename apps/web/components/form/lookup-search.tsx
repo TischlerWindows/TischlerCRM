@@ -574,6 +574,14 @@ export function LookupUserSearch({
                 key={user.id}
                 type="button"
                 onClick={() => {
+                  // Seed the global lookup cache with the picked user so
+                  // resolveLookupDisplayName finds it on the very next
+                  // render — mirrors the equivalent seed in LookupSearch's
+                  // selection handler. Without this, the raw user id shows
+                  // until an unrelated background fetch of /admin/users
+                  // happens to complete (or the page is refreshed and the
+                  // preloader awaits it before the initial paint).
+                  upsertLookupCacheRecord('User', user);
                   onChange(user.id);
                   onQueryChange(user.name || user.email);
                 }}
