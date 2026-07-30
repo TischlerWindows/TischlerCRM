@@ -320,6 +320,18 @@ function TeamMemberSlotField({
   const labelText = panelField?.labelOverride || defaultLabel(slotConfig)
   const isRequired = panelField?.behavior === 'required'
 
+  // Editable contexts (full edit form, inline-edit-all) always use the plain
+  // label size matching regular fields there. Read-only record-page display
+  // applies the panel's configured labelStyle, matching how regular fields
+  // render on that same page.
+  const labelStyle: React.CSSProperties = readOnly ? {
+    ...(panelField?.labelStyle?.color ? { color: panelField.labelStyle.color } : {}),
+    fontWeight: panelField?.labelStyle?.bold ? 700 : undefined,
+    fontStyle: panelField?.labelStyle?.italic ? 'italic' : undefined,
+    textTransform: panelField?.labelStyle?.uppercase ? 'uppercase' : undefined,
+    fontSize: panelField?.labelStyle?.fontSize ? `${panelField.labelStyle.fontSize}px` : undefined,
+  } : {}
+
   const valueStyle: React.CSSProperties = {
     ...(panelField?.valueStyle?.color ? { color: panelField.valueStyle.color } : {}),
     ...(panelField?.valueStyle?.background ? { backgroundColor: panelField.valueStyle.background, padding: '2px 6px', borderRadius: 4 } : {}),
@@ -474,9 +486,9 @@ function TeamMemberSlotField({
 
   return (
     <div>
-      {/* Deliberately ignores panelField.labelStyle (fontSize/uppercase/color) --
-         always matches the plain label style regular fields render with. */}
-      <div className="text-sm font-medium text-gray-700 mb-0.5">
+      {/* labelStyle is only non-empty when readOnly (record-page display) --
+         edit contexts always get the plain label size regular fields use. */}
+      <div className="text-sm font-medium text-gray-700 mb-0.5" style={labelStyle}>
         {labelText}
         {isRequired && <span className="text-red-500 ml-0.5">*</span>}
       </div>
