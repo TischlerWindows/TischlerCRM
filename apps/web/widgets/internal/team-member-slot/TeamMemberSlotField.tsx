@@ -320,14 +320,6 @@ function TeamMemberSlotField({
   const labelText = panelField?.labelOverride || defaultLabel(slotConfig)
   const isRequired = panelField?.behavior === 'required'
 
-  const labelStyle: React.CSSProperties = {
-    ...(panelField?.labelStyle?.color ? { color: panelField.labelStyle.color } : {}),
-    fontWeight: panelField?.labelStyle?.bold ? 700 : undefined,
-    fontStyle: panelField?.labelStyle?.italic ? 'italic' : undefined,
-    textTransform: panelField?.labelStyle?.uppercase ? 'uppercase' : undefined,
-    fontSize: panelField?.labelStyle?.fontSize ? `${panelField.labelStyle.fontSize}px` : undefined,
-  }
-
   const valueStyle: React.CSSProperties = {
     ...(panelField?.valueStyle?.color ? { color: panelField.valueStyle.color } : {}),
     ...(panelField?.valueStyle?.background ? { backgroundColor: panelField.valueStyle.background, padding: '2px 6px', borderRadius: 4 } : {}),
@@ -482,7 +474,9 @@ function TeamMemberSlotField({
 
   return (
     <div>
-      <div className="text-sm font-medium text-gray-700 mb-0.5" style={labelStyle}>
+      {/* Deliberately ignores panelField.labelStyle (fontSize/uppercase/color) --
+         always matches the plain label style regular fields render with. */}
+      <div className="text-sm font-medium text-gray-700 mb-0.5">
         {labelText}
         {isRequired && <span className="text-red-500 ml-0.5">*</span>}
       </div>
