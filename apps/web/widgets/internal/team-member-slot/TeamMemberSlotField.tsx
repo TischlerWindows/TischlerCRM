@@ -482,7 +482,7 @@ function TeamMemberSlotField({
 
   return (
     <div>
-      <div className="text-xs font-medium text-gray-500 mb-0.5" style={labelStyle}>
+      <div className="text-sm font-medium text-gray-700 mb-0.5" style={labelStyle}>
         {labelText}
         {isRequired && <span className="text-red-500 ml-0.5">*</span>}
       </div>
