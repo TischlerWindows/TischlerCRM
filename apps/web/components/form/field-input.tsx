@@ -1085,6 +1085,18 @@ export function FieldInput({
   }
 
   // ── Standard field wrapper (label + input + error + help) ─────
+  const labelOverrideStyle: React.CSSProperties = (() => {
+    const ls = (layoutField as any)?.labelStyle;
+    if (!ls) return {};
+    return {
+      ...(ls.color ? { color: ls.color } : {}),
+      ...(ls.bold ? { fontWeight: 700 } : {}),
+      ...(ls.italic ? { fontStyle: 'italic' } : {}),
+      ...(ls.uppercase ? { textTransform: 'uppercase' } : {}),
+      ...(ls.fontSize ? { fontSize: `${ls.fontSize}px` } : {}),
+    };
+  })();
+
   return (
     <div
       key={fieldDef.apiName}
@@ -1098,6 +1110,7 @@ export function FieldInput({
           <Icon className="h-4 w-4 text-gray-400" />
           <span
             className={labelPresentationClassName((layoutField as any)?.presentation)}
+            style={labelOverrideStyle}
           >
             {fieldDef.label}
             {fieldDef.required && (
