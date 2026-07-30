@@ -134,6 +134,30 @@ export function buildApp() {
     done(null, body);
   });
 
+  // Global safety net for errors that escape a route's own try/catch —
+  // persists into the same ErrorLog table the client-side reporter uses
+  // (source: 'server'), visible at Settings > Error Log alongside client errors.
+  app.setErrorHandler(async (error, req, reply) => {
+    req.log.error(error);
+    try {
+      await prisma.errorLog.create({
+        data: {
+          id: generateId('ErrorLog'),
+          message: error.message.slice(0, 2000),
+          stack: error.stack?.slice(0, 8000),
+          source: 'server',
+          url: req.url?.slice(0, 2000),
+          userId: (req as any).user?.sub ?? null,
+          metadata: { method: req.method, statusCode: error.statusCode ?? 500 },
+        },
+      });
+    } catch {
+      // Never let error-logging itself break the error response
+    }
+    const statusCode = error.statusCode && error.statusCode < 500 ? error.statusCode : 500;
+    reply.code(statusCode).send({ error: statusCode < 500 ? error.message : 'Internal server error' });
+  });
+
   // Serve Next.js static files (if built)
   const nextStaticPath = path.join(__dirname, '../../web/.next/static');
   if (fs.existsSync(nextStaticPath)) {
