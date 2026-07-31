@@ -19,6 +19,7 @@ import {
   MoreVertical, 
   Edit, 
   Trash2,
+  Copy,
   Clock,
   User,
   Star,
@@ -1510,6 +1511,31 @@ export default function SummaryPage() {
       // Remove product log entries for this summary
       apiClient.delete(`/product-log/${id}`).catch(() => {});
     }
+  };
+
+  const handleDuplicateSummary = (id: string) => {
+    const original = summaries.find(s => s.id === id);
+    if (!original) return;
+    const duplicated: Summary = {
+      ...original,
+      id: Date.now().toString(),
+      name: `${original.name || 'Untitled Summary'} (Copy)`,
+      lastModifiedAt: new Date().toISOString(),
+      isFavorite: false,
+    };
+    const updatedSummaries = [duplicated, ...summaries];
+    setSummaries(updatedSummaries);
+    setSetting('summaries', updatedSummaries);
+    // Give the duplicate its own product log rows, keyed by its new id.
+    const logItems = buildProductLogItems(duplicated);
+    apiClient.post('/product-log/sync', {
+      summaryId: duplicated.id,
+      summaryName: duplicated.name || '',
+      opportunityNumber: duplicated.opportunityNumber || '',
+      linkedOpportunityId: duplicated.linkedOpportunityId || null,
+      date: duplicated.date || undefined,
+      items: logItems,
+    }).catch(() => {});
   };
 
   const handleToggleFavorite = (id: string) => {
@@ -3464,6 +3490,12 @@ export default function SummaryPage() {
                               {summary.isFavorite ? 'Unfavorite' : 'Favorite'}
                             </button>
                             <button
+                              onClick={() => { handleDuplicateSummary(summary.id); setOpenDropdown(null); }}
+                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <Copy className="w-4 h-4" />Duplicate
+                            </button>
+                            <button
                               onClick={() => { handleDeleteSummary(summary.id); setOpenDropdown(null); }}
                               className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                             >
@@ -3600,6 +3632,16 @@ export default function SummaryPage() {
                                   >
                                     <Star className={cn("w-4 h-4", summary.isFavorite && "fill-yellow-400 text-yellow-400")} />
                                     {summary.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleDuplicateSummary(summary.id);
+                                      setOpenDropdown(null);
+                                    }}
+                                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                    Duplicate
                                   </button>
                                   <button
                                     onClick={() => {
