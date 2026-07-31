@@ -902,6 +902,9 @@ export default function SummaryPage() {
   const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
   const [opportunitySearch, setOpportunitySearch] = useState('');
   const [loadingOpportunities, setLoadingOpportunities] = useState(false);
+  // 'new' = picker selection builds a fresh Summary from the Opportunity (existing flow).
+  // 'duplicate' = picker selection re-links a cloned copy of editingSummary to the chosen Opportunity.
+  const [opportunityPickerMode, setOpportunityPickerMode] = useState<'new' | 'duplicate'>('new');
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -1079,7 +1082,8 @@ export default function SummaryPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const openOpportunityPicker = async () => {
+  const openOpportunityPicker = async (mode: 'new' | 'duplicate' = 'new') => {
+    setOpportunityPickerMode(mode);
     setShowOpportunityPicker(true);
     setOpportunitySearch('');
     setLoadingOpportunities(true);
@@ -1304,6 +1308,39 @@ export default function SummaryPage() {
         contactCellPhone: quoteRecipientContact.cellPhone,
       },
     });
+  };
+
+  const handleDuplicateToOpportunity = async (record: any) => {
+    setShowOpportunityPicker(false);
+    if (!editingSummary) return;
+    const address = await resolveOppPropertyAddress(record);
+    const duplicated: Summary = {
+      ...editingSummary,
+      id: Date.now().toString(),
+      name: `${editingSummary.name || 'Untitled Summary'} (Copy)`,
+      lastModifiedAt: new Date().toISOString(),
+      isFavorite: false,
+      linkedOpportunityId: record.id,
+      opportunityNumber: record.opportunityNumber || record.Opportunity__opportunityNumber || '',
+      address,
+    };
+    const updatedSummaries = [duplicated, ...summaries];
+    setSummaries(updatedSummaries);
+    setSetting('summaries', updatedSummaries);
+    const logItems = buildProductLogItems(duplicated);
+    apiClient.post('/product-log/sync', {
+      summaryId: duplicated.id,
+      summaryName: duplicated.name || '',
+      opportunityNumber: duplicated.opportunityNumber || '',
+      linkedOpportunityId: duplicated.linkedOpportunityId || null,
+      date: duplicated.date || undefined,
+      items: logItems,
+    }).catch(() => {});
+    setShowNewSummary(false);
+    setEditingSummary(null);
+    setActivePage(1);
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 3000);
   };
 
   const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string; plansDated?: string; finials?: string; hingeFinishSpecification?: string; contactReceivingQuote?: string; accountReceivingQuote?: string; accountShippingAddress?: string; contactPrimaryPhone?: string; contactEmail?: string; contactCellPhone?: string } }) => {
@@ -3399,7 +3436,7 @@ export default function SummaryPage() {
             <h3 className="text-lg font-medium text-gray-900">Summary Records</h3>
             <div className="flex gap-3">
               <button
-                onClick={openOpportunityPicker}
+                onClick={() => openOpportunityPicker()}
                 className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -3679,12 +3716,18 @@ export default function SummaryPage() {
 
     {/* Opportunity Picker Modal */}
     {showOpportunityPicker && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Select Opportunity</h2>
-              <p className="text-sm text-gray-600 mt-1">Choose an Opportunity to link to this Summary</p>
+              <h2 className="text-lg font-bold text-gray-900">
+                {opportunityPickerMode === 'duplicate' ? 'Duplicate to Opportunity' : 'Select Opportunity'}
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {opportunityPickerMode === 'duplicate'
+                  ? 'Choose which Opportunity the duplicated Summary should be linked to'
+                  : 'Choose an Opportunity to link to this Summary'}
+              </p>
             </div>
             <button
               onClick={() => setShowOpportunityPicker(false)}
@@ -3731,7 +3774,7 @@ export default function SummaryPage() {
                 }).map(r => (
                   <button
                     key={r.id}
-                    onClick={() => handleOpportunitySelected(r)}
+                    onClick={() => opportunityPickerMode === 'duplicate' ? handleDuplicateToOpportunity(r) : handleOpportunitySelected(r)}
                     className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors"
                   >
                     <div className="font-medium text-gray-900">
@@ -3780,6 +3823,14 @@ export default function SummaryPage() {
                 >
                   <Printer className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Download PDF</span>
+                </button>
+                <button
+                  onClick={() => openOpportunityPicker('duplicate')}
+                  className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  title="Duplicate this Summary and link it to a different Opportunity"
+                >
+                  <Copy className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Duplicate</span>
                 </button>
                 <button
                   onClick={() => {
