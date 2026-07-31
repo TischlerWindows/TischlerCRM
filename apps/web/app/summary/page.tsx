@@ -2389,6 +2389,36 @@ export default function SummaryPage() {
       ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
     ].filter(row => [row[3], row[4], row[5], row[6]].some(v => v !== '—'));
     const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'rollScreens', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
+
+    // Installation Total (installation's own "final" + its dynamic sub-rows, e.g. Wood bucks/Waterproofing)
+    const installationRowsTotal = ((ao.installation?.installationRows || []) as Array<{ price: string }>).reduce((sum: number, r: { price: string }) => sum + (parseFloat((r.price || '').replace(/[^0-9.-]/g, '')) || 0), 0);
+    const instGrandTotalPdf = pv(ao.installation?.final) + installationRowsTotal;
+    if (installationRowsTotal) {
+      aoRows.push(['Installation Total', '—', '—', '—', '—', '—', fmtDollar(String(instGrandTotalPdf)), '—', '—', '—']);
+    }
+
+    // Add-On Items TOTAL — mirrors the editor's bottom TOTAL row
+    const aoCustomRows = (ao.customRows || []) as any[];
+    const aoDeductRows = (ao.deductRows || []) as any[];
+    const aoFullTotal = aoKeys.reduce((sum, k) => sum + pv(ao[k]?.full), 0) + aoCustomRows.reduce((sum, cr) => sum + pv(cr.full), 0) - aoDeductRows.reduce((sum, cr) => sum + pv(cr.full), 0);
+    const aoFinalTotal = aoKeys.reduce((sum, k) => sum + pv(ao[k]?.final), 0) + installationRowsTotal + aoCustomRows.reduce((sum, cr) => sum + pv(cr.final), 0) - aoDeductRows.reduce((sum, cr) => sum + pv(cr.final), 0);
+    aoRows.push(['TOTAL', '—', '—', '—', fmtDollar(String(aoFullTotal)), '—', fmtDollar(String(aoFinalTotal)), '—', '—', '—']);
+
+    // Grand Total (Job) = Add-Ons Final total + Quote Totals' Grand Total "+Adj" dollar figure
+    const qtot2 = s.quoteTotals;
+    const aggQtSumPdf = (f: 'full' | 'pct' | 'final' | 'finalAdj') => {
+      if (s.hasMultipleLocations) {
+        return (s.subLocations ?? []).reduce((a: number, l: any) => {
+          const q = l.quoteTotals;
+          return a + pv(q?.euroWindows?.[f]) + pv(q?.doubleHung?.[f]) + pv(q?.euroDoors?.[f]);
+        }, 0);
+      }
+      return pv(qtot2?.euroWindows?.[f]) + pv(qtot2?.doubleHung?.[f]) + pv(qtot2?.euroDoors?.[f]);
+    };
+    const quoteTotalsAdjDollar = aggQtSumPdf('finalAdj') + pv(s.grandTotalAdjustment?.finalAdj);
+    const jobGrandTotal = aoFinalTotal + quoteTotalsAdjDollar;
+    aoRows.push(['GRAND TOTAL (JOB)', '—', '—', '—', '—', '—', fmtDollar(String(jobGrandTotal)), '—', '—', '—']);
+
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
     y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors });
@@ -5614,6 +5644,35 @@ export default function SummaryPage() {
                                         <td className="px-2 py-3 bg-blue-50/60"></td>
                                         <td className="px-2 py-3 bg-green-50/60"></td>
                                         <td className="px-2 py-3 bg-purple-50/60"></td>
+                                      </tr>
+                                    );
+                                  })()}
+                                  {/* Grand Total (Job) = Add-Ons Final total + Quote Totals' Grand Total "+Adj" dollar figure */}
+                                  {(() => {
+                                    const installationRowsTotal = ((ao.installation?.installationRows || []) as Array<{ price: string }>).reduce((s: number, r: { price: string }) => s + (parseFloat((r.price || '').replace(/[^0-9.-]/g, '')) || 0), 0);
+                                    const aoFinalTotal = aoKeys.reduce((s, k) => s + (parseFloat(getAo(k).final) || 0), 0) + installationRowsTotal + customRows.reduce((s, cr) => s + (parseFloat(cr.final) || 0), 0) - deductRows.reduce((s, cr) => s + (parseFloat(cr.final) || 0), 0);
+
+                                    const qt = editingSummary.quoteTotals;
+                                    const aggQtSum = (f: 'full' | 'pct' | 'final' | 'finalAdj') => {
+                                      if (editingSummary.hasMultipleLocations) {
+                                        return (editingSummary.subLocations ?? []).reduce((a, l) => {
+                                          const q = l.quoteTotals;
+                                          return a + (parseFloat((q?.euroWindows as any)?.[f] || '0') || 0) + (parseFloat((q?.doubleHung as any)?.[f] || '0') || 0) + (parseFloat((q?.euroDoors as any)?.[f] || '0') || 0);
+                                        }, 0);
+                                      }
+                                      return (parseFloat((qt?.euroWindows as any)?.[f] || '0') || 0) + (parseFloat((qt?.doubleHung as any)?.[f] || '0') || 0) + (parseFloat((qt?.euroDoors as any)?.[f] || '0') || 0);
+                                    };
+                                    const quoteTotalsAdjDollar = aggQtSum('finalAdj') + (parseFloat((editingSummary.grandTotalAdjustment as any)?.finalAdj || '0') || 0);
+                                    const jobGrandTotal = aoFinalTotal + quoteTotalsAdjDollar;
+
+                                    return (
+                                      <tr className="bg-brand-navy/5 font-bold border-t-2 border-brand-navy/30">
+                                        <td className="sticky left-0 z-10 bg-brand-navy/5"></td>
+                                        <td className="px-3 py-3 text-brand-navy sticky left-[24px] z-10 bg-brand-navy/5 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap">GRAND TOTAL (JOB)</td>
+                                        <td className="px-2 py-3" colSpan={5}></td>
+                                        <td className="px-2 py-3"></td>
+                                        <td className="px-2 py-3 text-right text-brand-navy text-base" colSpan={2}>{jobGrandTotal ? '$' + fmtAo(jobGrandTotal) : '—'}</td>
+                                        <td className="px-2 py-3" colSpan={4}></td>
                                       </tr>
                                     );
                                   })()}
