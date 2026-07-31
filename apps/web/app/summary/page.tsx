@@ -1736,7 +1736,7 @@ export default function SummaryPage() {
     const drawTable = (
       doc: any, startY: number, headers: string[],
       colWidths: number[], rows: string[][],
-      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[]; colColors?: { [colIdx: number]: [number, number, number] }; colTextColors?: { [colIdx: number]: [number, number, number] } }
+      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[]; boldRows?: number[]; colColors?: { [colIdx: number]: [number, number, number] }; colTextColors?: { [colIdx: number]: [number, number, number] } }
     ) => {
       const x0 = 15;
       let y = startY;
@@ -1806,6 +1806,7 @@ export default function SummaryPage() {
         // Per-row color, alternating, or last-row highlight
         const rowColor = opts?.rowColors?.[ri];
         const isLast = opts?.highlightLast && ri === rows.length - 1;
+        const isBoldRow = isLast || opts?.boldRows?.includes(ri);
         if (rowColor) {
           doc.setFillColor(...rowColor);
           doc.rect(x0, y, totalW, rh, 'F');
@@ -1816,7 +1817,7 @@ export default function SummaryPage() {
           doc.setFillColor(...altRow);
           doc.rect(x0, y, totalW, rh, 'F');
         }
-        if (isLast) doc.setFont('helvetica', 'bold');
+        if (isBoldRow) doc.setFont('helvetica', 'bold');
 
         doc.setTextColor(50, 50, 50);
         cx = x0;
@@ -1838,7 +1839,7 @@ export default function SummaryPage() {
           if (isBoldCol) doc.setFont('helvetica', 'normal');
           cx += colWidths[i] ?? 0;
         }
-        if (isLast) doc.setFont('helvetica', 'normal');
+        if (isBoldRow) doc.setFont('helvetica', 'normal');
         y += rh;
       }
       return y;
@@ -2419,9 +2420,29 @@ export default function SummaryPage() {
     const jobGrandTotal = aoFinalTotal + quoteTotalsAdjDollar;
     aoRows.push(['GRAND TOTAL (JOB)', '—', '—', '—', '—', '—', fmtDollar(String(jobGrandTotal)), '—', '—', '—']);
 
+    // Distinguish the summary rows just appended (Installation Total / TOTAL /
+    // GRAND TOTAL) from the regular line items with their own bg + bold.
+    const aoRowColors: ([number, number, number] | null)[] = aoRows.map(() => null);
+    const aoBoldRows: number[] = [];
+    if (installationRowsTotal) {
+      const idx = aoRows.length - 3;
+      aoRowColors[idx] = [225, 232, 240];
+      aoBoldRows.push(idx);
+    }
+    {
+      const idx = aoRows.length - 2;
+      aoRowColors[idx] = [232, 235, 240];
+      aoBoldRows.push(idx);
+    }
+    {
+      const idx = aoRows.length - 1;
+      aoRowColors[idx] = [255, 243, 205];
+      aoBoldRows.push(idx);
+    }
+
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
-    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors });
+    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors, rowColors: aoRowColors, boldRows: aoBoldRows });
 
     // ── Add footers to all pages ──
     const totalPages = doc.getNumberOfPages();
