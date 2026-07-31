@@ -394,7 +394,7 @@ export default function ProductsPage() {
                       <td className="px-4 py-3 text-right text-gray-700">{fmt(group.totalSqFeet)}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{group.totalNetEuro ? `€${fmt(group.totalNetEuro)}` : ''}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{group.totalSqFeet > 0 ? `€${fmt(group.totalNetEuro / group.totalSqFeet)}` : ''}</td>
-                      <td className="px-4 py-3 text-center text-gray-500 text-xs">{group.details.length}</td>
+                      <td className="px-4 py-3 text-center text-gray-500 text-xs">{new Set(group.details.map(d => d.summaryId)).size}</td>
                     </tr>
 
                     {isExpanded && (
