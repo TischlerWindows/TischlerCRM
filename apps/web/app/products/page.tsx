@@ -173,30 +173,45 @@ export default function ProductsPage() {
     const fWood  = filters.woodType.trim();
     const fFinish = filters.finish.trim();
     const fSpacer = filters.spacerBar.trim();
+    const hasSpecOrJobFilter = !!(fJob || fGlass || fHung || fWood || fFinish || fSpacer);
 
-    return groups.filter(g => {
-      if (categoryFilter !== 'All' && g.category !== categoryFilter) return false;
-      // productType: substring match (typed text)
-      if (fPT && !g.productType.toLowerCase().includes(fPT.toLowerCase())) return false;
-      // Glass Type only applies to Euro Windows / Euro Doors (not Double Hung € those use Hung Glass Type)
-      if (fGlass && g.category === 'Double Hung') return false;
-      // Hung Glass Type only applies to Double Hung groups
-      if (fHung && g.category !== 'Double Hung') return false;
-      // spec/job filters € group passes if at least one detail matches ALL active filters
-      if (fJob || fGlass || fHung || fWood || fFinish || fSpacer) {
-        const anyDetailMatches = g.details.some(d => {
-          if (fJob && !`${d.summaryName} ${d.opportunityNumber}`.toLowerCase().includes(fJob)) return false;
-          if (fGlass && d.glassType !== fGlass) return false;
-          if (fHung && d.hungType !== fHung) return false;
-          if (fWood && d.woodType !== fWood) return false;
-          if (fFinish && d.finish !== fFinish) return false;
-          if (fSpacer && d.spacerBarType !== fSpacer) return false;
-          return true;
-        });
-        if (!anyDetailMatches) return false;
-      }
+    const detailMatches = (d: ProductLogDetail) => {
+      if (fJob && !`${d.summaryName} ${d.opportunityNumber}`.toLowerCase().includes(fJob)) return false;
+      if (fGlass && d.glassType !== fGlass) return false;
+      if (fHung && d.hungType !== fHung) return false;
+      if (fWood && d.woodType !== fWood) return false;
+      if (fFinish && d.finish !== fFinish) return false;
+      if (fSpacer && d.spacerBarType !== fSpacer) return false;
       return true;
-    });
+    };
+
+    const result: ProductLogGroup[] = [];
+    for (const g of groups) {
+      if (categoryFilter !== 'All' && g.category !== categoryFilter) continue;
+      // productType: substring match (typed text)
+      if (fPT && !g.productType.toLowerCase().includes(fPT.toLowerCase())) continue;
+      // Glass Type only applies to Euro Windows / Euro Doors (not Double Hung — those use Hung Glass Type)
+      if (fGlass && g.category === 'Double Hung') continue;
+      // Hung Glass Type only applies to Double Hung groups
+      if (fHung && g.category !== 'Double Hung') continue;
+
+      // Narrow to matching details (job/spec filters), then recompute this
+      // group's aggregate totals from ONLY those details — previously the
+      // whole group's original totals were kept even when a filter matched
+      // just one of its many details.
+      const details = hasSpecOrJobFilter ? g.details.filter(detailMatches) : g.details;
+      if (!details.length) continue;
+
+      result.push({
+        ...g,
+        details,
+        totalQty: details.reduce((s, d) => s + d.qty, 0),
+        totalFields: details.reduce((s, d) => s + d.fields, 0),
+        totalSqFeet: details.reduce((s, d) => s + d.sqFeet, 0),
+        totalNetEuro: details.reduce((s, d) => s + d.netEuro, 0),
+      });
+    }
+    return result;
   }, [groups, filters, categoryFilter]);
 
   const totals = useMemo(() => ({
@@ -344,6 +359,7 @@ export default function ProductsPage() {
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total Fields</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total Sq Ft</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total NET €</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Price / Sq Ft</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Jobs</th>
               </tr>
             </thead>
@@ -377,23 +393,17 @@ export default function ProductsPage() {
                       <td className="px-4 py-3 text-right text-gray-700">{fmtInt(group.totalFields)}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{fmt(group.totalSqFeet)}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{group.totalNetEuro ? `€${fmt(group.totalNetEuro)}` : ''}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{group.totalSqFeet > 0 ? `€${fmt(group.totalNetEuro / group.totalSqFeet)}` : ''}</td>
                       <td className="px-4 py-3 text-center text-gray-500 text-xs">{group.details.length}</td>
                     </tr>
 
                     {isExpanded && (
                       <tr key={`${key}--expanded`}>
-                        <td colSpan={8} className="p-0">
+                        <td colSpan={9} className="p-0">
                           <div className="bg-[#f8f9fb] border-t border-b border-gray-200 px-6 py-4">
                             <div className="grid grid-cols-1 gap-3">
-                              {group.details.filter(d => {
-                                const fJobRender = filters.job.toLowerCase().trim();
-                                if (fJobRender && !`${d.summaryName} ${d.opportunityNumber}`.toLowerCase().includes(fJobRender)) return false;
-                                if (filters.glassType && d.glassType !== filters.glassType) return false;
-                                if (filters.woodType && d.woodType !== filters.woodType) return false;
-                                if (filters.finish && d.finish !== filters.finish) return false;
-                                if (filters.spacerBar && d.spacerBarType !== filters.spacerBar) return false;
-                                return true;
-                              }).map((d, i) => (
+                              {/* group.details is already narrowed to matching rows by `filtered` above */}
+                              {group.details.map((d, i) => (
                                 <div
                                   key={`${d.summaryId}-${i}`}
                                   className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap items-start gap-x-8 gap-y-2"
@@ -472,6 +482,12 @@ export default function ProductsPage() {
                                         <div className="text-sm font-semibold text-brand-navy">€{fmt(d.netEuro)}</div>
                                       </div>
                                     )}
+                                    {d.sqFeet > 0 && d.netEuro > 0 && (
+                                      <div>
+                                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Price / Sq Ft</div>
+                                        <div className="text-sm font-medium text-gray-700">€{fmt(d.netEuro / d.sqFeet)}</div>
+                                      </div>
+                                    )}
                                   </div>
                                 {(() => {
                                   const pto = d.productTypeOptions;
@@ -503,6 +519,7 @@ export default function ProductsPage() {
                 <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.fields)}</td>
                 <td className="px-4 py-3 text-right text-gray-800">{fmt(totals.sqFeet)}</td>
                 <td className="px-4 py-3 text-right text-gray-800">€{fmt(totals.netEuro)}</td>
+                <td className="px-4 py-3 text-right text-gray-800">{totals.sqFeet > 0 ? `€${fmt(totals.netEuro / totals.sqFeet)}` : ''}</td>
                 <td></td>
               </tr>
             </tfoot>
