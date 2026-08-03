@@ -905,6 +905,10 @@ export default function SummaryPage() {
   // 'new' = picker selection builds a fresh Summary from the Opportunity (existing flow).
   // 'duplicate' = picker selection re-links a cloned copy of editingSummary to the chosen Opportunity.
   const [opportunityPickerMode, setOpportunityPickerMode] = useState<'new' | 'duplicate'>('new');
+  // Edit lock: prevents two people from having the same summary open at once
+  // (see apps/api/src/routes/summaries.ts). Renewed on a heartbeat while open.
+  const lockedSummaryIdRef = useRef<string | null>(null);
+  const lockHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -1014,8 +1018,7 @@ export default function SummaryPage() {
       const found = summaries.find(s => s.id === editId);
       if (found) {
         router.replace('/summary');
-        setEditingSummary(found);
-        setShowNewSummary(true);
+        void openSummaryForEdit(found);
       }
     }
   }, [loading, searchParams]);
@@ -1326,7 +1329,7 @@ export default function SummaryPage() {
     };
     const updatedSummaries = [duplicated, ...summaries];
     setSummaries(updatedSummaries);
-    setSetting('summaries', updatedSummaries);
+    apiClient.put(`/summaries/${duplicated.id}`, { value: duplicated }).catch(() => {});
     const logItems = buildProductLogItems(duplicated);
     apiClient.post('/product-log/sync', {
       summaryId: duplicated.id,
@@ -1336,6 +1339,7 @@ export default function SummaryPage() {
       date: duplicated.date || undefined,
       items: logItems,
     }).catch(() => {});
+    releaseCurrentLock();
     setShowNewSummary(false);
     setEditingSummary(null);
     setActivePage(1);
@@ -1540,11 +1544,47 @@ export default function SummaryPage() {
     ];
   };
 
+  // ── Edit lock (prevents two people editing the same summary at once) ──
+  const releaseCurrentLock = () => {
+    const id = lockedSummaryIdRef.current;
+    if (lockHeartbeatRef.current) {
+      clearInterval(lockHeartbeatRef.current);
+      lockHeartbeatRef.current = null;
+    }
+    lockedSummaryIdRef.current = null;
+    if (id) apiClient.post(`/summaries/${id}/unlock`).catch(() => {});
+  };
+
+  const openSummaryForEdit = async (summary: Summary) => {
+    try {
+      await apiClient.post(`/summaries/${summary.id}/lock`);
+    } catch (err: any) {
+      alert(err?.message || 'This summary is currently being edited by another user.');
+      return;
+    }
+    lockedSummaryIdRef.current = summary.id;
+    if (lockHeartbeatRef.current) clearInterval(lockHeartbeatRef.current);
+    lockHeartbeatRef.current = setInterval(() => {
+      apiClient.post(`/summaries/${summary.id}/lock`).catch(() => {});
+    }, 60_000);
+    setEditingSummary({ ...summary, hungType: summary.hungType ?? '#34', hungTypeCustom: summary.hungTypeCustom ?? '' });
+    setShowNewSummary(true);
+  };
+
+  // Safety net: release any held lock if the user navigates away / closes the tab
+  // without hitting Cancel/Close (the 3-minute server-side TTL is the ultimate backstop).
+  useEffect(() => {
+    return () => {
+      releaseCurrentLock();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleDeleteSummary = (id: string) => {
     if (confirm('Are you sure you want to delete this summary?')) {
       const updatedSummaries = summaries.filter(s => s.id !== id);
       setSummaries(updatedSummaries);
-      setSetting('summaries', updatedSummaries);
+      apiClient.delete(`/summaries/${id}`).catch(() => {});
       // Remove product log entries for this summary
       apiClient.delete(`/product-log/${id}`).catch(() => {});
     }
@@ -1562,7 +1602,7 @@ export default function SummaryPage() {
     };
     const updatedSummaries = [duplicated, ...summaries];
     setSummaries(updatedSummaries);
-    setSetting('summaries', updatedSummaries);
+    apiClient.put(`/summaries/${duplicated.id}`, { value: duplicated }).catch(() => {});
     // Give the duplicate its own product log rows, keyed by its new id.
     const logItems = buildProductLogItems(duplicated);
     apiClient.post('/product-log/sync', {
@@ -1736,7 +1776,7 @@ export default function SummaryPage() {
     const drawTable = (
       doc: any, startY: number, headers: string[],
       colWidths: number[], rows: string[][],
-      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[]; boldRows?: number[]; rowTextColors?: { [rowIdx: number]: [number, number, number] }; rowFontSizes?: { [rowIdx: number]: number }; colColors?: { [colIdx: number]: [number, number, number] }; colTextColors?: { [colIdx: number]: [number, number, number] } }
+      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[]; boldRows?: number[]; rowTextColors?: { [rowIdx: number]: [number, number, number] }; rowFontSizes?: { [rowIdx: number]: number }; rowFontSizeCol?: { [rowIdx: number]: number }; colColors?: { [colIdx: number]: [number, number, number] }; colTextColors?: { [colIdx: number]: [number, number, number] } }
     ) => {
       const x0 = 15;
       let y = startY;
@@ -1822,7 +1862,6 @@ export default function SummaryPage() {
           doc.rect(x0, y, totalW, rh, 'F');
         }
         if (isBoldRow) doc.setFont('helvetica', 'bold');
-        if (rowFontSize) doc.setFontSize(rowFontSize);
 
         doc.setTextColor(50, 50, 50);
         cx = x0;
@@ -1837,6 +1876,11 @@ export default function SummaryPage() {
           else doc.setTextColor(50, 50, 50);
           const isBoldCol = opts?.boldCol !== undefined && i === opts.boldCol;
           if (isBoldCol) doc.setFont('helvetica', 'bold');
+          // A row-level font size (e.g. Grand Total) only enlarges the one
+          // designated column (rowFontSizeCol) — not the whole row, or the
+          // label cell overflows its column width into the next one.
+          const useBigFont = !!rowFontSize && (opts?.rowFontSizeCol?.[ri] === undefined || opts.rowFontSizeCol[ri] === i);
+          if (useBigFont) doc.setFontSize(rowFontSize!);
           const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
           const tx = align === 'right' ? cx + (colWidths[i] ?? 0) - 1.5 : cx + 1.5;
           const lines = rowLineData[ri]?.[i] ?? [];
@@ -1845,10 +1889,10 @@ export default function SummaryPage() {
           });
           if (rowTxt || colTxt) doc.setTextColor(50, 50, 50);
           if (isBoldCol) doc.setFont('helvetica', 'normal');
+          if (useBigFont) doc.setFontSize(6);
           cx += colWidths[i] ?? 0;
         }
         if (isBoldRow) doc.setFont('helvetica', 'normal');
-        if (rowFontSize) doc.setFontSize(6);
         y += rh;
       }
       return y;
@@ -2450,13 +2494,16 @@ export default function SummaryPage() {
     }
     // Grand Total row reads black/bold/larger regardless of the column's
     // usual blue/green text color, and gets extra height for the bigger font.
+    // Only the "Final" $ cell (col 6) gets the larger size -- not the whole
+    // row, or the label text overflows its column into the next one.
     const aoGrandTotalIdx = aoRows.length - 1;
     const aoRowTextColors: { [rowIdx: number]: [number, number, number] } = { [aoGrandTotalIdx]: [0, 0, 0] };
     const aoRowFontSizes: { [rowIdx: number]: number } = { [aoGrandTotalIdx]: 8 };
+    const aoRowFontSizeCol: { [rowIdx: number]: number } = { [aoGrandTotalIdx]: 6 };
 
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
-    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors, rowColors: aoRowColors, boldRows: aoBoldRows, rowTextColors: aoRowTextColors, rowFontSizes: aoRowFontSizes });
+    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors, rowColors: aoRowColors, boldRows: aoBoldRows, rowTextColors: aoRowTextColors, rowFontSizes: aoRowFontSizes, rowFontSizeCol: aoRowFontSizeCol });
 
     // ── Add footers to all pages ──
     const totalPages = doc.getNumberOfPages();
@@ -2510,6 +2557,17 @@ export default function SummaryPage() {
     }
     const summaryToSave = { ...editingSummary, productTypeOptions: prunedPto };
 
+    if (isNew) {
+      // Newly-created summaries aren't lockable until they exist server-side;
+      // claim the lock now so nobody else can open it once it appears in the list.
+      lockedSummaryIdRef.current = summaryToSave.id;
+      if (lockHeartbeatRef.current) clearInterval(lockHeartbeatRef.current);
+      lockHeartbeatRef.current = setInterval(() => {
+        apiClient.post(`/summaries/${summaryToSave.id}/lock`).catch(() => {});
+      }, 60_000);
+      apiClient.post(`/summaries/${summaryToSave.id}/lock`).catch(() => {});
+    }
+
     let updatedSummaries;
     if (isNew) {
       updatedSummaries = [summaryToSave, ...summaries];
@@ -2520,7 +2578,7 @@ export default function SummaryPage() {
     }
 
     setSummaries(updatedSummaries);
-    setSetting('summaries', updatedSummaries);
+    apiClient.put(`/summaries/${summaryToSave.id}`, { value: summaryToSave }).catch(() => {});
     // Sync product log
     const logItems = buildProductLogItems(summaryToSave);
     apiClient.post('/product-log/sync', {
@@ -3539,10 +3597,7 @@ export default function SummaryPage() {
                 <div key={summary.id} className="px-4 py-3 flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <button
-                      onClick={() => {
-                        setEditingSummary({ ...summary, hungType: summary.hungType ?? '#34', hungTypeCustom: summary.hungTypeCustom ?? '' });
-                        setShowNewSummary(true);
-                      }}
+                      onClick={() => void openSummaryForEdit(summary)}
                       className="text-sm font-medium text-brand-navy hover:text-brand-dark text-left truncate w-full"
                     >
                       {summary.name || 'Untitled Summary'}
@@ -3576,8 +3631,7 @@ export default function SummaryPage() {
                           <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
                             <button
                               onClick={() => {
-                                setEditingSummary({ ...summary, hungType: summary.hungType ?? '#34', hungTypeCustom: summary.hungTypeCustom ?? '' });
-                                setShowNewSummary(true);
+                                void openSummaryForEdit(summary);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -3677,10 +3731,7 @@ export default function SummaryPage() {
                       <tr key={summary.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-sm text-gray-900">
                           <button
-                            onClick={() => {
-                              setEditingSummary({ ...summary, hungType: summary.hungType ?? '#34', hungTypeCustom: summary.hungTypeCustom ?? '' });
-                              setShowNewSummary(true);
-                            }}
+                            onClick={() => void openSummaryForEdit(summary)}
                             className="text-brand-navy hover:text-brand-dark font-medium"
                           >
                             {summary.name || 'Untitled Summary'}
@@ -3719,8 +3770,7 @@ export default function SummaryPage() {
                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
                                   <button
                                     onClick={() => {
-                                      setEditingSummary({ ...summary, hungType: summary.hungType ?? '#34', hungTypeCustom: summary.hungTypeCustom ?? '' });
-                                      setShowNewSummary(true);
+                                      void openSummaryForEdit(summary);
                                       setOpenDropdown(null);
                                     }}
                                     className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -3899,6 +3949,7 @@ export default function SummaryPage() {
                 </button>
                 <button
                   onClick={() => {
+                    releaseCurrentLock();
                     setShowNewSummary(false);
                     setEditingSummary(null);
                     setActivePage(1);
@@ -6437,6 +6488,7 @@ export default function SummaryPage() {
               <button
                 onClick={() => {
                   const oppId = editingSummary?.linkedOpportunityId;
+                  releaseCurrentLock();
                   setShowNewSummary(false);
                   setEditingSummary(null);
                   setActivePage(1);
@@ -6475,6 +6527,7 @@ export default function SummaryPage() {
                 <button
                   onClick={() => {
                     const oppId = editingSummary?.linkedOpportunityId;
+                    releaseCurrentLock();
                     setShowNewSummary(false);
                     setEditingSummary(null);
                     setActivePage(1);
