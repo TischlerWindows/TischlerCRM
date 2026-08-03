@@ -1560,6 +1560,22 @@ export default function SummaryPage() {
     if (id) apiClient.post(`/summaries/${id}/unlock`).catch(() => {});
   };
 
+  // Closing the editor (via X / Cancel / Close) does a full page reload/navigation
+  // instead of just clearing local state. Local state was already updated on save,
+  // but other views (the linked Opportunity's Summary widget, dashboards, etc.) can
+  // still be holding stale data fetched before the save — a reload guarantees
+  // whatever's shown next reflects what's actually persisted, instead of requiring
+  // a manual browser refresh.
+  const closeSummaryEditor = () => {
+    const oppId = editingSummary?.linkedOpportunityId;
+    releaseCurrentLock();
+    if (oppId) {
+      window.location.href = `/opportunities/${oppId}`;
+    } else {
+      window.location.reload();
+    }
+  };
+
   const openSummaryForEdit = async (summary: Summary) => {
     try {
       await apiClient.post(`/summaries/${summary.id}/lock`);
@@ -3965,15 +3981,7 @@ export default function SummaryPage() {
                   <span className="hidden sm:inline">Duplicate</span>
                 </button>
                 <button
-                  onClick={() => {
-                    releaseCurrentLock();
-                    setShowNewSummary(false);
-                    setEditingSummary(null);
-                    setActivePage(1);
-                    if (editingSummary?.linkedOpportunityId) {
-                      router.push(`/opportunities/${editingSummary.linkedOpportunityId}`);
-                    }
-                  }}
+                  onClick={closeSummaryEditor}
                   className="p-2 hover:bg-gray-100 rounded transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -6519,16 +6527,7 @@ export default function SummaryPage() {
 
             <div className="p-3 sm:p-6 border-t border-gray-200 flex flex-wrap justify-between items-center gap-2 print:hidden">
               <button
-                onClick={() => {
-                  const oppId = editingSummary?.linkedOpportunityId;
-                  releaseCurrentLock();
-                  setShowNewSummary(false);
-                  setEditingSummary(null);
-                  setActivePage(1);
-                  if (oppId) {
-                    router.push(`/opportunities/${oppId}`);
-                  }
-                }}
+                onClick={closeSummaryEditor}
                 className="px-6 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel
@@ -6558,16 +6557,7 @@ export default function SummaryPage() {
                   Save Summary
                 </button>
                 <button
-                  onClick={() => {
-                    const oppId = editingSummary?.linkedOpportunityId;
-                    releaseCurrentLock();
-                    setShowNewSummary(false);
-                    setEditingSummary(null);
-                    setActivePage(1);
-                    if (oppId) {
-                      router.push(`/opportunities/${oppId}`);
-                    }
-                  }}
+                  onClick={closeSummaryEditor}
                   className="px-6 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Close
