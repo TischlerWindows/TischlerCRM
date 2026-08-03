@@ -2063,6 +2063,46 @@ export async function dropboxRoutes(app: FastifyInstance) {
     }
   });
 
+  // ── Stream file bytes through our own origin for inline preview ──
+  // Dropbox's temporary links set frame-ancestors/X-Frame-Options headers
+  // that block them from being embedded in an <iframe>, so the browser's
+  // PDF viewer can't render them directly. Proxying the content endpoint
+  // here lets the frontend fetch it as a blob and build an object URL,
+  // which iframes happily display.
+  app.get('/dropbox/preview/:fileId', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const { fileId } = req.params as { fileId: string };
+    const accessToken = await getAccessToken(user.sub);
+    if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
+
+    try {
+      const resp = await fetch(`${DROPBOX_CONTENT_URL}/files/download`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Dropbox-API-Arg': JSON.stringify({ path: fileId }),
+        },
+      });
+
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        app.log.error({ status: resp.status, body: errText }, 'Dropbox preview download failed');
+        return reply.code(500).send({ error: 'Failed to load file for preview' });
+      }
+
+      const buffer = Buffer.from(await resp.arrayBuffer());
+      reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', 'inline')
+        .send(buffer);
+    } catch (err: any) {
+      app.log.error(err, 'Dropbox preview failed');
+      reply.code(500).send({ error: 'Failed to load file for preview' });
+    }
+  });
+
   // ── Upload file to record folder ──
   app.post('/dropbox/upload/:objectApiName/:recordId', async (req, reply) => {
     const user = req.user;

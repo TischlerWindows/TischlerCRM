@@ -281,13 +281,22 @@ export function DropboxFileBrowser({
     setPreviewError(null);
     setPreviewLoading(true);
     try {
-      const { url } = await apiClient.getDropboxDownloadUrl(entry.id);
-      setPreviewUrl(url);
+      // Blob + object URL, not the raw Dropbox link — Dropbox's temporary
+      // links set frame-blocking headers that stop them rendering in an <iframe>.
+      const blob = await apiClient.getDropboxPreviewBlob(entry.id);
+      setPreviewUrl(URL.createObjectURL(blob));
     } catch (err: any) {
       setPreviewError(err.message || 'Failed to load preview');
     } finally {
       setPreviewLoading(false);
     }
+  };
+
+  const closePreview = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewFile(null);
+    setPreviewUrl(null);
+    setPreviewError(null);
   };
 
   const handleDelete = async (entry: DropboxEntry) => {
@@ -897,7 +906,7 @@ export function DropboxFileBrowser({
     {previewFile && (
       <div
         className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4"
-        onClick={() => setPreviewFile(null)}
+        onClick={closePreview}
       >
         <div
           className="bg-white rounded-lg shadow-2xl w-full h-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
@@ -924,7 +933,7 @@ export function DropboxFileBrowser({
                 <span className="hidden sm:inline">Open in Dropbox</span>
               </button>
               <button
-                onClick={() => setPreviewFile(null)}
+                onClick={closePreview}
                 className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition"
               >
                 <X className="w-4 h-4" />

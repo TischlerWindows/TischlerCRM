@@ -864,6 +864,18 @@ class ApiClient {
     return this.request<{ url: string }>(`/dropbox/download/${encodeURIComponent(fileId)}`);
   }
 
+  async getDropboxPreviewBlob(fileId: string): Promise<Blob> {
+    const url = `${this.baseUrl}/dropbox/preview/${encodeURIComponent(fileId)}`;
+    const headers: Record<string, string> = {};
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({ error: 'Failed to load preview' }));
+      throw new Error(detail.error || `Failed to load preview (${res.status})`);
+    }
+    return res.blob();
+  }
+
   async createDropboxFolder(objectApiName: string, recordId: string, name: string, subPath?: string, folderName?: string) {
     return this.request<{ id: string; name: string; path: string }>(`/dropbox/folder/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`, {
       method: 'POST',
