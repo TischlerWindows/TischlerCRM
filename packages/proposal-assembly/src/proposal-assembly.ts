@@ -117,11 +117,12 @@ function resolveEffectiveTitle(params: {
   useTitleVariants: boolean;
   titleVariantsRaw: unknown;
   driverFields: string[];
+  requireAllDrivers: boolean;
   context: QuoteContext;
   tokens: Record<string, string>;
   fallback: string;
 }): string {
-  const { useTitleVariants, titleVariantsRaw, driverFields, context, tokens, fallback } = params;
+  const { useTitleVariants, titleVariantsRaw, driverFields, requireAllDrivers, context, tokens, fallback } = params;
   if (!useTitleVariants || !Array.isArray(titleVariantsRaw) || driverFields.length === 0) {
     return fallback;
   }
@@ -131,7 +132,7 @@ function resolveEffectiveTitle(params: {
     const title = typeof tv.title === 'string' ? tv.title.trim() : '';
     const matchValue = typeof tv.matchValue === 'string' ? tv.matchValue : '';
     if (!title || !matchValue) continue;
-    if (matchValueMatchesContext(matchValue, driverFields, context)) {
+    if (matchValueMatchesContext(matchValue, driverFields, context, { requireAllDrivers })) {
       return resolveTokensWithDiagnostics(title, tokens).text || fallback;
     }
   }
@@ -268,6 +269,7 @@ export function assembleProposal({
     if (preset.driverField) {
       const configObj = (preset.config as Record<string, unknown> | null) ?? {};
       const mergeVariants = !!configObj.mergeVariants;
+      const requireAllDrivers = !!configObj.requireAllDrivers;
       const universalBodyRaw = typeof configObj.universalBody === 'string' ? configObj.universalBody.trim() : '';
       const universalBodyPosition = configObj.universalBodyPosition === 'before' ? 'before' : 'after';
 
@@ -311,6 +313,7 @@ export function assembleProposal({
         useTitleVariants,
         titleVariantsRaw: configObj.titleVariants,
         driverFields,
+        requireAllDrivers,
         context,
         tokens,
         fallback: resolvedBlockTitle,

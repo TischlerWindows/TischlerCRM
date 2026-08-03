@@ -632,7 +632,8 @@ export function assemblePresets(
 export function matchValueMatchesContext(
   matchValue: string,
   driverFields: string[],
-  context: QuoteContext
+  context: QuoteContext,
+  options?: { requireAllDrivers?: boolean }
 ): boolean {
   if (!matchValue || driverFields.length === 0) return false;
 
@@ -664,24 +665,40 @@ export function matchValueMatchesContext(
     return v.startsWith(matchPart) && (afterMatch === '' || /^[\s,;-]/.test(afterMatch));
   };
 
-  // Every value in the Match Value checklist must be satisfied by some
-  // driver field's context value — this is an AND across matchParts, not an
-  // OR. (Previously any single matched part short-circuited the whole check,
-  // so a variant configured with e.g. "Aluminum Spacer" + "Premium Colors"
-  // would incorrectly match a job that only had one of the two.)
-  const partIsSatisfied = (match: string): boolean => {
-    for (const driverField of driverFields) {
-      const driverValue = (context as unknown as Record<string, unknown>)[driverField];
-      if (driverValue === undefined || driverValue === null) continue;
-      if (Array.isArray(driverValue)) {
-        if (driverValue.some((item) => typeValueMatch(String(item), match))) return true;
-      } else {
-        if (typeValueMatch(String(driverValue), match)) return true;
-      }
+  const driverValueSatisfiesSomePart = (driverField: string): boolean => {
+    const driverValue = (context as unknown as Record<string, unknown>)[driverField];
+    if (driverValue === undefined || driverValue === null) return false;
+    if (Array.isArray(driverValue)) {
+      return matchParts.some((match) => driverValue.some((item) => typeValueMatch(String(item), match)));
     }
-    return false;
+    return matchParts.some((match) => typeValueMatch(String(driverValue), match));
   };
-  const typeMatch = matchParts.every(partIsSatisfied);
+
+  let typeMatch: boolean;
+  if (options?.requireAllDrivers) {
+    // Strict mode: EVERY selected driver field must itself have a matching
+    // value in the checklist — not just the checklist as a whole across any
+    // driver. E.g. with drivers spacerBarType + spacerBarColors, both fields
+    // must individually match, not just one of them.
+    typeMatch = driverFields.every(driverValueSatisfiesSomePart);
+  } else {
+    // Default mode: every value in the Match Value checklist must be
+    // satisfied by *some* driver field's context value — an AND across
+    // matchParts, but any driver field may supply the match for each part.
+    const partIsSatisfied = (match: string): boolean => {
+      for (const driverField of driverFields) {
+        const driverValue = (context as unknown as Record<string, unknown>)[driverField];
+        if (driverValue === undefined || driverValue === null) continue;
+        if (Array.isArray(driverValue)) {
+          if (driverValue.some((item) => typeValueMatch(String(item), match))) return true;
+        } else {
+          if (typeValueMatch(String(driverValue), match)) return true;
+        }
+      }
+      return false;
+    };
+    typeMatch = matchParts.every(partIsSatisfied);
+  }
   if (!typeMatch) return false;
 
   // If an option filter is encoded, ALL of its parts must also match
@@ -729,13 +746,15 @@ export function matchVariants(
 
   // Support comma-separated multi-driver: "glassType,productTypes"
   const driverFields = preset.driverField.split(',').map((f) => f.trim()).filter(Boolean);
+  const configObj = (preset.config as Record<string, unknown> | null) ?? {};
+  const requireAllDrivers = !!configObj.requireAllDrivers;
 
   const activeVariants = preset.variants
     .filter((v) => v.isActive)
     .sort((a, b) => a.order - b.order);
 
   const matched = activeVariants.filter((variant) =>
-    matchValueMatchesContext(variant.matchValue, driverFields, context)
+    matchValueMatchesContext(variant.matchValue, driverFields, context, { requireAllDrivers })
   );
   if (matched.length <= 1) return matched;
 

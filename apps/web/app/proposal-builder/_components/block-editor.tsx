@@ -431,6 +431,24 @@ CONSTANT → intro paragraphs and closing (no number)`}
               />
             </label>
 
+            {driverField.split(',').map(v => v.trim()).filter(Boolean).length > 1 && (
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!(config.requireAllDrivers)}
+                  onChange={(e) => onConfigChange({ ...config, requireAllDrivers: e.target.checked })}
+                  className="w-3.5 h-3.5 rounded border-gray-300 text-[#1e3a5f] focus:ring-[#1e3a5f]/20"
+                />
+                <span className="text-xs text-gray-700">Require match on all Driver Variables</span>
+                <HelpHint
+                  label="Require all drivers help"
+                  title="Match all Driver Variables"
+                  description="By default a variant matches if its Match Value is found in ANY of the selected drivers. Turn this on to require EVERY selected driver to have a matching value before the variant fires."
+                  example={`Drivers = "spacerBarType" + "spacerBarColors"\nOff → matches if EITHER field has a matching value\nOn  → matches only if BOTH fields have a matching value`}
+                />
+              </label>
+            )}
+
             {/* Universal Text */}
             <div className="border border-gray-200 rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between">
