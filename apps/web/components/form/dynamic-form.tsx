@@ -1193,7 +1193,7 @@ export default function DynamicForm({
     const gridFields: {
       fieldDef: FieldDef;
       pageField: PageField;
-      column: number;
+      column: number | undefined;
       order: number;
       colSpan: number;
       rowSpan: number;
@@ -1206,7 +1206,7 @@ export default function DynamicForm({
         gridFields.push({
           fieldDef: { apiName: f.fieldApiName, label: '', type: 'Text' } as FieldDef,
           pageField: f as any,
-          column: (f as any).column ?? f.order % panel.columns,
+          column: (f as any).column,
           order: f.order,
           colSpan: f.colSpan ?? 1,
           rowSpan: (f as any).rowSpan ?? 1,
@@ -1218,7 +1218,7 @@ export default function DynamicForm({
         gridFields.push({
           fieldDef: { apiName: f.fieldApiName, label: (f as any).labelOverride ?? 'Lookup Fields', type: 'Text' } as FieldDef,
           pageField: f as any,
-          column: (f as any).column ?? f.order % panel.columns,
+          column: (f as any).column,
           order: f.order,
           colSpan: f.colSpan ?? 1,
           rowSpan: (f as any).rowSpan ?? 1,
@@ -1230,7 +1230,7 @@ export default function DynamicForm({
         gridFields.push({
           fieldDef: fd,
           pageField: f as any,
-          column: (f as any).column ?? f.order % panel.columns,
+          column: (f as any).column,
           order: f.order,
           colSpan: f.colSpan ?? 1,
           rowSpan: (f as any).rowSpan ?? 1,
@@ -1242,38 +1242,66 @@ export default function DynamicForm({
     // column count, so the rendered form matches the page-layout structure
     // exactly (independent per-column stacking let rows drift out of sync
     // with the layout editor's grid, especially once a field ran tall).
+    //
+    // Fields with an explicit `column` (dragged into place in the layout
+    // editor) keep that exact column. Fields with no explicit column (e.g.
+    // bulk-added) flow left-to-right/top-to-bottom around whatever's already
+    // placed, instead of using `order % columns` — that modulo ignored
+    // colSpan, so a spanning field earlier in the panel would silently shift
+    // every later same-row field into an already-occupied cell and bump it
+    // down a row.
     const occupied = new Set<string>();
-    type PlacedField = (typeof gridFields)[0] & { gridRow: number };
+    type PlacedField = (typeof gridFields)[0] & { column: number; gridRow: number };
     const placed: PlacedField[] = [];
+    let flowRow = 1;
+    let flowCol = 0;
 
-    const colGroups: (typeof gridFields[0])[][] = [];
-    for (let c = 0; c < panel.columns; c++) {
-      colGroups[c] = gridFields
-        .filter((f) => f.column === c)
-        .sort((a, b) => a.order - b.order);
-    }
-    for (let c = 0; c < panel.columns; c++) {
-      for (const f of colGroups[c] || []) {
-        const cs = Math.min(f.colSpan, panel.columns - f.column);
-        const rs = f.rowSpan;
-        let row = 1;
-        search: while (true) {
-          for (let dr = 0; dr < rs; dr++) {
-            for (let dc = 0; dc < cs; dc++) {
-              if (occupied.has(`${row + dr},${f.column + dc}`)) {
-                row++;
-                continue search;
-              }
-            }
+    const isOccupied = (row: number, col: number, cs: number, rs: number) => {
+      for (let dr = 0; dr < rs; dr++) {
+        for (let dc = 0; dc < cs; dc++) {
+          if (occupied.has(`${row + dr},${col + dc}`)) return true;
+        }
+      }
+      return false;
+    };
+    const markOccupied = (row: number, col: number, cs: number, rs: number) => {
+      for (let dr = 0; dr < rs; dr++) {
+        for (let dc = 0; dc < cs; dc++) {
+          occupied.add(`${row + dr},${col + dc}`);
+        }
+      }
+    };
+
+    for (const f of [...gridFields].sort((a, b) => a.order - b.order)) {
+      const rs = f.rowSpan;
+      let col: number;
+      let row: number;
+      if (f.column !== undefined && f.column !== null) {
+        col = f.column;
+        const cs = Math.min(f.colSpan, panel.columns - col);
+        row = 1;
+        while (isOccupied(row, col, cs, rs)) row++;
+        placed.push({ ...f, column: col, gridRow: row });
+        markOccupied(row, col, cs, rs);
+      } else {
+        const cs = Math.min(f.colSpan, panel.columns);
+        while (true) {
+          if (flowCol + cs > panel.columns) {
+            flowCol = 0;
+            flowRow++;
+            continue;
+          }
+          if (isOccupied(flowRow, flowCol, cs, rs)) {
+            flowCol++;
+            continue;
           }
           break;
         }
-        placed.push({ ...f, gridRow: row });
-        for (let dr = 0; dr < rs; dr++) {
-          for (let dc = 0; dc < cs; dc++) {
-            occupied.add(`${row + dr},${f.column + dc}`);
-          }
-        }
+        col = flowCol;
+        row = flowRow;
+        placed.push({ ...f, column: col, gridRow: row });
+        markOccupied(row, col, cs, rs);
+        flowCol += cs;
       }
     }
 
