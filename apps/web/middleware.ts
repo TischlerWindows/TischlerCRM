@@ -17,6 +17,9 @@ export function middleware(request: NextRequest) {
     // <img src> which is allowed by `https:` above).
     `font-src 'self' data: https://api-production-e4e8.up.railway.app https://*.up.railway.app`,
     `connect-src 'self' https://api-production-e4e8.up.railway.app https://*.up.railway.app https://*.tile.openstreetmap.org https://maps.googleapis.com`,
+    // Dropbox/proposal PDF previews are rendered via blob: object URLs in an <iframe>;
+    // 'self' alone does not cover the blob: scheme.
+    `frame-src 'self' blob:`,
     `frame-ancestors 'none'`,
     `object-src 'none'`,
     `base-uri 'self'`,
