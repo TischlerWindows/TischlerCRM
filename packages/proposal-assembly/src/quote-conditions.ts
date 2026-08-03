@@ -664,26 +664,28 @@ export function matchValueMatchesContext(
     return v.startsWith(matchPart) && (afterMatch === '' || /^[\s,;-]/.test(afterMatch));
   };
 
-  // Matches if ANY of the configured driver fields produces a match.
-  let typeMatch = false;
-  for (const driverField of driverFields) {
-    const driverValue = (context as unknown as Record<string, unknown>)[driverField];
-    if (driverValue === undefined || driverValue === null) continue;
-    if (Array.isArray(driverValue)) {
-      if (matchParts.some((match) => driverValue.some((item) => typeValueMatch(String(item), match)))) {
-        typeMatch = true;
-        break;
-      }
-    } else {
-      if (matchParts.some((match) => typeValueMatch(String(driverValue), match))) {
-        typeMatch = true;
-        break;
+  // Every value in the Match Value checklist must be satisfied by some
+  // driver field's context value — this is an AND across matchParts, not an
+  // OR. (Previously any single matched part short-circuited the whole check,
+  // so a variant configured with e.g. "Aluminum Spacer" + "Premium Colors"
+  // would incorrectly match a job that only had one of the two.)
+  const partIsSatisfied = (match: string): boolean => {
+    for (const driverField of driverFields) {
+      const driverValue = (context as unknown as Record<string, unknown>)[driverField];
+      if (driverValue === undefined || driverValue === null) continue;
+      if (Array.isArray(driverValue)) {
+        if (driverValue.some((item) => typeValueMatch(String(item), match))) return true;
+      } else {
+        if (typeValueMatch(String(driverValue), match)) return true;
       }
     }
-  }
+    return false;
+  };
+  const typeMatch = matchParts.every(partIsSatisfied);
   if (!typeMatch) return false;
 
-  // If an option filter is encoded, also check against hardwareOptions.
+  // If an option filter is encoded, ALL of its parts must also match
+  // (same AND semantics as above), against hardwareOptions.
   if (optionFilterStr) {
     const optSep = optionFilterStr.includes('\n') ? '\n' : ',';
     const optionParts = optionFilterStr
@@ -692,12 +694,31 @@ export function matchValueMatchesContext(
       .filter(Boolean);
     if (optionParts.length > 0) {
       const hwLower = context.hardwareOptions.map((o) => o.toLowerCase());
-      const optionMatch = optionParts.some((opt) => hwLower.some((hw) => typeValueMatch(hw, opt)));
+      const optionMatch = optionParts.every((opt) => hwLower.some((hw) => typeValueMatch(hw, opt)));
       if (!optionMatch) return false;
     }
   }
 
   return true;
+}
+
+/**
+ * Count how many discrete values an encoded `matchValue` checks for — used to
+ * rank matched variants by specificity so a broader/subset match (e.g. just
+ * "Aluminum Spacer") doesn't render alongside a narrower one that also
+ * matched (e.g. "Aluminum Spacer" + "Premium Colors").
+ */
+function matchValueSpecificity(matchValue: string): number {
+  if (!matchValue) return 0;
+  const sep = matchValue.includes('\n') ? '\n' : ',';
+  const pipeIdx = matchValue.indexOf('||');
+  const typeMatchStr = pipeIdx === -1 ? matchValue : matchValue.slice(0, pipeIdx);
+  const optionFilterStr = pipeIdx === -1 ? '' : matchValue.slice(pipeIdx + 2);
+  const typeCount = typeMatchStr.split(sep).map((p) => p.trim()).filter(Boolean).length;
+  if (!optionFilterStr) return typeCount;
+  const optSep = optionFilterStr.includes('\n') ? '\n' : ',';
+  const optionCount = optionFilterStr.split(optSep).map((p) => p.trim()).filter(Boolean).length;
+  return typeCount + optionCount;
 }
 
 export function matchVariants(
@@ -713,9 +734,16 @@ export function matchVariants(
     .filter((v) => v.isActive)
     .sort((a, b) => a.order - b.order);
 
-  return activeVariants.filter((variant) =>
+  const matched = activeVariants.filter((variant) =>
     matchValueMatchesContext(variant.matchValue, driverFields, context)
   );
+  if (matched.length <= 1) return matched;
+
+  // When several variants match, only the most specific one(s) should win —
+  // a variant whose Match Value is a subset of another matched variant's
+  // (fewer checked values) is strictly broader and shouldn't also render.
+  const maxSpecificity = Math.max(...matched.map((v) => matchValueSpecificity(v.matchValue)));
+  return matched.filter((v) => matchValueSpecificity(v.matchValue) === maxSpecificity);
 }
 
 export function assemblePresetsBySection(
