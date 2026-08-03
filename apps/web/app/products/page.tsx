@@ -75,7 +75,7 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
         if (!qty && !netEuro) continue;
 
         const parts = [row.type, row.type2, row.type3, row.type4].filter(Boolean);
-        const productType = parts.length ? parts.join(' w/ ') : '€';
+        const productType = parts.length ? parts.join(' w/ ') : '—';
 
         let category: string;
         if (isDoor) {
@@ -112,7 +112,7 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
 
   return Array.from(map.entries())
     .map(([key, { category, details }]) => ({
-      productType: key.split('|||')[1] ?? '€',
+      productType: key.split('|||')[1] ?? '—',
       category,
       totalQty: details.reduce((s, d) => s + d.qty, 0),
       totalFields: details.reduce((s, d) => s + d.fields, 0),
@@ -316,7 +316,7 @@ export default function ProductsPage() {
                     type="text"
                     value={filters.job}
                     onChange={e => setFilter('job', e.target.value)}
-                    placeholder="Search job€"
+                    placeholder="Search jobs…"
                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 bg-white"
                   />
                 ) : (
@@ -340,7 +340,7 @@ export default function ProductsPage() {
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
         {loading ? (
-          <div className="text-center py-16 text-gray-400 text-sm">Loading€</div>
+          <div className="text-center py-16 text-gray-400 text-sm">Loading…</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400 text-sm">
             {groups.length === 0
@@ -417,9 +417,8 @@ export default function ProductsPage() {
                                       {d.date && <span>{new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
                                     </div>
                                     {(d.widthFtIn || d.heightFtIn) && (
-                                      <div className="text-xs text-gray-600 mt-1">
+                                      <div className="text-xs text-gray-600 mt-1 flex gap-2">
                                         {d.widthFtIn && <span>W: {d.widthFtIn}</span>}
-                                        {d.widthFtIn && d.heightFtIn && <span className="mx-1 text-gray-300">€</span>}
                                         {d.heightFtIn && <span>H: {d.heightFtIn}</span>}
                                       </div>
                                     )}
