@@ -25,6 +25,23 @@ const DROPBOX_CONTENT_URL = 'https://content.dropboxapi.com/2';
 
 const CRM_ROOT_FOLDER = '/TischlerCRM';
 
+const MIME_TYPES_BY_EXT: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.svg': 'image/svg+xml',
+};
+
+/** Best-effort MIME type from a filename's extension, for inline preview. */
+function guessMimeType(fileName: string): string {
+  const ext = fileName.slice(fileName.lastIndexOf('.')).toLowerCase();
+  return MIME_TYPES_BY_EXT[ext] || 'application/octet-stream';
+}
+
 // ── Helpers ────────────────────────────────────────────────────────
 
 function getFrontendUrl(): string {
@@ -2074,6 +2091,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
     const { fileId } = req.params as { fileId: string };
+    const { name } = req.query as { name?: string };
     const accessToken = await getAccessToken(user.sub);
     if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
 
@@ -2092,11 +2110,24 @@ export async function dropboxRoutes(app: FastifyInstance) {
         return reply.code(500).send({ error: 'Failed to load file for preview' });
       }
 
-      const buffer = Buffer.from(await resp.arrayBuffer());
+      // Dropbox's content-download endpoint always reports
+      // application/octet-stream regardless of the real file type — the
+      // browser then can't tell it's a PDF/image and just downloads it.
+      // Prefer the filename the caller already knows; fall back to the
+      // api-result header Dropbox echoes back with the file's metadata.
+      let fileName = name || '';
+      if (!fileName) {
+        const resultHeader = resp.headers.get('dropbox-api-result') || resp.headers.get('x-dropbox-api-result');
+        if (resultHeader) {
+          try {
+            fileName = (JSON.parse(resultHeader).name as string) || '';
+          } catch { /* ignore */ }
+        }
+      }
       reply
-        .header('Content-Type', resp.headers.get('content-type') || 'application/octet-stream')
+        .header('Content-Type', guessMimeType(fileName))
         .header('Content-Disposition', 'inline')
-        .send(buffer);
+        .send(Buffer.from(await resp.arrayBuffer()));
     } catch (err: any) {
       app.log.error(err, 'Dropbox preview failed');
       reply.code(500).send({ error: 'Failed to load file for preview' });

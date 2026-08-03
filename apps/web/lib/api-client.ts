@@ -864,8 +864,9 @@ class ApiClient {
     return this.request<{ url: string }>(`/dropbox/download/${encodeURIComponent(fileId)}`);
   }
 
-  async getDropboxPreviewBlob(fileId: string): Promise<Blob> {
-    const url = `${this.baseUrl}/dropbox/preview/${encodeURIComponent(fileId)}`;
+  async getDropboxPreviewBlob(fileId: string, fileName?: string): Promise<Blob> {
+    const qs = fileName ? `?name=${encodeURIComponent(fileName)}` : '';
+    const url = `${this.baseUrl}/dropbox/preview/${encodeURIComponent(fileId)}${qs}`;
     const headers: Record<string, string> = {};
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
     const res = await fetch(url, { headers });

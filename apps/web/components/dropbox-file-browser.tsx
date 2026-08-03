@@ -295,7 +295,7 @@ export function DropboxFileBrowser({
     try {
       // Blob + object URL, not the raw Dropbox link — Dropbox's temporary
       // links set frame-blocking headers that stop them rendering in an <iframe>.
-      const blob = await apiClient.getDropboxPreviewBlob(entry.id);
+      const blob = await apiClient.getDropboxPreviewBlob(entry.id, entry.name);
       setPreviewUrl(URL.createObjectURL(blob));
     } catch (err: any) {
       setPreviewError(err.message || 'Failed to load preview');
