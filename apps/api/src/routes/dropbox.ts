@@ -2094,7 +2094,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
       const buffer = Buffer.from(await resp.arrayBuffer());
       reply
-        .header('Content-Type', 'application/pdf')
+        .header('Content-Type', resp.headers.get('content-type') || 'application/octet-stream')
         .header('Content-Disposition', 'inline')
         .send(buffer);
     } catch (err: any) {

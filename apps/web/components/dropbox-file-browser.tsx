@@ -56,6 +56,18 @@ function isPdfFile(entry: { name: string; isFolder: boolean }): boolean {
   return !entry.isFolder && entry.name.toLowerCase().endsWith('.pdf');
 }
 
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+
+function isImageFile(entry: { name: string; isFolder: boolean }): boolean {
+  if (entry.isFolder) return false;
+  const lower = entry.name.toLowerCase();
+  return IMAGE_EXTENSIONS.some(ext => lower.endsWith(ext));
+}
+
+function isPreviewableFile(entry: { name: string; isFolder: boolean }): boolean {
+  return isPdfFile(entry) || isImageFile(entry);
+}
+
 // Dropbox logo SVG
 function DropboxLogo({ className }: { className?: string }) {
   return (
@@ -272,7 +284,7 @@ export function DropboxFileBrowser({
   };
 
   const handleOpenFile = async (entry: DropboxEntry) => {
-    if (!isPdfFile(entry)) {
+    if (!isPreviewableFile(entry)) {
       handleDownload(entry);
       return;
     }
@@ -862,7 +874,7 @@ export function DropboxFileBrowser({
               style={contextMenuPos ? { position: 'absolute', left: contextMenuPos.x, top: contextMenuPos.y } : undefined}
               className={`${contextMenuPos ? '' : 'absolute right-4 top-12'} z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]`}
             >
-              {isPdfFile(entry) && (
+              {isPreviewableFile(entry) && (
                 <button
                   onClick={() => { handleOpenFile(entry); closeMenu(); }}
                   className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -909,7 +921,7 @@ export function DropboxFileBrowser({
         onClick={closePreview}
       >
         <div
-          className="bg-white rounded-lg shadow-2xl w-full h-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
+          className="bg-white rounded-lg shadow-2xl w-[96vw] h-[96vh] max-w-[1600px] flex flex-col overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
@@ -950,7 +962,14 @@ export function DropboxFileBrowser({
                 <p className="text-sm text-red-600">{previewError}</p>
               </div>
             ) : previewUrl ? (
-              <iframe title={previewFile.name} src={previewUrl} className="absolute inset-0 w-full h-full border-0" />
+              isPdfFile(previewFile) ? (
+                <iframe title={previewFile.name} src={previewUrl} className="absolute inset-0 w-full h-full border-0" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center overflow-auto p-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={previewUrl} alt={previewFile.name} className="max-w-full max-h-full object-contain" />
+                </div>
+              )
             ) : null}
           </div>
         </div>
