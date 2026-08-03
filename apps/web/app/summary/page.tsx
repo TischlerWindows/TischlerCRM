@@ -1736,7 +1736,7 @@ export default function SummaryPage() {
     const drawTable = (
       doc: any, startY: number, headers: string[],
       colWidths: number[], rows: string[][],
-      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[]; boldRows?: number[]; colColors?: { [colIdx: number]: [number, number, number] }; colTextColors?: { [colIdx: number]: [number, number, number] } }
+      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[]; boldRows?: number[]; rowTextColors?: { [rowIdx: number]: [number, number, number] }; rowFontSizes?: { [rowIdx: number]: number }; colColors?: { [colIdx: number]: [number, number, number] }; colTextColors?: { [colIdx: number]: [number, number, number] } }
     ) => {
       const x0 = 15;
       let y = startY;
@@ -1758,9 +1758,11 @@ export default function SummaryPage() {
         })
       );
       // Each row gets its own height = max lines in any cell of that row * baseRh
-      const rowHeights: number[] = rowLineData.map((row) => {
+      // (scaled up for rows with a larger rowFontSizes override, e.g. Grand Total)
+      const rowHeights: number[] = rowLineData.map((row, ri) => {
         const maxL = row.reduce((m, lines) => Math.max(m, lines.length), 1);
-        return baseRh * maxL;
+        const fontScale = (opts?.rowFontSizes?.[ri] ?? 6) / 6;
+        return baseRh * maxL * fontScale;
       });
 
       // fitOnPage: if the whole table won't fit on remaining page, start a new page first
@@ -1807,6 +1809,8 @@ export default function SummaryPage() {
         const rowColor = opts?.rowColors?.[ri];
         const isLast = opts?.highlightLast && ri === rows.length - 1;
         const isBoldRow = isLast || opts?.boldRows?.includes(ri);
+        const rowTxt = opts?.rowTextColors?.[ri];
+        const rowFontSize = opts?.rowFontSizes?.[ri];
         if (rowColor) {
           doc.setFillColor(...rowColor);
           doc.rect(x0, y, totalW, rh, 'F');
@@ -1818,6 +1822,7 @@ export default function SummaryPage() {
           doc.rect(x0, y, totalW, rh, 'F');
         }
         if (isBoldRow) doc.setFont('helvetica', 'bold');
+        if (rowFontSize) doc.setFontSize(rowFontSize);
 
         doc.setTextColor(50, 50, 50);
         cx = x0;
@@ -1825,8 +1830,11 @@ export default function SummaryPage() {
           const colBg = opts?.colColors?.[i];
           const colTxt = opts?.colTextColors?.[i];
           if (colBg) { doc.setFillColor(...colBg); doc.rect(cx, y, colWidths[i] ?? 0, rh, 'F'); }
-          // Re-assert text color after any fill operation — jsPDF can conflate fill/text state
-          if (colTxt) doc.setTextColor(...colTxt); else doc.setTextColor(50, 50, 50);
+          // Re-assert text color after any fill operation — jsPDF can conflate fill/text state.
+          // A row-level text color (e.g. Grand Total) wins over a column-level one.
+          if (rowTxt) doc.setTextColor(...rowTxt);
+          else if (colTxt) doc.setTextColor(...colTxt);
+          else doc.setTextColor(50, 50, 50);
           const isBoldCol = opts?.boldCol !== undefined && i === opts.boldCol;
           if (isBoldCol) doc.setFont('helvetica', 'bold');
           const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
@@ -1835,11 +1843,12 @@ export default function SummaryPage() {
           lines.forEach((line: string, li: number) => {
             doc.text(line, tx, y + 3 + li * baseRh, { align });
           });
-          if (colTxt) doc.setTextColor(50, 50, 50);
+          if (rowTxt || colTxt) doc.setTextColor(50, 50, 50);
           if (isBoldCol) doc.setFont('helvetica', 'normal');
           cx += colWidths[i] ?? 0;
         }
         if (isBoldRow) doc.setFont('helvetica', 'normal');
+        if (rowFontSize) doc.setFontSize(6);
         y += rh;
       }
       return y;
@@ -2439,10 +2448,15 @@ export default function SummaryPage() {
       aoRowColors[idx] = [255, 243, 205];
       aoBoldRows.push(idx);
     }
+    // Grand Total row reads black/bold/larger regardless of the column's
+    // usual blue/green text color, and gets extra height for the bigger font.
+    const aoGrandTotalIdx = aoRows.length - 1;
+    const aoRowTextColors: { [rowIdx: number]: [number, number, number] } = { [aoGrandTotalIdx]: [0, 0, 0] };
+    const aoRowFontSizes: { [rowIdx: number]: number } = { [aoGrandTotalIdx]: 8 };
 
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
-    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors, rowColors: aoRowColors, boldRows: aoBoldRows });
+    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors, rowColors: aoRowColors, boldRows: aoBoldRows, rowTextColors: aoRowTextColors, rowFontSizes: aoRowFontSizes });
 
     // ── Add footers to all pages ──
     const totalPages = doc.getNumberOfPages();
