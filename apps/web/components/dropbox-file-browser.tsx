@@ -52,6 +52,10 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
+function isPdfFile(entry: { name: string; isFolder: boolean }): boolean {
+  return !entry.isFolder && entry.name.toLowerCase().endsWith('.pdf');
+}
+
 // Dropbox logo SVG
 function DropboxLogo({ className }: { className?: string }) {
   return (
@@ -99,6 +103,10 @@ export function DropboxFileBrowser({
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [contextMenuId, setContextMenuId] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [previewFile, setPreviewFile] = useState<DropboxEntry | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const dragGhostRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contextRef = useRef<HTMLDivElement>(null);
@@ -260,6 +268,25 @@ export function DropboxFileBrowser({
       window.open(url, '_blank');
     } catch {
       setError('Failed to get download link');
+    }
+  };
+
+  const handleOpenFile = async (entry: DropboxEntry) => {
+    if (!isPdfFile(entry)) {
+      handleDownload(entry);
+      return;
+    }
+    setPreviewFile(entry);
+    setPreviewUrl(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
+    try {
+      const { url } = await apiClient.getDropboxDownloadUrl(entry.id);
+      setPreviewUrl(url);
+    } catch (err: any) {
+      setPreviewError(err.message || 'Failed to load preview');
+    } finally {
+      setPreviewLoading(false);
     }
   };
 
@@ -560,6 +587,7 @@ export function DropboxFileBrowser({
 
   // ── Connected — full file browser ──
   return (
+    <>
     <div className="border border-gray-200 rounded-lg mt-4 overflow-visible relative">
       {/* Hidden drag ghost */}
       <div
@@ -779,7 +807,7 @@ export function DropboxFileBrowser({
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleDownload(entry)}
+                          onClick={() => handleOpenFile(entry)}
                           className="text-sm text-gray-700 hover:text-blue-600 truncate text-left"
                         >
                           {entry.name}
@@ -825,6 +853,14 @@ export function DropboxFileBrowser({
               style={contextMenuPos ? { position: 'absolute', left: contextMenuPos.x, top: contextMenuPos.y } : undefined}
               className={`${contextMenuPos ? '' : 'absolute right-4 top-12'} z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]`}
             >
+              {isPdfFile(entry) && (
+                <button
+                  onClick={() => { handleOpenFile(entry); closeMenu(); }}
+                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <FileText className="w-3.5 h-3.5" /> Preview
+                </button>
+              )}
               <button
                 onClick={() => { handleDownload(entry); closeMenu(); }}
                 className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -856,5 +892,61 @@ export function DropboxFileBrowser({
         {currentPath.length > 0 && ` in /${currentPath.join('/')}`}
       </div>
     </div>
+
+    {/* Inline PDF preview modal, SharePoint-style */}
+    {previewFile && (
+      <div
+        className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4"
+        onClick={() => setPreviewFile(null)}
+      >
+        <div
+          className="bg-white rounded-lg shadow-2xl w-full h-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText className="w-4 h-4 text-red-500 shrink-0" />
+              <span className="text-sm font-medium text-gray-800 truncate">{previewFile.name}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => handleDownload(previewFile)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Download</span>
+              </button>
+              <button
+                onClick={() => openInDropbox(previewFile.path)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Open in Dropbox</span>
+              </button>
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div className="relative flex-1 min-h-0 bg-gray-100">
+            {previewLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+              </div>
+            ) : previewError ? (
+              <div className="absolute inset-0 flex items-center justify-center p-6">
+                <p className="text-sm text-red-600">{previewError}</p>
+              </div>
+            ) : previewUrl ? (
+              <iframe title={previewFile.name} src={previewUrl} className="absolute inset-0 w-full h-full border-0" />
+            ) : null}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
