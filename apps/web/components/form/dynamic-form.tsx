@@ -1282,7 +1282,7 @@ export default function DynamicForm({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${panel.columns}, 1fr)`,
+            gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))`,
             gridAutoRows: 'minmax(60px, auto)',
             gap: '1rem',
           }}
@@ -1295,6 +1295,7 @@ export default function DynamicForm({
                 gridRow: `${f.gridRow} / span ${f.rowSpan}`,
                 display: 'flex',
                 flexDirection: 'column',
+                minWidth: 0,
               }}
             >
               <div
