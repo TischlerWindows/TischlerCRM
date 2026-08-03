@@ -1238,42 +1238,10 @@ export default function DynamicForm({
       }
     }
 
-    const hasSpanning = gridFields.some(
-      (f) => f.colSpan > 1 || f.rowSpan > 1,
-    );
-
-    if (!hasSpanning) {
-      const columnArrays: (typeof gridFields)[] = [];
-      for (let i = 0; i < panel.columns; i++) {
-        columnArrays[i] = gridFields
-          .filter((f) => f.column === i)
-          .sort((a, b) => a.order - b.order);
-      }
-
-      return (
-        <div className="p-4 pt-0">
-          <div
-            className={cn(
-              'grid gap-4',
-              panel.columns === 1 && 'grid-cols-1',
-              panel.columns === 2 && 'grid-cols-1 md:grid-cols-2',
-              panel.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
-              panel.columns === 4 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
-            )}
-          >
-            {columnArrays.map((columnEntries, colIndex) => (
-              <div key={`col-${colIndex}`} className="flex flex-col gap-4">
-                {columnEntries.map((entry) =>
-                  renderField(entry.fieldDef, false, entry.pageField),
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    // Spanning mode
+    // Always place fields on a true CSS grid keyed to the panel's configured
+    // column count, so the rendered form matches the page-layout structure
+    // exactly (independent per-column stacking let rows drift out of sync
+    // with the layout editor's grid, especially once a field ran tall).
     const occupied = new Set<string>();
     type PlacedField = (typeof gridFields)[0] & { gridRow: number };
     const placed: PlacedField[] = [];
