@@ -1328,8 +1328,13 @@ export default function SummaryPage() {
       address,
     };
     const updatedSummaries = [duplicated, ...summaries];
+    try {
+      await apiClient.put(`/summaries/${duplicated.id}`, { value: duplicated });
+    } catch (err: any) {
+      alert(`Failed to duplicate summary: ${err?.message || 'Unknown error'}`);
+      return;
+    }
     setSummaries(updatedSummaries);
-    apiClient.put(`/summaries/${duplicated.id}`, { value: duplicated }).catch(() => {});
     const logItems = buildProductLogItems(duplicated);
     apiClient.post('/product-log/sync', {
       summaryId: duplicated.id,
@@ -2525,7 +2530,7 @@ export default function SummaryPage() {
     }
   };
 
-  const handleSaveSummary = () => {
+  const handleSaveSummary = async () => {
     if (!editingSummary) return;
     
     // Validate required fields
@@ -2568,6 +2573,19 @@ export default function SummaryPage() {
       apiClient.post(`/summaries/${summaryToSave.id}/lock`).catch(() => {});
     }
 
+    // Persist to the server FIRST — only reflect the save in local state (and
+    // show the "Saved" toast) once it actually succeeds. Previously this PUT
+    // was fire-and-forget with `.catch(() => {})`, so any failure (network
+    // blip, validation error, 500) was silently swallowed: the toast still
+    // said "Summary saved!" and local state still showed the edit, even
+    // though nothing persisted server-side — the next reload would revert it.
+    try {
+      await apiClient.put(`/summaries/${summaryToSave.id}`, { value: summaryToSave });
+    } catch (err: any) {
+      alert(`Failed to save summary: ${err?.message || 'Unknown error'}\n\nYour changes were NOT saved — please try again.`);
+      return;
+    }
+
     let updatedSummaries;
     if (isNew) {
       updatedSummaries = [summaryToSave, ...summaries];
@@ -2578,7 +2596,6 @@ export default function SummaryPage() {
     }
 
     setSummaries(updatedSummaries);
-    apiClient.put(`/summaries/${summaryToSave.id}`, { value: summaryToSave }).catch(() => {});
     // Sync product log
     const logItems = buildProductLogItems(summaryToSave);
     apiClient.post('/product-log/sync', {
