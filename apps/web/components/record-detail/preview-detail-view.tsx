@@ -23,14 +23,17 @@ export function PreviewDetailView({ layout, record, objectDef }: PreviewDetailVi
   const [activeTabIdx, setActiveTabIdx] = useState(0);
   const [sectionToggles, setSectionToggles] = useState<Record<string, boolean>>({});
   const [collapsedPanelIds, setCollapsedPanelIds] = useState<Set<string>>(new Set());
+  const [manualPanelIds, setManualPanelIds] = useState<Set<string>>(new Set());
   const [collapsedWidgetIds, setCollapsedWidgetIds] = useState<Set<string>>(
     () => collectDefaultCollapsedWidgetIds(layout),
   );
 
-  const togglePanelCollapse = (panelId: string) => {
+  const togglePanelCollapse = (panelId: string, currentlyCollapsed?: boolean) => {
+    setManualPanelIds((prev) => (prev.has(panelId) ? prev : new Set(prev).add(panelId)));
     setCollapsedPanelIds((prev) => {
       const next = new Set(prev);
-      if (next.has(panelId)) next.delete(panelId);
+      const isCollapsed = currentlyCollapsed !== undefined ? currentlyCollapsed : prev.has(panelId);
+      if (isCollapsed) next.delete(panelId);
       else next.add(panelId);
       return next;
     });
@@ -114,6 +117,7 @@ export function PreviewDetailView({ layout, record, objectDef }: PreviewDetailVi
         setSectionToggles={setSectionToggles}
         collapsedPanelIds={collapsedPanelIds}
         togglePanelCollapse={togglePanelCollapse}
+        manualPanelIds={manualPanelIds}
         collapsedWidgetIds={collapsedWidgetIds}
         toggleWidgetCollapse={toggleWidgetCollapse}
       />

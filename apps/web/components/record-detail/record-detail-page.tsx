@@ -142,10 +142,13 @@ export default function RecordDetailPage({
   const [sectionToggles, setSectionToggles] = useState<Record<string, boolean>>({});
   const [activeTabIdx, setActiveTabIdx] = useState(0);
   const [collapsedPanelIds, setCollapsedPanelIds] = useState<Set<string>>(new Set());
-  const togglePanelCollapse = useCallback((panelId: string) => {
+  const [manualPanelIds, setManualPanelIds] = useState<Set<string>>(new Set());
+  const togglePanelCollapse = useCallback((panelId: string, currentlyCollapsed?: boolean) => {
+    setManualPanelIds((prev) => (prev.has(panelId) ? prev : new Set(prev).add(panelId)));
     setCollapsedPanelIds((prev) => {
       const next = new Set(prev);
-      if (next.has(panelId)) next.delete(panelId);
+      const isCollapsed = currentlyCollapsed !== undefined ? currentlyCollapsed : prev.has(panelId);
+      if (isCollapsed) next.delete(panelId);
       else next.add(panelId);
       return next;
     });
@@ -553,6 +556,7 @@ export default function RecordDetailPage({
                       setSectionToggles={setSectionToggles}
                       collapsedPanelIds={collapsedPanelIds}
                       togglePanelCollapse={togglePanelCollapse}
+                      manualPanelIds={manualPanelIds}
                       collapsedWidgetIds={collapsedWidgetIds}
                       toggleWidgetCollapse={toggleWidgetCollapse}
                     />
@@ -579,6 +583,7 @@ export default function RecordDetailPage({
                     setSectionToggles={setSectionToggles}
                     collapsedPanelIds={collapsedPanelIds}
                     togglePanelCollapse={togglePanelCollapse}
+                    manualPanelIds={manualPanelIds}
                     collapsedWidgetIds={collapsedWidgetIds}
                     toggleWidgetCollapse={toggleWidgetCollapse}
                   />

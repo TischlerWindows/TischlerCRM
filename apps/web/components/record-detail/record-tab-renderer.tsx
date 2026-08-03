@@ -141,7 +141,9 @@ export interface RecordTabRendererProps {
   setSectionToggles: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   /** Panel-level collapse state (for new model) */
   collapsedPanelIds: Set<string>;
-  togglePanelCollapse: (panelId: string) => void;
+  togglePanelCollapse: (panelId: string, currentlyCollapsed?: boolean) => void;
+  /** Panels the user has explicitly toggled — overrides the auto-collapse-when-empty default */
+  manualPanelIds: Set<string>;
   /** Widget-level collapse state */
   collapsedWidgetIds: Set<string>;
   toggleWidgetCollapse: (widgetId: string) => void;
@@ -259,6 +261,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
     isLookupLoaded,
     collapsedPanelIds,
     togglePanelCollapse,
+    manualPanelIds,
     collapsedWidgetIds,
     toggleWidgetCollapse,
     enabledWidgetIds,
@@ -429,12 +432,20 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
             ...(panel.style?.bodyBackground ? { backgroundColor: panel.style.bodyBackground } : {}),
           };
 
-          const isPanelCollapsed = collapsedPanelIds.has(panel.id);
+          // A panel with no populated fields starts collapsed (until the user toggles it manually)
+          const isPanelEmpty = visibleFields.every((f: any) => {
+            if (f.kind === 'teamMemberSlot' || f.kind === 'lookupFields') return false;
+            const fd = getFieldDef(f.fieldApiName, objectDef);
+            if (!fd || fd.type === 'LookupFields') return false;
+            const v = getRecordValue(f.fieldApiName, record, fd, formulaValues);
+            return v === undefined || v === null || v === '' || v === 'N/A' || (Array.isArray(v) && v.length === 0);
+          });
+          const isPanelCollapsed = manualPanelIds.has(panel.id) ? collapsedPanelIds.has(panel.id) : isPanelEmpty;
           return (
             <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm">
               <button
                 type="button"
-                onClick={() => togglePanelCollapse(panel.id)}
+                onClick={() => togglePanelCollapse(panel.id, isPanelCollapsed)}
                 className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left rounded-t-lg overflow-hidden"
                 style={headerStyle}
                 aria-label={isPanelCollapsed ? `Expand ${panel.label} panel` : `Collapse ${panel.label} panel`}
