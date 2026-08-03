@@ -4766,8 +4766,24 @@ export default function SummaryPage() {
 
                     const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
                     const fmtInt = (v: number) => v ? Math.round(v).toLocaleString('en-US') : '—';
-                    // Format a stored raw number string for display inside the input ($87,600)
-                    const fmtQtInput = (v: string) => { const n = parseFloat((v || '').replace(/[$,]/g, '')); return n ? '$' + n.toLocaleString('en-US') : (v || ''); };
+                    // Format a stored raw number string for display inside the input ($87,600.50).
+                    // Groups the integer part with commas but preserves the decimal portion exactly
+                    // as typed (trailing "." or trailing zeros) instead of round-tripping through
+                    // parseFloat/toLocaleString, which silently discarded them mid-keystroke and
+                    // made it impossible to type cents.
+                    const fmtMoneyInput = (v: string, symbol: string): string => {
+                      const cleaned = (v || '').split(symbol).join('').replace(/,/g, '');
+                      if (!cleaned) return v || '';
+                      const neg = cleaned.startsWith('-');
+                      const body = neg ? cleaned.slice(1) : cleaned;
+                      const dotIdx = body.indexOf('.');
+                      const intRaw = (dotIdx === -1 ? body : body.slice(0, dotIdx)).replace(/\D/g, '');
+                      const decRaw = dotIdx === -1 ? '' : body.slice(dotIdx + 1).replace(/\D/g, '');
+                      if (!intRaw && dotIdx === -1) return v || '';
+                      const groupedInt = intRaw ? Number(intRaw).toLocaleString('en-US') : '0';
+                      return `${neg ? '-' : ''}${symbol}${groupedInt}${dotIdx !== -1 ? '.' + decRaw : ''}`;
+                    };
+                    const fmtQtInput = (v: string) => fmtMoneyInput(v, '$');
                     const stripQtInput = (v: string) => v.replace(/[$,]/g, '');
 
                     const totalQty = euroWindowQty + doubleHungQty + doorQty;
@@ -5289,7 +5305,7 @@ export default function SummaryPage() {
                         const inp = (key: string, field: string, placeholder?: string) => {
                           const isDollar = field === 'full' || field === 'pct' || field === 'final';
                           const isEuro = field === 'netEuro';
-                          const fmtEuro = (v: string) => { const n = parseFloat((v || '').replace(/[€,]/g, '')); return n ? '€' + n.toLocaleString('en-US') : (v || ''); };
+                          const fmtEuro = (v: string) => fmtMoneyInput(v, '€');
                           const raw = getAo(key)[field] || '';
                           const displayVal = isDollar ? fmtQtInput(raw) : isEuro ? fmtEuro(raw) : raw;
                           const onChange = (e: React.ChangeEvent<HTMLInputElement>) => setAo(key, field, isDollar ? stripQtInput(e.target.value) : isEuro ? e.target.value.replace(/[€,]/g, '') : e.target.value);
