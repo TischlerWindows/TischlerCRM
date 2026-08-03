@@ -24,6 +24,7 @@ import { reportRoutes } from './routes/reports.js';
 import { dashboardRoutes } from './routes/dashboards.js';
 import { backupRoutes } from './routes/backup.js';
 import { settingRoutes } from './routes/settings.js';
+import { summaryRoutes } from './routes/summaries.js';
 import { preferenceRoutes } from './routes/preferences.js';
 import { departmentRoutes } from './routes/departments.js';
 import { usersAdminRoutes } from './routes/users-admin.js';
@@ -554,6 +555,7 @@ export function buildApp() {
   app.register(dashboardRoutes);
   app.register(backupRoutes);
   app.register(settingRoutes);
+  app.register(summaryRoutes);
   app.register(preferenceRoutes);
   app.register(departmentRoutes);
   app.register(usersAdminRoutes);
