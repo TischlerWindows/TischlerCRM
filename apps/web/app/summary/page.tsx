@@ -46,6 +46,7 @@ import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { DateInput } from '@/components/date-input';
 import { useSchemaStore } from '@/lib/schema-store';
+import { filterPicklistValues } from '@/components/form/picklist-fields';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -917,6 +918,31 @@ export default function SummaryPage() {
   const oppFields = schema?.objects?.find(o => o.apiName === 'Opportunity')?.fields ?? [];
   const getOppPicklist = (apiName: string): string[] =>
     oppFields.find(f => f.apiName === apiName)?.picklistValues ?? [];
+
+  // Maps the (un-prefixed) Opportunity field apiName used by a Conditional
+  // Field Formatting rule's condition to the corresponding Summary property,
+  // so those rules (e.g. "Spacer Bar Colors depends on Spacer Bar Type",
+  // configured in Object Manager) are honored here too, not just in the
+  // generic dynamic-form record editor.
+  const PICKLIST_DEP_FIELD_MAP: Record<string, string> = {
+    woodType: 'woodType',
+    finishSpecifications: 'finish',
+    glassType: 'glassType',
+    spacer_bar_type: 'spacerBarType',
+    spacerBarColors: 'spacerBarColors',
+    finials: 'finials',
+    hingeFinishSpecification: 'hingeFinishSpecification',
+  };
+  const getOppPicklistFiltered = (apiName: string): string[] => {
+    const fieldDef = oppFields.find(f => f.apiName === apiName);
+    const raw = fieldDef?.picklistValues ?? [];
+    if (!fieldDef?.picklistDependencies?.length || !editingSummary) return raw;
+    const recordData: Record<string, any> = {};
+    for (const [oppKey, summaryKey] of Object.entries(PICKLIST_DEP_FIELD_MAP)) {
+      recordData[oppKey] = (editingSummary as any)[summaryKey];
+    }
+    return filterPicklistValues(raw, fieldDef, recordData, {});
+  };
 
   // Arrow-key/Tab navigation when a cell is selected but not in edit mode
   useEffect(() => {
@@ -4332,7 +4358,7 @@ export default function SummaryPage() {
                             className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.woodType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
                           >
                             <option value="">Select wood type...</option>
-                            {getOppPicklist('Opportunity__woodType').map(v => (
+                            {getOppPicklistFiltered('Opportunity__woodType').map(v => (
                               <option key={v} value={v}>{v}</option>
                             ))}
                             <option value="Custom Option">Custom Option</option>
@@ -4356,7 +4382,7 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select finish...</option>
-                            {getOppPicklist('Opportunity__finishSpecifications').map(v => (
+                            {getOppPicklistFiltered('Opportunity__finishSpecifications').map(v => (
                               <option key={v} value={v}>{v}</option>
                             ))}
                           </select>
@@ -4379,7 +4405,7 @@ export default function SummaryPage() {
                                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.glassType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
                               >
                                 <option value="">Select glass type...</option>
-                                {getOppPicklist('Opportunity__glassType').map(v => (
+                                {getOppPicklistFiltered('Opportunity__glassType').map(v => (
                                   <option key={v} value={v}>{v}</option>
                                 ))}
                                 <option value="Custom Option">Custom Option</option>
@@ -4404,7 +4430,7 @@ export default function SummaryPage() {
                                   className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.hungType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
                                 >
                                   <option value="">Select hung glass type...</option>
-                                  {getOppPicklist('Opportunity__glassType').map(v => (
+                                  {getOppPicklistFiltered('Opportunity__glassType').map(v => (
                                     <option key={v} value={v}>{v}</option>
                                   ))}
                                   <option value="Custom Option">Custom Option</option>
@@ -4428,7 +4454,7 @@ export default function SummaryPage() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Additional Glass Types for Proposal</label>
                         {(() => {
-                          const options = getOppPicklist('Opportunity__glassType');
+                          const options = getOppPicklistFiltered('Opportunity__glassType');
                           const selected = editingSummary.additionalGlassTypes || [];
                           return (
                             <details className="relative">
@@ -4473,7 +4499,7 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select spacer bar type...</option>
-                            {getOppPicklist('Opportunity__spacer_bar_type').map(v => (
+                            {getOppPicklistFiltered('Opportunity__spacer_bar_type').map(v => (
                               <option key={v} value={v}>{v}</option>
                             ))}
                           </select>
@@ -4486,7 +4512,7 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select spacer bar colors...</option>
-                            {getOppPicklist('Opportunity__spacerBarColors').map(v => (
+                            {getOppPicklistFiltered('Opportunity__spacerBarColors').map(v => (
                               <option key={v} value={v}>{v}</option>
                             ))}
                           </select>
@@ -4554,7 +4580,7 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select...</option>
-                            {getOppPicklist('Opportunity__finials').map(v => (
+                            {getOppPicklistFiltered('Opportunity__finials').map(v => (
                               <option key={v} value={v}>{v}</option>
                             ))}
                           </select>
@@ -4567,7 +4593,7 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select...</option>
-                            {getOppPicklist('Opportunity__hingeFinishSpecification').map(v => (
+                            {getOppPicklistFiltered('Opportunity__hingeFinishSpecification').map(v => (
                               <option key={v} value={v}>{v}</option>
                             ))}
                           </select>
