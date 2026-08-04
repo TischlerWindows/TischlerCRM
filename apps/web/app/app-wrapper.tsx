@@ -123,7 +123,12 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/product-log') ||
     pathname?.includes('demo');
 
-  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
+  // Proposal Builder is a full-viewport (h-screen) tool with its own embedded
+  // header/back-link, same as the Object Manager page editor — it must be
+  // excluded here too, otherwise its h-screen root gets nested under this
+  // wrapper's own sticky header + h-dvh container and overflows, clipping
+  // the top of its own toolbar (the Save button lives there).
+  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/proposal-builder') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
 
   // Always refresh schema from the API on mount / when user changes.
   // The persisted Zustand cache provides a value for the very first paint
