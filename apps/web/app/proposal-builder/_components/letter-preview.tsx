@@ -362,8 +362,8 @@ function BlockPreview({
             </div>
           ) : (
             <>
-              <div className="text-[10pt] font-bold" style={{ color: NAVY }}>
-                <span className="inline-block w-7">({specNumber ?? 1})</span>
+              <div className="flex text-[10pt] font-bold" style={{ color: NAVY }}>
+                <span className="w-7 shrink-0">({specNumber ?? 1})</span>
                 <span>{preset.title}</span>
               </div>
               {preset.body && (
