@@ -767,6 +767,40 @@ function matchValueSpecificity(matchValue: string): number {
   return typeCount + optionCount;
 }
 
+/**
+ * Returns true if variant `a` is strictly subsumed by variant `b`:
+ * all of a's type-match parts appear in b's, and b has more constraints
+ * (extra type parts or adds an option filter). Used to suppress a less-
+ * specific variant when a more-specific sibling also matched.
+ *
+ * Variants matching on entirely different product types (e.g. "L&R D" vs
+ * "Outswing Folding Window,...") are never in a subset relationship, so
+ * neither suppresses the other.
+ */
+function isSubsetVariant(a: SpecVariantData, b: SpecVariantData): boolean {
+  const parseParts = (mv: string) => {
+    const sep = mv.includes('\n') ? '\n' : ',';
+    const pipeIdx = mv.indexOf('||');
+    const typeStr = pipeIdx === -1 ? mv : mv.slice(0, pipeIdx);
+    const optStr = pipeIdx === -1 ? '' : mv.slice(pipeIdx + 2);
+    return {
+      typeParts: new Set(typeStr.split(sep).map((p) => p.trim().toLowerCase()).filter(Boolean)),
+      hasOptions: !!optStr.trim(),
+    };
+  };
+  const ap = parseParts(a.matchValue);
+  const bp = parseParts(b.matchValue);
+  // Every type part of a must appear in b
+  for (const t of ap.typeParts) {
+    if (!bp.typeParts.has(t)) return false;
+  }
+  // b must be strictly more constrained (not an identical matchValue)
+  if (ap.typeParts.size === bp.typeParts.size && ap.hasOptions === bp.hasOptions) return false;
+  // a having options that b doesn't is not a subset relationship
+  if (ap.hasOptions && !bp.hasOptions) return false;
+  return true;
+}
+
 export function matchVariants(
   preset: SpecPresetData,
   context: QuoteContext
@@ -787,11 +821,10 @@ export function matchVariants(
   );
   if (matched.length <= 1) return matched;
 
-  // When several variants match, only the most specific one(s) should win —
-  // a variant whose Match Value is a subset of another matched variant's
-  // (fewer checked values) is strictly broader and shouldn't also render.
-  const maxSpecificity = Math.max(...matched.map((v) => matchValueSpecificity(v.matchValue)));
-  return matched.filter((v) => matchValueSpecificity(v.matchValue) === maxSpecificity);
+  // Eliminate variants whose criteria are strictly subsumed by another matched variant.
+  // "L&R D" is eliminated when "L&R D||72mm Thick Sash" also matches (same type, B adds option).
+  // "Outswing Folding Window,..." is NOT eliminated by "L&R D||72mm" — different type families.
+  return matched.filter((a) => !matched.some((b) => a !== b && isSubsetVariant(a, b)));
 }
 
 export function assemblePresetsBySection(
