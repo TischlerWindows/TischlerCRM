@@ -31,12 +31,12 @@ const DRIVER_FIELD_SCHEMA_MAP: Record<string, string> = {
   woodType: 'Opportunity__woodType',
   finishType: 'Opportunity__finishSpecifications',
   spacerBarType: 'Opportunity__spacer_bar_type',
+  spacerBarColors: 'Opportunity__spacerBarColors',
 };
 
 /** Hard-coded choices for driver fields that aren't a simple picklist in the schema. */
 const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
   jobType: ['Premium', 'Coastal', 'Dade County'],
-  spacerBarColors: ['Standard White, Silver, Brown, Black', 'Premium C31, C32, C33, C34'],
   // Matched against QuoteContext.hasMultipleLocations, which is coerced to the
   // literal string "true"/"false" during variant matching — keep these values
   // in sync with that (see matchValueMatchesContext in quote-conditions.ts).
