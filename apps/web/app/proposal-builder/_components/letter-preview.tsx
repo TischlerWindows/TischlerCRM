@@ -367,7 +367,7 @@ function BlockPreview({
                 <span>{preset.title}</span>
               </div>
               {preset.body && (
-                <SafeRichHtml className="mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
+                <SafeRichHtml className="mt-0.5 pl-7 text-[10pt] leading-[1.55]" html={preset.body} bodyKey={bodyKey} />
               )}
             </>
           )}
