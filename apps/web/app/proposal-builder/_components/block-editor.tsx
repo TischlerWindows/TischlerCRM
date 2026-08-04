@@ -23,7 +23,7 @@ const DRIVER_FIELDS = [
   { value: 'spacerBarColors', label: 'Spacer Bar Colors' },
   { value: 'sdlType', label: 'SDL Type' },
   { value: 'tdlType', label: 'TDL Type' },
-  { value: 'hasSdlOrTdl', label: 'SDL/TDL Selected' },
+  { value: 'sdlTdlSelection', label: 'SDL/TDL Selected' },
   { value: 'hasMultipleLocations', label: 'Multiple Locations' },
 ];
 
@@ -44,11 +44,12 @@ const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
   // 125MM) respectively; see QuoteContext.sdlType/tdlType in quote-conditions.ts.
   sdlType: ['22MM', '44MM'],
   tdlType: ['48MM', '70MM', '125MM'],
-  // Matched against QuoteContext.hasSdlOrTdl/hasMultipleLocations, which are
-  // coerced to the literal string "true"/"false" during variant matching —
-  // keep these values in sync with that (see matchValueMatchesContext in
-  // quote-conditions.ts).
-  hasSdlOrTdl: ['true', 'false'],
+  // Matches QuoteContext.sdlTdlSelection — which of SDL/TDL is filled in on
+  // the job (see buildQuoteContext in quote-conditions.ts).
+  sdlTdlSelection: ['SDL', 'TDL', 'Both', 'Neither'],
+  // Matched against QuoteContext.hasMultipleLocations, which is coerced to the
+  // literal string "true"/"false" during variant matching — keep these values
+  // in sync with that (see matchValueMatchesContext in quote-conditions.ts).
   hasMultipleLocations: ['true', 'false'],
   productTypes: [
     // Hung windows

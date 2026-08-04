@@ -93,8 +93,8 @@ export interface QuoteContext {
   woodType: string;
   sdlType: string;
   tdlType: string;
-  /** True when either an SDL or a TDL value is selected (vs. blank/none). */
-  hasSdlOrTdl: boolean;
+  /** Which of SDL/TDL is selected on the job: 'SDL' | 'TDL' | 'Both' | 'Neither'. */
+  sdlTdlSelection: 'SDL' | 'TDL' | 'Both' | 'Neither';
   spacerBarType: string;
   spacerBarColors: string;
   quoteType: string;
@@ -392,7 +392,14 @@ export function buildQuoteContext(summary: SummaryForConditions): QuoteContext {
     woodType: summary.woodType || '',
     sdlType: summary.sdl || summary.sdlCustom || '',
     tdlType: summary.tdl || summary.tdlCustom || '',
-    hasSdlOrTdl: !!(summary.sdl || summary.sdlCustom || summary.tdl || summary.tdlCustom),
+    sdlTdlSelection: (() => {
+      const hasSdl = !!(summary.sdl || summary.sdlCustom);
+      const hasTdl = !!(summary.tdl || summary.tdlCustom);
+      if (hasSdl && hasTdl) return 'Both';
+      if (hasSdl) return 'SDL';
+      if (hasTdl) return 'TDL';
+      return 'Neither';
+    })(),
     spacerBarType: summary.spacerBarType || '',
     spacerBarColors: summary.spacerBarColors || '',
     quoteType: summary.quoteType || '',
