@@ -68,6 +68,8 @@ export interface SummaryForPlaceholders {
   finish: string;
   sdl: string;
   sdlCustom?: string;
+  tdl?: string;
+  tdlCustom?: string;
   spacerBarColors: string;
   spacerBarType: string;
   woodType: string;
@@ -161,6 +163,16 @@ function mmToFractionalInches(mm: number): string {
   const fracs = ['', '1/16', '1/8', '3/16', '1/4', '5/16', '3/8', '7/16', '1/2', '9/16', '5/8', '11/16', '3/4', '13/16', '7/8', '15/16'];
   const frac = fracs[fracIndex] ?? '';
   return frac ? `${adjWhole}-${frac}"` : `${adjWhole}"`;
+}
+
+/**
+ * Parse an SDL/TDL value like "22MM" and convert it to a fractional-inch
+ * string (e.g. `7/8"`). Returns '' if no leading number is found (blank or
+ * "Custom Option").
+ */
+function sdlTdlToFractionalInches(raw: string): string {
+  const m = (raw || '').match(/(\d+(?:\.\d+)?)/);
+  return m ? mmToFractionalInches(parseFloat(m[1] ?? '0')) : '';
 }
 
 /** Expand product type abbreviations to full names. */
@@ -523,6 +535,14 @@ export function buildTokenMap(
     glassType: summary.glassTypeCustom || summary.glassType || '',
     finishType,
     sdlType: summary.sdlCustom || summary.sdl || '',
+    // Fractional-inch equivalent of the SDL/TDL mm value (e.g. "22MM" → `7/8"`),
+    // for use in muntin/mullion spec text like "a {{sdlInches}} simulated
+    // divided lite (SDL) muntin and mullion system." Prefer the custom value
+    // when "Custom Option" was picked, so a custom mm entry (e.g. "30mm") still
+    // converts — the raw select value ("Custom Option") has no digits to parse.
+    sdlInches: sdlTdlToFractionalInches(summary.sdlCustom || summary.sdl || ''),
+    tdlType: summary.tdlCustom || summary.tdl || '',
+    tdlInches: sdlTdlToFractionalInches(summary.tdlCustom || summary.tdl || ''),
     spacerBarColor: summary.spacerBarColors || '',
     spacerBarType: summary.spacerBarType || '',
     woodType: summary.woodTypeCustom || summary.woodType || '',
