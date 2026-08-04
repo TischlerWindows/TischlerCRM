@@ -338,9 +338,13 @@ export function assembleProposal({
           // If the variant body is blank, fall back to the block body.
           const variantBodySource = variant.body?.trim() ? variant.body : (preset.body || '');
           const resolved = resolveTokensWithDiagnostics(variantBodySource, tokens);
-          // Per-body-variant title (set via VariantEditor title field) overrides the
-          // effective title when useTitleVariants is off. When on, title variants win.
-          const rawVariantTitle = useTitleVariants ? null : (variant.title?.trim() || null);
+          // Per-body-variant title (set via VariantEditor title field) only
+          // overrides the block's own static title when "Title Variants" is
+          // explicitly turned on for this block. Off (the default) means the
+          // block's static Title always wins, even if a variant's Title field
+          // happens to have text in it — matches the "Title Variants?"
+          // checkbox shown in the block editor.
+          const rawVariantTitle = useTitleVariants ? (variant.title?.trim() || null) : null;
           const variantTitle = rawVariantTitle
             ? resolveTokensWithDiagnostics(rawVariantTitle, tokens).text
             : null;
