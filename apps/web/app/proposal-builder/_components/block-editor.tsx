@@ -22,6 +22,8 @@ const DRIVER_FIELDS = [
   { value: 'spacerBarType', label: 'Spacer Bar Type' },
   { value: 'spacerBarColors', label: 'Spacer Bar Colors' },
   { value: 'sdlType', label: 'SDL Type' },
+  { value: 'tdlType', label: 'TDL Type' },
+  { value: 'hasSdlOrTdl', label: 'SDL/TDL Selected' },
   { value: 'hasMultipleLocations', label: 'Multiple Locations' },
 ];
 
@@ -37,13 +39,16 @@ const DRIVER_FIELD_SCHEMA_MAP: Record<string, string> = {
 /** Hard-coded choices for driver fields that aren't a simple picklist in the schema. */
 const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
   jobType: ['Premium', 'Coastal', 'Dade County'],
-  // sdlType isn't backed by an Opportunity picklist — it's derived in the Summary
-  // from either the SDL select (22MM/44MM) or the TDL select (48MM/70MM/125MM),
-  // see QuoteContext.sdlType in quote-conditions.ts.
-  sdlType: ['22MM', '44MM', '48MM', '70MM', '125MM'],
-  // Matched against QuoteContext.hasMultipleLocations, which is coerced to the
-  // literal string "true"/"false" during variant matching — keep these values
-  // in sync with that (see matchValueMatchesContext in quote-conditions.ts).
+  // sdlType/tdlType aren't backed by an Opportunity picklist — they're derived
+  // in the Summary from the SDL select (22MM/44MM) and TDL select (48MM/70MM/
+  // 125MM) respectively; see QuoteContext.sdlType/tdlType in quote-conditions.ts.
+  sdlType: ['22MM', '44MM'],
+  tdlType: ['48MM', '70MM', '125MM'],
+  // Matched against QuoteContext.hasSdlOrTdl/hasMultipleLocations, which are
+  // coerced to the literal string "true"/"false" during variant matching —
+  // keep these values in sync with that (see matchValueMatchesContext in
+  // quote-conditions.ts).
+  hasSdlOrTdl: ['true', 'false'],
   hasMultipleLocations: ['true', 'false'],
   productTypes: [
     // Hung windows

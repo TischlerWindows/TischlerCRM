@@ -92,6 +92,9 @@ export interface QuoteContext {
   finishType: string;
   woodType: string;
   sdlType: string;
+  tdlType: string;
+  /** True when either an SDL or a TDL value is selected (vs. blank/none). */
+  hasSdlOrTdl: boolean;
   spacerBarType: string;
   spacerBarColors: string;
   quoteType: string;
@@ -387,7 +390,9 @@ export function buildQuoteContext(summary: SummaryForConditions): QuoteContext {
     jobType: summary.jobType || '',
     finishType,
     woodType: summary.woodType || '',
-    sdlType: summary.sdl || summary.tdl || summary.sdlCustom || summary.tdlCustom || '',
+    sdlType: summary.sdl || summary.sdlCustom || '',
+    tdlType: summary.tdl || summary.tdlCustom || '',
+    hasSdlOrTdl: !!(summary.sdl || summary.sdlCustom || summary.tdl || summary.tdlCustom),
     spacerBarType: summary.spacerBarType || '',
     spacerBarColors: summary.spacerBarColors || '',
     quoteType: summary.quoteType || '',
