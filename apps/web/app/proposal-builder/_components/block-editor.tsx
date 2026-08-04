@@ -37,6 +37,10 @@ const DRIVER_FIELD_SCHEMA_MAP: Record<string, string> = {
 /** Hard-coded choices for driver fields that aren't a simple picklist in the schema. */
 const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
   jobType: ['Premium', 'Coastal', 'Dade County'],
+  // sdlType isn't backed by an Opportunity picklist — it's derived in the Summary
+  // from either the SDL select (22MM/44MM) or the TDL select (48MM/70MM/125MM),
+  // see QuoteContext.sdlType in quote-conditions.ts.
+  sdlType: ['22MM', '44MM', '48MM', '70MM', '125MM'],
   // Matched against QuoteContext.hasMultipleLocations, which is coerced to the
   // literal string "true"/"false" during variant matching — keep these values
   // in sync with that (see matchValueMatchesContext in quote-conditions.ts).
