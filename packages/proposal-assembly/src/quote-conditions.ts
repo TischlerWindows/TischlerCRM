@@ -336,12 +336,7 @@ export function buildQuoteContext(summary: SummaryForConditions): QuoteContext {
   if (hasDollarValue(summary.addOns?.finalFinish?.final)) addOnItems.push('Final Finish');
   if (hasDollarValue(summary.addOns?.installation?.final)) addOnItems.push('Installation');
 
-  // Parse finish type number from the finish string (e.g., "... 200" → "200")
-  let finishType = '';
-  if (summary.finish) {
-    const match = summary.finish.match(/(\d+)\s*$/);
-    finishType = match?.[1] ?? summary.finish;
-  }
+  const finishType = summary.finish || '';
 
   // Check if any rows have types at all (to determine hasWindows / hasDoors)
   // Also check sub-location rows for multi-location summaries
