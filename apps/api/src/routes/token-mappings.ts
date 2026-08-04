@@ -38,6 +38,10 @@ export async function tokenMappingRoutes(app: FastifyInstance) {
         { tokenName: 'installationDetails', sourceObject: 'SUMMARY', sourcePath: 'installationDetails', format: 'TEXT', label: 'Installation Details (sub-rows + total)', category: 'Add-ons' },
         { tokenName: 'installationTotalPrice', sourceObject: 'SUMMARY', sourcePath: 'installationTotalPrice', format: 'CURRENCY', label: 'Installation Total Price', category: 'Add-ons' },
         { tokenName: 'productTypeDetails', sourceObject: 'SUMMARY', sourcePath: 'productTypeDetails', format: 'TEXT', label: 'Product Type Details', category: 'Products' },
+        { tokenName: 'sdlType', sourceObject: 'SUMMARY', sourcePath: 'sdlType', format: 'TEXT', label: 'SDL (mm)', category: 'Materials' },
+        { tokenName: 'sdlInches', sourceObject: 'SUMMARY', sourcePath: 'sdlInches', format: 'TEXT', label: 'SDL (fractional inches)', category: 'Materials' },
+        { tokenName: 'tdlType', sourceObject: 'SUMMARY', sourcePath: 'tdlType', format: 'TEXT', label: 'TDL (mm)', category: 'Materials' },
+        { tokenName: 'tdlInches', sourceObject: 'SUMMARY', sourcePath: 'tdlInches', format: 'TEXT', label: 'TDL (fractional inches)', category: 'Materials' },
       ] as const;
       const existingNames = new Set(
         (await prisma.tokenMapping.findMany({ where: { templateId, isBuiltIn: true }, select: { tokenName: true } })).map((m) => m.tokenName)

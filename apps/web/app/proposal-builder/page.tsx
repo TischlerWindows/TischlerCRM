@@ -1197,6 +1197,10 @@ export default function QuoteBuilderPage() {
         { tokenName: 'installationDetails', sourceObject: 'SUMMARY' as const, sourcePath: 'installationDetails', format: 'TEXT' as const, isBuiltIn: false },
         { tokenName: 'installationTotalPrice', sourceObject: 'SUMMARY' as const, sourcePath: 'installationTotalPrice', format: 'TEXT' as const, isBuiltIn: false },
         { tokenName: 'productTypeDetails', sourceObject: 'SUMMARY' as const, sourcePath: 'productTypeDetails', format: 'TEXT' as const, isBuiltIn: false },
+        { tokenName: 'sdlType', sourceObject: 'SUMMARY' as const, sourcePath: 'sdlType', format: 'TEXT' as const, isBuiltIn: false },
+        { tokenName: 'sdlInches', sourceObject: 'SUMMARY' as const, sourcePath: 'sdlInches', format: 'TEXT' as const, isBuiltIn: false },
+        { tokenName: 'tdlType', sourceObject: 'SUMMARY' as const, sourcePath: 'tdlType', format: 'TEXT' as const, isBuiltIn: false },
+        { tokenName: 'tdlInches', sourceObject: 'SUMMARY' as const, sourcePath: 'tdlInches', format: 'TEXT' as const, isBuiltIn: false },
       ].filter((m) => !syntheticNames.has(m.tokenName));
 
       // Normalize matchValues in presets: convert newline-separated values (new format)
