@@ -1184,6 +1184,14 @@ export default function QuoteBuilderPage() {
         ? { ...patchedSummary2, additionalGlassTypes: [...existingAdditional, resolvedHungType] }
         : patchedSummary2;
 
+      // Bypass stale package dist for finishType matching: both old and new
+      // buildQuoteContext agree when summary.finish is just the numeric code.
+      const rawFinish: string = (patchedSummary3 as any).finish || '';
+      const finishCodeM = rawFinish.match(/(\d+)\s*$/);
+      const patchedSummary4 = finishCodeM
+        ? { ...patchedSummary3, finish: finishCodeM[1] }
+        : patchedSummary3;
+
       const baseTokenMappings = tokenMappings.map((m) => ({
         tokenName: m.tokenName,
         sourceObject: m.sourceObject,
@@ -1206,17 +1214,25 @@ export default function QuoteBuilderPage() {
       // Normalize matchValues in presets: convert newline-separated values (new format)
       // to comma-separated (legacy format) so a stale package dist still produces
       // correct substring matches. The rebuilt dist handles both formats natively.
+      // Also normalize finishType matchValues to their numeric code suffix so matching
+      // works regardless of whether the package dist returns the full string or just the code.
       const normalizedPresets = previewPresets.map((preset: any) => ({
         ...preset,
-        variants: (preset.variants ?? []).map((v: any) => ({
-          ...v,
-          matchValue: typeof v.matchValue === 'string' ? v.matchValue.replace(/\n/g, ',') : v.matchValue,
-        })),
+        variants: (preset.variants ?? []).map((v: any) => {
+          let mv = typeof v.matchValue === 'string' ? v.matchValue.replace(/\n/g, ',') : (v.matchValue ?? '');
+          if (preset.driverField === 'finishType') {
+            mv = mv.split(',').map((p: string) => {
+              const m = p.trim().match(/(\d+)\s*$/);
+              return m ? m[1] : p.trim();
+            }).filter(Boolean).join('\n');
+          }
+          return { ...v, matchValue: mv };
+        }),
       }));
 
       return {
         result: assembleProposal({
-          summary: patchedSummary3 as any,
+          summary: patchedSummary4 as any,
           template: {
             id: selectedTemplateId,
             name: selectedTemplate?.name ?? '',
