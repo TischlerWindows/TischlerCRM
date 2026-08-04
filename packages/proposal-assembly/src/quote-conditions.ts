@@ -101,6 +101,8 @@ export interface QuoteContext {
 
   // Hardware & features
   hardwareOptions: string[];
+  /** Per-product-type option map — used to scope the || option filter. */
+  productTypeOptions: Record<string, string[]>;
   projectContains: string[];
 
   // Add-on flags
@@ -401,6 +403,7 @@ export function buildQuoteContext(summary: SummaryForConditions): QuoteContext {
 
     // Options
     hardwareOptions,
+    productTypeOptions: summary.productTypeOptions ?? {},
     projectContains: summary.projectContains || [],
 
     // Add-ons
@@ -708,8 +711,11 @@ export function matchValueMatchesContext(
   }
   if (!typeMatch) return false;
 
-  // If an option filter is encoded, ALL of its parts must also match
-  // (same AND semantics as above), against hardwareOptions.
+  // If an option filter is encoded, ALL of its parts must also match.
+  // When the productTypes driver is active, scope the option pool to only the
+  // options for the product types that matched the type part — prevents a match
+  // like "L&R D||90mm Thick Sash" from passing just because 90mm is checked on a
+  // different product type (e.g. Double Hung Concealed Balance).
   if (optionFilterStr) {
     const optSep = optionFilterStr.includes('\n') ? '\n' : ',';
     const optionParts = optionFilterStr
@@ -717,8 +723,24 @@ export function matchValueMatchesContext(
       .map((p) => p.trim().toLowerCase())
       .filter(Boolean);
     if (optionParts.length > 0) {
-      const hwLower = context.hardwareOptions.map((o) => o.toLowerCase());
-      const optionMatch = optionParts.every((opt) => hwLower.some((hw) => typeValueMatch(hw, opt)));
+      let optionPool: string[];
+      if (
+        driverFields.includes('productTypes') &&
+        Object.keys(context.productTypeOptions).length > 0
+      ) {
+        // Scope to options of the product types that matched the type part.
+        const scoped = new Set<string>();
+        for (const pt of context.productTypes) {
+          if (matchParts.some((mp) => typeValueMatch(pt, mp))) {
+            for (const o of context.productTypeOptions[pt] ?? []) scoped.add(o);
+          }
+        }
+        optionPool = Array.from(scoped);
+      } else {
+        optionPool = context.hardwareOptions;
+      }
+      const poolLower = optionPool.map((o) => o.toLowerCase());
+      const optionMatch = optionParts.every((opt) => poolLower.some((hw) => typeValueMatch(hw, opt)));
       if (!optionMatch) return false;
     }
   }
