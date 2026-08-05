@@ -8,6 +8,7 @@ import {
   type BrandResources,
   type PageLogoFile,
 } from '../lib/proposal-pdf/renderer.js';
+import { collectGlassTypeKeys, appendGlassSheets } from '../lib/proposal-pdf/glass-sheets.js';
 
 const renderSchema = z.object({
   summaryId: z.string().min(1),
@@ -124,6 +125,16 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
     } catch (err) {
       app.log.error({ err }, 'PDF render failed');
       return reply.code(500).send({ error: 'Failed to render proposal PDF' });
+    }
+
+    // ── Append glass type data sheets ─────────────────────────────
+    const glassKeys = collectGlassTypeKeys(summary as Record<string, unknown>);
+    if (glassKeys.length > 0) {
+      try {
+        pdfBuffer = await appendGlassSheets(pdfBuffer, glassKeys);
+      } catch (err) {
+        app.log.warn({ err }, 'Glass sheet append failed — returning proposal without sheets');
+      }
     }
 
     const safeName = (result.pdfData.projectName || 'Proposal').replace(/[^A-Za-z0-9_-]+/g, '_');
