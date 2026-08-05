@@ -13,6 +13,9 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
+// In dev (tsx), import.meta.url resolves to this source file → glass-types/ lives next to it.
+// In prod (esbuild bundle dist/server.js), import.meta.url resolves to dist/ → glass-types/ is
+// copied there by the build script.
 const SHEETS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'glass-types');
 
 /** Extract the canonical numeric key from any glass type string. */
