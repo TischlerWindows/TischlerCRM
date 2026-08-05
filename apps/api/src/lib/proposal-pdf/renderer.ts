@@ -525,31 +525,29 @@ function drawSpecificationItem(
 
   doc.moveDown(0.4);
   const lineY = doc.y;
+  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
 
-  // Draw "(N)" in its fixed column without advancing to a new line.
-  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE)
-     .text(`(${number})`, PAGE_MARGIN, lineY, { width: NUMBER_COL, lineBreak: false });
-  // Restore Y — PDFKit can drift after lineBreak: false.
-  doc.y = lineY;
-  doc.x = PAGE_MARGIN;
-
-  if (!hideTitle) {
-    // Title in the right column; all wrapped lines stay aligned within colWidth.
-    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE)
-       .text(preset.title, PAGE_MARGIN + NUMBER_COL, lineY, { width: colWidth });
+  if (hideTitle) {
+    // Number and body share the same baseline.
+    doc.text(`(${number})`, PAGE_MARGIN, lineY, { width: NUMBER_COL });
+    doc.y = lineY;   // rewind so body starts on the same line as the number
     doc.x = PAGE_MARGIN;
-
-    if (preset.body && preset.body.trim()) {
-      doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: NUMBER_COL });
-    }
-  } else {
-    // No title — body starts on the same baseline as the number.
-    if (preset.body && preset.body.trim()) {
+    if (preset.body?.trim()) {
       doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
       drawRichBody(doc, preset.body, ctx, { topGap: 0, indent: NUMBER_COL });
-    } else {
-      doc.moveDown(1);
+    }
+  } else {
+    // Draw title in the right column first — captures the correct post-title Y.
+    doc.text(preset.title, PAGE_MARGIN + NUMBER_COL, lineY, { width: colWidth });
+    const afterTitleY = doc.y;
+    // Overlay number in the left column at the same lineY (backward Y is fine in PDFKit).
+    doc.text(`(${number})`, PAGE_MARGIN, lineY, { width: NUMBER_COL });
+    // Restore Y to the bottom of the taller element (the title).
+    doc.y = afterTitleY;
+    doc.x = PAGE_MARGIN;
+    if (preset.body?.trim()) {
+      doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+      drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: NUMBER_COL });
     }
   }
 }
