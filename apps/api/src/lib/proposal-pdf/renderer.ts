@@ -929,10 +929,18 @@ function drawStyledRuns(
         underline: !!run.underline,
         ...(isLast ? { paragraphGap: 4 } : {}),
       });
+    } else if (i === 0) {
+      // Explicit (x, y) sets doc.x so wrapped lines stay at the same indent.
+      doc.text(text, PAGE_MARGIN + opts.indent, doc.y, {
+        continued: !isLast,
+        width: textWidth,
+        underline: !!run.underline,
+        ...(isLast ? { paragraphGap: 4 } : {}),
+        ...(opts.align ? { align: opts.align } : {}),
+      });
     } else {
       doc.text(text, {
         continued: !isLast,
-        indent: i === 0 ? opts.indent : 0,
         underline: !!run.underline,
         ...(isLast ? { paragraphGap: 4 } : {}),
         ...(opts.align ? { align: opts.align, width: textWidth } : {}),
