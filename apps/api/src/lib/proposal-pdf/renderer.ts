@@ -207,6 +207,10 @@ export async function renderProposalPDF(
       inferBlockType(preset.section, preset.title);
     const config = (preset.config ?? {}) as Record<string, unknown>;
 
+    // A prior block's explicit-position (indented) text draw can leave doc.x
+    // shifted right — reset before every block so indentation never bleeds.
+    doc.x = PAGE_MARGIN;
+
     switch (type) {
       case 'LETTERHEAD': {
         // Resolve any first-page logo so the letterhead block can reserve space.
