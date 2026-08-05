@@ -519,25 +519,37 @@ function drawSpecificationItem(
   ctx: BrandContext,
 ): void {
   const hideTitle = !!(preset.config as Record<string, unknown> | null)?.hideTitle;
+  // NUMBER_COL matches w-7 (1.75 rem = 28 px → 21 pt) in the web preview.
+  const NUMBER_COL = 21;
+  const colWidth = doc.page.width - 2 * PAGE_MARGIN - NUMBER_COL;
+
   doc.moveDown(0.4);
-  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
-  if (hideTitle) {
-    // Number inline with body text: emit "(N)  " with continued:true so
-    // PDFKit keeps the cursor on the same line, then let drawRichBody flow.
-    doc.text(`(${number})  `, { continued: true, indent: 0 });
-    if (preset.body && preset.body.trim()) {
-      doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0, indent: 0 });
-    } else {
-      doc.text(''); // close the continued line
-    }
-  } else {
-    doc.text(`(${number})`, { continued: true, indent: 0 });
-    doc.text(`  ${preset.title}`);
+  const lineY = doc.y;
+
+  // Draw "(N)" in its fixed column without advancing to a new line.
+  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE)
+     .text(`(${number})`, PAGE_MARGIN, lineY, { width: NUMBER_COL, lineBreak: false });
+  // Restore Y — PDFKit can drift after lineBreak: false.
+  doc.y = lineY;
+  doc.x = PAGE_MARGIN;
+
+  if (!hideTitle) {
+    // Title in the right column; all wrapped lines stay aligned within colWidth.
+    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE)
+       .text(preset.title, PAGE_MARGIN + NUMBER_COL, lineY, { width: colWidth });
+    doc.x = PAGE_MARGIN;
 
     if (preset.body && preset.body.trim()) {
       doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: 0 });
+      drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: NUMBER_COL });
+    }
+  } else {
+    // No title — body starts on the same baseline as the number.
+    if (preset.body && preset.body.trim()) {
+      doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+      drawRichBody(doc, preset.body, ctx, { topGap: 0, indent: NUMBER_COL });
+    } else {
+      doc.moveDown(1);
     }
   }
 }
