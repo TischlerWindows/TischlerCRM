@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Users, Plus, RefreshCw, Trash2, Ban, Send, ExternalLink, Copy, Check, Mail, KeyRound, LogIn } from 'lucide-react';
 import { apiClient, UserRow, CreateUserInput, InviteStatus } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 import { SettingsFilterBar } from '@/components/settings/settings-filter-bar';
 import { SettingsContentCard } from '@/components/settings/settings-content-card';
@@ -52,6 +53,8 @@ interface ConfirmAction {
 
 export default function UsersPage() {
   const { user: currentUser, impersonate } = useAuth();
+  const { hasAppPermission } = usePermissions();
+  const canManage = currentUser?.role === 'ADMIN' || hasAppPermission('manageUsers');
   const [users, setUsers] = useState<UserRow[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,11 +189,11 @@ export default function UsersPage() {
         icon={Users}
         title="Users"
         subtitle="Manage team members, profiles, and account access"
-        action={{
+        action={canManage ? {
           label: 'New User',
           icon: Plus,
           onClick: () => setShowNewModal(true),
-        }}
+        } : undefined}
       />
 
       <SettingsFilterBar
@@ -321,7 +324,7 @@ export default function UsersPage() {
                               <LogIn className="w-3.5 h-3.5" />
                             </button>
                           )}
-                          {canResend && (
+                          {canResend && canManage && (
                             <button
                               onClick={() => handleResendInvite(user.id)}
                               className="p-1.5 text-amber-500 hover:text-amber-700 rounded-md hover:bg-amber-50 transition-colors"
@@ -330,6 +333,7 @@ export default function UsersPage() {
                               <Send className="w-3.5 h-3.5" />
                             </button>
                           )}
+                          {canManage && (
                           <button
                             onClick={() => setConfirmAction({ type: 'freeze', userId: user.id, userName: user.name ?? user.email, isActive: user.isActive })}
                             className="p-1.5 text-gray-400 hover:text-orange-600 rounded-md hover:bg-orange-50 transition-colors"
@@ -337,6 +341,8 @@ export default function UsersPage() {
                           >
                             <Ban className="w-3.5 h-3.5" />
                           </button>
+                          )}
+                          {canManage && (
                           <button
                             onClick={() => setConfirmAction({ type: 'delete', userId: user.id, userName: user.name ?? user.email })}
                             className="p-1.5 text-gray-400 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors"
@@ -344,6 +350,7 @@ export default function UsersPage() {
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>
