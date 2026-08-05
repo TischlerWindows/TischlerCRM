@@ -161,7 +161,6 @@ const DOOR_TYPES = [
   'Outswing Folding',
   'Inswing Folding',
   'L&R D',
-  'Pivot',
   'Inswing DD',
   'Outswing DD',
   'Fixed with Sash',
