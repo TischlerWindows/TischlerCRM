@@ -1216,9 +1216,9 @@ export default function QuoteBuilderPage() {
       // correct substring matches. The rebuilt dist handles both formats natively.
       // Also normalize finishType matchValues to their numeric code suffix so matching
       // works regardless of whether the package dist returns the full string or just the code.
-      const normalizedPresets = previewPresets.map((preset: any) => ({
-        ...preset,
-        variants: (preset.variants ?? []).map((v: any) => {
+      const normalizedPresets = previewPresets.map((preset: any) => {
+        // Step 1: per-variant matchValue normalization
+        const normalizedVars = (preset.variants ?? []).map((v: any) => {
           let mv = typeof v.matchValue === 'string' ? v.matchValue.replace(/\n/g, ',') : (v.matchValue ?? '');
           if (preset.driverField === 'finishType') {
             mv = mv.split(',').map((p: string) => {
@@ -1227,8 +1227,41 @@ export default function QuoteBuilderPage() {
             }).filter(Boolean).join('\n');
           }
           return { ...v, matchValue: mv };
-        }),
-      }));
+        });
+
+        // Step 2: stale-dist bypass for productTypes presets — equalize variant
+        // specificity so the old count-based filter never drops an unrelated
+        // product-type family variant (e.g. DH spec=1 vs L&R D||SS RH spec=2).
+        // Padding with duplicate type entries raises spec without changing match results.
+        const driverFields = String(preset.driverField || '').split(',').map((f: string) => f.trim());
+        if (driverFields.includes('productTypes')) {
+          const specOf = (mv: string): number => {
+            const pi = mv.indexOf('||');
+            const tp = pi === -1 ? mv : mv.slice(0, pi);
+            const op = pi === -1 ? '' : mv.slice(pi + 2);
+            return tp.split(',').filter((p: string) => p.trim()).length
+              + (op ? op.split(',').filter((p: string) => p.trim()).length : 0);
+          };
+          const maxSpec = Math.max(1, ...normalizedVars.map((v: any) => specOf(v.matchValue)));
+          const equalizedVars = normalizedVars.map((v: any) => {
+            const spec = specOf(v.matchValue);
+            if (spec >= maxSpec) return v;
+            const pi = v.matchValue.indexOf('||');
+            const tp = pi === -1 ? v.matchValue : v.matchValue.slice(0, pi);
+            const op = pi === -1 ? '' : v.matchValue.slice(pi + 2);
+            const types = tp.split(',').map((p: string) => p.trim()).filter(Boolean);
+            const opts = op ? op.split(',').map((p: string) => p.trim()).filter(Boolean) : [];
+            if (types.length === 0) return v;
+            const padded = [...types];
+            while (padded.length + opts.length < maxSpec) padded.push(types[0]);
+            const newMv = opts.length > 0 ? `${padded.join(',')}||${opts.join(',')}` : padded.join(',');
+            return { ...v, matchValue: newMv };
+          });
+          return { ...preset, variants: equalizedVars };
+        }
+
+        return { ...preset, variants: normalizedVars };
+      });
 
       return {
         result: assembleProposal({
