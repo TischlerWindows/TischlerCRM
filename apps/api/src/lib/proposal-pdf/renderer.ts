@@ -528,13 +528,14 @@ function drawSpecificationItem(
   doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
 
   if (hideTitle) {
-    // Number and body share the same baseline.
-    doc.text(`(${number})`, PAGE_MARGIN, lineY, { width: NUMBER_COL });
-    doc.y = lineY;   // rewind so body starts on the same line as the number
-    doc.x = PAGE_MARGIN;
+    // Use continued:true to keep number and body on the same line without
+    // any backward doc.y manipulation (which can break PDFKit pagination).
+    doc.text(`(${number})  `, { continued: true, indent: 0 });
     if (preset.body?.trim()) {
       doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0, indent: NUMBER_COL });
+      drawRichBody(doc, preset.body, ctx, { topGap: 0, indent: 0 });
+    } else {
+      doc.text('');
     }
   } else {
     // Draw title in the right column first — captures the correct post-title Y.
