@@ -526,34 +526,40 @@ function drawSpecificationItem(
   // NUMBER_COL matches w-7 (1.75 rem = 28 px → 21 pt) in the web preview.
   const NUMBER_COL = 21;
   const colWidth = doc.page.width - 2 * PAGE_MARGIN - NUMBER_COL;
+  const hasTitle = !hideTitle && !!preset.title?.trim();
+  const hasBody = !!preset.body?.trim();
 
   doc.moveDown(0.4);
   const lineY = doc.y;
-  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
 
-  if (hideTitle) {
-    // Use continued:true to keep number and body on the same line without
-    // any backward doc.y manipulation (which can break PDFKit pagination).
-    doc.text(`(${number})  `, { continued: true, indent: 0 });
-    if (preset.body?.trim()) {
-      doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0, indent: 0 });
-    } else {
-      doc.text('');
-    }
-  } else {
-    // Draw title in the right column first — captures the correct post-title Y.
+  // Draw the row's primary text (title if present, else the body) first, in
+  // the right column — this captures its true post-wrap Y regardless of how
+  // many lines it wraps to, and (via explicit x) keeps every wrapped line
+  // aligned to the same column as the first.
+  let afterPrimaryY = lineY;
+  if (hasTitle) {
+    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
     doc.text(preset.title, PAGE_MARGIN + NUMBER_COL, lineY, { width: colWidth });
-    const afterTitleY = doc.y;
-    // Overlay number in the left column at the same lineY (backward Y is fine in PDFKit).
-    doc.text(`(${number})`, PAGE_MARGIN, lineY, { width: NUMBER_COL });
-    // Restore Y to the bottom of the taller element (the title).
-    doc.y = afterTitleY;
-    doc.x = PAGE_MARGIN;
-    if (preset.body?.trim()) {
-      doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: NUMBER_COL });
-    }
+    afterPrimaryY = doc.y;
+  } else if (hasBody) {
+    doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    doc.y = lineY;
+    drawRichBody(doc, preset.body, ctx, { topGap: 0, indent: NUMBER_COL });
+    afterPrimaryY = doc.y;
+  }
+
+  // Overlay the number in the left column at the row's start Y (backward Y
+  // is fine in PDFKit); restore Y/X to below whichever element was taller.
+  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
+  doc.text(`(${number})`, PAGE_MARGIN, lineY, { width: NUMBER_COL });
+  doc.y = Math.max(afterPrimaryY, doc.y);
+  doc.x = PAGE_MARGIN;
+
+  // With a title, the body (if any) goes on its own line below, indented to
+  // the same right column.
+  if (hasTitle && hasBody) {
+    doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: NUMBER_COL });
   }
 }
 
