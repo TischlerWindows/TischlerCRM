@@ -550,6 +550,7 @@ function drawSpecificationItem(
   // the right column — this captures its true post-wrap Y regardless of how
   // many lines it wraps to, and (via explicit x) keeps every wrapped line
   // aligned to the same column as the first.
+  const startPageCount = doc.bufferedPageRange().count;
   let afterPrimaryY = lineY;
   if (hasTitle) {
     doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
@@ -562,11 +563,25 @@ function drawSpecificationItem(
     afterPrimaryY = doc.y;
   }
 
-  // Overlay the number in the left column at the row's start Y (backward Y
-  // is fine in PDFKit); restore Y/X to below whichever element was taller.
+  // If the primary text above spilled onto a new page, `lineY` is now a
+  // stale coordinate from the OLD page — drawing the number there would
+  // land it on the wrong (current/final) page, e.g. near its bottom edge.
+  // Detect that and draw the number back on the page the item actually
+  // started on, then return to the final page to keep flowing correctly.
+  const endRange = doc.bufferedPageRange();
+  const pageBrokeMidItem = endRange.count > startPageCount;
+  const finalPageIndex = endRange.start + endRange.count - 1;
+  const startPageIndex = finalPageIndex - (endRange.count - startPageCount);
+
+  if (pageBrokeMidItem) doc.switchToPage(startPageIndex);
   doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
   doc.text(`(${number})`, PAGE_MARGIN, lineY, { width: NUMBER_COL });
-  doc.y = Math.max(afterPrimaryY, doc.y);
+  if (pageBrokeMidItem) doc.switchToPage(finalPageIndex);
+
+  // Restore Y/X to below whichever element was taller (same-page case), or
+  // to the primary content's end (page-break case, since the number overlay
+  // above was drawn on the earlier page and doesn't affect the final page's Y).
+  doc.y = pageBrokeMidItem ? afterPrimaryY : Math.max(afterPrimaryY, doc.y);
   doc.x = PAGE_MARGIN;
 
   // With a title, the body (if any) goes on its own line below, indented to
