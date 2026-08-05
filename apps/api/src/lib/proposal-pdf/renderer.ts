@@ -864,14 +864,17 @@ function drawBlock(
   indent: number,
   align?: 'left' | 'center' | 'right',
 ): void {
+  // Convert CSS px margin-left to pt (0.75 pt per px) and add to the caller's base indent.
+  const blockIndent = indent + Math.round((block.marginLeft ?? 0) * 0.75);
+
   if (block.kind === 'paragraph') {
-    drawStyledRuns(doc, block.runs, ctx, { indent, lineGap: 1, align: block.align ?? align });
+    drawStyledRuns(doc, block.runs, ctx, { indent: blockIndent, lineGap: 1, align: block.align ?? align });
     return;
   }
 
   if (block.kind === 'bullet') {
     drawStyledRuns(doc, [{ text: '•  ', bold: false, italic: false }, ...block.runs], ctx, {
-      indent,
+      indent: blockIndent,
       lineGap: 1,
     });
     return;
@@ -882,7 +885,7 @@ function drawBlock(
       doc,
       [{ text: `${block.index}.  `, bold: false, italic: false }, ...block.runs],
       ctx,
-      { indent, lineGap: 1 },
+      { indent: blockIndent, lineGap: 1 },
     );
   }
 }

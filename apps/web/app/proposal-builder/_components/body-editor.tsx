@@ -5,7 +5,7 @@ import StarterKit from '@tiptap/starter-kit';
 import TextStyle from '@tiptap/extension-text-style';
 import Underline from '@tiptap/extension-underline';
 import { Extension } from '@tiptap/core';
-import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered } from 'lucide-react';
+import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, IndentIncrease, IndentDecrease } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, type ReactNode } from 'react';
 
 // Custom font-size extension built on TextStyle (TipTap v2 compatible).
@@ -39,6 +39,65 @@ const FontSize = Extension.create({
         () =>
         ({ chain }: any) =>
           chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
+    };
+  },
+});
+
+// Paragraph indent: 24 px per level (≈ 18 pt), max 7 levels.
+const INDENT_STEP = 24;
+const INDENT_MAX = INDENT_STEP * 7;
+
+const ParagraphIndent = Extension.create({
+  name: 'paragraphIndent',
+  addGlobalAttributes() {
+    return [{
+      types: ['paragraph'],
+      attributes: {
+        marginLeft: {
+          default: 0,
+          parseHTML: (el) => {
+            const style = (el as HTMLElement).getAttribute?.('style') ?? '';
+            const m = /margin-left:\s*([\d.]+)px/i.exec(style);
+            return m ? parseFloat(m[1]) : 0;
+          },
+          renderHTML: (attrs) =>
+            attrs.marginLeft ? { style: `margin-left: ${attrs.marginLeft}px` } : {},
+        },
+      },
+    }];
+  },
+  addCommands() {
+    return {
+      indent:
+        () =>
+        ({ state, dispatch }: any) => {
+          const { tr } = state;
+          const { $from, $to } = state.selection;
+          let changed = false;
+          state.doc.nodesBetween($from.pos, $to.pos, (node: any, pos: number) => {
+            if (node.type.name === 'paragraph' && (node.attrs.marginLeft || 0) < INDENT_MAX) {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, marginLeft: (node.attrs.marginLeft || 0) + INDENT_STEP });
+              changed = true;
+            }
+          });
+          if (changed && dispatch) dispatch(tr);
+          return changed;
+        },
+      outdent:
+        () =>
+        ({ state, dispatch }: any) => {
+          const { tr } = state;
+          const { $from, $to } = state.selection;
+          let changed = false;
+          state.doc.nodesBetween($from.pos, $to.pos, (node: any, pos: number) => {
+            if (node.type.name === 'paragraph' && (node.attrs.marginLeft || 0) > 0) {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, marginLeft: Math.max(0, (node.attrs.marginLeft || 0) - INDENT_STEP) });
+              changed = true;
+            }
+          });
+          if (changed && dispatch) dispatch(tr);
+          return changed;
+        },
     };
   },
 });
@@ -104,7 +163,7 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
   ref,
 ) {
   const editor = useEditor({
-    extensions: [StarterKit, TextStyle, Underline, FontSize],
+    extensions: [StarterKit, TextStyle, Underline, FontSize, ParagraphIndent],
     content: value,
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
     editorProps: {
@@ -200,6 +259,21 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
           label="Numbered list"
         >
           <ListOrdered className="w-3 h-3" />
+        </ToolbarBtn>
+        <div className="w-px h-4 bg-gray-200 mx-1" aria-hidden />
+        <ToolbarBtn
+          active={false}
+          onClick={() => (editor.chain().focus() as any).indent().run()}
+          label="Indent"
+        >
+          <IndentIncrease className="w-3 h-3" />
+        </ToolbarBtn>
+        <ToolbarBtn
+          active={false}
+          onClick={() => (editor.chain().focus() as any).outdent().run()}
+          label="Outdent"
+        >
+          <IndentDecrease className="w-3 h-3" />
         </ToolbarBtn>
         <div className="w-px h-4 bg-gray-200 mx-1" aria-hidden />
         {/* Font size selector */}

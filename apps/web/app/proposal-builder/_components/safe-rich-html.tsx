@@ -16,11 +16,17 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     // only for the literal "monospace" keyword, used by the nbsp-padded
     // pricing-column tokens so columns actually line up in a preview font).
     span: ['style'],
+    // Allow p with style so margin-left (indent) and text-align survive.
+    p: ['style'],
   },
   allowedStyles: {
     span: {
       'font-size': [/^\d+(\.\d+)?pt$/],
       'font-family': [/^monospace$/],
+    },
+    p: {
+      'margin-left': [/^\d+(\.\d+)?px$/],
+      'text-align': [/^(left|center|right)$/],
     },
   },
   // Drop disallowed tags entirely (no fallback to plain text inside <script>).

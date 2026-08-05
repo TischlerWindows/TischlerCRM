@@ -30,9 +30,9 @@ export interface StyledRun {
 }
 
 export type Block =
-  | { kind: 'paragraph'; runs: StyledRun[]; align?: 'left' | 'center' | 'right' }
-  | { kind: 'bullet'; runs: StyledRun[] }
-  | { kind: 'number'; index: number; runs: StyledRun[] };
+  | { kind: 'paragraph'; runs: StyledRun[]; align?: 'left' | 'center' | 'right'; marginLeft?: number }
+  | { kind: 'bullet'; runs: StyledRun[]; marginLeft?: number }
+  | { kind: 'number'; index: number; runs: StyledRun[]; marginLeft?: number };
 
 export function htmlToBlocks(html: string): Block[] {
   if (!html || !html.trim()) return [];
@@ -62,6 +62,9 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
     const style = el.getAttribute('style') ?? '';
     const alignMatch = /text-align:\s*(left|center|right)/i.exec(style);
     const align = alignMatch ? (alignMatch[1].toLowerCase() as 'left' | 'center' | 'right') : undefined;
+    // Parse margin-left (set by ParagraphIndent extension, 24 px per level)
+    const mlMatch = /margin-left:\s*([\d.]+)px/i.exec(style);
+    const marginLeft = mlMatch ? parseFloat(mlMatch[1]) : undefined;
 
     // Split on \n runs produced by <br> tags. PDFKit's doc.text('\n', {continued:true})
     // is unreliable — it can silently drop the line advance. Splitting at <br>
@@ -78,24 +81,19 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
 
     for (const seg of segments) {
       if (seg.length === 0 || seg.every((r) => !r.text.trim())) {
-        out.push({ kind: 'paragraph', runs: [{ text: '', bold: false, italic: false }], align });
+        out.push({ kind: 'paragraph', runs: [{ text: '', bold: false, italic: false }], align, ...(marginLeft ? { marginLeft } : {}) });
       } else {
-        out.push({ kind: 'paragraph', runs: seg, align });
+        out.push({ kind: 'paragraph', runs: seg, align, ...(marginLeft ? { marginLeft } : {}) });
       }
     }
     return;
   }
   if (tag === 'UL') {
-    for (const li of el.querySelectorAll('li')) {
-      out.push({ kind: 'bullet', runs: collectRuns(li) });
-    }
+    pushListItems(el, out, 'bullet', 0);
     return;
   }
   if (tag === 'OL') {
-    const items = el.querySelectorAll('li');
-    items.forEach((li, idx) => {
-      out.push({ kind: 'number', index: idx + 1, runs: collectRuns(li) });
-    });
+    pushListItems(el, out, 'number', 0);
     return;
   }
   // Unknown top-level tag — flatten its text as a paragraph.
@@ -103,9 +101,43 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
   if (runs.length > 0) out.push({ kind: 'paragraph', runs });
 }
 
+// Walk direct <li> children of a <ul>/<ol>, recursing into nested lists with
+// increasing marginLeft so nesting depth maps to PDF indent (20 px/level ≈ 15 pt).
+function pushListItems(
+  el: HTMLElement,
+  out: Block[],
+  kind: 'bullet' | 'number',
+  depth: number,
+): void {
+  let index = 0;
+  for (const child of el.childNodes) {
+    if (child.nodeType !== NodeType.ELEMENT_NODE) continue;
+    const childEl = child as HTMLElement;
+    if (childEl.tagName?.toUpperCase() !== 'LI') continue;
+    index++;
+    // Collect text for this item, skipping nested UL/OL so their text doesn't bleed up.
+    const runs = collectRuns(childEl, { bold: false, italic: false }, new Set(['UL', 'OL']));
+    const marginLeft = depth > 0 ? depth * 20 : undefined;
+    if (kind === 'bullet') {
+      out.push({ kind: 'bullet', runs, ...(marginLeft !== undefined ? { marginLeft } : {}) });
+    } else {
+      out.push({ kind: 'number', index, runs, ...(marginLeft !== undefined ? { marginLeft } : {}) });
+    }
+    // Recurse into nested lists found as direct children of this LI.
+    for (const nested of childEl.childNodes) {
+      if (nested.nodeType !== NodeType.ELEMENT_NODE) continue;
+      const nestedEl = nested as HTMLElement;
+      const nestedTag = nestedEl.tagName?.toUpperCase();
+      if (nestedTag === 'UL') pushListItems(nestedEl, out, 'bullet', depth + 1);
+      else if (nestedTag === 'OL') pushListItems(nestedEl, out, 'number', depth + 1);
+    }
+  }
+}
+
 function collectRuns(
   el: HTMLElement,
   ctx: { bold: boolean; italic: boolean; underline?: boolean; fontSize?: number; monospace?: boolean } = { bold: false, italic: false },
+  skipTags: Set<string> = new Set(),
 ): StyledRun[] {
   const runs: StyledRun[] = [];
 
@@ -129,6 +161,8 @@ function collectRuns(
     const childEl = child as HTMLElement;
     const tag = childEl.tagName?.toUpperCase();
 
+    if (skipTags.has(tag)) continue;
+
     if (tag === 'BR') {
       runs.push({ text: '\n', bold: ctx.bold, italic: ctx.italic, underline: ctx.underline, fontSize: ctx.fontSize, monospace: ctx.monospace });
       continue;
@@ -149,7 +183,7 @@ function collectRuns(
       }
       if (/font-family:\s*monospace/i.test(style)) next.monospace = true;
     }
-    runs.push(...collectRuns(childEl, next));
+    runs.push(...collectRuns(childEl, next, skipTags));
   }
 
   return runs;
