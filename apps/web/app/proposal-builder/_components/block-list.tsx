@@ -60,7 +60,7 @@ interface Props {
 const PALETTE_GROUPS: Array<{ group: 'Layout' | 'Content' | 'Data'; types: BlockType[] }> = [
   {
     group: 'Layout',
-    types: ['LETTERHEAD', 'EXCLUSIONS_HEADER', 'CLOSING_SIGNATURE', 'PAGE_BREAK', 'INSTALLATION_HEADER', 'FOOTER'],
+    types: ['LETTERHEAD', 'EXCLUSIONS_HEADER', 'CLOSING_SIGNATURE', 'INSTALLATION_HEADER', 'FOOTER'],
   },
   {
     group: 'Content',

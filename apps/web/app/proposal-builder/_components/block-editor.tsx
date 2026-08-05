@@ -562,6 +562,21 @@ Off + conditions → evaluated against the active summary.`}
               description="When off, this block is treated as a draft — it never renders in the preview or the generated PDF, regardless of conditions or 'Always included'. Use to retire a block without deleting it."
             />
           </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!(config.pageBreakBefore)}
+              onChange={(e) => onConfigChange({ ...config, pageBreakBefore: e.target.checked })}
+              className="w-3.5 h-3.5 rounded border-gray-300 text-[#1e3a5f] focus:ring-[#1e3a5f]/20"
+            />
+            <span className="text-xs text-gray-700">Page break before</span>
+            <HelpHint
+              label="Page break before help"
+              title="Force a page break"
+              description="When on, the PDF starts a fresh page right before this block."
+              example={`Useful for forcing a section (e.g. the Installation appendix) to always start on its own page.`}
+            />
+          </label>
         </div>
 
         {/* Conditions (only when not always-included) */}

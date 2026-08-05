@@ -200,12 +200,18 @@ export async function renderProposalPDF(
   let specCounter = 0;
   let footerOverride: FooterConfig | null = null;
   let letterheadDrawn = false;
+  let isFirstBlock = true;
 
   for (const ob of trimmedBlocks) {
     const preset = ob.preset;
     const type: BlockType = (preset.blockType as BlockType | null) ??
       inferBlockType(preset.section, preset.title);
     const config = (preset.config ?? {}) as Record<string, unknown>;
+
+    // Admin-set "Page break before" flag (any block type) — skipped on the
+    // very first rendered block since there's nothing before it to break from.
+    if (config.pageBreakBefore && !isFirstBlock) doc.addPage();
+    isFirstBlock = false;
 
     // A prior block's explicit-position (indented) text draw can leave doc.x
     // shifted right — reset before every block so indentation never bleeds.
@@ -528,6 +534,14 @@ function drawSpecificationItem(
   const colWidth = doc.page.width - 2 * PAGE_MARGIN - NUMBER_COL;
   const hasTitle = !hideTitle && !!preset.title?.trim();
   const hasBody = !!preset.body?.trim();
+
+  // Guard against PDFKit's own auto-pagination firing mid-item: if this item
+  // started too close to the bottom margin, its content could wrap onto a
+  // new page WHILE the number is still overlaid at the old (pre-break) Y,
+  // splitting "(n)" from its own text. Start fresh instead when there isn't
+  // room for at least a couple of lines.
+  const minHeight = BODY_FONT_SIZE * 1.3 * 2 + 8;
+  if (doc.y + minHeight > doc.page.height - doc.page.margins.bottom) doc.addPage();
 
   doc.moveDown(0.4);
   const lineY = doc.y;
