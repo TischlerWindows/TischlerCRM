@@ -1,6 +1,6 @@
 export function getOptionsForType(t: string): string[] {
   const lo = t.toLowerCase();
-  if (lo === 'pivot' || lo === 'outswing pivot' || lo.includes('convert pivot')) {
+  if (lo.includes('pivot')) {
     return ['Maco Instinct Motorized Locks'];
   }
   if (lo === 'inswing folding') {

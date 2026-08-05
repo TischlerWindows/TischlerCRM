@@ -12,7 +12,7 @@ import { NFRC_DATA } from './nfrc-data.js';
 // can be filtered before being rendered into the proposal.
 function getValidOptionsForType(t: string): string[] {
   const lo = t.toLowerCase();
-  if (lo === 'pivot' || lo === 'outswing pivot' || lo.includes('convert pivot')) {
+  if (lo.includes('pivot')) {
     return ['Maco Instinct Motorized Locks'];
   }
   if (lo === 'inswing folding') return ['Threshold #6', 'Threshold #6C', 'Threshold ADA'];

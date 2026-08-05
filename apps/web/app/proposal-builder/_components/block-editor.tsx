@@ -55,7 +55,6 @@ const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
     // Hung windows
     'Single Hung Concealed Balance',
     'Single Hung Weight and Chain',
-    'Single Hung Cross Cable Balance System',
     'Double Hung Concealed Balance',
     'Double Hung Weight and Chain',
     'Double Hung Cross Cable Balance System',
@@ -84,7 +83,7 @@ const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
     'Inswing Folding',
     'Pivot',
     'Outswing Pivot',
-    'Convert Pivot to Inswing',
+    'Inswing Pivot',
     // Simulated DH
     'Offset Simulated DH (2 Glass Fields)',
     'Simulated DH (1 glass Field and a 44MM)',

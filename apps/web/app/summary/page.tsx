@@ -142,10 +142,8 @@ const WINDOW_TYPES = [
   'Single Hung Weight and Chain',
   'Double Hung Weight and Chain',
   'Triple Hung Weight and Chain',
-  'Single Hung Cross Cable Balance System',
   'Double Hung Cross Cable Balance System',
   'Triple Hung Cross Cable Balance System',
-  'Vent Locks',
   'Inswing French',
   'Inswing T & T French',
   'Outswing French',
@@ -176,7 +174,7 @@ const DOOR_TYPES = [
   'Outswing French GD',
   'Inswing French DD',
   'Outswing French DD',
-  'Convert Pivot to Inswing',
+  'Inswing Pivot',
   'Outswing Pivot'
 ];
 

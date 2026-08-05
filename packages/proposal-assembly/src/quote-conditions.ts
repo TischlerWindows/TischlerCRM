@@ -218,7 +218,6 @@ export interface PresetConditionDecision {
 const SINGLE_HUNG_TYPES = [
   'Single Hung Concealed Balance',
   'Single Hung Weight and Chain',
-  'Single Hung Cross Cable Balance System',
 ];
 
 const DOUBLE_HUNG_TYPES = [
@@ -250,7 +249,7 @@ const FOLDING_TYPES = [
   'Inswing Folding',
 ];
 
-const PIVOT_TYPES = ['Pivot', 'Outswing Pivot', 'Convert Pivot to Inswing'];
+const PIVOT_TYPES = ['Pivot', 'Outswing Pivot', 'Inswing Pivot'];
 
 const SIMULATED_DH_TYPES = [
   'Offset Simulated DH (2 Glass Fields)',
