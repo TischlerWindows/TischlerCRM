@@ -691,9 +691,11 @@ export function matchValueMatchesContext(
     // must individually match, not just one of them.
     typeMatch = driverFields.every(driverValueSatisfiesSomePart);
   } else {
-    // Default mode: every value in the Match Value checklist must be
-    // satisfied by *some* driver field's context value — an AND across
-    // matchParts, but any driver field may supply the match for each part.
+    // Default mode: the variant matches if ANY value in the Match Value
+    // checklist is satisfied by some driver field's context value — an OR
+    // across matchParts. This is what the multi-select "Match Value" UI
+    // implies (e.g. grouping several equivalent product types into one
+    // variant): the project only needs ONE of the listed values, not all.
     const partIsSatisfied = (match: string): boolean => {
       for (const driverField of driverFields) {
         const driverValue = (context as unknown as Record<string, unknown>)[driverField];
@@ -706,7 +708,7 @@ export function matchValueMatchesContext(
       }
       return false;
     };
-    typeMatch = matchParts.every(partIsSatisfied);
+    typeMatch = matchParts.some(partIsSatisfied);
   }
   if (!typeMatch) return false;
 
