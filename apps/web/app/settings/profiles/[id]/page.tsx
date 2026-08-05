@@ -34,8 +34,11 @@ const OBJ_PERM_COLS: { key: string; label: string; width: string }[] = [
 
 const APP_PERMS: { key: string; label: string; desc: string }[] = [
   { key: 'manageUsers',           label: 'Manage Users',            desc: 'Create, edit, and deactivate user accounts' },
+  { key: 'viewAllUsers',          label: 'View All Users',          desc: 'View all user accounts' },
   { key: 'manageProfiles',        label: 'Manage Profiles',         desc: 'Create and edit profiles and permissions' },
+  { key: 'viewAllProfiles',       label: 'View All Profiles',       desc: 'View all profiles and permissions' },
   { key: 'manageDepartments',     label: 'Manage Departments',      desc: 'Create and manage department hierarchy' },
+  { key: 'viewAllDepartments',    label: 'View All Departments',    desc: 'View all departments and hierarchy' },
   { key: 'manageIntegrations',    label: 'Manage Integrations',     desc: 'Configure third-party integrations and API keys' },
   { key: 'manageCompanySettings', label: 'Manage Company Settings', desc: 'Edit company-wide settings and preferences' },
   { key: 'exportData',            label: 'Export Data',             desc: 'Export records and reports to CSV/Excel' },

@@ -6,7 +6,7 @@ import { logAudit, extractIp } from '../audit.js';
 
 const OBJECTS = ['leads','opportunities','projects','service','quotes','installations','properties','contacts','companies','products','workorders'] as const;
 const APP_KEYS = [
-  'manageUsers','manageProfiles','manageDepartments','manageIntegrations','manageCompanySettings',
+  'manageUsers','viewAllUsers','manageProfiles','viewAllProfiles','manageDepartments','viewAllDepartments','manageIntegrations','manageCompanySettings',
   'exportData','importData',
   'viewReports','manageReports','manageDashboards',
   'viewSummary','viewSetup','viewAuditLog',

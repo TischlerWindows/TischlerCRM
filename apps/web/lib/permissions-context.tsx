@@ -17,8 +17,12 @@ export interface ObjectPermission {
 
 export interface AppPermissions {
   manageUsers: boolean;
+  viewAllUsers: boolean;
   manageRoles: boolean;
   manageDepartments: boolean;
+  viewAllDepartments: boolean;
+  manageProfiles: boolean;
+  viewAllProfiles: boolean;
   exportData: boolean;
   importData: boolean;
   manageReports: boolean;
