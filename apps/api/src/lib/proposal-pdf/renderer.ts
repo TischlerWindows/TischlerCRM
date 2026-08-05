@@ -929,8 +929,10 @@ function drawStyledRuns(
         underline: !!run.underline,
         ...(isLast ? { paragraphGap: 4 } : {}),
       });
-    } else if (i === 0) {
+    } else if (i === 0 && opts.indent > 0) {
       // Explicit (x, y) sets doc.x so wrapped lines stay at the same indent.
+      // Only safe when starting a fresh line (indent > 0 means no preceding
+      // continued:true chain, e.g. a "(2)  " number prefix, to preserve).
       doc.text(text, PAGE_MARGIN + opts.indent, doc.y, {
         continued: !isLast,
         width: textWidth,
