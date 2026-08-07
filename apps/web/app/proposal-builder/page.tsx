@@ -77,6 +77,18 @@ interface TokenMappingData {
   isBuiltIn?: boolean;
 }
 
+// Tokens computed entirely in code — not stored in the DB TokenMapping table.
+const BUILT_IN_TOKENS: TokenMappingData[] = [
+  { id: '__builtin_installationDetails', tokenName: 'installationDetails', label: 'Installation Details', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'installationDetails', format: 'TEXT' },
+  { id: '__builtin_installationTotalPrice', tokenName: 'installationTotalPrice', label: 'Installation Total Price', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'installationTotalPrice', format: 'TEXT' },
+  { id: '__builtin_productTypeDetails', tokenName: 'productTypeDetails', label: 'Product Type Details', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'productTypeDetails', format: 'TEXT' },
+  { id: '__builtin_roughHardware', tokenName: 'roughHardware', label: 'Rough Hardware', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'roughHardware', format: 'TEXT' },
+  { id: '__builtin_sdlType', tokenName: 'sdlType', label: 'SDL Type', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'sdlType', format: 'TEXT' },
+  { id: '__builtin_sdlInches', tokenName: 'sdlInches', label: 'SDL Inches', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'sdlInches', format: 'TEXT' },
+  { id: '__builtin_tdlType', tokenName: 'tdlType', label: 'TDL Type', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'tdlType', format: 'TEXT' },
+  { id: '__builtin_tdlInches', tokenName: 'tdlInches', label: 'TDL Inches', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'tdlInches', format: 'TEXT' },
+];
+
 export default function QuoteBuilderPage() {
   const loadSchema = useSchemaStore(s => s.loadSchema);
 
@@ -1199,18 +1211,11 @@ export default function QuoteBuilderPage() {
         format: m.format,
         isBuiltIn: m.isBuiltIn ?? false,
       }));
-      // Inject synthetic mappings for new built-ins if the DB hasn't been seeded yet.
+      // Inject built-in tokens that aren't yet in the DB.
       const syntheticNames = new Set(baseTokenMappings.map((m) => m.tokenName));
-      const syntheticMappings = [
-        { tokenName: 'installationDetails', sourceObject: 'SUMMARY' as const, sourcePath: 'installationDetails', format: 'TEXT' as const, isBuiltIn: false },
-        { tokenName: 'installationTotalPrice', sourceObject: 'SUMMARY' as const, sourcePath: 'installationTotalPrice', format: 'TEXT' as const, isBuiltIn: false },
-        { tokenName: 'productTypeDetails', sourceObject: 'SUMMARY' as const, sourcePath: 'productTypeDetails', format: 'TEXT' as const, isBuiltIn: false },
-        { tokenName: 'roughHardware', sourceObject: 'SUMMARY' as const, sourcePath: 'roughHardware', format: 'TEXT' as const, isBuiltIn: false },
-        { tokenName: 'sdlType', sourceObject: 'SUMMARY' as const, sourcePath: 'sdlType', format: 'TEXT' as const, isBuiltIn: false },
-        { tokenName: 'sdlInches', sourceObject: 'SUMMARY' as const, sourcePath: 'sdlInches', format: 'TEXT' as const, isBuiltIn: false },
-        { tokenName: 'tdlType', sourceObject: 'SUMMARY' as const, sourcePath: 'tdlType', format: 'TEXT' as const, isBuiltIn: false },
-        { tokenName: 'tdlInches', sourceObject: 'SUMMARY' as const, sourcePath: 'tdlInches', format: 'TEXT' as const, isBuiltIn: false },
-      ].filter((m) => !syntheticNames.has(m.tokenName));
+      const syntheticMappings = BUILT_IN_TOKENS
+        .filter((m) => !syntheticNames.has(m.tokenName))
+        .map(({ tokenName, sourceObject, sourcePath, format }) => ({ tokenName, sourceObject, sourcePath, format, isBuiltIn: false }));
 
       // Normalize matchValues in presets: convert newline-separated values (new format)
       // to comma-separated (legacy format) so a stale package dist still produces
@@ -1409,7 +1414,12 @@ export default function QuoteBuilderPage() {
                 style={{ height: variablesPanel.height }}
               >
                 <VariableChips
-                  mappings={tokenMappings}
+                  mappings={[
+                    ...tokenMappings,
+                    ...BUILT_IN_TOKENS.filter(
+                      (b) => !tokenMappings.some((m) => m.tokenName === b.tokenName)
+                    ),
+                  ]}
                   grouped={tokenGrouped}
                   onInsert={handleInsertToken}
                   onNewToken={() => setShowNewTokenModal(true)}
