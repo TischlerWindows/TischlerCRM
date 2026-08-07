@@ -549,6 +549,10 @@ export default function DynamicForm({
         ...fieldProps,
         apiName,
         type: normalizeFieldType(fieldProps.type!),
+        // Prefer the live field label so renaming a field in Object Manager takes
+        // effect everywhere. An explicit per-layout labelOverride still wins;
+        // the layout's own captured `label` (legacy/stale) is the last resort.
+        label: (pageField as any).labelOverride ?? schemaField?.label ?? fieldProps.label,
         // Prefer canonical schema values for picklist data — layout copies
         // can become stale or corrupted.
         ...(schemaField?.picklistValues ? { picklistValues: schemaField.picklistValues } : {}),
