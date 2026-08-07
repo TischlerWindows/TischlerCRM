@@ -2,35 +2,17 @@
 
 import {
   ChevronDown,
-  ChevronRight,
   ChevronUp,
   Copy,
   EyeOff,
-  FileText,
   GitBranch,
   GripVertical,
   Plus,
   ScrollText,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SpecPresetData } from '@crm/proposal-assembly';
 import { BLOCK_TYPE_META, type BlockType } from '@crm/types';
-
-const SECTION_ORDER: Array<SpecPresetData['section']> = [
-  'CONSTANT',
-  'SPECIFICATION',
-  'OPTION',
-  'EXCLUSION',
-  'INSTALLATION',
-];
-
-const SECTION_LABEL: Record<SpecPresetData['section'], string> = {
-  CONSTANT: 'Constants',
-  SPECIFICATION: 'Specifications',
-  OPTION: 'Options',
-  EXCLUSION: 'Exclusions',
-  INSTALLATION: 'Installation',
-};
 
 const SECTION_COLORS: Record<string, string> = {
   CONSTANT: 'bg-slate-100 text-slate-700',
@@ -40,7 +22,7 @@ const SECTION_COLORS: Record<string, string> = {
   INSTALLATION: 'bg-green-100 text-green-700',
 };
 
-const COLLAPSED_STORAGE_KEY = 'proposalBuilder.blockGroups.collapsed';
+
 
 interface Props {
   presets: SpecPresetData[];
@@ -76,35 +58,6 @@ function reorderAt(list: SpecPresetData[], from: number, to: number): SpecPreset
   return next.map((p, i) => ({ ...p, order: i }));
 }
 
-function useCollapsedSections(): {
-  collapsed: Set<string>;
-  toggle: (section: string) => void;
-} {
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(COLLAPSED_STORAGE_KEY);
-      if (raw) setCollapsed(new Set(JSON.parse(raw) as string[]));
-    } catch {
-      // ignore — older browsers / disabled storage
-    }
-  }, []);
-  const toggle = useCallback((section: string) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(section)) next.delete(section);
-      else next.add(section);
-      try {
-        window.localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify(Array.from(next)));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  }, []);
-  return { collapsed, toggle };
-}
-
 export function BlockList({
   presets,
   selectedPresetId,
@@ -117,7 +70,6 @@ export function BlockList({
   dragIdx,
   onDragStart,
 }: Props) {
-  const { collapsed, toggle } = useCollapsedSections();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const selectedPreset = presets.find((p) => p.id === selectedPresetId) || null;
@@ -280,122 +232,82 @@ export function BlockList({
             )}
           </div>
         ) : (
-          SECTION_ORDER.map((section) => {
-            const inGroup = presets.filter((p) => p.section === section);
-            if (inGroup.length === 0) return null;
-            const isCollapsed = collapsed.has(section);
-            return (
-              <section key={section} aria-label={SECTION_LABEL[section]}>
-                <button
-                  type="button"
-                  onClick={() => toggle(section)}
-                  aria-expanded={!isCollapsed}
-                  aria-controls={`block-group-${section}`}
-                  className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-50/80 border-b border-gray-100 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-navy/30 transition-colors"
+          <ul role="list">
+            {presets.map((preset) => {
+              const idx = presets.indexOf(preset);
+              const isSelected = preset.id === selectedPresetId;
+              return (
+                <li
+                  key={preset.id}
+                  draggable
+                  tabIndex={0}
+                  aria-current={isSelected ? 'true' : undefined}
+                  onDragStart={() => onDragStart(idx)}
+                  onDragOver={(e) => handleDragOver(e, idx)}
+                  onDragEnd={() => onReorderEnd()}
+                  onClick={() => onSelect(preset)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.target === e.currentTarget) {
+                        e.preventDefault();
+                        onSelect(preset);
+                      }
+                    }
+                  }}
+                  className={`group flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-navy/30 transition-colors ${
+                    isSelected ? 'bg-[#ede9f5] border-l-[3px] border-l-[#da291c]' : 'hover:bg-gray-50'
+                  } ${!preset.isActive ? 'opacity-50' : ''}`}
                 >
-                  {isCollapsed ? (
-                    <ChevronRight aria-hidden="true" className="w-3 h-3 text-gray-400" />
-                  ) : (
-                    <ChevronDown aria-hidden="true" className="w-3 h-3 text-gray-400" />
+                  <GripVertical
+                    aria-hidden="true"
+                    className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 cursor-grab"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold text-gray-400 tabular-nums w-4 text-right">
+                        {idx + 1}
+                      </span>
+                      <span className="text-xs font-medium text-gray-900 truncate">{preset.title}</span>
+                    </div>
+                    <div className="flex items-center gap-1 mt-0.5 ml-5.5 flex-wrap">
+                      <span className={`text-[9px] font-semibold px-1 py-0.5 rounded ${SECTION_COLORS[preset.section] || ''}`}>
+                        {preset.section}
+                      </span>
+                      {preset.isAlwaysIncluded && (
+                        <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-purple-100 text-purple-700">Always</span>
+                      )}
+                      {preset.driverField && (
+                        <GitBranch className="w-3 h-3 text-indigo-500" aria-label={`Driver field: ${preset.driverField}`} />
+                      )}
+                    </div>
+                  </div>
+                  {!preset.isActive && (
+                    <EyeOff aria-label="Inactive block" className="w-3 h-3 text-gray-400 flex-shrink-0" />
                   )}
-                  <span className="flex-1 text-left">{SECTION_LABEL[section]}</span>
-                  <span className="font-normal lowercase tracking-normal text-gray-400">
-                    {inGroup.length}
-                  </span>
-                </button>
-                {!isCollapsed && (
-                  <ul role="list" id={`block-group-${section}`} className="contents">
-                    {inGroup.map((preset) => {
-                      const idx = presets.indexOf(preset);
-                      const inGroupIdx = inGroup.indexOf(preset);
-                      const isSelected = preset.id === selectedPresetId;
-                      const isFirstInGroup = inGroupIdx === 0;
-                      const isLastInGroup = inGroupIdx === inGroup.length - 1;
-                      return (
-                        <li
-                          key={preset.id}
-                          draggable
-                          tabIndex={0}
-                          aria-current={isSelected ? 'true' : undefined}
-                          onDragStart={() => onDragStart(idx)}
-                          onDragOver={(e) => handleDragOver(e, idx)}
-                          onDragEnd={() => onReorderEnd()}
-                          onClick={() => onSelect(preset)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              if (e.target === e.currentTarget) {
-                                e.preventDefault();
-                                onSelect(preset);
-                              }
-                            }
-                          }}
-                          className={`group flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-navy/30 transition-colors ${
-                            isSelected ? 'bg-[#ede9f5] border-l-[3px] border-l-[#da291c]' : 'hover:bg-gray-50'
-                          } ${!preset.isActive ? 'opacity-50' : ''}`}
-                        >
-                          <GripVertical
-                            aria-hidden="true"
-                            className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 cursor-grab"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              {/* Per-group position. Resets per section so users
-                                  don't see a confusing global index like
-                                  "1, 2, 28, 3" when blocks are grouped. */}
-                              <span className="text-[10px] font-bold text-gray-400 tabular-nums w-4 text-right">
-                                {inGroupIdx + 1}
-                              </span>
-                              <span className="text-xs font-medium text-gray-900 truncate">{preset.title}</span>
-                            </div>
-                            <div className="flex items-center gap-1 mt-0.5 ml-5.5 flex-wrap">
-                              <span className={`text-[9px] font-semibold px-1 py-0.5 rounded ${SECTION_COLORS[preset.section] || ''}`}>
-                                {preset.section}
-                              </span>
-                              {preset.isAlwaysIncluded && (
-                                <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-purple-100 text-purple-700">Always</span>
-                              )}
-                              {preset.driverField && (
-                                <GitBranch className="w-3 h-3 text-indigo-500" aria-label={`Driver field: ${preset.driverField}`} />
-                              )}
-                            </div>
-                          </div>
-                          {!preset.isActive && (
-                            <EyeOff aria-label="Inactive block" className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                          )}
-                          <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMove(idx, -1);
-                              }}
-                              disabled={isFirstInGroup}
-                              aria-label={`Move ${preset.title} up`}
-                              className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-navy/30 disabled:opacity-30 disabled:cursor-not-allowed"
-                            >
-                              <ChevronUp className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMove(idx, 1);
-                              }}
-                              disabled={isLastInGroup}
-                              aria-label={`Move ${preset.title} down`}
-                              className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-navy/30 disabled:opacity-30 disabled:cursor-not-allowed"
-                            >
-                              <ChevronDown className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </section>
-            );
-          })
+                  <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleMove(idx, -1); }}
+                      disabled={idx === 0}
+                      aria-label={`Move ${preset.title} up`}
+                      className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-navy/30 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleMove(idx, 1); }}
+                      disabled={idx === presets.length - 1}
+                      aria-label={`Move ${preset.title} down`}
+                      className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-navy/30 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
     </div>
