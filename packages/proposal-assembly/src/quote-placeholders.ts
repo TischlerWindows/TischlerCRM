@@ -53,6 +53,95 @@ function getValidOptionsForType(t: string): string[] {
   return ['72mm Thick Sash', '90mm Thick Sash'];
 }
 
+// ── Rough Hardware token ──────────────────────────────────────────
+
+const GD_TYPES_LOWER = new Set([
+  'inswing gd', 'outswing gd', 'inswing french gd', 'outswing french gd',
+]);
+
+const WINDOW_NON_HUNG_TYPES_LOWER = new Set([
+  'push outswing', 'crank outswing',
+  'inswing', 'inswing t & t',
+  'awning', 'tilt-in',
+  'inswing french', 'outswing french',
+  'inswing folding window', 'outswing folding window',
+]);
+
+// <br><br> creates an empty paragraph block which renders as a blank line in PDF.
+const BB = '<br><br>';
+
+function buildRoughHardwareText(
+  activeTypes: Set<string>,
+  pto: Record<string, string[]>,
+): string {
+  const activeList = Array.from(activeTypes).map((t) => t.toLowerCase());
+  const hasGD = activeList.some((t) => GD_TYPES_LOWER.has(t));
+  const hasWindows = activeList.some((t) => WINDOW_NON_HUNG_TYPES_LOWER.has(t));
+
+  const parts: string[] = [];
+
+  if (hasGD && hasWindows) {
+    parts.push(
+      'The Tischler system is a stainless steel multi-point locking system for garden doors and a corrosion resistant metal alloy perimeter locking system at jamb, head and sill for windows.' + BB +
+      'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
+      'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays. Garden doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional.' + BB +
+      'Standard TUS lock cylinders (not re-keyable.)'
+    );
+  } else if (hasGD) {
+    parts.push(
+      'The Tischler system is a stainless steel multi-point locking system for garden doors.' + BB +
+      'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
+      'Garden doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional.' + BB +
+      'Standard TUS lock cylinders (not re-keyable.)'
+    );
+  } else if (hasWindows) {
+    parts.push(
+      'The Tischler system is a corrosion resistant metal alloy perimeter locking system at jamb, head and sill for windows.' + BB +
+      'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
+      'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays.'
+    );
+  }
+
+  const HUNG_KINDS = [
+    { label: 'Single', concealedKey: 'Single Hung Concealed Balance', wcKey: 'Single Hung Weight and Chain' },
+    { label: 'Double', concealedKey: 'Double Hung Concealed Balance', wcKey: 'Double Hung Weight and Chain' },
+    { label: 'Triple', concealedKey: 'Triple Hung Concealed Balance', wcKey: 'Triple Hung Weight and Chain' },
+  ];
+  for (const { label, concealedKey, wcKey } of HUNG_KINDS) {
+    if (activeTypes.has(concealedKey)) {
+      parts.push(
+        `${label} hung window operation is a concealed stainless steel constant force spring balance system allowing sash operation of equal force. Clear opening is subject to size and sash weight` + BB +
+        `${label} with standard polished brass sash locks and stops.`
+      );
+    }
+    if (activeTypes.has(wcKey)) {
+      parts.push(
+        `${label} hung window operation is a weight and chain balance system. Chains and pulleys are supplied in standard solid brass. Weights and chains are supplied loose for installation on site by others` + BB +
+        `${label} with standard polished brass sash locks and stops.`
+      );
+    }
+  }
+
+  const lrActiveTypes = ['L&R D', 'Lift and Roll Window'].filter((t) => activeTypes.has(t));
+  if (lrActiveTypes.length > 0) {
+    const lrOptions = lrActiveTypes.flatMap((t) => pto[t] ?? []);
+    if (lrOptions.includes('SS RH')) {
+      parts.push(
+        'Lift-rolling doors with corrosion resistant metal alloy rough hardware with stainless steel meeting stile interlocks and locking bolts. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices.' + BB +
+        'Lift-rolling doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
+      );
+    }
+    if (lrOptions.includes('Standard RH')) {
+      parts.push(
+        'Lift rolling doors with corrosion resistant metal alloy rough hardware. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices' + BB +
+        'Lift-rolling doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
+      );
+    }
+  }
+
+  return parts.join(BB);
+}
+
 // ── Types ──────────────────────────────────────────────────────────
 
 /** Subset of Summary fields used for token resolution. */
@@ -674,6 +763,32 @@ export function buildTokenMap(
         }
       }
       return lines.join('<br>');
+    })(),
+    roughHardware: (() => {
+      const rhPto = ((summary as any).productTypeOptions as Record<string, string[]> | undefined) ?? {};
+      const rhFields = ['type', 'type2', 'type3', 'type4'];
+      const rhSubOpt: Record<string, string> = {
+        type: 'typeSubOption', type2: 'type2SubOption',
+        type3: 'type3SubOption', type4: 'type4SubOption',
+      };
+      const rhRows: unknown[] = [
+        ...((summary as any).rows || []),
+        ...((summary as any).doorRows || []),
+        ...(((summary as any).subLocations || []) as any[]).flatMap(
+          (l: any) => [...(l.rows || []), ...(l.doorRows || [])]
+        ),
+      ];
+      const rhActive = new Set<string>(
+        rhRows.flatMap((r: any) =>
+          rhFields.map((f) => {
+            const t = r[f];
+            if (!t) return null;
+            if (t === 'Fixed with Sash' && r[rhSubOpt[f]!]) return `Fixed with Sash: ${r[rhSubOpt[f]!]}`;
+            return t;
+          }).filter((t): t is string => Boolean(t))
+        )
+      );
+      return buildRoughHardwareText(rhActive, rhPto);
     })(),
   };
 
