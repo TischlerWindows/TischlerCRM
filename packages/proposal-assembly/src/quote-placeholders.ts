@@ -70,6 +70,10 @@ const WINDOW_NON_HUNG_TYPES_LOWER = new Set([
 // <br><br> creates an empty paragraph block which renders as a blank line in PDF.
 const BB = '<br><br>';
 
+// Prefix body text with a bold section header followed by a blank line.
+const section = (header: string, body: string) =>
+  `<strong>${header}</strong>${BB}${body}`;
+
 function buildRoughHardwareText(
   activeTypes: Set<string>,
   pto: Record<string, string[]>,
@@ -81,25 +85,25 @@ function buildRoughHardwareText(
   const parts: string[] = [];
 
   if (hasGD && hasWindows) {
-    parts.push(
+    parts.push(section('GARDEN DOORS & WINDOWS:',
       'The Tischler system is a stainless steel multi-point locking system for garden doors and a corrosion resistant metal alloy perimeter locking system at jamb, head and sill for windows.' + BB +
       'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
       'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays. Garden doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional.' + BB +
       'Standard TUS lock cylinders (not re-keyable.)'
-    );
+    ));
   } else if (hasGD) {
-    parts.push(
+    parts.push(section('GARDEN DOORS:',
       'The Tischler system is a stainless steel multi-point locking system for garden doors.' + BB +
       'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
       'Garden doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional.' + BB +
       'Standard TUS lock cylinders (not re-keyable.)'
-    );
+    ));
   } else if (hasWindows) {
-    parts.push(
+    parts.push(section('WINDOWS:',
       'The Tischler system is a corrosion resistant metal alloy perimeter locking system at jamb, head and sill for windows.' + BB +
       'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
       'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays.'
-    );
+    ));
   }
 
   const HUNG_KINDS = [
@@ -109,16 +113,16 @@ function buildRoughHardwareText(
   ];
   for (const { label, concealedKey, wcKey } of HUNG_KINDS) {
     if (activeTypes.has(concealedKey)) {
-      parts.push(
+      parts.push(section(`${label.toUpperCase()} HUNG:`,
         `${label} hung window operation is a concealed stainless steel constant force spring balance system allowing sash operation of equal force. Clear opening is subject to size and sash weight` + BB +
         `${label} with standard polished brass sash locks and stops.`
-      );
+      ));
     }
     if (activeTypes.has(wcKey)) {
-      parts.push(
+      parts.push(section(`${label.toUpperCase()} HUNG:`,
         `${label} hung window operation is a weight and chain balance system. Chains and pulleys are supplied in standard solid brass. Weights and chains are supplied loose for installation on site by others` + BB +
         `${label} with standard polished brass sash locks and stops.`
-      );
+      ));
     }
   }
 
@@ -126,16 +130,16 @@ function buildRoughHardwareText(
   if (lrActiveTypes.length > 0) {
     const lrOptions = lrActiveTypes.flatMap((t) => pto[t] ?? []);
     if (lrOptions.includes('SS RH')) {
-      parts.push(
+      parts.push(section('L&R DOORS with SS / RH:',
         'Lift-rolling doors with corrosion resistant metal alloy rough hardware with stainless steel meeting stile interlocks and locking bolts. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices.' + BB +
         'Lift-rolling doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
-      );
+      ));
     }
     if (lrOptions.includes('Standard RH')) {
-      parts.push(
+      parts.push(section('L&R DOORS:',
         'Lift rolling doors with corrosion resistant metal alloy rough hardware. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices' + BB +
         'Lift-rolling doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
-      );
+      ));
     }
   }
 
