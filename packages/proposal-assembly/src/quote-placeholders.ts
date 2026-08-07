@@ -59,6 +59,12 @@ const GD_TYPES_LOWER = new Set([
   'inswing gd', 'outswing gd', 'inswing french gd', 'outswing french gd',
 ]);
 
+// House doors get their own "HOUSE DOORS:" header but reuse the garden door paragraph text.
+const HOUSE_DOOR_TYPES_LOWER = new Set([
+  'inswing house door', 'outswing house door',
+  'inswing french house door', 'outswing french house door',
+]);
+
 const WINDOW_NON_HUNG_TYPES_LOWER = new Set([
   'push outswing', 'crank outswing',
   'inswing', 'inswing t & t',
@@ -66,6 +72,14 @@ const WINDOW_NON_HUNG_TYPES_LOWER = new Set([
   'inswing french', 'outswing french',
   'inswing folding window', 'outswing folding window',
 ]);
+
+const DOMESTIC_DOOR_TYPES_LOWER = new Set([
+  'inswing dd', 'outswing dd', 'inswing french dd', 'outswing french dd',
+]);
+
+const FOLDING_DOOR_TYPES_LOWER = new Set(['inswing folding', 'outswing folding']);
+
+const CRANK_OUT_TYPE_LOWER = 'crank outswing';
 
 // <br><br> creates an empty paragraph block which renders as a blank line in PDF.
 const BB = '<br><br>';
@@ -80,29 +94,55 @@ function buildRoughHardwareText(
 ): string {
   const activeList = Array.from(activeTypes).map((t) => t.toLowerCase());
   const hasGD = activeList.some((t) => GD_TYPES_LOWER.has(t));
+  const hasHouseDoor = activeList.some((t) => HOUSE_DOOR_TYPES_LOWER.has(t));
   const hasWindows = activeList.some((t) => WINDOW_NON_HUNG_TYPES_LOWER.has(t));
 
   const parts: string[] = [];
 
-  if (hasGD && hasWindows) {
-    parts.push(section('GARDEN DOORS & WINDOWS:',
+  // Garden doors and house doors share identical hardware copy; only the header differs.
+  const doorLabels: string[] = [];
+  if (hasGD) doorLabels.push('GARDEN DOORS');
+  if (hasHouseDoor) doorLabels.push('HOUSE DOORS');
+  const hasDoorLike = doorLabels.length > 0;
+  if (hasWindows) doorLabels.push('WINDOWS');
+  const header = doorLabels.length > 1
+    ? doorLabels.slice(0, -1).join(', ') + ' & ' + doorLabels[doorLabels.length - 1] + ':'
+    : doorLabels[0] + ':';
+
+  if (hasDoorLike && hasWindows) {
+    parts.push(section(header,
       'The Tischler system is a stainless steel multi-point locking system for garden doors and a corrosion resistant metal alloy perimeter locking system at jamb, head and sill for windows.' + BB +
       'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
       'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays. Garden doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional.' + BB +
       'Standard TUS lock cylinders (not re-keyable.)'
     ));
-  } else if (hasGD) {
-    parts.push(section('GARDEN DOORS:',
+  } else if (hasDoorLike) {
+    parts.push(section(header,
       'The Tischler system is a stainless steel multi-point locking system for garden doors.' + BB +
       'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
       'Garden doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional.' + BB +
       'Standard TUS lock cylinders (not re-keyable.)'
     ));
   } else if (hasWindows) {
-    parts.push(section('WINDOWS:',
+    parts.push(section(header,
       'The Tischler system is a corrosion resistant metal alloy perimeter locking system at jamb, head and sill for windows.' + BB +
       'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
       'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays.'
+    ));
+  }
+
+  if (activeList.some((t) => DOMESTIC_DOOR_TYPES_LOWER.has(t))) {
+    parts.push(section('DOMESTIC DOORS:',
+      'Doors incorporate a multi-point locking corrosion resistant metal alloy rough hardware.' + BB +
+      'Standard aluminum construction handles in white or dark brown. Domestic doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional. Standard TUS lock cylinders (not re-keyable.) Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.' + BB +
+      'Domestic doors with 4”x4” butt hinges.'
+    ));
+  }
+
+  if (activeList.some((t) => FOLDING_DOOR_TYPES_LOWER.has(t))) {
+    parts.push(section('FOLDING DOORS:',
+      'Folding doors incorporate a multi-point locking corrosion resistant metal alloy rough hardware. This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
+      'Standard aluminum construction handles in white or dark brown. Folding doors with interior operable handles (active sash) and exterior pulls. Upgraded (final) finish hardware at an additional cost.'
     ));
   }
 
@@ -141,6 +181,13 @@ function buildRoughHardwareText(
         'Lift-rolling doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
       ));
     }
+  }
+
+  // Crank-out always renders last, after every other applicable section.
+  if (activeList.includes(CRANK_OUT_TYPE_LOWER)) {
+    parts.push(section('CRANK-OUT CASEMENTS:',
+      'Crank-out casements with stainless steel Roto scissor crank out hardware and 3-point locking system. One crank per casement sash. Hardware is available in four finishes – Earth Brown, Coppertone, Dark Brown, and Metallic Brown. Color samples available upon request. Not available in a brushed nickel finish.'
+    ));
   }
 
   return parts.join(BB);
