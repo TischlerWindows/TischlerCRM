@@ -109,12 +109,19 @@ function buildRoughHardwareText(
     ? doorLabels.slice(0, -1).join(', ') + ' & ' + doorLabels[doorLabels.length - 1] + ':'
     : doorLabels[0] + ':';
 
+  // Crank-out has no header of its own — it's an extra paragraph tacked onto
+  // whichever windows-inclusive section fires (combined or windows-only).
+  const crankOutText = activeList.includes(CRANK_OUT_TYPE_LOWER)
+    ? BB + 'Crank-out casements with stainless steel Roto scissor crank out hardware and 3-point locking system. One crank per casement sash. Hardware is available in four finishes – Earth Brown, Coppertone, Dark Brown, and Metallic Brown. Color samples available upon request. Not available in a brushed nickel finish.'
+    : '';
+
   if (hasDoorLike && hasWindows) {
     parts.push(section(header,
       'The Tischler system is a stainless steel multi-point locking system for garden doors and a corrosion resistant metal alloy perimeter locking system at jamb, head and sill for windows.' + BB +
       'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
       'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays. Garden doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional.' + BB +
-      'Standard TUS lock cylinders (not re-keyable.)'
+      'Standard TUS lock cylinders (not re-keyable.)' +
+      crankOutText
     ));
   } else if (hasDoorLike) {
     parts.push(section(header,
@@ -127,7 +134,8 @@ function buildRoughHardwareText(
     parts.push(section(header,
       'The Tischler system is a corrosion resistant metal alloy perimeter locking system at jamb, head and sill for windows.' + BB +
       'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
-      'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays.'
+      'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays.' +
+      crankOutText
     ));
   }
 
@@ -181,13 +189,6 @@ function buildRoughHardwareText(
         'Lift-rolling doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
       ));
     }
-  }
-
-  // Crank-out always renders last, after every other applicable section.
-  if (activeList.includes(CRANK_OUT_TYPE_LOWER)) {
-    parts.push(section('CRANK-OUT CASEMENTS:',
-      'Crank-out casements with stainless steel Roto scissor crank out hardware and 3-point locking system. One crank per casement sash. Hardware is available in four finishes – Earth Brown, Coppertone, Dark Brown, and Metallic Brown. Color samples available upon request. Not available in a brushed nickel finish.'
-    ));
   }
 
   return parts.join(BB);
