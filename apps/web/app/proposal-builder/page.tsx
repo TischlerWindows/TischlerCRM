@@ -1414,13 +1414,15 @@ export default function QuoteBuilderPage() {
                 style={{ height: variablesPanel.height }}
               >
                 <VariableChips
-                  mappings={[
-                    ...tokenMappings,
-                    ...BUILT_IN_TOKENS.filter(
-                      (b) => !tokenMappings.some((m) => m.tokenName === b.tokenName)
-                    ),
-                  ]}
-                  grouped={tokenGrouped}
+                  mappings={(() => {
+                    const extra = BUILT_IN_TOKENS.filter((b) => !tokenMappings.some((m) => m.tokenName === b.tokenName));
+                    return extra.length ? [...tokenMappings, ...extra] : tokenMappings;
+                  })()}
+                  grouped={(() => {
+                    const extra = BUILT_IN_TOKENS.filter((b) => !tokenMappings.some((m) => m.tokenName === b.tokenName));
+                    if (!extra.length) return tokenGrouped;
+                    return { ...tokenGrouped, 'Built-in': [...(tokenGrouped['Built-in'] ?? []), ...extra] };
+                  })()}
                   onInsert={handleInsertToken}
                   onNewToken={() => setShowNewTokenModal(true)}
                   onDeleteToken={handleDeleteToken}
