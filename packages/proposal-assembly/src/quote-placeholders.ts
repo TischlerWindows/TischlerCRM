@@ -161,13 +161,13 @@ function buildRoughHardwareText(
   ];
   for (const { label, concealedKey, wcKey } of HUNG_KINDS) {
     if (activeTypes.has(concealedKey)) {
-      parts.push(section(`${label.toUpperCase()} HUNG:`,
+      parts.push(section(`${label.toUpperCase()} HUNG CONCEALED BALANCE:`,
         `${label} hung window operation is a concealed stainless steel constant force spring balance system allowing sash operation of equal force. Clear opening is subject to size and sash weight` + BB +
         `${label} with standard polished brass sash locks and stops.`
       ));
     }
     if (activeTypes.has(wcKey)) {
-      parts.push(section(`${label.toUpperCase()} HUNG:`,
+      parts.push(section(`${label.toUpperCase()} HUNG WEIGHT & CHAIN:`,
         `${label} hung window operation is a weight and chain balance system. Chains and pulleys are supplied in standard solid brass. Weights and chains are supplied loose for installation on site by others` + BB +
         `${label} with standard polished brass sash locks and stops.`
       ));
