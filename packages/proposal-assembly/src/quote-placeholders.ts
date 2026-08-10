@@ -95,7 +95,12 @@ function buildRoughHardwareText(
   const activeList = Array.from(activeTypes).map((t) => t.toLowerCase());
   const hasGD = activeList.some((t) => GD_TYPES_LOWER.has(t));
   const hasHouseDoor = activeList.some((t) => HOUSE_DOOR_TYPES_LOWER.has(t));
-  const hasWindows = activeList.some((t) => WINDOW_NON_HUNG_TYPES_LOWER.has(t));
+  const hasWindows = activeList.some((t) =>
+    WINDOW_NON_HUNG_TYPES_LOWER.has(t) ||
+    t.includes('offset simulated') ||
+    t.includes('simulated dh') ||
+    t.includes('simulated double hung')
+  );
 
   const parts: string[] = [];
 
