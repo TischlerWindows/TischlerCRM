@@ -87,6 +87,7 @@ const BUILT_IN_TOKENS: TokenMappingData[] = [
   { id: '__builtin_sdlInches', tokenName: 'sdlInches', label: 'SDL Inches', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'sdlInches', format: 'TEXT' },
   { id: '__builtin_tdlType', tokenName: 'tdlType', label: 'TDL Type', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'tdlType', format: 'TEXT' },
   { id: '__builtin_tdlInches', tokenName: 'tdlInches', label: 'TDL Inches', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'tdlInches', format: 'TEXT' },
+  { id: '__builtin_finialSection', tokenName: 'finialSection', label: 'Finial Section', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'finialSection', format: 'TEXT' },
 ];
 
 export default function QuoteBuilderPage() {

@@ -199,6 +199,45 @@ function buildRoughHardwareText(
   return parts.join(BB);
 }
 
+const OUTSWING_WINDOW_TYPES_LOWER = new Set(['push outswing', 'crank outswing']);
+
+function buildFinialSectionText(
+  activeTypes: Set<string>,
+  finials: string,
+  hingeFinishSpec: string,
+): string {
+  const activeList = Array.from(activeTypes).map((t) => t.toLowerCase());
+  const hasOutswingWindows = activeList.some((t) => OUTSWING_WINDOW_TYPES_LOWER.has(t));
+  const hasSwingDoors = activeList.some((t) => GD_TYPES_LOWER.has(t) || HOUSE_DOOR_TYPES_LOWER.has(t));
+
+  if (!hasOutswingWindows && !hasSwingDoors) return '';
+  if (!finials || !hingeFinishSpec) return '';
+
+  const hasFinial = finials === 'Yes';
+  const isCustomFinish = hingeFinishSpec === 'Premium Custom Finish (Specify in Notes)';
+  const isBrushedSS = hingeFinishSpec === 'Base (Brushed Stainless Steel)';
+
+  const subject = hasOutswingWindows && hasSwingDoors
+    ? 'Outswing turn only windows & Swing doors'
+    : hasOutswingWindows
+      ? 'Outswing turn only windows'
+      : 'Swing doors';
+
+  if (!hasFinial && isCustomFinish) {
+    return `${subject} with flat top stainless steel hinges. Hinges are available in a variety of finishes. Decorative finials are not included but are available at an additional cost. (finials and finish to be selected during the shop drawing phase.)`;
+  }
+
+  if (hasFinial && isCustomFinish) {
+    return `${subject} with stainless steel hinges. Hinges are available in a variety of finishes with five different finial options (finials and finish to be selected during the shop drawing phase.)`;
+  }
+
+  if (!hasFinial && isBrushedSS) {
+    return `${subject} with flat top brushed stainless steel hinges. Decorative finials and custom finishes are not included but are available at an additional cost.`;
+  }
+
+  return '';
+}
+
 // ── Types ──────────────────────────────────────────────────────────
 
 /** Subset of Summary fields used for token resolution. */
@@ -229,6 +268,8 @@ export interface SummaryForPlaceholders {
   contactEmail: string;
   contactPrimaryPhone: string;
   quoteType: string;
+  finials?: string;
+  hingeFinishSpecification?: string;
   quoteTotals: {
     euroWindows: { full: string; pct: string; final: string; finalAdj: string };
     doubleHung: { full: string; pct: string; final: string; finalAdj: string };
@@ -846,6 +887,31 @@ export function buildTokenMap(
         )
       );
       return buildRoughHardwareText(rhActive, rhPto);
+    })(),
+    finialSection: (() => {
+      const fiFields = ['type', 'type2', 'type3', 'type4'];
+      const fiSubOpt: Record<string, string> = {
+        type: 'typeSubOption', type2: 'type2SubOption',
+        type3: 'type3SubOption', type4: 'type4SubOption',
+      };
+      const fiRows: unknown[] = [
+        ...((summary as any).rows || []),
+        ...((summary as any).doorRows || []),
+        ...(((summary as any).subLocations || []) as any[]).flatMap(
+          (l: any) => [...(l.rows || []), ...(l.doorRows || [])]
+        ),
+      ];
+      const fiActive = new Set<string>(
+        fiRows.flatMap((r: any) =>
+          fiFields.map((f) => {
+            const t = r[f];
+            if (!t) return null;
+            if (t === 'Fixed with Sash' && r[fiSubOpt[f]!]) return `Fixed with Sash: ${r[fiSubOpt[f]!]}`;
+            return t;
+          }).filter((t): t is string => Boolean(t))
+        )
+      );
+      return buildFinialSectionText(fiActive, summary.finials || '', summary.hingeFinishSpecification || '');
     })(),
   };
 
