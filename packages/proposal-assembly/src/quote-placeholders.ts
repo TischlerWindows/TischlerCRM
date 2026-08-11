@@ -790,7 +790,9 @@ export function buildTokenMap(
       );
       const grandTotal = base + subTotal;
       if (rows.length === 0) return formatDollar(String(grandTotal));
-      const lines = rows.map(r => `${r.label}: ${r.price}`);
+      const lines: string[] = [];
+      if (base > 0) lines.push(`Installation: ${formatDollar(String(base))}`);
+      rows.forEach(r => lines.push(`${r.label}: ${r.price}`));
       lines.push(`Total: ${formatDollar(String(grandTotal))}`);
       return lines.join('<br>');
     })(),
@@ -1051,7 +1053,9 @@ export function resolveCustomTokens(args: CustomTokenResolverArgs): Record<strin
           if (rows.length === 0) {
             out[m.tokenName] = formatDollar(String(grandTotal));
           } else {
-            const lines = rows.map(r => `${r.label}: ${r.price}`);
+            const lines: string[] = [];
+            if (base > 0) lines.push(`Installation: ${formatDollar(String(base))}`);
+            rows.forEach(r => lines.push(`${r.label}: ${r.price}`));
             lines.push(`Total: ${formatDollar(String(grandTotal))}`);
             out[m.tokenName] = lines.join('<br>');
           }
