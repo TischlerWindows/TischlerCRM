@@ -286,15 +286,6 @@ export async function renderProposalPDF(
   // up top should include a LETTERHEAD block.
   void letterheadDrawn;
 
-  // Auto-append hung diagram on a new page whenever the summary has hung rows,
-  // regardless of whether the template contains a HUNG_DIAGRAM block.
-  if ((result.pdfData.hungRows ?? []).length > 0) {
-    doc.addPage();
-    doc.y = doc.page.margins.top;
-    doc.x = PAGE_MARGIN;
-    drawHungDiagram(doc, result, ctx);
-  }
-
   drawPageLogos(doc, ctx, brand.pageLogos ?? []);
   drawFooter(doc, ctx, footerOverride);
 

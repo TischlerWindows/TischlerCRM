@@ -9,6 +9,7 @@ import {
   type PageLogoFile,
 } from '../lib/proposal-pdf/renderer.js';
 import { collectGlassTypeKeys, appendGlassSheets } from '../lib/proposal-pdf/glass-sheets.js';
+import { appendHungDiagram } from '../lib/proposal-pdf/hung-diagram.js';
 
 const renderSchema = z.object({
   summaryId: z.string().min(1),
@@ -134,6 +135,16 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
         pdfBuffer = await appendGlassSheets(pdfBuffer, glassKeys);
       } catch (err) {
         app.log.warn({ err }, 'Glass sheet append failed — returning proposal without sheets');
+      }
+    }
+
+    // ── Append hung-window diagram with dimension overlay ─────────
+    const hungRows = (result.pdfData.hungRows ?? []) as Array<{ widthFtIn: string; widthMM: string; heightFtIn: string; heightMM: string }>;
+    if (hungRows.length > 0) {
+      try {
+        pdfBuffer = await appendHungDiagram(pdfBuffer, hungRows);
+      } catch (err) {
+        app.log.warn({ err }, 'Hung diagram append failed — returning proposal without diagram');
       }
     }
 
