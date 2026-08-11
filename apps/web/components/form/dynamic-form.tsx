@@ -1599,6 +1599,14 @@ export default function DynamicForm({
                     return visiblePanels
                       .map((panelItem, panelIdx) => {
                         const isCollapsed = collapsedSections.has(panelItem.id);
+                        const headerStyle: React.CSSProperties = {
+                          ...((panelItem as any).style?.headerBackground ? { backgroundColor: (panelItem as any).style.headerBackground } : {}),
+                          ...((panelItem as any).style?.headerTextColor ? { color: (panelItem as any).style.headerTextColor } : {}),
+                          fontWeight: (panelItem as any).style?.headerBold ? 700 : undefined,
+                          fontStyle: (panelItem as any).style?.headerItalic ? 'italic' : undefined,
+                          textTransform: (panelItem as any).style?.headerUppercase ? 'uppercase' : undefined,
+                          fontSize: (panelItem as any).style?.headerFontSize ? `${(panelItem as any).style.headerFontSize}px` : undefined,
+                        };
                         return (
                           <div
                             key={panelItem.id}
@@ -1616,10 +1624,11 @@ export default function DynamicForm({
                             <button
                               type="button"
                               onClick={() => toggleSection(panelItem.id)}
-                              className="w-full flex items-center justify-between p-4 bg-gray-100 hover:bg-gray-150 transition-colors rounded-t-lg"
+                              className="w-full flex items-center justify-between p-4 bg-gray-100 hover:bg-gray-150 transition-colors rounded-t-lg overflow-hidden"
+                              style={headerStyle}
                             >
                               <div className="text-left">
-                                <h3 className="text-lg font-semibold text-gray-900">
+                                <h3 className="text-lg font-semibold text-gray-900" style={headerStyle}>
                                   {panelItem.label}
                                 </h3>
                                 {(panelItem as any).description ? (
@@ -1729,7 +1738,17 @@ export default function DynamicForm({
                         key={panelItem.id}
                         className="bg-white rounded-lg border border-gray-200"
                       >
-                        <div className="p-4 bg-gray-100 rounded-t-lg">
+                        <div
+                          className="p-4 bg-gray-100 rounded-t-lg"
+                          style={{
+                            ...((panelItem as any).style?.headerBackground ? { backgroundColor: (panelItem as any).style.headerBackground } : {}),
+                            ...((panelItem as any).style?.headerTextColor ? { color: (panelItem as any).style.headerTextColor } : {}),
+                            fontWeight: (panelItem as any).style?.headerBold ? 700 : undefined,
+                            fontStyle: (panelItem as any).style?.headerItalic ? 'italic' : undefined,
+                            textTransform: (panelItem as any).style?.headerUppercase ? 'uppercase' : undefined,
+                            fontSize: (panelItem as any).style?.headerFontSize ? `${(panelItem as any).style.headerFontSize}px` : undefined,
+                          }}
+                        >
                           <h3 className="text-lg font-semibold text-gray-900">
                             {panelItem.label}
                           </h3>
