@@ -1486,17 +1486,18 @@ export default function DynamicForm({
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               <div className="bg-white rounded-lg border border-gray-200">
                 <div
-                  className="p-4 bg-gray-100 rounded-t-lg"
+                  className="px-4 py-2 bg-gray-100 rounded-t-lg"
                   style={{
                     ...((step.section as any).style?.headerBackground ? { backgroundColor: (step.section as any).style.headerBackground } : {}),
+                  }}
+                >
+                  <h3 className="text-sm font-semibold text-gray-900" style={{
                     ...((step.section as any).style?.headerTextColor ? { color: (step.section as any).style.headerTextColor } : {}),
                     fontWeight: (step.section as any).style?.headerBold ? 700 : undefined,
                     fontStyle: (step.section as any).style?.headerItalic ? 'italic' : undefined,
                     textTransform: (step.section as any).style?.headerUppercase ? 'uppercase' : undefined,
                     fontSize: (step.section as any).style?.headerFontSize ? `${(step.section as any).style.headerFontSize}px` : undefined,
-                  }}
-                >
-                  <h3 className="text-sm font-semibold text-gray-900">
+                  }}>
                     {step.regionLabel || step.section.label}
                   </h3>
                   {(step.section as any).description ? (
@@ -1634,7 +1635,7 @@ export default function DynamicForm({
                             <button
                               type="button"
                               onClick={() => toggleSection(panelItem.id)}
-                              className="w-full flex items-center justify-between p-4 bg-gray-100 hover:bg-gray-150 transition-colors rounded-t-lg overflow-hidden"
+                              className="w-full flex items-center justify-between px-4 py-2 bg-gray-100 hover:bg-gray-150 transition-colors rounded-t-lg overflow-hidden"
                               style={headerStyle}
                             >
                               <div className="text-left">
@@ -1749,17 +1750,18 @@ export default function DynamicForm({
                         className="bg-white rounded-lg border border-gray-200"
                       >
                         <div
-                          className="p-4 bg-gray-100 rounded-t-lg"
+                          className="px-4 py-2 bg-gray-100 rounded-t-lg"
                           style={{
                             ...((panelItem as any).style?.headerBackground ? { backgroundColor: (panelItem as any).style.headerBackground } : {}),
+                          }}
+                        >
+                          <h3 className="text-sm font-semibold text-gray-900" style={{
                             ...((panelItem as any).style?.headerTextColor ? { color: (panelItem as any).style.headerTextColor } : {}),
                             fontWeight: (panelItem as any).style?.headerBold ? 700 : undefined,
                             fontStyle: (panelItem as any).style?.headerItalic ? 'italic' : undefined,
                             textTransform: (panelItem as any).style?.headerUppercase ? 'uppercase' : undefined,
                             fontSize: (panelItem as any).style?.headerFontSize ? `${(panelItem as any).style.headerFontSize}px` : undefined,
-                          }}
-                        >
-                          <h3 className="text-sm font-semibold text-gray-900">
+                          }}>
                             {panelItem.label}
                           </h3>
                           {(panelItem as any).description ? (
