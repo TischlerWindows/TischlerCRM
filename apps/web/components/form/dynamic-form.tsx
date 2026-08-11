@@ -1485,7 +1485,17 @@ export default function DynamicForm({
           return (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-4 bg-gray-100 rounded-t-lg">
+                <div
+                  className="p-4 bg-gray-100 rounded-t-lg"
+                  style={{
+                    ...((step.section as any).style?.headerBackground ? { backgroundColor: (step.section as any).style.headerBackground } : {}),
+                    ...((step.section as any).style?.headerTextColor ? { color: (step.section as any).style.headerTextColor } : {}),
+                    fontWeight: (step.section as any).style?.headerBold ? 700 : undefined,
+                    fontStyle: (step.section as any).style?.headerItalic ? 'italic' : undefined,
+                    textTransform: (step.section as any).style?.headerUppercase ? 'uppercase' : undefined,
+                    fontSize: (step.section as any).style?.headerFontSize ? `${(step.section as any).style.headerFontSize}px` : undefined,
+                  }}
+                >
                   <h3 className="text-lg font-semibold text-gray-900">
                     {step.regionLabel || step.section.label}
                   </h3>
