@@ -1496,7 +1496,7 @@ export default function DynamicForm({
                     fontSize: (step.section as any).style?.headerFontSize ? `${(step.section as any).style.headerFontSize}px` : undefined,
                   }}
                 >
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-sm font-semibold text-gray-900">
                     {step.regionLabel || step.section.label}
                   </h3>
                   {(step.section as any).description ? (
@@ -1638,7 +1638,7 @@ export default function DynamicForm({
                               style={headerStyle}
                             >
                               <div className="text-left">
-                                <h3 className="text-lg font-semibold text-gray-900" style={headerStyle}>
+                                <h3 className="text-sm font-semibold text-gray-900" style={headerStyle}>
                                   {panelItem.label}
                                 </h3>
                                 {(panelItem as any).description ? (
@@ -1759,7 +1759,7 @@ export default function DynamicForm({
                             fontSize: (panelItem as any).style?.headerFontSize ? `${(panelItem as any).style.headerFontSize}px` : undefined,
                           }}
                         >
-                          <h3 className="text-lg font-semibold text-gray-900">
+                          <h3 className="text-sm font-semibold text-gray-900">
                             {panelItem.label}
                           </h3>
                           {(panelItem as any).description ? (
