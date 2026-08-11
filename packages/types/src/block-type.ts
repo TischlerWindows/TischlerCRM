@@ -26,6 +26,7 @@ export const BLOCK_TYPES = [
   'PAGE_BREAK',
   'INSTALLATION_HEADER',
   'FOOTER',
+  'HUNG_DIAGRAM',
 ] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
@@ -317,5 +318,11 @@ export const BLOCK_TYPE_META: Record<BlockType, BlockTypeMeta> = {
     label: 'Footer',
     description: 'Page footer text + page numbers',
     group: 'Layout',
+  },
+  HUNG_DIAGRAM: {
+    type: 'HUNG_DIAGRAM',
+    label: 'Hung Window Diagram',
+    description: 'Double/single/triple hung window diagram with dimensions from the summary',
+    group: 'Data',
   },
 };

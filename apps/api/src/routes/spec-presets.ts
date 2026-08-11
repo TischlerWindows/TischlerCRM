@@ -143,9 +143,9 @@ export async function specPresetRoutes(app: FastifyInstance) {
           data: {
             id: generateId('SpecPreset'),
             ...presetData,
-            blockType: validated.blockType,
+            blockType: validated.blockType as any,
             config: (validated.config ?? null) as object | null,
-          },
+          } as any,
         });
 
         if (conditions && conditions.length > 0) {
@@ -286,9 +286,9 @@ export async function specPresetRoutes(app: FastifyInstance) {
           where: { id },
           data: {
             ...presetData,
-            ...(hasBlockTypeUpdate ? { blockType: validatedBlockType } : {}),
+            ...(hasBlockTypeUpdate ? { blockType: validatedBlockType as any } : {}),
             ...(hasConfigUpdate ? { config: (validatedConfig ?? null) as object | null } : {}),
-          },
+          } as any,
         });
 
         if (conditions !== undefined) {
@@ -390,9 +390,9 @@ export async function specPresetRoutes(app: FastifyInstance) {
           title: d.title,
           body: d.body ?? null,
           section: d.section,
-          blockType: d.blockType,
+          blockType: d.blockType as any,
           isAlwaysIncluded: true,
-        })),
+        })) as any,
       });
 
       const presets = await prisma.specPreset.findMany({

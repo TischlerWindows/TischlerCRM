@@ -944,6 +944,7 @@ enum BlockType {
   PAGE_BREAK             // forces doc.addPage()
   INSTALLATION_HEADER    // installation-page title + cost row
   FOOTER                 // footer override (text + page numbers)
+  HUNG_DIAGRAM           // double/single/triple hung window diagram with dimensions from summary
 }
 
 enum ConditionOperator {

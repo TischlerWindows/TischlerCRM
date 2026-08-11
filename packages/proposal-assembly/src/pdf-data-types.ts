@@ -59,6 +59,9 @@ export interface QuotePDFData {
   installationTotalPrice: string;
   installationRows: Array<{ label: string; price: string }>;
 
+  // Hung window diagram data — populated when any row has a hung product type
+  hungRows: Array<{ widthFtIn: string; widthMM: string; heightFtIn: string; heightMM: string; qty: string }>;
+
   // Flags
   hasInstallation: boolean;
   hasMagneticContacts: boolean;

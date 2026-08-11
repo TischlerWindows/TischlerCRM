@@ -200,6 +200,24 @@ function buildPdfData(
     installationTotalPrice: tokens.installationTotalPrice || '$0.00',
     installationRows: (summary.addOns?.installation as any)?.installationRows || [],
 
+    hungRows: (() => {
+      const typeFields = ['type', 'type2', 'type3', 'type4'];
+      const allRows: Array<Record<string, unknown>> = [
+        ...(summary.rows as Array<Record<string, unknown>>),
+        ...((summary.subLocations || []) as Array<{ rows: Array<Record<string, unknown>> }>)
+          .flatMap((l) => l.rows || []),
+      ];
+      return allRows
+        .filter((r) => typeFields.some((f) => String(r[f] || '').toLowerCase().includes('hung')))
+        .map((r) => ({
+          widthFtIn: String(r.widthFtIn || ''),
+          widthMM: String(r.widthMM || ''),
+          heightFtIn: String(r.heightFtIn || ''),
+          heightMM: String(r.heightMM || ''),
+          qty: String(r.qty || ''),
+        }));
+    })(),
+
     hasInstallation: context.hasInstallation,
     hasMagneticContacts: context.hasMagneticContacts,
     hasFinalFinish: context.hasFinalFinish,

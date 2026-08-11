@@ -272,6 +272,9 @@ export async function renderProposalPDF(
       case 'FOOTER':
         footerOverride = config as FooterConfig;
         break;
+      case 'HUNG_DIAGRAM':
+        drawHungDiagram(doc, result, ctx);
+        break;
     }
   }
 
@@ -358,6 +361,107 @@ function drawPageLogos(
       }
     }
   }
+}
+
+// ── Hung window diagram helpers ────────────────────────────────────
+
+function drawHungArrow(
+  doc: PDFKit.PDFDocument,
+  cx: number,
+  cy: number,
+  direction: 'up' | 'down',
+  color: string,
+): void {
+  const hw = 11;  // arrowhead half-width
+  const ah = 15;  // arrowhead height
+  const sw = 4.5; // shaft half-width
+  const sh = 18;  // shaft length
+  doc.save();
+  doc.fillColor(color).strokeColor(color);
+  if (direction === 'down') {
+    doc.rect(cx - sw, cy - sh, sw * 2, sh).fill(color);
+    doc.moveTo(cx - hw, cy).lineTo(cx + hw, cy).lineTo(cx, cy + ah).closePath().fill(color);
+  } else {
+    doc.moveTo(cx - hw, cy).lineTo(cx + hw, cy).lineTo(cx, cy - ah).closePath().fill(color);
+    doc.rect(cx - sw, cy, sw * 2, sh).fill(color);
+  }
+  doc.restore();
+}
+
+function drawHungDiagram(
+  doc: PDFKit.PDFDocument,
+  result: ProposalAssemblyResult,
+  ctx: BrandContext,
+): void {
+  const rows = result.pdfData.hungRows ?? [];
+  if (rows.length === 0) return;
+  const row = rows[0]!;
+
+  const WIN_W = 170;
+  const WIN_H = 270;
+  const SILL_EXT = 10;
+  const SILL_H = 13;
+  const DOT_R = 3.2;
+  const bottomBound = doc.page.height - doc.page.margins.bottom;
+
+  if (doc.y + WIN_H + SILL_H + 60 > bottomBound) doc.addPage();
+
+  doc.moveDown(0.5);
+  const winX = (doc.page.width - WIN_W) / 2;
+  const winY = doc.y;
+  const midY = winY + WIN_H / 2;
+  const sillY = winY + WIN_H;
+  const sillBotY = sillY + SILL_H;
+
+  // Frame & sashes
+  doc.save().strokeColor(ctx.text);
+  doc.rect(winX, winY, WIN_W, WIN_H).lineWidth(3.5).stroke();
+  const fi = 7;
+  doc.rect(winX + fi, winY + fi, WIN_W - fi * 2, WIN_H - fi * 2).lineWidth(1.5).stroke();
+  doc.moveTo(winX, midY).lineTo(winX + WIN_W, midY).lineWidth(3.5).stroke();
+  const sg = 16;
+  doc.rect(winX + sg, winY + sg, WIN_W - sg * 2, WIN_H / 2 - sg - 3).lineWidth(1).stroke();
+  doc.rect(winX + sg, midY + 3, WIN_W - sg * 2, WIN_H / 2 - sg - 3).lineWidth(1).stroke();
+  doc.rect(winX - SILL_EXT, sillY, WIN_W + SILL_EXT * 2, SILL_H).lineWidth(2).stroke();
+  doc.restore();
+
+  // Arrows
+  drawHungArrow(doc, winX + WIN_W / 2, winY + WIN_H * 0.27, 'down', ctx.red);
+  drawHungArrow(doc, winX + WIN_W / 2, winY + WIN_H * 0.73, 'up', ctx.red);
+
+  // Width dimension line
+  const wDimY = sillBotY + 18;
+  doc.save().strokeColor(ctx.text).fillColor(ctx.text).lineWidth(1);
+  doc.moveTo(winX, wDimY).lineTo(winX + WIN_W, wDimY).stroke();
+  doc.circle(winX, wDimY, DOT_R).fill();
+  doc.circle(winX + WIN_W, wDimY, DOT_R).fill();
+  doc.restore();
+  doc.font(ctx.fonts.regular).fontSize(8).fillColor(ctx.text);
+  doc.text(row.widthFtIn, winX - 10, wDimY + DOT_R + 5, { width: WIN_W + 20, align: 'center', lineBreak: false });
+  doc.text(`[${row.widthMM} mm]`, winX - 10, wDimY + DOT_R + 16, { width: WIN_W + 20, align: 'center', lineBreak: false });
+
+  // Height dimension line (right)
+  const hDimX = winX + WIN_W + 24;
+  doc.save().strokeColor(ctx.text).fillColor(ctx.text).lineWidth(1);
+  doc.moveTo(hDimX, winY).lineTo(hDimX, sillBotY).stroke();
+  doc.circle(hDimX, winY, DOT_R).fill();
+  doc.circle(hDimX, sillBotY, DOT_R).fill();
+  doc.restore();
+
+  // Height label — rotated so text reads bottom-to-top
+  const hMidY = (winY + sillBotY) / 2;
+  const preSaveY = doc.y;
+  doc.save();
+  doc.translate(hDimX + 6, hMidY);
+  doc.rotate(90);
+  doc.font(ctx.fonts.regular).fontSize(8).fillColor(ctx.text);
+  doc.text(row.heightFtIn, -28, -11, { width: 56, align: 'center', lineBreak: false });
+  doc.text(`[${row.heightMM} mm]`, -28, 1, { width: 56, align: 'center', lineBreak: false });
+  doc.restore();
+  doc.y = preSaveY;
+
+  doc.y = wDimY + 32;
+  doc.x = PAGE_MARGIN;
 }
 
 // ── Per-block drawers ───────────────────────────────────────────────
