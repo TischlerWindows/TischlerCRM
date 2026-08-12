@@ -4054,7 +4054,7 @@ export default function SummaryPage() {
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
                     <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
                       <h3 className="text-lg font-bold text-white uppercase">Project Summary</h3>
-                      <p className="text-xs font-bold text-red-100 mt-0.5">Overview information pulled from the data entry sheet</p>
+                      <p className="text-xs font-bold text-white mt-0.5">Overview information pulled from the data entry sheet</p>
                     </div>
                     <div className="p-3 sm:p-6 space-y-5">
                       {/* Row 1: Date + Opportunity # */}
@@ -5045,7 +5045,7 @@ export default function SummaryPage() {
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
                         <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
                           <h3 className="text-lg font-bold text-white uppercase">{editingSummary.hasMultipleLocations ? 'Grand Total — All Locations' : 'Quote Totals'}</h3>
-                          <p className="text-xs text-red-100 mt-0.5">Aggregated from the data entry sheet</p>
+                          <p className="text-xs text-white mt-0.5">Aggregated from the data entry sheet</p>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="min-w-[1200px] md:min-w-[680px] text-xs sm:text-sm">
