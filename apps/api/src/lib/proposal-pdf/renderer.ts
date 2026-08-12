@@ -44,6 +44,10 @@ const FALLBACK_BOLD_ITALIC = 'Helvetica-BoldOblique';
 
 const PAGE_MARGIN = 56; // ≈ 0.78"
 const BODY_FONT_SIZE = 10;
+
+// NUMBER_COL matches w-7 (1.75 rem = 28 px → 21 pt) in the web preview — used
+// for spec item number prefix and free-text body indent.
+const NUMBER_COL = 21;
 const SECTION_HEADING_SIZE = 12;
 const FOOTER_SIZE = 7;
 
@@ -623,7 +627,7 @@ function drawFreeTextBlock(
   }
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    drawRichBody(doc, preset.body, ctx, { topGap: (!hideTitle && preset.title) ? 0.1 : 0.4 });
+    drawRichBody(doc, preset.body, ctx, { topGap: (!hideTitle && preset.title) ? 0.1 : 0.4, indent: NUMBER_COL });
   }
 }
 
@@ -634,8 +638,6 @@ function drawSpecificationItem(
   ctx: BrandContext,
 ): void {
   const hideTitle = !!(preset.config as Record<string, unknown> | null)?.hideTitle;
-  // NUMBER_COL matches w-7 (1.75 rem = 28 px → 21 pt) in the web preview.
-  const NUMBER_COL = 21;
   const colWidth = doc.page.width - 2 * PAGE_MARGIN - NUMBER_COL;
   const hasTitle = !hideTitle && !!preset.title?.trim();
   const hasBody = !!preset.body?.trim();

@@ -330,7 +330,7 @@ function BlockPreview({
             <div className="text-[10pt] font-bold mb-1" style={{ color: NAVY }}>{preset.title}</div>
           )}
           {preset.body && (
-            <SafeRichHtml className="text-[10pt] leading-[1.5] p-1" html={preset.body} bodyKey={bodyKey} />
+            <SafeRichHtml className="text-[10pt] leading-[1.5] pl-7 p-1" html={preset.body} bodyKey={bodyKey} />
           )}
         </div>,
       );
