@@ -4052,9 +4052,9 @@ export default function SummaryPage() {
               {activePage === 2 && (
                 <div className="max-w-7xl mx-auto space-y-8">
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
-                      <h3 className="text-lg font-semibold text-gray-900">Project Summary</h3>
-                      <p className="text-sm text-gray-500 mt-1">Overview information pulled from the data entry sheet</p>
+                    <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
+                      <h3 className="text-sm font-semibold text-white uppercase">Project Summary</h3>
+                      <p className="text-xs text-red-100 mt-0.5">Overview information pulled from the data entry sheet</p>
                     </div>
                     <div className="p-3 sm:p-6 space-y-5">
                       {/* Row 1: Date + Opportunity # */}
