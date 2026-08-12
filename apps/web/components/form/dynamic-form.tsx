@@ -1493,7 +1493,6 @@ export default function DynamicForm({
                 >
                   <h3 className="text-sm font-semibold text-gray-900" style={{
                     ...((step.section as any).style?.headerTextColor ? { color: (step.section as any).style.headerTextColor } : {}),
-                    fontWeight: (step.section as any).style?.headerBold ? 700 : undefined,
                     fontStyle: (step.section as any).style?.headerItalic ? 'italic' : undefined,
                     textTransform: (step.section as any).style?.headerUppercase ? 'uppercase' : undefined,
                     fontSize: (step.section as any).style?.headerFontSize ? `${(step.section as any).style.headerFontSize}px` : undefined,
@@ -1613,7 +1612,6 @@ export default function DynamicForm({
                         const headerStyle: React.CSSProperties = {
                           ...((panelItem as any).style?.headerBackground ? { backgroundColor: (panelItem as any).style.headerBackground } : {}),
                           ...((panelItem as any).style?.headerTextColor ? { color: (panelItem as any).style.headerTextColor } : {}),
-                          fontWeight: (panelItem as any).style?.headerBold ? 700 : undefined,
                           fontStyle: (panelItem as any).style?.headerItalic ? 'italic' : undefined,
                           textTransform: (panelItem as any).style?.headerUppercase ? 'uppercase' : undefined,
                           fontSize: (panelItem as any).style?.headerFontSize ? `${(panelItem as any).style.headerFontSize}px` : undefined,
@@ -1757,7 +1755,6 @@ export default function DynamicForm({
                         >
                           <h3 className="text-sm font-semibold text-gray-900" style={{
                             ...((panelItem as any).style?.headerTextColor ? { color: (panelItem as any).style.headerTextColor } : {}),
-                            fontWeight: (panelItem as any).style?.headerBold ? 700 : undefined,
                             fontStyle: (panelItem as any).style?.headerItalic ? 'italic' : undefined,
                             textTransform: (panelItem as any).style?.headerUppercase ? 'uppercase' : undefined,
                             fontSize: (panelItem as any).style?.headerFontSize ? `${(panelItem as any).style.headerFontSize}px` : undefined,
