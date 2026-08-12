@@ -1310,7 +1310,7 @@ export default function DynamicForm({
     }
 
     return (
-      <div className="p-4 pt-0">
+      <div className="p-4 pt-4">
         <div
           style={{
             display: 'grid',
