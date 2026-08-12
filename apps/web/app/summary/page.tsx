@@ -4053,7 +4053,7 @@ export default function SummaryPage() {
                 <div className="max-w-7xl mx-auto space-y-8">
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
                     <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
-                      <h3 className="text-sm font-semibold text-white uppercase">Project Summary</h3>
+                      <h3 className="text-base font-semibold text-white uppercase">Project Summary</h3>
                       <p className="text-xs text-red-100 mt-0.5">Overview information pulled from the data entry sheet</p>
                     </div>
                     <div className="p-3 sm:p-6 space-y-5">
@@ -4248,9 +4248,9 @@ export default function SummaryPage() {
 
                   {/* Product Specifications */}
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
-                      <h3 className="text-lg font-semibold text-gray-900">Product Specifications</h3>
-                      <p className="text-sm text-gray-500 mt-1">Product details for this project</p>
+                    <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
+                      <h3 className="text-base font-semibold text-white uppercase">Product Specifications</h3>
+                      <p className="text-xs text-red-100 mt-0.5">Product details for this project</p>
                     </div>
                     <div className="p-3 sm:p-6 space-y-5">
                       {/* Row 1: Product (auto-filled from Opportunity, editable) */}
@@ -4627,8 +4627,8 @@ export default function SummaryPage() {
 
                   {/* Delivery Cost */}
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
-                      <h3 className="text-lg font-semibold text-gray-900">Delivery Cost</h3>
+                    <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
+                      <h3 className="text-base font-semibold text-white uppercase">Delivery Cost</h3>
                     </div>
                     <div className="p-3 sm:p-6">
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
@@ -4694,8 +4694,8 @@ export default function SummaryPage() {
 
                   {/* Tax Cost */}
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
-                      <h3 className="text-lg font-semibold text-gray-900">Tax Cost</h3>
+                    <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
+                      <h3 className="text-base font-semibold text-white uppercase">Tax Cost</h3>
                     </div>
                     <div className="p-3 sm:p-6">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -4766,8 +4766,8 @@ export default function SummaryPage() {
                     ];
                     return (
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                        <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
-                          <h3 className="text-lg font-semibold text-gray-900">Cost Analysis</h3>
+                        <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
+                          <h3 className="text-base font-semibold text-white uppercase">Cost Analysis</h3>
                         </div>
                         <div className="p-3 sm:p-6 grid grid-cols-2 sm:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-4">
                           {rows.map(r => (
@@ -4947,11 +4947,11 @@ export default function SummaryPage() {
                       };
                       return (
                         <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
-                          <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg flex items-center gap-3">
-                            <h3 className="text-lg font-semibold text-gray-900">
+                          <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg flex items-center gap-3">
+                            <h3 className="text-base font-semibold text-white uppercase">
                               {locLabel ? `Quote Totals — Location ${locLabel}` : 'Quote Totals'}
                             </h3>
-                            {!locLabel && <p className="text-sm text-gray-500">Aggregated from the data entry sheet</p>}
+                            {!locLabel && <p className="text-xs text-red-100">Aggregated from the data entry sheet</p>}
                           </div>
                           <div className="overflow-x-auto">
                             <table className="min-w-[1200px] md:min-w-[680px] text-xs sm:text-sm">
@@ -5043,9 +5043,9 @@ export default function SummaryPage() {
                       ))}
                       {/* Grand total (or the only table in single-location mode) */}
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
-                        <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
-                          <h3 className="text-lg font-semibold text-gray-900">{editingSummary.hasMultipleLocations ? 'Grand Total — All Locations' : 'Quote Totals'}</h3>
-                          <p className="text-sm text-gray-500 mt-1">Aggregated from the data entry sheet</p>
+                        <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
+                          <h3 className="text-base font-semibold text-white uppercase">{editingSummary.hasMultipleLocations ? 'Grand Total — All Locations' : 'Quote Totals'}</h3>
+                          <p className="text-xs text-red-100 mt-0.5">Aggregated from the data entry sheet</p>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="min-w-[1200px] md:min-w-[680px] text-xs sm:text-sm">
@@ -5390,9 +5390,9 @@ export default function SummaryPage() {
 
                         return (
                           <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
-                            <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
-                              <h3 className="text-lg font-semibold text-gray-900">Add-On Items</h3>
-                              <p className="text-sm text-gray-500 mt-1">Additional line items below the quote totals</p>
+                            <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
+                              <h3 className="text-base font-semibold text-white uppercase">Add-On Items</h3>
+                              <p className="text-xs text-red-100 mt-0.5">Additional line items below the quote totals</p>
                             </div>
                             <div className="overflow-x-auto">
                               <table className="min-w-[1180px] md:min-w-[700px] text-xs sm:text-sm">
@@ -6027,8 +6027,8 @@ export default function SummaryPage() {
 
               {/* Main Table */}
               <div className="border rounded-lg overflow-hidden print-section mt-4">
-                <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-gray-900">Windows</h3>
+                <div className="bg-brand-red px-4 py-3 flex justify-between items-center">
+                  <h3 className="text-base font-semibold text-white uppercase">Windows</h3>
                   <div className="flex items-center gap-4 print:hidden">
                     <button
                       onClick={() => setTusPositionLocked(v => !v)}
@@ -6290,8 +6290,8 @@ export default function SummaryPage() {
 
               {/* Doors Table */}
               <div className="border rounded-lg overflow-hidden mt-6 print-section">
-                <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-gray-900">Doors</h3>
+                <div className="bg-brand-red px-4 py-3 flex justify-between items-center">
+                  <h3 className="text-base font-semibold text-white uppercase">Doors</h3>
                   <div className="flex items-center gap-4 print:hidden">
                     <button
                       onClick={() => setTusPositionLocked(v => !v)}
