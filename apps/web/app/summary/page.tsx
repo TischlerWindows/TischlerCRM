@@ -4250,7 +4250,7 @@ export default function SummaryPage() {
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
                     <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
                       <h3 className="text-lg font-bold text-white uppercase">Product Specifications</h3>
-                      <p className="text-xs font-boldtext-white-100 mt-0.5">Product details for this project</p>
+                      <p className="text-xs font-bold text-white mt-0.5">Product details for this project</p>
                     </div>
                     <div className="p-3 sm:p-6 space-y-5">
                       {/* Row 1: Product (auto-filled from Opportunity, editable) */}
@@ -4951,7 +4951,7 @@ export default function SummaryPage() {
                             <h3 className="text-lg font-bold text-white uppercase">
                               {locLabel ? `Quote Totals — Location ${locLabel}` : 'Quote Totals'}
                             </h3>
-                            {!locLabel && <p className="text-xs font-bold text-white-100">Aggregated from the data entry sheet</p>}
+                            {!locLabel && <p className="text-xs font-bold text-white">Aggregated from the data entry sheet</p>}
                           </div>
                           <div className="overflow-x-auto">
                             <table className="min-w-[1200px] md:min-w-[680px] text-xs sm:text-sm">
@@ -5392,7 +5392,7 @@ export default function SummaryPage() {
                           <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
                             <div className="bg-brand-red px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg">
                               <h3 className="text-lg font-bold text-white uppercase">Add-On Items</h3>
-                              <p className="text-xs font-bold text-white-100 mt-0.5">Additional line items below the quote totals</p>
+                              <p className="text-xs font-bold text-white mt-0.5">Additional line items below the quote totals</p>
                             </div>
                             <div className="overflow-x-auto">
                               <table className="min-w-[1180px] md:min-w-[700px] text-xs sm:text-sm">
