@@ -169,6 +169,10 @@ export async function fieldRoutes(app: FastifyInstance) {
       if (field) isMultiSelect = field.type === 'MultiPicklist' || field.type === 'MultiSelectPicklist';
     }
 
+    // Records store values under BOTH the prefixed key (e.g. "Account__status")
+    // AND the bare key (e.g. "status"). Update both so they stay consistent.
+    const bareApiName = fieldApiName.replace(/^[A-Za-z]+__/, '');
+
     if (isMultiSelect) {
       // Multi-select values are stored as semicolon-separated strings — replace the token in-place.
       await prisma.$executeRaw`
@@ -194,14 +198,47 @@ export async function fieldRoutes(app: FastifyInstance) {
           OR data->>${fieldApiName} LIKE ${'%;' + oldValue + ';%'}
         )
       `;
+      if (bareApiName !== fieldApiName) {
+        await prisma.$executeRaw`
+          UPDATE "Record"
+          SET data = jsonb_set(
+            data,
+            ARRAY[${bareApiName}::text],
+            to_jsonb(
+              regexp_replace(
+                data->>${bareApiName},
+                '(^|;)' || ${oldValue} || '(;|$)',
+                '\\1' || ${newValue} || '\\2',
+                'g'
+              )
+            )
+          )
+          WHERE "objectId" = ${object.id}
+          AND data ? ${bareApiName}
+          AND (
+            data->>${bareApiName} = ${oldValue}
+            OR data->>${bareApiName} LIKE ${'%;' + oldValue}
+            OR data->>${bareApiName} LIKE ${oldValue + ';%'}
+            OR data->>${bareApiName} LIKE ${'%;' + oldValue + ';%'}
+          )
+        `;
+      }
     } else {
-      // Single-select: exact match replace
+      // Single-select: exact match replace for both key forms
       await prisma.$executeRaw`
         UPDATE "Record"
         SET data = jsonb_set(data, ARRAY[${fieldApiName}::text], to_jsonb(${newValue}::text))
         WHERE "objectId" = ${object.id}
         AND data->>${fieldApiName} = ${oldValue}
       `;
+      if (bareApiName !== fieldApiName) {
+        await prisma.$executeRaw`
+          UPDATE "Record"
+          SET data = jsonb_set(data, ARRAY[${bareApiName}::text], to_jsonb(${newValue}::text))
+          WHERE "objectId" = ${object.id}
+          AND data->>${bareApiName} = ${oldValue}
+        `;
+      }
     }
 
     reply.send({ ok: true });
@@ -225,6 +262,9 @@ export async function fieldRoutes(app: FastifyInstance) {
       if (field) isMultiSelect = field.type === 'MultiPicklist' || field.type === 'MultiSelectPicklist';
     }
 
+    // Records store values under BOTH the prefixed key AND the bare key — clear both.
+    const bareApiName = fieldApiName.replace(/^[A-Za-z]+__/, '');
+
     if (isMultiSelect) {
       // Remove token from semicolon-separated string; clean up leading/trailing semicolons
       await prisma.$executeRaw`
@@ -245,14 +285,42 @@ export async function fieldRoutes(app: FastifyInstance) {
           OR data->>${fieldApiName} LIKE ${'%;' + value + ';%'}
         )
       `;
+      if (bareApiName !== fieldApiName) {
+        await prisma.$executeRaw`
+          UPDATE "Record"
+          SET data = CASE
+            WHEN regexp_replace(regexp_replace(data->>${bareApiName}, '(^|;)' || ${value} || '(;|$)', '\\1\\2', 'g'), '^;|;$', '', 'g') = ''
+              THEN data - ${bareApiName}
+            ELSE jsonb_set(data, ARRAY[${bareApiName}::text], to_jsonb(
+              regexp_replace(regexp_replace(data->>${bareApiName}, '(^|;)' || ${value} || '(;|$)', ';', 'g'), '^;|;$', '', 'g')
+            ))
+          END
+          WHERE "objectId" = ${object.id}
+          AND data ? ${bareApiName}
+          AND (
+            data->>${bareApiName} = ${value}
+            OR data->>${bareApiName} LIKE ${'%;' + value}
+            OR data->>${bareApiName} LIKE ${value + ';%'}
+            OR data->>${bareApiName} LIKE ${'%;' + value + ';%'}
+          )
+        `;
+      }
     } else {
-      // Single-select: remove the key entirely when its value matches
+      // Single-select: remove both key forms entirely when value matches
       await prisma.$executeRaw`
         UPDATE "Record"
         SET data = data - ${fieldApiName}
         WHERE "objectId" = ${object.id}
         AND data->>${fieldApiName} = ${value}
       `;
+      if (bareApiName !== fieldApiName) {
+        await prisma.$executeRaw`
+          UPDATE "Record"
+          SET data = data - ${bareApiName}
+          WHERE "objectId" = ${object.id}
+          AND data->>${bareApiName} = ${value}
+        `;
+      }
     }
 
     reply.send({ ok: true });
