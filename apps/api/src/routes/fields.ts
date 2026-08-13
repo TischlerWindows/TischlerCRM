@@ -25,6 +25,74 @@ const createFieldSchema = z.object({
 
 const updateFieldSchema = createFieldSchema.omit({ objectApiName: true }).partial();
 
+// Multi-select values are stored either as a ";"-joined string (most widgets)
+// or as a raw jsonb string array (some legacy imports / older widgets) —
+// handle both so a rename/clear reaches every record regardless of format.
+async function renameMultiSelectValueForKey(
+  objectId: string,
+  key: string,
+  oldValue: string,
+  newValue: string,
+) {
+  await prisma.$executeRaw`
+    UPDATE "Record"
+    SET data = jsonb_set(
+      data,
+      ARRAY[${key}::text],
+      CASE
+        WHEN jsonb_typeof(data->${key}) = 'array' THEN (
+          SELECT COALESCE(jsonb_agg(CASE WHEN elem = ${oldValue} THEN ${newValue}::text ELSE elem END), '[]'::jsonb)
+          FROM jsonb_array_elements_text(data->${key}) AS elem
+        )
+        ELSE to_jsonb(
+          regexp_replace(data->>${key}, '(^|;)' || ${oldValue} || '(;|$)', '\\1' || ${newValue} || '\\2', 'g')
+        )
+      END
+    )
+    WHERE "objectId" = ${objectId}
+    AND data ? ${key}
+    AND (
+      (jsonb_typeof(data->${key}) = 'array' AND data->${key} ? ${oldValue})
+      OR (jsonb_typeof(data->${key}) <> 'array' AND (
+        data->>${key} = ${oldValue}
+        OR data->>${key} LIKE ${'%;' + oldValue}
+        OR data->>${key} LIKE ${oldValue + ';%'}
+        OR data->>${key} LIKE ${'%;' + oldValue + ';%'}
+      ))
+    )
+  `;
+}
+
+async function clearMultiSelectValueForKey(objectId: string, key: string, value: string) {
+  await prisma.$executeRaw`
+    UPDATE "Record"
+    SET data = CASE
+      WHEN jsonb_typeof(data->${key}) = 'array' THEN
+        jsonb_set(data, ARRAY[${key}::text], (
+          SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb)
+          FROM jsonb_array_elements_text(data->${key}) AS elem
+          WHERE elem <> ${value}
+        ))
+      WHEN regexp_replace(regexp_replace(data->>${key}, '(^|;)' || ${value} || '(;|$)', '\\1\\2', 'g'), '^;|;$', '', 'g') = ''
+        THEN data - ${key}
+      ELSE jsonb_set(data, ARRAY[${key}::text], to_jsonb(
+        regexp_replace(regexp_replace(data->>${key}, '(^|;)' || ${value} || '(;|$)', ';', 'g'), '^;|;$', '', 'g')
+      ))
+    END
+    WHERE "objectId" = ${objectId}
+    AND data ? ${key}
+    AND (
+      (jsonb_typeof(data->${key}) = 'array' AND data->${key} ? ${value})
+      OR (jsonb_typeof(data->${key}) <> 'array' AND (
+        data->>${key} = ${value}
+        OR data->>${key} LIKE ${'%;' + value}
+        OR data->>${key} LIKE ${value + ';%'}
+        OR data->>${key} LIKE ${'%;' + value + ';%'}
+      ))
+    )
+  `;
+}
+
 export async function fieldRoutes(app: FastifyInstance) {
   // Get all fields for an object
   app.get('/objects/:apiName/fields', async (req, reply) => {
@@ -174,54 +242,10 @@ export async function fieldRoutes(app: FastifyInstance) {
     const bareApiName = fieldApiName.replace(/^[A-Za-z]+__/, '');
 
     if (isMultiSelect) {
-      // Multi-select values are stored as semicolon-separated strings — replace the token in-place.
-      await prisma.$executeRaw`
-        UPDATE "Record"
-        SET data = jsonb_set(
-          data,
-          ARRAY[${fieldApiName}::text],
-          to_jsonb(
-            regexp_replace(
-              data->>${fieldApiName},
-              '(^|;)' || ${oldValue} || '(;|$)',
-              '\\1' || ${newValue} || '\\2',
-              'g'
-            )
-          )
-        )
-        WHERE "objectId" = ${object.id}
-        AND data ? ${fieldApiName}
-        AND (
-          data->>${fieldApiName} = ${oldValue}
-          OR data->>${fieldApiName} LIKE ${'%;' + oldValue}
-          OR data->>${fieldApiName} LIKE ${oldValue + ';%'}
-          OR data->>${fieldApiName} LIKE ${'%;' + oldValue + ';%'}
-        )
-      `;
+      // Multi-select values may be stored as a ";"-joined string or a jsonb array.
+      await renameMultiSelectValueForKey(object.id, fieldApiName, oldValue, newValue);
       if (bareApiName !== fieldApiName) {
-        await prisma.$executeRaw`
-          UPDATE "Record"
-          SET data = jsonb_set(
-            data,
-            ARRAY[${bareApiName}::text],
-            to_jsonb(
-              regexp_replace(
-                data->>${bareApiName},
-                '(^|;)' || ${oldValue} || '(;|$)',
-                '\\1' || ${newValue} || '\\2',
-                'g'
-              )
-            )
-          )
-          WHERE "objectId" = ${object.id}
-          AND data ? ${bareApiName}
-          AND (
-            data->>${bareApiName} = ${oldValue}
-            OR data->>${bareApiName} LIKE ${'%;' + oldValue}
-            OR data->>${bareApiName} LIKE ${oldValue + ';%'}
-            OR data->>${bareApiName} LIKE ${'%;' + oldValue + ';%'}
-          )
-        `;
+        await renameMultiSelectValueForKey(object.id, bareApiName, oldValue, newValue);
       }
     } else {
       // Single-select: exact match replace for both key forms
@@ -266,44 +290,10 @@ export async function fieldRoutes(app: FastifyInstance) {
     const bareApiName = fieldApiName.replace(/^[A-Za-z]+__/, '');
 
     if (isMultiSelect) {
-      // Remove token from semicolon-separated string; clean up leading/trailing semicolons
-      await prisma.$executeRaw`
-        UPDATE "Record"
-        SET data = CASE
-          WHEN regexp_replace(regexp_replace(data->>${fieldApiName}, '(^|;)' || ${value} || '(;|$)', '\\1\\2', 'g'), '^;|;$', '', 'g') = ''
-            THEN data - ${fieldApiName}
-          ELSE jsonb_set(data, ARRAY[${fieldApiName}::text], to_jsonb(
-            regexp_replace(regexp_replace(data->>${fieldApiName}, '(^|;)' || ${value} || '(;|$)', ';', 'g'), '^;|;$', '', 'g')
-          ))
-        END
-        WHERE "objectId" = ${object.id}
-        AND data ? ${fieldApiName}
-        AND (
-          data->>${fieldApiName} = ${value}
-          OR data->>${fieldApiName} LIKE ${'%;' + value}
-          OR data->>${fieldApiName} LIKE ${value + ';%'}
-          OR data->>${fieldApiName} LIKE ${'%;' + value + ';%'}
-        )
-      `;
+      // Multi-select values may be stored as a ";"-joined string or a jsonb array.
+      await clearMultiSelectValueForKey(object.id, fieldApiName, value);
       if (bareApiName !== fieldApiName) {
-        await prisma.$executeRaw`
-          UPDATE "Record"
-          SET data = CASE
-            WHEN regexp_replace(regexp_replace(data->>${bareApiName}, '(^|;)' || ${value} || '(;|$)', '\\1\\2', 'g'), '^;|;$', '', 'g') = ''
-              THEN data - ${bareApiName}
-            ELSE jsonb_set(data, ARRAY[${bareApiName}::text], to_jsonb(
-              regexp_replace(regexp_replace(data->>${bareApiName}, '(^|;)' || ${value} || '(;|$)', ';', 'g'), '^;|;$', '', 'g')
-            ))
-          END
-          WHERE "objectId" = ${object.id}
-          AND data ? ${bareApiName}
-          AND (
-            data->>${bareApiName} = ${value}
-            OR data->>${bareApiName} LIKE ${'%;' + value}
-            OR data->>${bareApiName} LIKE ${value + ';%'}
-            OR data->>${bareApiName} LIKE ${'%;' + value + ';%'}
-          )
-        `;
+        await clearMultiSelectValueForKey(object.id, bareApiName, value);
       }
     } else {
       // Single-select: remove both key forms entirely when value matches
