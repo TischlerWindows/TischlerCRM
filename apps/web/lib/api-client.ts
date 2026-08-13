@@ -473,6 +473,20 @@ class ApiClient {
     });
   }
 
+  async renamePicklistValue(objectApiName: string, fieldApiName: string, oldValue: string, newValue: string, isMultiSelect?: boolean) {
+    return this.request<{ ok: boolean }>(`/objects/${objectApiName}/fields/${fieldApiName}/rename-value`, {
+      method: 'POST',
+      body: JSON.stringify({ oldValue, newValue, isMultiSelect }),
+    });
+  }
+
+  async clearPicklistValue(objectApiName: string, fieldApiName: string, value: string, isMultiSelect?: boolean) {
+    return this.request<{ ok: boolean }>(`/objects/${objectApiName}/fields/${fieldApiName}/clear-value`, {
+      method: 'POST',
+      body: JSON.stringify({ value, isMultiSelect }),
+    });
+  }
+
   async deleteField(objectApiName: string, fieldId: string) {
     return this.request<void>(`/objects/${objectApiName}/fields/${fieldId}`, {
       method: 'DELETE',

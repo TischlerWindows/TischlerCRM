@@ -152,7 +152,7 @@ export async function fieldRoutes(app: FastifyInstance) {
   // Rename a picklist value across all records for this field
   app.post('/objects/:apiName/fields/:fieldApiName/rename-value', async (req, reply) => {
     const { apiName, fieldApiName } = req.params as { apiName: string; fieldApiName: string };
-    const { oldValue, newValue } = req.body as { oldValue: string; newValue: string };
+    const { oldValue, newValue, isMultiSelect: clientMulti } = req.body as { oldValue: string; newValue: string; isMultiSelect?: boolean };
     if (!oldValue || !newValue || oldValue === newValue) {
       return reply.code(400).send({ error: 'oldValue and newValue are required and must differ' });
     }
@@ -162,12 +162,12 @@ export async function fieldRoutes(app: FastifyInstance) {
     });
     if (!object) return reply.code(404).send({ error: 'Object not found' });
 
-    const field = await prisma.customField.findFirst({
-      where: { objectId: object.id, apiName: fieldApiName },
-    });
-    if (!field) return reply.code(404).send({ error: 'Field not found' });
-
-    const isMultiSelect = field.type === 'MultiPicklist' || field.type === 'MultiSelectPicklist';
+    // Use client-provided type hint when available; fall back to DB lookup
+    let isMultiSelect = clientMulti ?? false;
+    if (clientMulti === undefined) {
+      const field = await prisma.customField.findFirst({ where: { objectId: object.id, apiName: fieldApiName } });
+      if (field) isMultiSelect = field.type === 'MultiPicklist' || field.type === 'MultiSelectPicklist';
+    }
 
     if (isMultiSelect) {
       // Multi-select values are stored as semicolon-separated strings — replace the token in-place.
@@ -210,7 +210,7 @@ export async function fieldRoutes(app: FastifyInstance) {
   // Remove a deleted picklist value from all existing records
   app.post('/objects/:apiName/fields/:fieldApiName/clear-value', async (req, reply) => {
     const { apiName, fieldApiName } = req.params as { apiName: string; fieldApiName: string };
-    const { value } = req.body as { value: string };
+    const { value, isMultiSelect: clientMulti } = req.body as { value: string; isMultiSelect?: boolean };
     if (!value) return reply.code(400).send({ error: 'value is required' });
 
     const object = await prisma.customObject.findFirst({
@@ -218,12 +218,12 @@ export async function fieldRoutes(app: FastifyInstance) {
     });
     if (!object) return reply.code(404).send({ error: 'Object not found' });
 
-    const field = await prisma.customField.findFirst({
-      where: { objectId: object.id, apiName: fieldApiName },
-    });
-    if (!field) return reply.code(404).send({ error: 'Field not found' });
-
-    const isMultiSelect = field.type === 'MultiPicklist' || field.type === 'MultiSelectPicklist';
+    // Use client-provided type hint when available; fall back to DB lookup
+    let isMultiSelect = clientMulti ?? false;
+    if (clientMulti === undefined) {
+      const field = await prisma.customField.findFirst({ where: { objectId: object.id, apiName: fieldApiName } });
+      if (field) isMultiSelect = field.type === 'MultiPicklist' || field.type === 'MultiSelectPicklist';
+    }
 
     if (isMultiSelect) {
       // Remove token from semicolon-separated string; clean up leading/trailing semicolons

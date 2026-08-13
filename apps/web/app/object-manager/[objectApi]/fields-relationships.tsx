@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useSchemaStore } from '@/lib/schema-store';
 import { FieldDef, FieldType } from '@/lib/schema';
 import { expressionEngine } from '@/lib/expressions';
+import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -414,27 +415,21 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       const fieldApiName = editingField.apiName;
       // Rename surviving values
       if (pendingRenames.length > 0) {
+        const isMultiSelect = formData.type === 'MultiPicklist' || formData.type === 'MultiSelectPicklist';
         for (const { oldValue, newValue } of pendingRenames) {
-          fetch(`/api/objects/${objectApiName}/fields/${fieldApiName}/rename-value`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ oldValue, newValue }),
-          }).catch(() => {});
+          apiClient.renamePicklistValue(objectApiName, fieldApiName, oldValue, newValue, isMultiSelect).catch(() => {});
         }
       }
       // Clear values that were removed from the list
       const originalValues = (editingField as any).picklistValues as string[] | undefined;
       if (originalValues?.length) {
+        const isMultiSelect = formData.type === 'MultiPicklist' || formData.type === 'MultiSelectPicklist';
         const currentValues = new Set(formData.picklistValues.filter(v => v.trim()));
         // Also account for renames: the old value name is gone but maps to newValue, not deleted
         const renamedOld = new Set(pendingRenames.map(r => r.oldValue));
         for (const v of originalValues) {
           if (!currentValues.has(v) && !renamedOld.has(v)) {
-            fetch(`/api/objects/${objectApiName}/fields/${fieldApiName}/clear-value`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ value: v }),
-            }).catch(() => {});
+            apiClient.clearPicklistValue(objectApiName, fieldApiName, v, isMultiSelect).catch(() => {});
           }
         }
       }
