@@ -102,6 +102,9 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingField, setEditingField] = useState<FieldDef | null>(null);
+  const [pendingRenames, setPendingRenames] = useState<Array<{oldValue: string; newValue: string}>>([]);
+  const [editingValueIdx, setEditingValueIdx] = useState<number | null>(null);
+  const [editingValueText, setEditingValueText] = useState('');
   const [selectedType, setSelectedType] = useState<FieldType | null>(null);
   const [showTypeSelector, setShowTypeSelector] = useState(true);
   const [showVisibilityEditor, setShowVisibilityEditor] = useState(false);
@@ -304,6 +307,8 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       subFields: cloned.subFields ? cloned.subFields.map(sf => ({ ...sf })) : [],
     });
     setSyntaxCheck(null);
+    setPendingRenames([]);
+    setEditingValueIdx(null);
     setShowCreateDialog(true);
   };
 
@@ -406,10 +411,22 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
 
     if (editingField) {
       updateField(objectApiName, editingField.apiName, newField as FieldDef);
+      // Fire rename-value for each renamed picklist entry to keep existing records in sync
+      if (pendingRenames.length > 0) {
+        const fieldApiName = editingField.apiName;
+        for (const { oldValue, newValue } of pendingRenames) {
+          fetch(`/api/objects/${objectApiName}/fields/${fieldApiName}/rename-value`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ oldValue, newValue }),
+          }).catch(() => {/* silent — schema save already succeeded */});
+        }
+      }
     } else {
       addField(objectApiName, newField as Omit<FieldDef, 'id'>);
     }
 
+    setPendingRenames([]);
     setShowCreateDialog(false);
   };
 
@@ -906,54 +923,78 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
 
                   {(selectedType === 'Picklist' || selectedType === 'MultiPicklist' || selectedType === 'DropdownWithCustom') && (
                     <div>
-                      <Label htmlFor="picklistValues">Picklist Values</Label>
-                      <Textarea
-                        id="picklistValues"
-                        value={formData.picklistValues.join('\n')}
-                        onChange={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n') })}
-                        onBlur={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n').filter(v => v.trim()) })}
-                        placeholder="Enter one value per line"
-                        rows={5}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Enter each option on a new line.
-                      </p>
-                      {formData.picklistValues.filter(v => v.trim()).length > 0 && (
-                        <div className="mt-3 space-y-1">
-                          <Label>Option Colors</Label>
-                          <p className="text-xs text-gray-500 mb-2">Click a color swatch to assign a color to each option. Colors are shown in forms.</p>
-                          <div className="space-y-1.5 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                            {formData.picklistValues.filter(v => v.trim()).map((val) => (
-                              <div key={val} className="flex items-center gap-2">
+                      <Label>Picklist Values</Label>
+                      <div className="border border-gray-200 rounded-lg overflow-hidden">
+                        {formData.picklistValues.filter(v => v.trim()).length === 0 && (
+                          <p className="text-sm text-gray-400 px-3 py-2 italic">No values yet — click &quot;Add Value&quot; below.</p>
+                        )}
+                        {formData.picklistValues.map((val, idx) => !val.trim() ? null : (
+                          <div key={idx} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-b-0 bg-white">
+                            <input
+                              type="color"
+                              value={formData.picklistColors[val] || '#d1d5db'}
+                              onChange={(e) => setFormData({ ...formData, picklistColors: { ...formData.picklistColors, [val]: e.target.value } })}
+                              className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5 shrink-0"
+                              title={`Color for "${val}"`}
+                            />
+                            {editingValueIdx === idx ? (
+                              <>
                                 <input
-                                  type="color"
-                                  value={formData.picklistColors[val] || '#d1d5db'}
-                                  onChange={(e) => setFormData({
-                                    ...formData,
-                                    picklistColors: { ...formData.picklistColors, [val]: e.target.value }
-                                  })}
-                                  className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5"
-                                  title={`Color for "${val}"`}
+                                  type="text"
+                                  value={editingValueText}
+                                  onChange={(e) => setEditingValueText(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const t = editingValueText.trim();
+                                      if (t && t !== val) {
+                                        const nv = [...formData.picklistValues]; nv[idx] = t;
+                                        const nc = { ...formData.picklistColors }; if (nc[val]) { nc[t] = nc[val]; delete nc[val]; }
+                                        setFormData({ ...formData, picklistValues: nv, picklistColors: nc });
+                                        if (editingField) setPendingRenames(r => [...r, { oldValue: val, newValue: t }]);
+                                      }
+                                      setEditingValueIdx(null);
+                                    } else if (e.key === 'Escape') setEditingValueIdx(null);
+                                  }}
+                                  autoFocus
+                                  className="flex-1 px-2 py-0.5 text-sm border border-brand-navy rounded focus:outline-none focus:ring-1 focus:ring-brand-navy/40"
                                 />
-                                <span className="text-sm text-gray-700">{val}</span>
+                                <button type="button" onClick={() => {
+                                  const t = editingValueText.trim();
+                                  if (t && t !== val) {
+                                    const nv = [...formData.picklistValues]; nv[idx] = t;
+                                    const nc = { ...formData.picklistColors }; if (nc[val]) { nc[t] = nc[val]; delete nc[val]; }
+                                    setFormData({ ...formData, picklistValues: nv, picklistColors: nc });
+                                    if (editingField) setPendingRenames(r => [...r, { oldValue: val, newValue: t }]);
+                                  }
+                                  setEditingValueIdx(null);
+                                }} className="text-xs text-brand-navy font-medium hover:underline shrink-0">Save</button>
+                                <button type="button" onClick={() => setEditingValueIdx(null)} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">Cancel</button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="flex-1 text-sm text-gray-700">{val}</span>
+                                <button type="button" onClick={() => { setEditingValueIdx(idx); setEditingValueText(val); }} className="text-xs text-gray-500 hover:text-brand-navy shrink-0">Edit</button>
                                 {formData.picklistColors[val] && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const updated = { ...formData.picklistColors };
-                                      delete updated[val];
-                                      setFormData({ ...formData, picklistColors: updated });
-                                    }}
-                                    className="text-xs text-gray-400 hover:text-gray-600 ml-auto"
-                                  >
-                                    clear
-                                  </button>
+                                  <button type="button" onClick={() => { const c = { ...formData.picklistColors }; delete c[val]; setFormData({ ...formData, picklistColors: c }); }} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">clear color</button>
                                 )}
-                              </div>
-                            ))}
+                                <button type="button" onClick={() => {
+                                  const nv = formData.picklistValues.filter((_, i) => i !== idx);
+                                  const nc = { ...formData.picklistColors }; delete nc[val];
+                                  setFormData({ ...formData, picklistValues: nv, picklistColors: nc });
+                                  if (editingValueIdx === idx) setEditingValueIdx(null);
+                                }} className="text-gray-400 hover:text-red-500 shrink-0" title="Remove"><X className="w-3.5 h-3.5" /></button>
+                              </>
+                            )}
                           </div>
-                        </div>
-                      )}
+                        ))}
+                      </div>
+                      <button type="button" onClick={() => {
+                        const base = formData.picklistValues.filter(v => v.trim());
+                        setFormData({ ...formData, picklistValues: [...base, ''] });
+                        setEditingValueIdx(base.length); setEditingValueText('');
+                      }} className="mt-2 text-sm text-brand-navy hover:text-brand-navy/80 flex items-center gap-1">
+                        <Plus className="w-3.5 h-3.5" /> Add Value
+                      </button>
                     </div>
                   )}
 
@@ -975,53 +1016,32 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         </p>
                       </div>
                       <div>
-                        <Label htmlFor="picklistValues">Picklist Values</Label>
-                        <Textarea
-                          id="picklistValues"
-                          value={formData.picklistValues.join('\n')}
-                          onChange={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n') })}
-                          onBlur={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n').filter(v => v.trim()) })}
-                          placeholder="Enter one value per line"
-                          rows={5}
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Enter each option on a new line.
-                        </p>
-                        {formData.picklistValues.filter(v => v.trim()).length > 0 && (
-                          <div className="mt-3 space-y-1">
-                            <Label>Option Colors</Label>
-                            <div className="space-y-1.5 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                              {formData.picklistValues.filter(v => v.trim()).map((val) => (
-                                <div key={val} className="flex items-center gap-2">
-                                  <input
-                                    type="color"
-                                    value={formData.picklistColors[val] || '#d1d5db'}
-                                    onChange={(e) => setFormData({
-                                      ...formData,
-                                      picklistColors: { ...formData.picklistColors, [val]: e.target.value }
-                                    })}
-                                    className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5"
-                                    title={`Color for "${val}"`}
-                                  />
-                                  <span className="text-sm text-gray-700">{val}</span>
-                                  {formData.picklistColors[val] && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const updated = { ...formData.picklistColors };
-                                        delete updated[val];
-                                        setFormData({ ...formData, picklistColors: updated });
-                                      }}
-                                      className="text-xs text-gray-400 hover:text-gray-600 ml-auto"
-                                    >
-                                      clear
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
+                        <Label>Picklist Values</Label>
+                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                          {formData.picklistValues.filter(v => v.trim()).length === 0 && (
+                            <p className="text-sm text-gray-400 px-3 py-2 italic">No values yet — click &quot;Add Value&quot; below.</p>
+                          )}
+                          {formData.picklistValues.map((val, idx) => !val.trim() ? null : (
+                            <div key={idx} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-b-0 bg-white">
+                              <input type="color" value={formData.picklistColors[val] || '#d1d5db'} onChange={(e) => setFormData({ ...formData, picklistColors: { ...formData.picklistColors, [val]: e.target.value } })} className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5 shrink-0" title={`Color for "${val}"`} />
+                              {editingValueIdx === idx ? (
+                                <>
+                                  <input type="text" value={editingValueText} onChange={(e) => setEditingValueText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { const t = editingValueText.trim(); if (t && t !== val) { const nv = [...formData.picklistValues]; nv[idx] = t; const nc = { ...formData.picklistColors }; if (nc[val]) { nc[t] = nc[val]; delete nc[val]; } setFormData({ ...formData, picklistValues: nv, picklistColors: nc }); if (editingField) setPendingRenames(r => [...r, { oldValue: val, newValue: t }]); } setEditingValueIdx(null); } else if (e.key === 'Escape') setEditingValueIdx(null); }} autoFocus className="flex-1 px-2 py-0.5 text-sm border border-brand-navy rounded focus:outline-none focus:ring-1 focus:ring-brand-navy/40" />
+                                  <button type="button" onClick={() => { const t = editingValueText.trim(); if (t && t !== val) { const nv = [...formData.picklistValues]; nv[idx] = t; const nc = { ...formData.picklistColors }; if (nc[val]) { nc[t] = nc[val]; delete nc[val]; } setFormData({ ...formData, picklistValues: nv, picklistColors: nc }); if (editingField) setPendingRenames(r => [...r, { oldValue: val, newValue: t }]); } setEditingValueIdx(null); }} className="text-xs text-brand-navy font-medium hover:underline shrink-0">Save</button>
+                                  <button type="button" onClick={() => setEditingValueIdx(null)} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">Cancel</button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="flex-1 text-sm text-gray-700">{val}</span>
+                                  <button type="button" onClick={() => { setEditingValueIdx(idx); setEditingValueText(val); }} className="text-xs text-gray-500 hover:text-brand-navy shrink-0">Edit</button>
+                                  {formData.picklistColors[val] && <button type="button" onClick={() => { const c = { ...formData.picklistColors }; delete c[val]; setFormData({ ...formData, picklistColors: c }); }} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">clear color</button>}
+                                  <button type="button" onClick={() => { const nv = formData.picklistValues.filter((_, i) => i !== idx); const nc = { ...formData.picklistColors }; delete nc[val]; setFormData({ ...formData, picklistValues: nv, picklistColors: nc }); if (editingValueIdx === idx) setEditingValueIdx(null); }} className="text-gray-400 hover:text-red-500 shrink-0" title="Remove"><X className="w-3.5 h-3.5" /></button>
+                                </>
+                              )}
                             </div>
-                          </div>
-                        )}
+                          ))}
+                        </div>
+                        <button type="button" onClick={() => { const base = formData.picklistValues.filter(v => v.trim()); setFormData({ ...formData, picklistValues: [...base, ''] }); setEditingValueIdx(base.length); setEditingValueText(''); }} className="mt-2 text-sm text-brand-navy hover:text-brand-navy/80 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add Value</button>
                       </div>
                       <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <p className="text-xs font-medium text-gray-700 mb-2">Preview</p>
@@ -1124,53 +1144,32 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         </p>
                       </div>
                       <div>
-                        <Label htmlFor="picklistValues">Picklist Values</Label>
-                        <Textarea
-                          id="picklistValues"
-                          value={formData.picklistValues.join('\n')}
-                          onChange={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n') })}
-                          onBlur={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n').filter(v => v.trim()) })}
-                          placeholder="Enter one value per line"
-                          rows={5}
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Enter each option on a new line.
-                        </p>
-                        {formData.picklistValues.filter(v => v.trim()).length > 0 && (
-                          <div className="mt-3 space-y-1">
-                            <Label>Option Colors</Label>
-                            <div className="space-y-1.5 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                              {formData.picklistValues.filter(v => v.trim()).map((val) => (
-                                <div key={val} className="flex items-center gap-2">
-                                  <input
-                                    type="color"
-                                    value={formData.picklistColors[val] || '#d1d5db'}
-                                    onChange={(e) => setFormData({
-                                      ...formData,
-                                      picklistColors: { ...formData.picklistColors, [val]: e.target.value }
-                                    })}
-                                    className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5"
-                                    title={`Color for "${val}"`}
-                                  />
-                                  <span className="text-sm text-gray-700">{val}</span>
-                                  {formData.picklistColors[val] && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const updated = { ...formData.picklistColors };
-                                        delete updated[val];
-                                        setFormData({ ...formData, picklistColors: updated });
-                                      }}
-                                      className="text-xs text-gray-400 hover:text-gray-600 ml-auto"
-                                    >
-                                      clear
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
+                        <Label>Picklist Values</Label>
+                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                          {formData.picklistValues.filter(v => v.trim()).length === 0 && (
+                            <p className="text-sm text-gray-400 px-3 py-2 italic">No values yet — click &quot;Add Value&quot; below.</p>
+                          )}
+                          {formData.picklistValues.map((val, idx) => !val.trim() ? null : (
+                            <div key={idx} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-b-0 bg-white">
+                              <input type="color" value={formData.picklistColors[val] || '#d1d5db'} onChange={(e) => setFormData({ ...formData, picklistColors: { ...formData.picklistColors, [val]: e.target.value } })} className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5 shrink-0" title={`Color for "${val}"`} />
+                              {editingValueIdx === idx ? (
+                                <>
+                                  <input type="text" value={editingValueText} onChange={(e) => setEditingValueText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { const t = editingValueText.trim(); if (t && t !== val) { const nv = [...formData.picklistValues]; nv[idx] = t; const nc = { ...formData.picklistColors }; if (nc[val]) { nc[t] = nc[val]; delete nc[val]; } setFormData({ ...formData, picklistValues: nv, picklistColors: nc }); if (editingField) setPendingRenames(r => [...r, { oldValue: val, newValue: t }]); } setEditingValueIdx(null); } else if (e.key === 'Escape') setEditingValueIdx(null); }} autoFocus className="flex-1 px-2 py-0.5 text-sm border border-brand-navy rounded focus:outline-none focus:ring-1 focus:ring-brand-navy/40" />
+                                  <button type="button" onClick={() => { const t = editingValueText.trim(); if (t && t !== val) { const nv = [...formData.picklistValues]; nv[idx] = t; const nc = { ...formData.picklistColors }; if (nc[val]) { nc[t] = nc[val]; delete nc[val]; } setFormData({ ...formData, picklistValues: nv, picklistColors: nc }); if (editingField) setPendingRenames(r => [...r, { oldValue: val, newValue: t }]); } setEditingValueIdx(null); }} className="text-xs text-brand-navy font-medium hover:underline shrink-0">Save</button>
+                                  <button type="button" onClick={() => setEditingValueIdx(null)} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">Cancel</button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="flex-1 text-sm text-gray-700">{val}</span>
+                                  <button type="button" onClick={() => { setEditingValueIdx(idx); setEditingValueText(val); }} className="text-xs text-gray-500 hover:text-brand-navy shrink-0">Edit</button>
+                                  {formData.picklistColors[val] && <button type="button" onClick={() => { const c = { ...formData.picklistColors }; delete c[val]; setFormData({ ...formData, picklistColors: c }); }} className="text-xs text-gray-400 hover:text-gray-600 shrink-0">clear color</button>}
+                                  <button type="button" onClick={() => { const nv = formData.picklistValues.filter((_, i) => i !== idx); const nc = { ...formData.picklistColors }; delete nc[val]; setFormData({ ...formData, picklistValues: nv, picklistColors: nc }); if (editingValueIdx === idx) setEditingValueIdx(null); }} className="text-gray-400 hover:text-red-500 shrink-0" title="Remove"><X className="w-3.5 h-3.5" /></button>
+                                </>
+                              )}
                             </div>
-                          </div>
-                        )}
+                          ))}
+                        </div>
+                        <button type="button" onClick={() => { const base = formData.picklistValues.filter(v => v.trim()); setFormData({ ...formData, picklistValues: [...base, ''] }); setEditingValueIdx(base.length); setEditingValueText(''); }} className="mt-2 text-sm text-brand-navy hover:text-brand-navy/80 flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add Value</button>
                       </div>
                       <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <p className="text-xs font-medium text-gray-700 mb-2">Preview</p>

@@ -149,6 +149,64 @@ export async function fieldRoutes(app: FastifyInstance) {
     reply.send(field);
   });
 
+  // Rename a picklist value across all records for this field
+  app.post('/objects/:apiName/fields/:fieldApiName/rename-value', async (req, reply) => {
+    const { apiName, fieldApiName } = req.params as { apiName: string; fieldApiName: string };
+    const { oldValue, newValue } = req.body as { oldValue: string; newValue: string };
+    if (!oldValue || !newValue || oldValue === newValue) {
+      return reply.code(400).send({ error: 'oldValue and newValue are required and must differ' });
+    }
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+    });
+    if (!object) return reply.code(404).send({ error: 'Object not found' });
+
+    const field = await prisma.customField.findFirst({
+      where: { objectId: object.id, apiName: fieldApiName },
+    });
+    if (!field) return reply.code(404).send({ error: 'Field not found' });
+
+    const isMultiSelect = field.type === 'MultiPicklist' || field.type === 'MultiSelectPicklist';
+
+    if (isMultiSelect) {
+      // Multi-select values are stored as semicolon-separated strings — replace the token in-place.
+      await prisma.$executeRaw`
+        UPDATE "Record"
+        SET data = jsonb_set(
+          data,
+          ARRAY[${fieldApiName}::text],
+          to_jsonb(
+            regexp_replace(
+              data->>${fieldApiName},
+              '(^|;)' || ${oldValue} || '(;|$)',
+              '\\1' || ${newValue} || '\\2',
+              'g'
+            )
+          )
+        )
+        WHERE "objectId" = ${object.id}
+        AND data ? ${fieldApiName}
+        AND (
+          data->>${fieldApiName} = ${oldValue}
+          OR data->>${fieldApiName} LIKE ${'%;' + oldValue}
+          OR data->>${fieldApiName} LIKE ${oldValue + ';%'}
+          OR data->>${fieldApiName} LIKE ${'%;' + oldValue + ';%'}
+        )
+      `;
+    } else {
+      // Single-select: exact match replace
+      await prisma.$executeRaw`
+        UPDATE "Record"
+        SET data = jsonb_set(data, ARRAY[${fieldApiName}::text], to_jsonb(${newValue}::text))
+        WHERE "objectId" = ${object.id}
+        AND data->>${fieldApiName} = ${oldValue}
+      `;
+    }
+
+    reply.send({ ok: true });
+  });
+
   // Delete field (soft delete)
   app.delete('/objects/:apiName/fields/:fieldApiName', async (req, reply) => {
     const { apiName, fieldApiName } = req.params as { apiName: string; fieldApiName: string };
