@@ -207,6 +207,57 @@ export async function fieldRoutes(app: FastifyInstance) {
     reply.send({ ok: true });
   });
 
+  // Remove a deleted picklist value from all existing records
+  app.post('/objects/:apiName/fields/:fieldApiName/clear-value', async (req, reply) => {
+    const { apiName, fieldApiName } = req.params as { apiName: string; fieldApiName: string };
+    const { value } = req.body as { value: string };
+    if (!value) return reply.code(400).send({ error: 'value is required' });
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+    });
+    if (!object) return reply.code(404).send({ error: 'Object not found' });
+
+    const field = await prisma.customField.findFirst({
+      where: { objectId: object.id, apiName: fieldApiName },
+    });
+    if (!field) return reply.code(404).send({ error: 'Field not found' });
+
+    const isMultiSelect = field.type === 'MultiPicklist' || field.type === 'MultiSelectPicklist';
+
+    if (isMultiSelect) {
+      // Remove token from semicolon-separated string; clean up leading/trailing semicolons
+      await prisma.$executeRaw`
+        UPDATE "Record"
+        SET data = CASE
+          WHEN regexp_replace(regexp_replace(data->>${fieldApiName}, '(^|;)' || ${value} || '(;|$)', '\\1\\2', 'g'), '^;|;$', '', 'g') = ''
+            THEN data - ${fieldApiName}
+          ELSE jsonb_set(data, ARRAY[${fieldApiName}::text], to_jsonb(
+            regexp_replace(regexp_replace(data->>${fieldApiName}, '(^|;)' || ${value} || '(;|$)', ';', 'g'), '^;|;$', '', 'g')
+          ))
+        END
+        WHERE "objectId" = ${object.id}
+        AND data ? ${fieldApiName}
+        AND (
+          data->>${fieldApiName} = ${value}
+          OR data->>${fieldApiName} LIKE ${'%;' + value}
+          OR data->>${fieldApiName} LIKE ${value + ';%'}
+          OR data->>${fieldApiName} LIKE ${'%;' + value + ';%'}
+        )
+      `;
+    } else {
+      // Single-select: remove the key entirely when its value matches
+      await prisma.$executeRaw`
+        UPDATE "Record"
+        SET data = data - ${fieldApiName}
+        WHERE "objectId" = ${object.id}
+        AND data->>${fieldApiName} = ${value}
+      `;
+    }
+
+    reply.send({ ok: true });
+  });
+
   // Delete field (soft delete)
   app.delete('/objects/:apiName/fields/:fieldApiName', async (req, reply) => {
     const { apiName, fieldApiName } = req.params as { apiName: string; fieldApiName: string };

@@ -411,15 +411,31 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
 
     if (editingField) {
       updateField(objectApiName, editingField.apiName, newField as FieldDef);
-      // Fire rename-value for each renamed picklist entry to keep existing records in sync
+      const fieldApiName = editingField.apiName;
+      // Rename surviving values
       if (pendingRenames.length > 0) {
-        const fieldApiName = editingField.apiName;
         for (const { oldValue, newValue } of pendingRenames) {
           fetch(`/api/objects/${objectApiName}/fields/${fieldApiName}/rename-value`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ oldValue, newValue }),
-          }).catch(() => {/* silent — schema save already succeeded */});
+          }).catch(() => {});
+        }
+      }
+      // Clear values that were removed from the list
+      const originalValues = (editingField as any).picklistValues as string[] | undefined;
+      if (originalValues?.length) {
+        const currentValues = new Set(formData.picklistValues.filter(v => v.trim()));
+        // Also account for renames: the old value name is gone but maps to newValue, not deleted
+        const renamedOld = new Set(pendingRenames.map(r => r.oldValue));
+        for (const v of originalValues) {
+          if (!currentValues.has(v) && !renamedOld.has(v)) {
+            fetch(`/api/objects/${objectApiName}/fields/${fieldApiName}/clear-value`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ value: v }),
+            }).catch(() => {});
+          }
         }
       }
     } else {
