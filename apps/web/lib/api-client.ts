@@ -487,6 +487,13 @@ class ApiClient {
     });
   }
 
+  async purgeStalePicklistValues(objectApiName: string, fieldApiName: string, validValues: string[], isMultiSelect?: boolean) {
+    return this.request<{ ok: boolean; updatedCount: number }>(`/objects/${objectApiName}/fields/${fieldApiName}/purge-stale-values`, {
+      method: 'POST',
+      body: JSON.stringify({ validValues, isMultiSelect }),
+    });
+  }
+
   async deleteField(objectApiName: string, fieldId: string) {
     return this.request<void>(`/objects/${objectApiName}/fields/${fieldId}`, {
       method: 'DELETE',

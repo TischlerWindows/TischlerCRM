@@ -316,6 +316,78 @@ export async function fieldRoutes(app: FastifyInstance) {
     reply.send({ ok: true });
   });
 
+  // Reconcile every record's stored value(s) against the field's current option
+  // list. Session-scoped rename/clear detection (above) only catches removals
+  // made in the same edit that triggered it — it can't retroactively clean up
+  // options that drifted out of the master list in past sessions (e.g. before
+  // this sync existed, or before a bug prevented it from running). This purge
+  // is unconditional: any stored value not in `validValues` is stripped.
+  app.post('/objects/:apiName/fields/:fieldApiName/purge-stale-values', async (req, reply) => {
+    const { apiName, fieldApiName } = req.params as { apiName: string; fieldApiName: string };
+    const { validValues, isMultiSelect: clientMulti } = req.body as {
+      validValues: string[];
+      isMultiSelect?: boolean;
+    };
+    if (!Array.isArray(validValues)) {
+      return reply.code(400).send({ error: 'validValues array is required' });
+    }
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+    });
+    if (!object) return reply.code(404).send({ error: 'Object not found' });
+
+    let isMultiSelect = clientMulti ?? false;
+    if (clientMulti === undefined) {
+      const field = await prisma.customField.findFirst({ where: { objectId: object.id, apiName: fieldApiName } });
+      if (field) isMultiSelect = field.type === 'MultiPicklist' || field.type === 'MultiSelectPicklist';
+    }
+
+    const bareApiName = fieldApiName.replace(/^[A-Za-z]+__/, '');
+    const keys = bareApiName !== fieldApiName ? [fieldApiName, bareApiName] : [fieldApiName];
+    const validSet = new Set(validValues);
+
+    const records = await prisma.record.findMany({
+      where: { objectId: object.id, deletedAt: null },
+      select: { id: true, data: true },
+    });
+
+    let updatedCount = 0;
+    for (const record of records) {
+      const data = record.data as Record<string, any>;
+      const newData: Record<string, any> = { ...data };
+      let changed = false;
+
+      for (const key of keys) {
+        if (!(key in data)) continue;
+        const raw = data[key];
+
+        if (isMultiSelect) {
+          const values: string[] = Array.isArray(raw)
+            ? raw.map((v) => String(v))
+            : String(raw).split(';');
+          const filtered = values.map((v) => v.trim()).filter((v) => v && validSet.has(v));
+          const nextValue = filtered.join(';');
+          const currentValue = Array.isArray(raw) ? raw.join(';') : String(raw ?? '');
+          if (nextValue !== currentValue) {
+            newData[key] = nextValue;
+            changed = true;
+          }
+        } else if (raw !== undefined && raw !== null && raw !== '' && !validSet.has(String(raw))) {
+          delete newData[key];
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        await prisma.record.update({ where: { id: record.id }, data: { data: newData } });
+        updatedCount++;
+      }
+    }
+
+    reply.send({ ok: true, updatedCount });
+  });
+
   // Delete field (soft delete)
   app.delete('/objects/:apiName/fields/:fieldApiName', async (req, reply) => {
     const { apiName, fieldApiName } = req.params as { apiName: string; fieldApiName: string };

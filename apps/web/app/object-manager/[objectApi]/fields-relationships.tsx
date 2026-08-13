@@ -414,36 +414,37 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       updateField(objectApiName, editingField.apiName, newField as FieldDef);
       const fieldApiName = editingField.apiName;
       const isMultiSelect = formData.type === 'MultiPicklist' || formData.type === 'MultiSelectPicklist';
-      const syncOps: Promise<unknown>[] = [];
+      const hasOptionList = ['Picklist', 'MultiPicklist', 'MultiSelectPicklist', 'PicklistText', 'PicklistLookup', 'DropdownWithCustom'].includes(formData.type);
+      const renameOps = pendingRenames.map(({ oldValue, newValue }) =>
+        apiClient.renamePicklistValue(objectApiName, fieldApiName, oldValue, newValue, isMultiSelect)
+      );
 
-      // Rename surviving values
-      for (const { oldValue, newValue } of pendingRenames) {
-        syncOps.push(apiClient.renamePicklistValue(objectApiName, fieldApiName, oldValue, newValue, isMultiSelect));
-      }
-
-      // Clear values that were removed from the list
-      const originalValues = (editingField as any).picklistValues as string[] | undefined;
-      if (originalValues?.length) {
-        const currentValues = new Set(formData.picklistValues.filter(v => v.trim()));
-        const renamedOld = new Set(pendingRenames.map(r => r.oldValue));
-        for (const v of originalValues) {
-          if (!currentValues.has(v) && !renamedOld.has(v)) {
-            syncOps.push(apiClient.clearPicklistValue(objectApiName, fieldApiName, v, isMultiSelect));
+      if (renameOps.length > 0 || hasOptionList) {
+        console.log('[picklist sync] starting sync for', fieldApiName);
+        (async () => {
+          // Renames must finish before the purge below so renamed values are
+          // preserved instead of being treated as no-longer-valid and stripped.
+          const renameResults = await Promise.allSettled(renameOps);
+          let purgeResult: PromiseSettledResult<unknown> | null = null;
+          if (hasOptionList) {
+            // Unconditional reconciliation against the field's current option list —
+            // catches values that drifted out of the list in earlier sessions too,
+            // not just ones removed in this particular edit.
+            const validValues = formData.picklistValues.filter(v => v.trim());
+            const result = await Promise.allSettled([
+              apiClient.purgeStalePicklistValues(objectApiName, fieldApiName, validValues, isMultiSelect),
+            ]);
+            purgeResult = result[0]!;
           }
-        }
-      }
-
-      if (syncOps.length > 0) {
-        console.log('[picklist sync] starting', syncOps.length, 'operation(s) for', fieldApiName);
-        Promise.allSettled(syncOps).then((results) => {
-          const failures = results.filter(r => r.status === 'rejected');
+          const allResults = purgeResult ? [...renameResults, purgeResult] : renameResults;
+          const failures = allResults.filter(r => r.status === 'rejected');
           if (failures.length > 0) {
             alert(`Field saved, but ${failures.length} record sync operation(s) failed. Check the console for details.`);
             failures.forEach(f => console.error('[picklist sync]', (f as PromiseRejectedResult).reason));
           } else {
-            console.log('[picklist sync] all', results.length, 'operation(s) succeeded');
+            console.log('[picklist sync] all', allResults.length, 'operation(s) succeeded');
           }
-        });
+        })();
       }
     } else {
       addField(objectApiName, newField as Omit<FieldDef, 'id'>);
