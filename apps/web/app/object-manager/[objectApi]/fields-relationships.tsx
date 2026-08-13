@@ -413,25 +413,37 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     if (editingField) {
       updateField(objectApiName, editingField.apiName, newField as FieldDef);
       const fieldApiName = editingField.apiName;
+      const isMultiSelect = formData.type === 'MultiPicklist' || formData.type === 'MultiSelectPicklist';
+      const syncOps: Promise<unknown>[] = [];
+
       // Rename surviving values
-      if (pendingRenames.length > 0) {
-        const isMultiSelect = formData.type === 'MultiPicklist' || formData.type === 'MultiSelectPicklist';
-        for (const { oldValue, newValue } of pendingRenames) {
-          apiClient.renamePicklistValue(objectApiName, fieldApiName, oldValue, newValue, isMultiSelect).catch(() => {});
-        }
+      for (const { oldValue, newValue } of pendingRenames) {
+        syncOps.push(apiClient.renamePicklistValue(objectApiName, fieldApiName, oldValue, newValue, isMultiSelect));
       }
+
       // Clear values that were removed from the list
       const originalValues = (editingField as any).picklistValues as string[] | undefined;
       if (originalValues?.length) {
-        const isMultiSelect = formData.type === 'MultiPicklist' || formData.type === 'MultiSelectPicklist';
         const currentValues = new Set(formData.picklistValues.filter(v => v.trim()));
-        // Also account for renames: the old value name is gone but maps to newValue, not deleted
         const renamedOld = new Set(pendingRenames.map(r => r.oldValue));
         for (const v of originalValues) {
           if (!currentValues.has(v) && !renamedOld.has(v)) {
-            apiClient.clearPicklistValue(objectApiName, fieldApiName, v, isMultiSelect).catch(() => {});
+            syncOps.push(apiClient.clearPicklistValue(objectApiName, fieldApiName, v, isMultiSelect));
           }
         }
+      }
+
+      if (syncOps.length > 0) {
+        console.log('[picklist sync] starting', syncOps.length, 'operation(s) for', fieldApiName);
+        Promise.allSettled(syncOps).then((results) => {
+          const failures = results.filter(r => r.status === 'rejected');
+          if (failures.length > 0) {
+            alert(`Field saved, but ${failures.length} record sync operation(s) failed. Check the console for details.`);
+            failures.forEach(f => console.error('[picklist sync]', (f as PromiseRejectedResult).reason));
+          } else {
+            console.log('[picklist sync] all', results.length, 'operation(s) succeeded');
+          }
+        });
       }
     } else {
       addField(objectApiName, newField as Omit<FieldDef, 'id'>);
