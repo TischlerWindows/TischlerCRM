@@ -430,9 +430,14 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       const fieldApiName = editingField.apiName;
       const isMultiSelect = formData.type === 'MultiPicklist' || formData.type === 'MultiSelectPicklist';
       const hasOptionList = ['Picklist', 'MultiPicklist', 'MultiSelectPicklist', 'PicklistText', 'PicklistLookup', 'DropdownWithCustom'].includes(formData.type);
-      const renameOps = pendingRenames.map(({ oldValue, newValue }) =>
-        apiClient.renamePicklistValue(objectApiName, fieldApiName, oldValue, newValue, isMultiSelect)
-      );
+      const renameOps = pendingRenames
+        // Adding a brand-new value (via "Add Value") records a blank
+        // placeholder as its "old" value until the user types the real text —
+        // that's a fresh addition, not a rename, and must not be sent as one.
+        .filter(({ oldValue, newValue }) => oldValue.trim() && newValue.trim() && oldValue !== newValue)
+        .map(({ oldValue, newValue }) =>
+          apiClient.renamePicklistValue(objectApiName, fieldApiName, oldValue, newValue, isMultiSelect)
+        );
 
       if (renameOps.length > 0 || hasOptionList) {
         console.log('[picklist sync] starting sync for', fieldApiName);
