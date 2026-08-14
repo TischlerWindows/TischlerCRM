@@ -21,6 +21,7 @@ import { evaluateVisibility, VisibilityContext } from '@/lib/field-visibility';
 import {
   getFormattingEffectsForPanel,
   getFormattingEffectsForRegion,
+  getFormattingEffectsForField,
 } from '@/lib/layout-formatting';
 import {
   resolveTabCanvasItems,
@@ -1212,9 +1213,11 @@ export default function DynamicForm({
     }[] = [];
     for (const f of panel.fields) {
       if (isHiddenByLifecycle(f as any, layoutType)) continue;
+      if ((f as any).behavior === 'hidden') continue;
       // Synthetic TeamMemberSlot fields bypass the FieldDef lookup; the renderer
       // dispatches on kind below and renders TeamMemberSlotField instead of FieldInput.
       if ((f as any).kind === 'teamMemberSlot' && (f as any).slotConfig) {
+        if (!evaluateVisibility((f as any).visibleIf, formData, visibilityCtx)) continue;
         gridFields.push({
           fieldDef: { apiName: f.fieldApiName, label: '', type: 'Text' } as FieldDef,
           pageField: f as any,
@@ -1239,6 +1242,16 @@ export default function DynamicForm({
       }
       const fd = getFieldDef(f.fieldApiName, f as any);
       if (fd) {
+        // Skip fields hidden by object-wide or placement-level "show only
+        // when" rules, or by a conditional formatting "hidden" effect —
+        // otherwise they'd still reserve their grid cell, leaving a gap
+        // where the remaining visible fields don't flow in to fill it.
+        const isVisible =
+          evaluateVisibility(fd.visibleIf, formData, visibilityCtx) &&
+          evaluateVisibility((f as any).visibleIf, formData, visibilityCtx);
+        if (!isVisible) continue;
+        const formatFx = getFormattingEffectsForField(layout, fd.apiName, formData, visibilityCtx);
+        if (formatFx?.hidden) continue;
         gridFields.push({
           fieldDef: fd,
           pageField: f as any,
