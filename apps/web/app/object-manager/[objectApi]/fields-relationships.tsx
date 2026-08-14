@@ -967,7 +967,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         {formData.picklistValues.filter(v => v.trim()).length === 0 && (
                           <p className="text-sm text-gray-400 px-3 py-2 italic">No values yet — click &quot;Add Value&quot; below.</p>
                         )}
-                        {formData.picklistValues.map((val, idx) => !val.trim() ? null : (
+                        {formData.picklistValues.map((val, idx) => (!val.trim() && editingValueIdx !== idx) ? null : (
                           <div key={idx} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-b-0 bg-white">
                             <div className="flex flex-col shrink-0">
                               <button type="button" disabled={idx === 0} onClick={() => movePicklistValue(idx, -1)} className="text-gray-400 hover:text-brand-navy disabled:opacity-25 disabled:hover:text-gray-400 disabled:cursor-not-allowed" title="Move up"><ChevronUp className="w-3.5 h-3.5" /></button>
@@ -1064,7 +1064,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                           {formData.picklistValues.filter(v => v.trim()).length === 0 && (
                             <p className="text-sm text-gray-400 px-3 py-2 italic">No values yet — click &quot;Add Value&quot; below.</p>
                           )}
-                          {formData.picklistValues.map((val, idx) => !val.trim() ? null : (
+                          {formData.picklistValues.map((val, idx) => (!val.trim() && editingValueIdx !== idx) ? null : (
                             <div key={idx} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-b-0 bg-white">
                               <div className="flex flex-col shrink-0">
                                 <button type="button" disabled={idx === 0} onClick={() => movePicklistValue(idx, -1)} className="text-gray-400 hover:text-brand-navy disabled:opacity-25 disabled:hover:text-gray-400 disabled:cursor-not-allowed" title="Move up"><ChevronUp className="w-3.5 h-3.5" /></button>
@@ -1196,7 +1196,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                           {formData.picklistValues.filter(v => v.trim()).length === 0 && (
                             <p className="text-sm text-gray-400 px-3 py-2 italic">No values yet — click &quot;Add Value&quot; below.</p>
                           )}
-                          {formData.picklistValues.map((val, idx) => !val.trim() ? null : (
+                          {formData.picklistValues.map((val, idx) => (!val.trim() && editingValueIdx !== idx) ? null : (
                             <div key={idx} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-b-0 bg-white">
                               <div className="flex flex-col shrink-0">
                                 <button type="button" disabled={idx === 0} onClick={() => movePicklistValue(idx, -1)} className="text-gray-400 hover:text-brand-navy disabled:opacity-25 disabled:hover:text-gray-400 disabled:cursor-not-allowed" title="Move up"><ChevronUp className="w-3.5 h-3.5" /></button>
