@@ -40,6 +40,8 @@ import { Textarea } from '@/components/ui/textarea';
   Cloud,
   CheckCircle2,
   XCircle,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 interface FieldsRelationshipsProps {
   objectApiName: string;
@@ -317,6 +319,19 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     if (confirm(`Are you sure you want to delete the field "${fieldApiName}"?`)) {
       deleteField(objectApiName, fieldApiName);
     }
+  };
+
+  // Reorders picklistValues in place. Safe for existing records: values are
+  // stored by their string content, not by position, so changing display
+  // order never affects already-saved record data.
+  const movePicklistValue = (idx: number, direction: -1 | 1) => {
+    const target = idx + direction;
+    if (target < 0 || target >= formData.picklistValues.length) return;
+    const nv = [...formData.picklistValues];
+    [nv[idx], nv[target]] = [nv[target]!, nv[idx]!];
+    setFormData({ ...formData, picklistValues: nv });
+    if (editingValueIdx === idx) setEditingValueIdx(target);
+    else if (editingValueIdx === target) setEditingValueIdx(idx);
   };
 
   const handleSaveField = () => {
@@ -954,6 +969,10 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         )}
                         {formData.picklistValues.map((val, idx) => !val.trim() ? null : (
                           <div key={idx} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-b-0 bg-white">
+                            <div className="flex flex-col shrink-0">
+                              <button type="button" disabled={idx === 0} onClick={() => movePicklistValue(idx, -1)} className="text-gray-400 hover:text-brand-navy disabled:opacity-25 disabled:hover:text-gray-400 disabled:cursor-not-allowed" title="Move up"><ChevronUp className="w-3.5 h-3.5" /></button>
+                              <button type="button" disabled={idx === formData.picklistValues.length - 1} onClick={() => movePicklistValue(idx, 1)} className="text-gray-400 hover:text-brand-navy disabled:opacity-25 disabled:hover:text-gray-400 disabled:cursor-not-allowed" title="Move down"><ChevronDown className="w-3.5 h-3.5" /></button>
+                            </div>
                             <input
                               type="color"
                               value={formData.picklistColors[val] || '#d1d5db'}
@@ -1047,6 +1066,10 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                           )}
                           {formData.picklistValues.map((val, idx) => !val.trim() ? null : (
                             <div key={idx} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-b-0 bg-white">
+                              <div className="flex flex-col shrink-0">
+                                <button type="button" disabled={idx === 0} onClick={() => movePicklistValue(idx, -1)} className="text-gray-400 hover:text-brand-navy disabled:opacity-25 disabled:hover:text-gray-400 disabled:cursor-not-allowed" title="Move up"><ChevronUp className="w-3.5 h-3.5" /></button>
+                                <button type="button" disabled={idx === formData.picklistValues.length - 1} onClick={() => movePicklistValue(idx, 1)} className="text-gray-400 hover:text-brand-navy disabled:opacity-25 disabled:hover:text-gray-400 disabled:cursor-not-allowed" title="Move down"><ChevronDown className="w-3.5 h-3.5" /></button>
+                              </div>
                               <input type="color" value={formData.picklistColors[val] || '#d1d5db'} onChange={(e) => setFormData({ ...formData, picklistColors: { ...formData.picklistColors, [val]: e.target.value } })} className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5 shrink-0" title={`Color for "${val}"`} />
                               {editingValueIdx === idx ? (
                                 <>
@@ -1175,6 +1198,10 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                           )}
                           {formData.picklistValues.map((val, idx) => !val.trim() ? null : (
                             <div key={idx} className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 last:border-b-0 bg-white">
+                              <div className="flex flex-col shrink-0">
+                                <button type="button" disabled={idx === 0} onClick={() => movePicklistValue(idx, -1)} className="text-gray-400 hover:text-brand-navy disabled:opacity-25 disabled:hover:text-gray-400 disabled:cursor-not-allowed" title="Move up"><ChevronUp className="w-3.5 h-3.5" /></button>
+                                <button type="button" disabled={idx === formData.picklistValues.length - 1} onClick={() => movePicklistValue(idx, 1)} className="text-gray-400 hover:text-brand-navy disabled:opacity-25 disabled:hover:text-gray-400 disabled:cursor-not-allowed" title="Move down"><ChevronDown className="w-3.5 h-3.5" /></button>
+                              </div>
                               <input type="color" value={formData.picklistColors[val] || '#d1d5db'} onChange={(e) => setFormData({ ...formData, picklistColors: { ...formData.picklistColors, [val]: e.target.value } })} className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5 shrink-0" title={`Color for "${val}"`} />
                               {editingValueIdx === idx ? (
                                 <>
