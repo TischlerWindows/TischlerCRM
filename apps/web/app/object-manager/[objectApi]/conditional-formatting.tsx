@@ -310,7 +310,7 @@ function EditorPanel({
   const [local, setLocal] = useState<RuleSetDraft>(draft);
 
   const picklistFields = allFields.filter(
-    (f) => (f.type === 'Picklist' || f.type === 'MultiSelectPicklist' || f.type === 'DropdownWithCustom') && !f.readOnly,
+    (f) => (f.type === 'Picklist' || f.type === 'MultiPicklist' || f.type === 'MultiSelectPicklist' || f.type === 'DropdownWithCustom') && !f.readOnly,
   );
 
   const dependentField = allFields.find((f) => f.apiName === local.dependentFieldApiName);
@@ -376,7 +376,7 @@ function EditorPanel({
             {allFields
               .filter(
                 (f) =>
-                  (f.type === 'Picklist' || f.type === 'DropdownWithCustom') &&
+                  (f.type === 'Picklist' || f.type === 'MultiPicklist' || f.type === 'MultiSelectPicklist' || f.type === 'DropdownWithCustom') &&
                   f.apiName !== local.dependentFieldApiName,
               )
               .map((f) => (
@@ -445,7 +445,7 @@ export default function ConditionalFormatting({ objectApiName }: ConditionalForm
   const existingPairs: { dep: FieldDef; ctrl: string }[] = [];
   for (const field of allFields) {
     if (
-      (field.type !== 'Picklist' && field.type !== 'MultiSelectPicklist' && field.type !== 'DropdownWithCustom') ||
+      (field.type !== 'Picklist' && field.type !== 'MultiPicklist' && field.type !== 'MultiSelectPicklist' && field.type !== 'DropdownWithCustom') ||
       !field.picklistDependencies?.length
     ) continue;
     const ctrlFields = new Set<string>();
