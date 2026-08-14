@@ -582,6 +582,10 @@ export interface PanelField {
   labelStyle: LabelStyle;
   valueStyle: ValueStyle;
   behavior: 'none' | 'required' | 'readOnly' | 'hidden';
+  /** Placement-specific "show only when" rules — distinct from the field
+   * definition's own object-wide visibleIf. Both are evaluated; the field
+   * shows only when neither hides it. */
+  visibleIf?: ConditionExpr[];
   hideOnNew?: boolean;       // Hide on New Record form (creation)
   hideOnView?: boolean;      // Hide on View (read-only detail page)
   hideOnEdit?: boolean;      // Hide on Edit (edit dialog)

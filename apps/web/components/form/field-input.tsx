@@ -235,9 +235,15 @@ export function FieldInput({
   const { user: _authUser } = useAuth();
   const isAdminUser = _authUser?.role === 'ADMIN';
 
-  // Check if field should be visible based on visibility rules
+  // Check if field should be visible based on visibility rules — the
+  // field definition's own object-wide rule AND this placement's
+  // page-layout-specific "show only when" rule must both pass.
   const isVisible = evaluateVisibility(
     fieldDef.visibleIf,
+    formData,
+    visibilityCtx,
+  ) && evaluateVisibility(
+    (layoutField as any)?.visibleIf,
     formData,
     visibilityCtx,
   );

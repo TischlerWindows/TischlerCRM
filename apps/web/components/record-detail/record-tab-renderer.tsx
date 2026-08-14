@@ -413,6 +413,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
             // LookupFields field type: always pass through
             if (fd.type === 'LookupFields') return true;
             if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
+            if (f.visibleIf?.length > 0 && !evaluateVisibility(f.visibleIf, layoutVisibilityData)) return false;
             const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
             if (fFx?.hidden) return false;
             return true;

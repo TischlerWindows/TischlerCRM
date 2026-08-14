@@ -78,6 +78,7 @@ export function CanvasFieldCard({ field, index, panelId, panelColumns }: CanvasF
 
   const hasVisibilityRule = useMemo(
     () =>
+      ((field as any).visibleIf?.length > 0) ||
       formattingRules.some(
         (r) =>
           r.active !== false &&
@@ -85,7 +86,7 @@ export function CanvasFieldCard({ field, index, panelId, panelColumns }: CanvasF
           r.target.fieldApiName === field.fieldApiName &&
           r.when.length > 0,
       ),
-    [formattingRules, field.fieldApiName],
+    [formattingRules, field.fieldApiName, (field as any).visibleIf],
   );
 
   const [dragSpan, setDragSpan] = useState<number | null>(null);

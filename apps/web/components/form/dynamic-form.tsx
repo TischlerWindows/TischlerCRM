@@ -614,7 +614,15 @@ export default function DynamicForm({
           panel.fields.forEach((field) => {
             if (isHiddenByLifecycle(field as any, layoutType)) return;
             const fd = getFieldDef(field.fieldApiName, field as any);
-            if (fd) pairs.push({ panelField: field, fieldDef: fd });
+            if (!fd) return;
+            // Skip conditionally-hidden fields (object-wide or placement-level
+            // "show only when" rules) so an invisible field can't block save
+            // by being flagged as a missing required value.
+            if (
+              !evaluateVisibility(fd.visibleIf, formData, visibilityCtx) ||
+              !evaluateVisibility((field as any).visibleIf, formData, visibilityCtx)
+            ) return;
+            pairs.push({ panelField: field, fieldDef: fd });
           });
         });
       });
@@ -1824,6 +1832,10 @@ export default function DynamicForm({
                                   if (!fieldDef) return null;
                                   const isVisible = evaluateVisibility(
                                     fieldDef.visibleIf,
+                                    formData,
+                                    visibilityCtx,
+                                  ) && evaluateVisibility(
+                                    (entry.panelField as any)?.visibleIf,
                                     formData,
                                     visibilityCtx,
                                   );

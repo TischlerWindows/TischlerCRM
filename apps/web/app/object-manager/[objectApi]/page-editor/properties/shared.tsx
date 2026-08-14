@@ -436,11 +436,15 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
       updateSection(selection.region.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
     } else if (selection.kind === 'panel') {
       updatePanel(selection.panel.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
+    } else if (selection.kind === 'field') {
+      updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
+        visibleIf: conditions.length > 0 ? conditions : undefined,
+      } as any);
     }
     setSaved(true);
     if (savedTimer.current) clearTimeout(savedTimer.current);
     savedTimer.current = setTimeout(() => setSaved(false), 3000);
-  }, [selection, updateSection, updatePanel]);
+  }, [selection, updateSection, updatePanel, updateField]);
 
   // Conditional returns come AFTER all hooks
   if (!selection) return null;
@@ -481,12 +485,14 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
     }
   };
 
-  // visibleIf conditions for regions and panels
+  // visibleIf conditions for regions, panels, and individual fields
   const visibleIfConditions: import('@/lib/schema').ConditionExpr[] =
     selection.kind === 'region'
       ? (selection.region as any).visibleIf ?? []
       : selection.kind === 'panel'
       ? (selection.panel as any).visibleIf ?? []
+      : selection.kind === 'field'
+      ? (selection.field as any).visibleIf ?? []
       : [];
 
   // Build a fake FieldDef so we can reuse FieldVisibilityRuleEditor
@@ -556,17 +562,21 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
         })()}
       </div>
 
-      {(selection.kind === 'region' || selection.kind === 'panel') && (
+      {(selection.kind === 'region' || selection.kind === 'panel' || selection.kind === 'field') && (
         <div className="border-t border-gray-100 pt-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
             Show only when
           </div>
           <div className="text-[11px] text-gray-500 mb-2">
-            When conditions are set, this {selection.kind === 'region' ? 'section' : 'panel'} is hidden by default and only shown when <strong>all</strong> conditions are met.
+            When conditions are set, this {selection.kind === 'region' ? 'section' : selection.kind === 'panel' ? 'panel' : 'field'} is hidden by default and only shown when <strong>all</strong> conditions are met.
           </div>
           <FieldVisibilityRuleEditor
             field={fakeField}
-            availableFields={availableFields}
+            availableFields={
+              selection.kind === 'field'
+                ? availableFields.filter((f) => f.apiName !== selection.field.fieldApiName)
+                : availableFields
+            }
             onSave={handleSaveConditions}
             onCancel={() => {}}
           />
