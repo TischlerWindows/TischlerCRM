@@ -42,6 +42,7 @@ import { Textarea } from '@/components/ui/textarea';
   XCircle,
   ChevronUp,
   ChevronDown,
+  Copy,
 } from 'lucide-react';
 interface FieldsRelationshipsProps {
   objectApiName: string;
@@ -308,6 +309,45 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       targetFields: cloned.targetFields ? { ...cloned.targetFields } : {},
       displayFields: (cloned as any).displayFields ? [...(cloned as any).displayFields] : [],
       subFields: cloned.subFields ? cloned.subFields.map(sf => ({ ...sf })) : [],
+    });
+    setSyntaxCheck(null);
+    setPendingRenames([]);
+    setEditingValueIdx(null);
+    setShowCreateDialog(true);
+  };
+
+  // Opens the "New Field" dialog pre-filled with a copy of an existing
+  // field's config. editingField stays null so Save creates a new field
+  // (via addField) instead of updating the original.
+  const handleDuplicateField = (field: FieldDef) => {
+    const copyLabel = `${field.label} (Copy)`;
+    const copyApiName = `${objectApiName}__${copyLabel.replace(/\s+/g, '_').toLowerCase()}`;
+    setEditingField(null);
+    setSelectedType(field.type);
+    setShowTypeSelector(false);
+    setFormData({
+      label: copyLabel,
+      apiName: copyApiName,
+      type: field.type,
+      required: field.required || false,
+      unique: false, // duplicating a unique field would collide with the original's values
+      helpText: field.helpText || '',
+      defaultValue: field.defaultValue || '',
+      maxLength: field.maxLength || 255,
+      precision: field.precision || 18,
+      scale: field.scale || 2,
+      displayFormat: field.autoNumber?.displayFormat || '',
+      formulaExpr: field.formulaExpr || '',
+      picklistValues: field.picklistValues ? [...field.picklistValues] : [],
+      picklistColors: (field as any).picklistColors ? { ...(field as any).picklistColors } : {},
+      picklistPosition: (field as any).picklistPosition || 'left',
+      relationshipName: field.relationshipName || '',
+      lookupObject: field.lookupObject || '',
+      lookupField: field.lookupField || '',
+      staticUrl: field.staticUrl || '',
+      targetFields: field.targetFields ? { ...field.targetFields } : {},
+      displayFields: (field as any).displayFields ? [...(field as any).displayFields] : [],
+      subFields: field.subFields ? field.subFields.map(sf => ({ ...sf })) : [],
     });
     setSyntaxCheck(null);
     setPendingRenames([]);
@@ -589,6 +629,13 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                               title={!canEdit ? 'Auto-number fields cannot be edited' : undefined}
                             >
                               <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDuplicateField(field)}
+                              className="text-gray-500 hover:text-brand-navy mr-4"
+                              title="Duplicate field"
+                            >
+                              <Copy className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => canDelete && handleDeleteField(field.apiName)}
