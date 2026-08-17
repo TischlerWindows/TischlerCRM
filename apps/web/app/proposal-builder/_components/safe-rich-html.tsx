@@ -1,13 +1,13 @@
 'use client';
 
 import sanitizeHtml from 'sanitize-html';
-import parse from 'html-react-parser';
+import parse, { type DOMNode, type Element, domToReact } from 'html-react-parser';
 
 /**
  * Tags Tiptap's StarterKit emits that we render in the proposal body.
  * Anything outside this list is stripped before parsing.
  */
-const ALLOWED_TAGS = ['p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'u', 'span'];
+const ALLOWED_TAGS = ['p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'u', 'span', 'pricingrow'];
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: ALLOWED_TAGS,
@@ -18,6 +18,8 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     span: ['style'],
     // Allow p with style so margin-left (indent) and text-align survive.
     p: ['style'],
+    // Pricing row data attributes
+    pricingrow: ['label', 'value', 'bold', 'underline'],
   },
   allowedStyles: {
     span: {
@@ -31,6 +33,24 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   },
   // Drop disallowed tags entirely (no fallback to plain text inside <script>).
   disallowedTagsMode: 'discard',
+};
+
+const PARSE_OPTIONS = {
+  replace(domNode: DOMNode) {
+    const el = domNode as Element;
+    if (el.type === 'tag' && el.name === 'pricingrow') {
+      const label = el.attribs?.label ?? '';
+      const value = el.attribs?.value ?? '';
+      const bold = el.attribs?.bold === 'true';
+      const underline = el.attribs?.underline === 'true';
+      return (
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: underline ? '1px solid #888' : undefined, paddingBottom: underline ? '2px' : undefined, marginBottom: underline ? '2px' : undefined, fontWeight: bold ? 700 : undefined }}>
+          <span>{label}</span>
+          <span>{value}</span>
+        </div>
+      );
+    }
+  },
 };
 
 interface Props {
@@ -80,7 +100,7 @@ export function SafeRichHtml({ html, className, bodyKey }: Props) {
       style={isPlainText ? { whiteSpace: 'pre-wrap' } : undefined}
       data-hard-edit-body={bodyKey}
     >
-      {parse(clean)}
+      {parse(clean, PARSE_OPTIONS)}
     </div>
   );
 }

@@ -1022,7 +1022,17 @@ function drawBlock(
   align?: 'left' | 'center' | 'right',
 ): void {
   // Convert CSS px margin-left to pt (0.75 pt per px) and add to the caller's base indent.
-  const blockIndent = indent + Math.round((block.marginLeft ?? 0) * 0.75);
+  const blockIndent = indent + ('marginLeft' in block ? Math.round(((block as any).marginLeft ?? 0) * 0.75) : 0);
+
+  if (block.kind === 'pricing-row') {
+    if (block.underline) {
+      doc.moveDown(0.1);
+      drawHorizontalLine(doc);
+      doc.moveDown(0.15);
+    }
+    drawKeyValueRow(doc, ctx, block.label, block.value, { bold: !!block.bold });
+    return;
+  }
 
   if (block.kind === 'paragraph') {
     drawStyledRuns(doc, block.runs, ctx, { indent: blockIndent, lineGap: 1, align: block.align ?? align });

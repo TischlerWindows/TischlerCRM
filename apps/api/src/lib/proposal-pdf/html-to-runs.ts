@@ -32,7 +32,9 @@ export interface StyledRun {
 export type Block =
   | { kind: 'paragraph'; runs: StyledRun[]; align?: 'left' | 'center' | 'right'; marginLeft?: number }
   | { kind: 'bullet'; runs: StyledRun[]; marginLeft?: number }
-  | { kind: 'number'; index: number; runs: StyledRun[]; marginLeft?: number };
+  | { kind: 'number'; index: number; runs: StyledRun[]; marginLeft?: number }
+  /** Two-column key-value row rendered with right-aligned amount. */
+  | { kind: 'pricing-row'; label: string; value: string; bold?: boolean; underline?: boolean };
 
 export function htmlToBlocks(html: string): Block[] {
   if (!html || !html.trim()) return [];
@@ -86,6 +88,14 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
         out.push({ kind: 'paragraph', runs: seg, align, ...(marginLeft ? { marginLeft } : {}) });
       }
     }
+    return;
+  }
+  if (tag === 'PRICINGROW') {
+    const label = el.getAttribute('label') ?? '';
+    const value = el.getAttribute('value') ?? '';
+    const bold = el.getAttribute('bold') === 'true';
+    const underline = el.getAttribute('underline') === 'true';
+    out.push({ kind: 'pricing-row', label, value, bold, underline });
     return;
   }
   if (tag === 'UL') {
