@@ -1004,10 +1004,53 @@ function drawRichBody(
 ): void {
   if (opts.topGap) doc.moveDown(opts.topGap);
   const indent = opts.indent ?? 0;
-  // Centred text in PDFKit can leave doc.x offset; snap back before drawing.
   if (opts.align === 'center') doc.x = PAGE_MARGIN;
-  const blocks = htmlToBlocks(html);
 
+  // Pre-pass: split HTML on <pricingrow> tags before the HTML parser ever sees
+  // them. This avoids relying on the parser to correctly bubble the elements
+  // out of their <p> wrapper (which varies by parser config and HTML nesting).
+  if (html.includes('<pricingrow')) {
+    const PROW = /<pricingrow([^>]*)>/gi;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    const getAttr = (attrs: string, name: string) => {
+      const m = new RegExp(`${name}="([^"]*?)"`).exec(attrs);
+      return m ? m[1] ?? '' : '';
+    };
+
+    const flushHtml = (chunk: string) => {
+      // Strip any </pricingrow> close tags that may follow
+      const stripped = chunk.replace(/<\/pricingrow>/gi, '').trim();
+      if (!stripped) return;
+      for (const block of htmlToBlocks(stripped)) {
+        if (opts.align === 'center') doc.x = PAGE_MARGIN;
+        drawBlock(doc, block, ctx, indent, opts.align);
+      }
+    };
+
+    while ((match = PROW.exec(html)) !== null) {
+      flushHtml(html.slice(lastIndex, match.index));
+      lastIndex = match.index + match[0].length;
+
+      const attrs = match[1] ?? '';
+      const label = getAttr(attrs, 'label');
+      const value = getAttr(attrs, 'value');
+      const bold = getAttr(attrs, 'bold') === 'true';
+      const underline = getAttr(attrs, 'underline') === 'true';
+
+      if (underline) {
+        doc.moveDown(0.1);
+        drawHorizontalLine(doc);
+        doc.moveDown(0.15);
+      }
+      drawKeyValueRow(doc, ctx, label, value, { bold });
+    }
+    flushHtml(html.slice(lastIndex));
+    return;
+  }
+
+  const blocks = htmlToBlocks(html);
   for (const block of blocks) {
     if (opts.align === 'center') doc.x = PAGE_MARGIN;
     drawBlock(doc, block, ctx, indent, opts.align);
