@@ -59,15 +59,53 @@ export function htmlToBlocks(html: string): Block[] {
 function pushBlocks(el: HTMLElement, out: Block[]): void {
   const tag = el.tagName?.toUpperCase();
   if (tag === 'P') {
-    const runs = collectRuns(el);
-    // Parse text-align from TipTap's inline style (e.g. text-align: right)
     const style = el.getAttribute('style') ?? '';
     const alignMatch = /text-align:\s*(left|center|right)/i.exec(style);
     const align = alignMatch ? (alignMatch[1].toLowerCase() as 'left' | 'center' | 'right') : undefined;
-    // Parse margin-left (set by ParagraphIndent extension, 24 px per level)
     const mlMatch = /margin-left:\s*([\d.]+)px/i.exec(style);
     const marginLeft = mlMatch ? parseFloat(mlMatch[1]) : undefined;
 
+    // If this paragraph contains <pricingrow> children (from a token substituted
+    // inline), split around them so each emits the correct block type. Runs
+    // before/after the pricingrow tags become their own paragraph blocks.
+    const hasPricingRows = el.childNodes.some(
+      (n) => n.nodeType === NodeType.ELEMENT_NODE && (n as HTMLElement).tagName?.toUpperCase() === 'PRICINGROW',
+    );
+    if (hasPricingRows) {
+      const flushRuns = (runs: StyledRun[]) => {
+        const segments: StyledRun[][] = [[]];
+        for (const r of runs) {
+          if (r.text === '\n') segments.push([]);
+          else segments[segments.length - 1].push(r);
+        }
+        for (const seg of segments) {
+          if (seg.length > 0 && seg.some((r) => r.text.trim())) {
+            out.push({ kind: 'paragraph', runs: seg, align, ...(marginLeft ? { marginLeft } : {}) });
+          }
+        }
+      };
+      let pending: StyledRun[] = [];
+      for (const child of el.childNodes) {
+        const childEl = child as HTMLElement;
+        if (child.nodeType === NodeType.ELEMENT_NODE && childEl.tagName?.toUpperCase() === 'PRICINGROW') {
+          flushRuns(pending);
+          pending = [];
+          out.push({
+            kind: 'pricing-row',
+            label: childEl.getAttribute('label') ?? '',
+            value: childEl.getAttribute('value') ?? '',
+            bold: childEl.getAttribute('bold') === 'true',
+            underline: childEl.getAttribute('underline') === 'true',
+          });
+        } else {
+          pending.push(...collectRuns(childEl));
+        }
+      }
+      flushRuns(pending);
+      return;
+    }
+
+    const runs = collectRuns(el);
     // Split on \n runs produced by <br> tags. PDFKit's doc.text('\n', {continued:true})
     // is unreliable — it can silently drop the line advance. Splitting at <br>
     // positions creates separate paragraph blocks, each rendered with their own
