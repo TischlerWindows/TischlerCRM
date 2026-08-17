@@ -86,19 +86,33 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
       };
       let pending: StyledRun[] = [];
       for (const child of el.childNodes) {
-        const childEl = child as HTMLElement;
-        if (child.nodeType === NodeType.ELEMENT_NODE && childEl.tagName?.toUpperCase() === 'PRICINGROW') {
-          flushRuns(pending);
-          pending = [];
-          out.push({
-            kind: 'pricing-row',
-            label: childEl.getAttribute('label') ?? '',
-            value: childEl.getAttribute('value') ?? '',
-            bold: childEl.getAttribute('bold') === 'true',
-            underline: childEl.getAttribute('underline') === 'true',
-          });
-        } else {
-          pending.push(...collectRuns(childEl));
+        if (child.nodeType === NodeType.TEXT_NODE) {
+          // TEXT_NODEs must be decoded directly — collectRuns iterates a
+          // node's *children*, so calling it on a text node yields nothing.
+          const text = decodeEntities(child.text ?? '');
+          if (text) pending.push({ text, bold: false, italic: false });
+        } else if (child.nodeType === NodeType.ELEMENT_NODE) {
+          const childEl = child as HTMLElement;
+          const childTag = childEl.tagName?.toUpperCase();
+          if (childTag === 'PRICINGROW') {
+            flushRuns(pending);
+            pending = [];
+            out.push({
+              kind: 'pricing-row',
+              label: childEl.getAttribute('label') ?? '',
+              value: childEl.getAttribute('value') ?? '',
+              bold: childEl.getAttribute('bold') === 'true',
+              underline: childEl.getAttribute('underline') === 'true',
+            });
+          } else if (childTag === 'BR') {
+            // <br> has no children so collectRuns yields nothing; push the
+            // newline sentinel directly.
+            pending.push({ text: '\n', bold: false, italic: false });
+          } else {
+            // Styled inline elements (strong, em, span, etc.) — collectRuns
+            // on their subtree works correctly since they have real children.
+            pending.push(...collectRuns(childEl));
+          }
         }
       }
       flushRuns(pending);
@@ -259,7 +273,7 @@ function decodeEntities(input: string): string {
 // Used by callers that just need the plain text (e.g. for header lines).
 export function plainTextFromBlocks(blocks: Block[]): string {
   return blocks
-    .map((b) => b.runs.map((r) => r.text).join(''))
+    .map((b) => b.kind === 'pricing-row' ? `${b.label} ${b.value}` : b.runs.map((r) => r.text).join(''))
     .filter((t) => t.length > 0)
     .join('\n');
 }
