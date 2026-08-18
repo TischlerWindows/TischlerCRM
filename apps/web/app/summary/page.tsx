@@ -286,6 +286,10 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // Always holds the latest value so the blur setTimeout closure doesn't
+  // read a stale captured version from before an option was selected.
+  const latestValueRef = useRef(value);
+  useEffect(() => { latestValueRef.current = value; }, [value]);
 
   const filteredOptions = [
     // Blank entry at top so Enter doesn't auto-select the first real option
@@ -475,7 +479,7 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
     setTimeout(() => {
       setIsOpen(false);
       setHighlightedIndex(-1);
-      onEditEnd?.(value);
+      onEditEnd?.(latestValueRef.current);
       setEditing(null);
     }, 200);
   };
