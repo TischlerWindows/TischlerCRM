@@ -595,6 +595,16 @@ function ExclusionsHeaderPreview({ config }: { config: ExclusionsHeaderConfig })
   );
 }
 
+const SALESPERSON_INFO: Record<string, { fullName: string; title?: string }> = {
+  andy:  { fullName: 'Andy Mickool',    title: 'V.P. of Sales - New England' },
+  ralph: { fullName: 'Ralph Smillie',   title: 'V.P. Of Sales - NYC' },
+  tim:   { fullName: 'Timothy K. Carpenter' },
+  jim:   { fullName: 'James G. Myers',  title: 'V.P. of Sales - SE USA & Caribbean Basin' },
+};
+function getSalespersonInfo(name: string): { fullName: string; title?: string } {
+  return SALESPERSON_INFO[name.trim().toLowerCase().split(/\s+/)[0] ?? ''] ?? { fullName: name };
+}
+
 function ClosingSignaturePreview({
   config,
   pdfData,
@@ -617,18 +627,30 @@ function ClosingSignaturePreview({
           <div className="mt-6 text-[24pt] leading-none" style={{ color: NAVY, fontFamily: FONT_FAMILIES.signature }}>
             {pdfData.salesman}
           </div>
-          <div className="mt-1 text-[9pt]" style={{ color: '#505050' }}>
-            {pdfData.salesman}
-          </div>
+          {(() => {
+            const info = getSalespersonInfo(pdfData.salesman);
+            return (
+              <>
+                <div className="mt-1 text-[9pt]" style={{ color: '#505050' }}>{info.fullName}</div>
+                {info.title && <div className="text-[9pt]" style={{ color: '#505050' }}>{info.title}</div>}
+              </>
+            );
+          })()}
         </>
       ) : (
         <>
           <div className="mt-6 text-[10pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>
             {companyLine}
           </div>
-          {pdfData.salesman && (
-            <div className="text-[9pt]" style={{ color: '#505050' }}>{pdfData.salesman}</div>
-          )}
+          {pdfData.salesman && (() => {
+            const info = getSalespersonInfo(pdfData.salesman);
+            return (
+              <>
+                <div className="text-[9pt]" style={{ color: '#505050' }}>{info.fullName}</div>
+                {info.title && <div className="text-[9pt]" style={{ color: '#505050' }}>{info.title}</div>}
+              </>
+            );
+          })()}
         </>
       )}
       {showEstimator && pdfData.estimator && pdfData.estimator !== pdfData.salesman && (

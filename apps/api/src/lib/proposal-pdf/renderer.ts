@@ -28,6 +28,18 @@ import {
 } from '@crm/types';
 import { htmlToBlocks, type Block, type StyledRun } from './html-to-runs.js';
 
+// Full names + titles for known salespeople, keyed by the first-name / display
+// name stored in the summary's salesman field.
+const SALESPERSON_INFO: Record<string, { fullName: string; title?: string }> = {
+  andy:  { fullName: 'Andy Mickool',    title: 'V.P. of Sales - New England' },
+  ralph: { fullName: 'Ralph Smillie',   title: 'V.P. Of Sales - NYC' },
+  tim:   { fullName: 'Timothy K. Carpenter' },
+  jim:   { fullName: 'James G. Myers',  title: 'V.P. of Sales - SE USA & Caribbean Basin' },
+};
+function getSalespersonInfo(name: string): { fullName: string; title?: string } {
+  return SALESPERSON_INFO[name.trim().toLowerCase().split(/\s+/)[0] ?? ''] ?? { fullName: name };
+}
+
 // ── Default brand constants (match the Tischler brand guide 2025) ───
 
 const DEFAULT_NAVY = '#151f6d'; // brand guide: Pantone 2756 C
@@ -898,11 +910,19 @@ function drawClosingSignatureBlock(
 
   if (useSignatureFont && ctx.fonts.signature && salesman) {
     doc.moveDown(0.6).fillColor(ctx.navy).font(ctx.fonts.signature).fontSize(24).text(salesman);
-    doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(salesman);
+    const info = getSalespersonInfo(salesman);
+    doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(info.fullName);
+    if (info.title) {
+      doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(info.title);
+    }
   } else {
     doc.moveDown(0.8).fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(companyLine);
     if (salesman) {
-      doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(salesman);
+      const info = getSalespersonInfo(salesman);
+      doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(info.fullName);
+      if (info.title) {
+        doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(info.title);
+      }
     }
   }
 
