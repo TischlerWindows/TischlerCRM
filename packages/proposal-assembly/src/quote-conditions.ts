@@ -301,7 +301,9 @@ function hasDollarValue(val: string | undefined | null): boolean {
 
 /** Check if any of the candidate types appear in the product types list. */
 function hasAnyType(productTypes: string[], candidates: string[]): boolean {
-  return candidates.some((c) => productTypes.includes(c));
+  return candidates.some((c) =>
+    productTypes.some((pt) => pt === c || pt.startsWith(c + ':'))
+  );
 }
 
 /**

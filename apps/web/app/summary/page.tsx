@@ -177,6 +177,15 @@ const DOOR_TYPES = [
   'Outswing Pivot'
 ];
 
+const LR_DOOR_PATTERNS = [
+  'Pattern 1F', 'Pattern 11', 'Pattern P1', 'Pattern F1F',
+  'Pattern 12F', 'Pattern P12', 'Pattern F11F',
+  'Pattern 123F', 'Pattern P11P', 'Pattern P123',
+  'Pattern F1221F',
+  'Pattern F123321F', 'Pattern P1221P', 'Pattern P123321P',
+  'Pattern F12344321F', 'Pattern P12344321P',
+];
+
 /** Returns the valid option set for a given product type string.
  *  Used in both the PDF renderer (to filter stale saved options) and
  *  the editor checkbox UI. */
@@ -256,13 +265,16 @@ const findAdjacentCellId = (
 };
 
 // Searchable dropdown cell component for Type columns
-const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue }: { 
+const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue, onEditEnd }: { 
   rowId: string; 
   field: string; 
   value: string; 
   onChange: (value: string) => void;
   options: string[];
-  redirectOnValue?: { value: string; toField: string };
+  /** Redirect focus to a sub-option cell when one of these values is selected. */
+  redirectOnValue?: { value: string | string[]; toField: string };
+  /** Called with the current value when the cell stops editing (blur/select). */
+  onEditEnd?: (value: string) => void;
 }) => {
   const { activeCellId, editingCellId, setActive, setEditing, pendingInput, setPendingInput } = useContext(CellNavContext);
   const cellId = `${rowId}:${field}`;
@@ -340,10 +352,14 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue 
     setSearchTerm('');
     setIsOpen(false);
     setHighlightedIndex(-1);
-    if (redirectOnValue && option === redirectOnValue.value) {
+    const triggerValues = redirectOnValue
+      ? (Array.isArray(redirectOnValue.value) ? redirectOnValue.value : [redirectOnValue.value])
+      : [];
+    if (redirectOnValue && triggerValues.includes(option)) {
       const targetId = `${rowId}:${redirectOnValue.toField}`;
       setTimeout(() => { setActive(targetId); setEditing(targetId); }, 0);
     } else {
+      onEditEnd?.(option);
       setEditing(null);
     }
     setTimeout(() => adjustHeight(textareaRef.current), 0);
@@ -459,6 +475,7 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue 
     setTimeout(() => {
       setIsOpen(false);
       setHighlightedIndex(-1);
+      onEditEnd?.(value);
       setEditing(null);
     }, 200);
   };
@@ -6450,18 +6467,24 @@ export default function SummaryPage() {
                             <CellInput rowId={row.id} field="qty2" value={row.qty2} onChange={(v) => updateDoorRow(row.id, 'qty2', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <CellDropdown rowId={row.id} field="type" value={row.type} onChange={(v) => updateDoorRow(row.id, 'type', v)} options={DOOR_TYPES} redirectOnValue={{ value: 'Fixed with Sash', toField: 'typeSubOption' }} />
+                            <CellDropdown rowId={row.id} field="type" value={row.type} onChange={(v) => updateDoorRow(row.id, 'type', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'L&R D'], toField: 'typeSubOption' }} />
                             {row.type === 'Fixed with Sash' && (
                               <CellDropdown rowId={row.id} field="typeSubOption" value={row.typeSubOption || ''} onChange={(v) => updateDoorRow(row.id, 'typeSubOption', v)} options={DOOR_TYPES} />
+                            )}
+                            {row.type === 'L&R D' && (
+                              <CellDropdown rowId={row.id} field="typeSubOption" value={row.typeSubOption || ''} onChange={(v) => updateDoorRow(row.id, 'typeSubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateDoorRow(row.id, 'type', ''); }} />
                             )}
                           </td>
                           <td className="px-0.5 py-1 align-top">
                             <CellInput rowId={row.id} field="qty3" value={row.qty3} onChange={(v) => updateDoorRow(row.id, 'qty3', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <CellDropdown rowId={row.id} field="type2" value={row.type2} onChange={(v) => updateDoorRow(row.id, 'type2', v)} options={DOOR_TYPES} redirectOnValue={{ value: 'Fixed with Sash', toField: 'type2SubOption' }} />
+                            <CellDropdown rowId={row.id} field="type2" value={row.type2} onChange={(v) => updateDoorRow(row.id, 'type2', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'L&R D'], toField: 'type2SubOption' }} />
                             {row.type2 === 'Fixed with Sash' && (
                               <CellDropdown rowId={row.id} field="type2SubOption" value={row.type2SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type2SubOption', v)} options={DOOR_TYPES} />
+                            )}
+                            {row.type2 === 'L&R D' && (
+                              <CellDropdown rowId={row.id} field="type2SubOption" value={row.type2SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type2SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateDoorRow(row.id, 'type2', ''); }} />
                             )}
                           </td>
                           {showType3 && (
@@ -6471,9 +6494,12 @@ export default function SummaryPage() {
                           )}
                           {showType3 && (
                             <td className="px-0.5 py-1 align-top">
-                              <CellDropdown rowId={row.id} field="type3" value={row.type3} onChange={(v) => updateDoorRow(row.id, 'type3', v)} options={DOOR_TYPES} redirectOnValue={{ value: 'Fixed with Sash', toField: 'type3SubOption' }} />
+                              <CellDropdown rowId={row.id} field="type3" value={row.type3} onChange={(v) => updateDoorRow(row.id, 'type3', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'L&R D'], toField: 'type3SubOption' }} />
                               {row.type3 === 'Fixed with Sash' && (
                                 <CellDropdown rowId={row.id} field="type3SubOption" value={row.type3SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type3SubOption', v)} options={DOOR_TYPES} />
+                              )}
+                              {row.type3 === 'L&R D' && (
+                                <CellDropdown rowId={row.id} field="type3SubOption" value={row.type3SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type3SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateDoorRow(row.id, 'type3', ''); }} />
                               )}
                             </td>
                           )}
@@ -6484,9 +6510,12 @@ export default function SummaryPage() {
                           )}
                           {showType4 && (
                             <td className="px-0.5 py-1 align-top">
-                              <CellDropdown rowId={row.id} field="type4" value={row.type4} onChange={(v) => updateDoorRow(row.id, 'type4', v)} options={DOOR_TYPES} redirectOnValue={{ value: 'Fixed with Sash', toField: 'type4SubOption' }} />
+                              <CellDropdown rowId={row.id} field="type4" value={row.type4} onChange={(v) => updateDoorRow(row.id, 'type4', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'L&R D'], toField: 'type4SubOption' }} />
                               {row.type4 === 'Fixed with Sash' && (
                                 <CellDropdown rowId={row.id} field="type4SubOption" value={row.type4SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type4SubOption', v)} options={DOOR_TYPES} />
+                              )}
+                              {row.type4 === 'L&R D' && (
+                                <CellDropdown rowId={row.id} field="type4SubOption" value={row.type4SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type4SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateDoorRow(row.id, 'type4', ''); }} />
                               )}
                             </td>
                           )}

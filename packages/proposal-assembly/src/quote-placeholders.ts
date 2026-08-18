@@ -22,7 +22,7 @@ function getValidOptionsForType(t: string): string[] {
       ? ['Threshold #6', 'Threshold #6C', 'Threshold ADA']
       : ['Threshold #7', 'Threshold #8', 'Threshold ADA'];
   }
-  if (lo === 'l&r d') return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
+  if (lo === 'l&r d' || lo.startsWith('l&r d:')) return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
   if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
     return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #6', 'Threshold #6C', 'Threshold ADA'];
   }
@@ -179,9 +179,14 @@ function buildRoughHardwareText(
     }
   }
 
-  const lrActiveTypes = ['L&R D', 'Lift and Roll Window'].filter((t) => activeTypes.has(t));
+  // Include L&R D pattern types (stored as 'L&R D: Pattern X') alongside bare 'L&R D'.
+  const lrActiveTypes = Array.from(activeTypes).filter(
+    (t) => t === 'L&R D' || t.startsWith('L&R D:') || t === 'Lift and Roll Window'
+  );
   if (lrActiveTypes.length > 0) {
-    const lrOptions = lrActiveTypes.flatMap((t) => pto[t] ?? []);
+    // Product-type options are keyed by 'L&R D' (the bare type); pattern sub-type
+    // keys share the same options, so merge under the bare key.
+    const lrOptions = lrActiveTypes.flatMap((t) => pto[t] ?? pto['L&R D'] ?? []);
     if (lrOptions.includes('SS RH')) {
       parts.push(section('L&R DOORS with SS / RH:',
         'Lift-rolling doors with corrosion resistant metal alloy rough hardware with stainless steel meeting stile interlocks and locking bolts. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices.' + BB +
@@ -391,6 +396,12 @@ function pluralizeTypeName(name: string): string {
 }
 
 function expandProductTypeName(name: string): string {
+  // L&R D with a sub-pattern (e.g. 'L&R D: Pattern 1F') must NOT go through
+  // pluralizeTypeName's compound-name splitting because 'Pattern 1F' has no
+  // known plural rule — return it directly after the abbreviation expansion.
+  if (/^L&R D:/.test(name)) {
+    return 'Lift & Roll Door: ' + name.slice('L&R D:'.length).trim();
+  }
   const expanded = name
     .replace(/\bL&R D\b/g, 'Lift & Roll Door')
     .replace(/\bT & T\b/g, 'Turn & Tilt')
@@ -795,6 +806,7 @@ export function buildTokenMap(
             const t = r[f];
             if (!t) return null;
             if (t === 'Fixed with Sash' && r[subOptMap[f]!]) return `Fixed with Sash: ${r[subOptMap[f]!]}`;
+            if (t === 'L&R D' && r[subOptMap[f]!]) return `L&R D: ${r[subOptMap[f]!]}`;
             return t;
           }).filter((t): t is string => Boolean(t))
         )
@@ -856,6 +868,7 @@ export function buildTokenMap(
             const t = r[f];
             if (!t) return null;
             if (t === 'Fixed with Sash' && r[rhSubOpt[f]!]) return `Fixed with Sash: ${r[rhSubOpt[f]!]}`;
+            if (t === 'L&R D' && r[rhSubOpt[f]!]) return `L&R D: ${r[rhSubOpt[f]!]}`;
             return t;
           }).filter((t): t is string => Boolean(t))
         )
@@ -881,6 +894,7 @@ export function buildTokenMap(
             const t = r[f];
             if (!t) return null;
             if (t === 'Fixed with Sash' && r[fiSubOpt[f]!]) return `Fixed with Sash: ${r[fiSubOpt[f]!]}`;
+            if (t === 'L&R D' && r[fiSubOpt[f]!]) return `L&R D: ${r[fiSubOpt[f]!]}`;
             return t;
           }).filter((t): t is string => Boolean(t))
         )

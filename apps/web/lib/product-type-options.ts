@@ -14,7 +14,7 @@ export function getOptionsForType(t: string): string[] {
       ? ['Threshold #6', 'Threshold #6C', 'Threshold ADA']
       : ['Threshold #7', 'Threshold #8', 'Threshold ADA'];
   }
-  if (lo === 'l&r d') {
+  if (lo === 'l&r d' || lo.startsWith('l&r d:')) {
     return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
   }
   if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
