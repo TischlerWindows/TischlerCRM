@@ -624,13 +624,13 @@ function ClosingSignaturePreview({
       <div className="mt-3 text-[10pt]">{closingText}</div>
       {useSignatureFont && fonts.signature && pdfData.salesman ? (
         <>
-          <div className="mt-6 text-[24pt] leading-none" style={{ color: NAVY, fontFamily: FONT_FAMILIES.signature }}>
-            {pdfData.salesman}
-          </div>
           {(() => {
             const info = getSalespersonInfo(pdfData.salesman);
             return (
               <>
+                <div className="mt-6 text-[24pt] leading-none" style={{ color: NAVY, fontFamily: FONT_FAMILIES.signature }}>
+                  {info.fullName}
+                </div>
                 <div className="mt-1 text-[9pt]" style={{ color: '#505050' }}>{info.fullName}</div>
                 {info.title && <div className="text-[9pt]" style={{ color: '#505050' }}>{info.title}</div>}
               </>

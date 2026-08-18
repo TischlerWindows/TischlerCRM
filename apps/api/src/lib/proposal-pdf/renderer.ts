@@ -909,8 +909,8 @@ function drawClosingSignatureBlock(
   const { salesman, estimator } = result.pdfData;
 
   if (useSignatureFont && ctx.fonts.signature && salesman) {
-    doc.moveDown(0.6).fillColor(ctx.navy).font(ctx.fonts.signature).fontSize(24).text(salesman);
     const info = getSalespersonInfo(salesman);
+    doc.moveDown(0.6).fillColor(ctx.navy).font(ctx.fonts.signature).fontSize(24).text(info.fullName);
     doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(info.fullName);
     if (info.title) {
       doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(info.title);
