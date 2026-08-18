@@ -815,9 +815,10 @@ export function buildTokenMap(
       const seenDisplayNames = new Set<string>();
 
       for (const [typeName, opts] of Object.entries(pto)) {
-        // Skip types not present in any current row (deleted ghost entries).
-        // Also pass through 'L&R D' when any L&R D pattern is active, since
-        // patterns are stored with the bare key in pto but as 'L&R D: X' in activeTypes.
+        // Pattern-specific L&R D keys are handled by the 'L&R D' base block below;
+        // skip them here to avoid a second, incorrectly-pluralised set of lines.
+        if (typeName.startsWith('L&R D:')) continue;
+
         const isLrBase = typeName === 'L&R D';
         const isActive = activeTypes.has(typeName) ||
           (isLrBase && Array.from(activeTypes).some((t) => t.startsWith('L&R D:')));
@@ -827,19 +828,20 @@ export function buildTokenMap(
         const filteredOpts = opts.filter((o: string) => validSet.has(o));
         if (filteredOpts.length === 0) continue;
 
-        // For L&R D with patterns, emit one entry per active pattern instead
-        // of a single 'L&R D' entry.
         if (isLrBase) {
           const lrPatternTypes = Array.from(activeTypes).filter((t) => t.startsWith('L&R D:'));
           const bareActive = activeTypes.has('L&R D');
           if (lrPatternTypes.length > 0) {
             for (const patternType of lrPatternTypes) {
+              // Use pattern-specific opts when available, fall back to base 'L&R D' opts.
+              const patternSpecificOpts = Array.isArray(pto[patternType]) ? pto[patternType] : null;
+              const patternOpts = (patternSpecificOpts ?? filteredOpts).filter((o: string) => validSet.has(o));
               const displayName = expandProductTypeName(patternType);
               if (seenDisplayNames.has(displayName)) continue;
               seenDisplayNames.add(displayName);
-              lines.push(buildFirstLine(patternType, filteredOpts) + '<br>');
+              lines.push(buildFirstLine(patternType, patternOpts.length > 0 ? patternOpts : filteredOpts) + '<br>');
             }
-            if (!bareActive) continue; // patterns handled above — skip the bare 'L&R D' entry
+            if (!bareActive) continue;
           }
         }
 
