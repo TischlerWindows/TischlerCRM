@@ -4305,6 +4305,7 @@ export default function SummaryPage() {
                             const t = (r as any)[f];
                             if (!t) return null;
                             if (t === 'Fixed with Sash' && (r as any)[subOptFieldMapEd[f]!]) return `Fixed with Sash: ${(r as any)[subOptFieldMapEd[f]!]}`;
+                            if (t === 'L&R D' && (r as any)[subOptFieldMapEd[f]!]) return `L&R D: ${(r as any)[subOptFieldMapEd[f]!]}`;
                             return t;
                           }).filter(Boolean))
                         )) as string[];
@@ -4331,11 +4332,18 @@ export default function SummaryPage() {
                             <label className="block text-sm font-medium text-gray-700">Product Type Options</label>
                             {uniqueTypes.map(typeName => {
                               const opts = getOptionsForType(typeName);
-                              const selected = (pto[typeName] || []).filter((o: string) => opts.includes(o));
+                              // L&R D pattern key uses colon in storage; fall back to bare 'L&R D'
+                              // pto if no pattern-specific entry has been saved yet.
+                              const ptoKey = typeName;
+                              const fallbackKey = typeName.startsWith('L&R D:') ? 'L&R D' : null;
+                              const selected = (pto[ptoKey] ?? (fallbackKey ? pto[fallbackKey] : undefined) ?? []).filter((o: string) => opts.includes(o));
+                              const displayLabel = typeName.startsWith('L&R D:')
+                                ? 'L&R D ' + typeName.slice('L&R D:'.length).trim()
+                                : typeName;
                               let prevCategory: string | null = null;
                               return (
                                 <div key={typeName} className="flex items-start gap-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                                  <div className="min-w-[200px] text-sm font-medium text-gray-800 pt-0.5">{typeName}</div>
+                                  <div className="min-w-[200px] text-sm font-medium text-gray-800 pt-0.5">{displayLabel}</div>
                                   <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                                     {opts.map(opt => {
                                       const category = categorizeProductOption(opt);
