@@ -74,7 +74,15 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
         const netEuro = pv(row.netEuroTotal);
         if (!qty && !netEuro) continue;
 
-        const parts = [row.type, row.type2, row.type3, row.type4].filter(Boolean);
+        // L&R D: include the pattern sub-option so each pattern is its own product.
+        const typeWithSub = (t: string | undefined, sub: string | undefined) =>
+          t === 'L&R D' && sub ? `L&R D ${sub}` : t;
+        const parts = [
+          typeWithSub(row.type, row.typeSubOption),
+          typeWithSub(row.type2, row.type2SubOption),
+          typeWithSub(row.type3, row.type3SubOption),
+          typeWithSub(row.type4, row.type4SubOption),
+        ].filter(Boolean);
         const productType = parts.length ? parts.join(' w/ ') : '—';
 
         let category: string;
@@ -490,8 +498,11 @@ export default function ProductsPage() {
                                   </div>
                                 {(() => {
                                   const pto = d.productTypeOptions;
+                                  // For L&R D patterns, fall back to the bare 'L&R D' key since all
+                                  // patterns share the same product type options checkboxes.
+                                  const ptoKey = /^L&R D /i.test(group.productType) ? 'L&R D' : group.productType;
                                   const validOpts = new Set(getOptionsForType(group.productType));
-                                  const opts = (Array.isArray(pto[group.productType]) ? pto[group.productType] : []).filter((o: string) => validOpts.has(o));
+                                  const opts = (Array.isArray(pto[ptoKey]) ? pto[ptoKey] : []).filter((o: string) => validOpts.has(o));
                                   if (!opts.length) return null;
                                   return (
                                     <div className="w-full mt-2 pt-2 border-t border-gray-100">

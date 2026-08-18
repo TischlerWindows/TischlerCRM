@@ -22,7 +22,7 @@ function getValidOptionsForType(t: string): string[] {
       ? ['Threshold #6', 'Threshold #6C', 'Threshold ADA']
       : ['Threshold #7', 'Threshold #8', 'Threshold ADA'];
   }
-  if (lo === 'l&r d' || lo.startsWith('l&r d:')) return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
+  if (lo === 'l&r d' || lo.startsWith('l&r d:') || lo.startsWith('l&r d ')) return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
   if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
     return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #6', 'Threshold #6C', 'Threshold ADA'];
   }
@@ -815,15 +815,34 @@ export function buildTokenMap(
       const seenDisplayNames = new Set<string>();
 
       for (const [typeName, opts] of Object.entries(pto)) {
-        // Skip types not present in any current row (deleted ghost entries)
-        if (activeTypes.size > 0 && !activeTypes.has(typeName)) continue;
+        // Skip types not present in any current row (deleted ghost entries).
+        // Also pass through 'L&R D' when any L&R D pattern is active, since
+        // patterns are stored with the bare key in pto but as 'L&R D: X' in activeTypes.
+        const isLrBase = typeName === 'L&R D';
+        const isActive = activeTypes.has(typeName) ||
+          (isLrBase && Array.from(activeTypes).some((t) => t.startsWith('L&R D:')));
+        if (activeTypes.size > 0 && !isActive) continue;
         if (!Array.isArray(opts) || opts.length === 0) continue;
-        // Filter out stale option values no longer valid for this type
         const validSet = new Set(getValidOptionsForType(typeName));
         const filteredOpts = opts.filter((o: string) => validSet.has(o));
         if (filteredOpts.length === 0) continue;
-        // Split colon-compound types into two entries, e.g.
-        // "Fixed with Sash: Push Outswing" → "Fixed with Sash Units" + "Push Outswings"
+
+        // For L&R D with patterns, emit one entry per active pattern instead
+        // of a single 'L&R D' entry.
+        if (isLrBase) {
+          const lrPatternTypes = Array.from(activeTypes).filter((t) => t.startsWith('L&R D:'));
+          const bareActive = activeTypes.has('L&R D');
+          if (lrPatternTypes.length > 0) {
+            for (const patternType of lrPatternTypes) {
+              const displayName = expandProductTypeName(patternType);
+              if (seenDisplayNames.has(displayName)) continue;
+              seenDisplayNames.add(displayName);
+              lines.push(buildFirstLine(patternType, filteredOpts) + '<br>');
+            }
+            if (!bareActive) continue; // patterns handled above — skip the bare 'L&R D' entry
+          }
+        }
+
         const typeNames = typeName.includes(':')
           ? typeName.split(':').map((s: string) => s.trim()).filter(Boolean)
           : [typeName];
