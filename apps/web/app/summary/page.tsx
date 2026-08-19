@@ -186,6 +186,26 @@ const LR_DOOR_PATTERNS = [
   'Pattern F12344321F', 'Pattern P12344321P',
 ];
 
+// Add-on table: Window Screens "Frame Type" options
+const WINDOW_SCREEN_FRAME_TYPES = [
+  'Aluminum Window Screens',
+  'Wood-covered Aluminum Window Screens',
+  'Wood Framed Window Screens',
+  'Wood Framed Door Screens',
+];
+
+// Add-on table: Door Screen Sash "Wood Frame" options
+const DOOR_SCREEN_WOOD_FRAME_TYPES = [
+  'Low Wind (Brush) Manual',
+  'Low Wind (Brush) Motorized',
+  'Zip Motorized',
+  'Manual Horizontal',
+  'Centor',
+];
+
+// Add-on table: "Mesh Type" options, shared by Window Screens and Door Screen Sash
+const SCREEN_MESH_TYPES = ['Fiberglass', 'Clearview', 'Bronze', 'Dog'];
+
 /** Returns the valid option set for a given product type string.
  *  Used in both the PDF renderer (to filter stale saved options) and
  *  the editor checkbox UI. */
@@ -5406,6 +5426,23 @@ export default function SummaryPage() {
                             style={{ lineHeight: '1.25rem', minHeight: '2rem' }}
                           />
                         );
+                        // Dropdown variant of inpLeft — keeps any pre-existing free-text
+                        // value as a selectable option so old data isn't silently blanked.
+                        const selLeft = (key: string, field: string, options: string[], placeholder?: string) => {
+                          const val = getAo(key)[field] || '';
+                          const extra = val && !options.includes(val) ? [val] : [];
+                          return (
+                            <select
+                              value={val}
+                              onChange={(e) => setAo(key, field, e.target.value)}
+                              className="w-full px-2 py-1.5 text-left text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 min-w-[96px] bg-white"
+                            >
+                              <option value="">{placeholder || '—'}</option>
+                              {extra.map((o) => <option key={o} value={o}>{o}</option>)}
+                              {options.map((o) => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          );
+                        };
 
                         const hiddenAoRows = new Set<string>((ao.hiddenRows || []) as string[]);
                         const toggleAoRow = (key: string) => { const n = new Set(hiddenAoRows); if (n.has(key)) n.delete(key); else n.add(key); setEditingSummary({ ...editingSummary, addOns: { ...ao, hiddenRows: Array.from(n) } }); };
@@ -5449,8 +5486,8 @@ export default function SummaryPage() {
                                     {aoToggleBtn('windowScreens')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Window Screens</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'qty', 'Qty')}</td>
-                                    <td className="px-1 py-1">{inpLeft('windowScreens', 'frameType', 'Frame Type')}</td>
-                                    <td className="px-1 py-1">{inpLeft('windowScreens', 'meshType', 'Mesh Type')}</td>
+                                    <td className="px-1 py-1">{selLeft('windowScreens', 'frameType', WINDOW_SCREEN_FRAME_TYPES, 'Frame Type')}</td>
+                                    <td className="px-1 py-1">{selLeft('windowScreens', 'meshType', SCREEN_MESH_TYPES, 'Mesh Type')}</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'netEuro')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'pct')}</td>
@@ -5468,8 +5505,8 @@ export default function SummaryPage() {
                                     {aoToggleBtn('doorScreenSash')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Door Screen Sash</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'qty', 'Qty')}</td>
-                                    <td className="px-1 py-1">{inpLeft('doorScreenSash', 'woodFrame', 'Wood Frame')}</td>
-                                    <td className="px-1 py-1">{inpLeft('doorScreenSash', 'meshType', 'Mesh Type')}</td>
+                                    <td className="px-1 py-1">{selLeft('doorScreenSash', 'woodFrame', DOOR_SCREEN_WOOD_FRAME_TYPES, 'Wood Frame')}</td>
+                                    <td className="px-1 py-1">{selLeft('doorScreenSash', 'meshType', SCREEN_MESH_TYPES, 'Mesh Type')}</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'netEuro')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'pct')}</td>
