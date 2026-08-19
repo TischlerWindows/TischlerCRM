@@ -872,24 +872,31 @@ export function buildTokenMap(
           ? typeName.split(':').map((s: string) => s.trim()).filter(Boolean)
           : [typeName];
         for (const singleName of typeNames) {
-          // Deduplicate: "Fixed with Sash Units" should appear only once
-          // even when multiple compound types share the same prefix.
           const displayName = expandProductTypeName(singleName);
           if (seenDisplayNames.has(displayName)) continue;
           seenDisplayNames.add(displayName);
-          // Double hung uses its own glass type field if set
           const cat = getProductNfrcCategory(singleName);
           const effectiveGlass = cat === 'doubleHung' ? hungGlassType : glassType;
           const nfrcBlock = formatNfrcBlock(singleName, effectiveGlass, filteredOpts);
           if (nfrcBlock) {
             lines.push(nfrcBlock);
           } else {
-            // Extra <br> so plain (no-NFRC) entries get the same visual
-            // spacing as NFRC entries whose </ul> creates a natural gap.
             lines.push(buildFirstLine(singleName, filteredOpts) + '<br>');
           }
         }
       }
+
+      // Final pass: emit any active L&R D patterns not yet in the output.
+      // This covers patterns with no pto options set — we can still show the
+      // pattern name and pattern-specific jamb depth without a sash thickness.
+      for (const patternType of Array.from(activeTypes)) {
+        if (!patternType.startsWith('L&R D:')) continue;
+        const displayName = expandProductTypeName(patternType);
+        if (seenDisplayNames.has(displayName)) continue;
+        seenDisplayNames.add(displayName);
+        lines.push(buildFirstLine(patternType, []) + '<br>');
+      }
+
       return lines.join('<br>');
     })(),
     roughHardware: (() => {

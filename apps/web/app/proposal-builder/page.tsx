@@ -1197,6 +1197,7 @@ export default function QuoteBuilderPage() {
         )
       ));
 
+      const seenLrPatterns = new Set<string>();
       const productTypeDetailsValue = pto
         ? [
             // L&R D pattern-specific pto keys — emit each directly (skip colon-split)
@@ -1205,17 +1206,28 @@ export default function QuoteBuilderPage() {
               .filter(([key]) => _lrPatternActive.includes(key))
               .map(([typeName, opts]) => {
                 const displayName = expandPTName(typeName.replace('L&R D:', 'L&R D'));
+                seenLrPatterns.add(typeName);
                 return `<strong>${displayName}</strong> with ${(opts as string[]).map(fmtPTOpt).join(', ')}`;
               }),
             // Active L&R D patterns with no pto key — fall back to bare 'L&R D' opts
             ..._lrPatternActive
-              .filter((key) => !(Array.isArray(pto[key]) && pto[key].length > 0))
+              .filter((key) => !(Array.isArray(pto[key]) && (pto[key] as string[]).length > 0))
               .map((patternKey) => {
+                seenLrPatterns.add(patternKey);
                 const baseOpts = (pto['L&R D'] || []) as string[];
-                if (!baseOpts.length) return null;
                 const displayName = expandPTName(patternKey.replace('L&R D:', 'L&R D'));
-                return `<strong>${displayName}</strong> with ${baseOpts.map(fmtPTOpt).join(', ')}`;
-              }).filter(Boolean),
+                // Show the pattern even if no opts — jamb depth is still useful
+                return baseOpts.length
+                  ? `<strong>${displayName}</strong> with ${baseOpts.map(fmtPTOpt).join(', ')}`
+                  : `<strong>${displayName}</strong>`;
+              }),
+            // Any remaining active L&R D patterns not yet emitted
+            ..._lrPatternActive
+              .filter((key) => !seenLrPatterns.has(key))
+              .map((patternKey) => {
+                const displayName = expandPTName(patternKey.replace('L&R D:', 'L&R D'));
+                return `<strong>${displayName}</strong>`;
+              }),
             // All other pto entries (non-L&R D)
             ...Object.entries(pto)
               .filter(([key, opts]) => !key.startsWith('L&R D') && Array.isArray(opts) && opts.length > 0)
