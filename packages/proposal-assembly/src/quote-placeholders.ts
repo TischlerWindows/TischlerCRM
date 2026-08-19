@@ -815,10 +815,23 @@ export function buildTokenMap(
       const seenDisplayNames = new Set<string>();
 
       for (const [typeName, opts] of Object.entries(pto)) {
-        // Pattern-specific L&R D keys are handled by the 'L&R D' base block below;
-        // skip them here to avoid a second, incorrectly-pluralised set of lines.
-        if (typeName.startsWith('L&R D:')) continue;
+        // L&R D pattern keys ('L&R D: Pattern X') are formatted directly as single
+        // entries — don't let the colon-split path below mis-pluralise 'Pattern 1Fs'.
+        if (typeName.startsWith('L&R D:')) {
+          if (activeTypes.size > 0 && !activeTypes.has(typeName)) continue;
+          if (!Array.isArray(opts) || opts.length === 0) continue;
+          const validSet = new Set(getValidOptionsForType(typeName));
+          const filteredOpts = opts.filter((o: string) => validSet.has(o));
+          if (filteredOpts.length === 0) continue;
+          const displayName = expandProductTypeName(typeName);
+          if (seenDisplayNames.has(displayName)) continue;
+          seenDisplayNames.add(displayName);
+          lines.push(buildFirstLine(typeName, filteredOpts) + '<br>');
+          continue;
+        }
 
+        // Bare 'L&R D' key: emit entries for any active patterns that don't have
+        // their own pto key (acts as a fallback / pre-patterns legacy path).
         const isLrBase = typeName === 'L&R D';
         const isActive = activeTypes.has(typeName) ||
           (isLrBase && Array.from(activeTypes).some((t) => t.startsWith('L&R D:')));
@@ -829,20 +842,19 @@ export function buildTokenMap(
         if (filteredOpts.length === 0) continue;
 
         if (isLrBase) {
-          const lrPatternTypes = Array.from(activeTypes).filter((t) => t.startsWith('L&R D:'));
+          // Only emit patterns that don't have their own pto entry (those are
+          // already handled by the 'L&R D: X' branch above).
+          const unhandledPatterns = Array.from(activeTypes).filter(
+            (t) => t.startsWith('L&R D:') && !(Array.isArray(pto[t]) && pto[t].length > 0)
+          );
           const bareActive = activeTypes.has('L&R D');
-          if (lrPatternTypes.length > 0) {
-            for (const patternType of lrPatternTypes) {
-              // Use pattern-specific opts when available, fall back to base 'L&R D' opts.
-              const patternSpecificOpts = Array.isArray(pto[patternType]) ? pto[patternType] : null;
-              const patternOpts = (patternSpecificOpts ?? filteredOpts).filter((o: string) => validSet.has(o));
-              const displayName = expandProductTypeName(patternType);
-              if (seenDisplayNames.has(displayName)) continue;
-              seenDisplayNames.add(displayName);
-              lines.push(buildFirstLine(patternType, patternOpts.length > 0 ? patternOpts : filteredOpts) + '<br>');
-            }
-            if (!bareActive) continue;
+          for (const patternType of unhandledPatterns) {
+            const displayName = expandProductTypeName(patternType);
+            if (seenDisplayNames.has(displayName)) continue;
+            seenDisplayNames.add(displayName);
+            lines.push(buildFirstLine(patternType, filteredOpts) + '<br>');
           }
+          if (!bareActive) continue;
         }
 
         const typeNames = typeName.includes(':')

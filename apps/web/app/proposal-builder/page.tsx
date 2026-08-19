@@ -1199,19 +1199,30 @@ export default function QuoteBuilderPage() {
 
       const productTypeDetailsValue = pto
         ? [
-            // Main pto entries — skip L&R D keys entirely (handled below)
+            // L&R D pattern-specific pto keys — emit each directly (skip colon-split)
             ...Object.entries(pto)
-              .filter(([key, opts]) => Array.isArray(opts) && opts.length > 0 && key !== 'L&R D' && !key.startsWith('L&R D:'))
+              .filter(([key, opts]) => key.startsWith('L&R D:') && Array.isArray(opts) && opts.length > 0)
+              .filter(([key]) => _lrPatternActive.includes(key))
+              .map(([typeName, opts]) => {
+                const displayName = expandPTName(typeName.replace('L&R D:', 'L&R D'));
+                return `<strong>${displayName}</strong> with ${(opts as string[]).map(fmtPTOpt).join(', ')}`;
+              }),
+            // Active L&R D patterns with no pto key — fall back to bare 'L&R D' opts
+            ..._lrPatternActive
+              .filter((key) => !(Array.isArray(pto[key]) && pto[key].length > 0))
+              .map((patternKey) => {
+                const baseOpts = (pto['L&R D'] || []) as string[];
+                if (!baseOpts.length) return null;
+                const displayName = expandPTName(patternKey.replace('L&R D:', 'L&R D'));
+                return `<strong>${displayName}</strong> with ${baseOpts.map(fmtPTOpt).join(', ')}`;
+              }).filter(Boolean),
+            // All other pto entries (non-L&R D)
+            ...Object.entries(pto)
+              .filter(([key, opts]) => !key.startsWith('L&R D') && Array.isArray(opts) && opts.length > 0)
               .map(([typeName, opts]) => {
                 const name = expandPTName(typeName);
                 return `<strong>${name}</strong> with ${(opts as string[]).map(fmtPTOpt).join(', ')}`;
               }),
-            // L&R D patterns — one entry per active pattern
-            ..._lrPatternActive.map((patternKey) => {
-              const patternOpts = (pto[patternKey] && pto[patternKey].length > 0 ? pto[patternKey] : pto['L&R D'] || []) as string[];
-              const displayName = expandPTName(patternKey.replace('L&R D:', 'L&R D'));
-              return patternOpts.length > 0 ? `<strong>${displayName}</strong> with ${patternOpts.map(fmtPTOpt).join(', ')}` : null;
-            }).filter(Boolean),
           ].join('<br>')
         : '';
       const patchedSummary2 = { ...patchedSummary, productTypeDetails: productTypeDetailsValue };
