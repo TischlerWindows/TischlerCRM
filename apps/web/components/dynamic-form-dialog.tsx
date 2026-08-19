@@ -103,7 +103,7 @@ export default function DynamicFormDialog({
             }
           }}
         >
-          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <DialogHeader className="px-6 pt-6 pb-4 [@media(max-height:500px)]:px-4 [@media(max-height:500px)]:pt-2 [@media(max-height:500px)]:pb-2 border-b">
             <DialogTitle>
               {title ||
                 `${layoutType === 'create' ? 'Create New' : 'Edit'} ${

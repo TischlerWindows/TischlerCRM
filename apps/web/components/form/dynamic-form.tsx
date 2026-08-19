@@ -1901,8 +1901,8 @@ export default function DynamicForm({
 
         {/* Actions -- wizard mode */}
         {isWizardMode && !showReview && (
-          <div className="sticky bottom-0 flex items-center justify-between p-6 [@media(max-height:500px)]:py-2 border-t bg-gray-50 z-10">
-            <div className="text-sm text-gray-500">
+          <div className="sticky bottom-0 flex items-center justify-between px-6 py-4 [@media(max-height:500px)]:px-4 [@media(max-height:500px)]:py-1.5 border-t bg-gray-50 z-10">
+            <div className="text-sm text-gray-500 [@media(max-height:500px)]:hidden">
               Step {currentStep + 1} of {wizardSections.length + 1}
             </div>
             <div className="flex gap-3">
