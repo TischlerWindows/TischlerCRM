@@ -807,7 +807,12 @@ export function buildTokenMap(
         const n = parseFloat(qty || '');
         return n > 0 ? ` (Qty.\u00A0${qty}.)` : '';
       };
-      const lines: string[] = [];
+      const escAttr = (s: string): string =>
+        s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      // Each row renders via the same <pricingrow> mechanism used for the
+      // BASE BID PRICE breakdown: "ADD:"/"DEDUCT:" + description underlined
+      // (labelunderline="true"), amount right-aligned against the page margin.
+      const rows: string[] = [];
 
       // Named add-on rows
       const named: Array<{ key: string; label: string }> = [
@@ -830,23 +835,23 @@ export function buildTokenMap(
         const details = [row.frameType, row.meshType, row.woodFrame, row.details]
           .filter(Boolean).join('. ');
         const desc = `${label}${qtyStr(row.qty)}${details ? ' ' + details : ''}`;
-        lines.push(`ADD: ${desc}. ${fmtAmt(row.final)}`);
+        rows.push(`<pricingrow label="ADD: ${escAttr(desc)}." value="${escAttr(fmtAmt(row.final))}" labelunderline="true"></pricingrow>`);
       }
       // Custom add rows
       for (const cr of (ao.customRows || []) as Array<Record<string, string>>) {
         if (!hasAmt(cr.final)) continue;
-        const desc = `${cr.item || ''}${qtyStr(cr.qty)}${cr.details ? ' ' + cr.details : ''}`;
-        lines.push(`ADD: ${desc.trim()}. ${fmtAmt(cr.final)}`);
+        const desc = `${cr.item || ''}${qtyStr(cr.qty)}${cr.details ? ' ' + cr.details : ''}`.trim();
+        rows.push(`<pricingrow label="ADD: ${escAttr(desc)}." value="${escAttr(fmtAmt(cr.final))}" labelunderline="true"></pricingrow>`);
       }
       // Deduct rows
       for (const dr of (ao.deductRows || []) as Array<Record<string, string>>) {
         if (!hasAmt(dr.final)) continue;
         const n = Math.abs(parseFloat((dr.final || '').replace(/[^0-9.-]/g, '')) || 0);
         const amount = `($\u00A0${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
-        const desc = `${dr.item || ''}${qtyStr(dr.qty)}${dr.details ? ' ' + dr.details : ''}`;
-        lines.push(`DEDUCT: ${desc.trim()}. ${amount}`);
+        const desc = `${dr.item || ''}${qtyStr(dr.qty)}${dr.details ? ' ' + dr.details : ''}`.trim();
+        rows.push(`<pricingrow label="DEDUCT: ${escAttr(desc)}." value="${escAttr(amount)}" labelunderline="true"></pricingrow>`);
       }
-      return lines.join('<br>');
+      return rows.join('');
     })(),
     productTypeDetails: (() => {
       const pto = (summary as any).productTypeOptions as Record<string, string[]> | undefined;

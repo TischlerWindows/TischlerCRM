@@ -34,7 +34,7 @@ export type Block =
   | { kind: 'bullet'; runs: StyledRun[]; marginLeft?: number }
   | { kind: 'number'; index: number; runs: StyledRun[]; marginLeft?: number }
   /** Two-column key-value row rendered with right-aligned amount. */
-  | { kind: 'pricing-row'; label: string; value: string; bold?: boolean; underline?: boolean };
+  | { kind: 'pricing-row'; label: string; value: string; bold?: boolean; underline?: boolean; underlineLabel?: boolean };
 
 export function htmlToBlocks(html: string): Block[] {
   if (!html || !html.trim()) return [];
@@ -103,6 +103,7 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
               value: childEl.getAttribute('value') ?? '',
               bold: childEl.getAttribute('bold') === 'true',
               underline: childEl.getAttribute('underline') === 'true',
+              underlineLabel: childEl.getAttribute('labelunderline') === 'true',
             });
           } else if (childTag === 'BR') {
             // <br> has no children so collectRuns yields nothing; push the
@@ -147,7 +148,8 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
     const value = el.getAttribute('value') ?? '';
     const bold = el.getAttribute('bold') === 'true';
     const underline = el.getAttribute('underline') === 'true';
-    out.push({ kind: 'pricing-row', label, value, bold, underline });
+    const underlineLabel = el.getAttribute('labelunderline') === 'true';
+    out.push({ kind: 'pricing-row', label, value, bold, underline, underlineLabel });
     return;
   }
   if (tag === 'UL') {

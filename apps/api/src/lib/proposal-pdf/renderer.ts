@@ -1058,8 +1058,9 @@ function drawRichBody(
       const value = getAttr(attrs, 'value');
       const bold = getAttr(attrs, 'bold') === 'true';
       const underline = getAttr(attrs, 'underline') === 'true';
+      const underlineLabel = getAttr(attrs, 'labelunderline') === 'true';
 
-      drawKeyValueRow(doc, ctx, label, value, { bold });
+      drawKeyValueRow(doc, ctx, label, value, { bold, underlineLabel });
       if (underline) {
         doc.moveDown(0.1);
         drawHorizontalLine(doc);
@@ -1088,7 +1089,7 @@ function drawBlock(
   const blockIndent = indent + ('marginLeft' in block ? Math.round(((block as any).marginLeft ?? 0) * 0.75) : 0);
 
   if (block.kind === 'pricing-row') {
-    drawKeyValueRow(doc, ctx, block.label, block.value, { bold: !!block.bold });
+    drawKeyValueRow(doc, ctx, block.label, block.value, { bold: !!block.bold, underlineLabel: !!block.underlineLabel });
     if (block.underline) {
       doc.moveDown(0.1);
       drawHorizontalLine(doc);
@@ -1199,16 +1200,22 @@ function drawKeyValueRow(
   ctx: BrandContext,
   label: string,
   value: string,
-  opts: { bold?: boolean } = {},
+  opts: { bold?: boolean; underlineLabel?: boolean } = {},
 ): void {
   const usable = doc.page.width - 2 * PAGE_MARGIN;
+  const labelWidth = usable * 0.7;
   doc.font(opts.bold ? ctx.fonts.bold : ctx.fonts.regular);
   const y = doc.y;
-  doc.text(label, PAGE_MARGIN, y, { continued: false, width: usable * 0.7 });
-  doc.text(value, PAGE_MARGIN + usable * 0.7, y, {
+  const labelHeight = doc.heightOfString(label, { width: labelWidth });
+  doc.text(label, PAGE_MARGIN, y, { continued: false, width: labelWidth, underline: !!opts.underlineLabel });
+  doc.text(value, PAGE_MARGIN + labelWidth, y, {
     width: usable * 0.3,
     align: 'right',
   });
+  // The value call's implicit y-advance is based on its own (single) line —
+  // restore doc.y to below the label's full wrapped height so a long,
+  // multi-line label doesn't get overwritten by the next block.
+  doc.y = y + labelHeight;
 }
 
 function normalizeHex(input: string | undefined | null): string | null {
