@@ -293,6 +293,9 @@ export interface SummaryForPlaceholders {
     magneticContact: { qty: string; final: string; [k: string]: unknown };
     finalFinish: { final: string; [k: string]: unknown };
     installation: { final: string; installationRows?: Array<{ label: string; price: string }>; [k: string]: unknown };
+    customRows?: Array<{ item: string; qty: string; details: string; final: string; [k: string]: unknown }>;
+    deductRows?: Array<{ item: string; qty: string; details: string; final: string; [k: string]: unknown }>;
+    [k: string]: unknown;
   };
 }
 
@@ -789,6 +792,60 @@ export function buildTokenMap(
       if (base > 0) lines.push(`Installation: ${formatDollar(String(base))}`);
       rows.forEach(r => lines.push(`${r.label}: ${r.price}`));
       lines.push(`Total: ${formatDollar(String(grandTotal))}`);
+      return lines.join('<br>');
+    })(),
+    options: (() => {
+      const ao = summary.addOns as Record<string, any>;
+      if (!ao) return '';
+      const fmtAmt = (v: string | undefined): string => {
+        const n = parseFloat((v || '').replace(/[^0-9.-]/g, ''));
+        if (!n) return '';
+        return '$\u00A0' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      };
+      const hasAmt = (v: string | undefined) => Math.abs(parseFloat((v || '').replace(/[^0-9.-]/g, '')) || 0) > 0;
+      const qtyStr = (qty: string | undefined) => {
+        const n = parseFloat(qty || '');
+        return n > 0 ? ` (Qty.\u00A0${qty}.)` : '';
+      };
+      const lines: string[] = [];
+
+      // Named add-on rows
+      const named: Array<{ key: string; label: string }> = [
+        { key: 'windowScreens',      label: 'Window Screens' },
+        { key: 'doorScreenSash',     label: 'Door Screen Sash' },
+        { key: 'entryDoor',          label: 'Entry Door' },
+        { key: 'jambExtensions',     label: 'Jamb Extensions' },
+        { key: 'magneticContact',    label: 'Magnetic Alarm Contacts' },
+        { key: 'splitFinish',        label: 'Split Finish' },
+        { key: 'integratedContacts', label: 'Integrated Contacts' },
+        { key: 'poolContacts',       label: 'Pool Alarm Contacts' },
+        { key: 'rollScreens',        label: 'Roll Screens' },
+        { key: 'shadeBoxes',         label: 'Shade Boxes' },
+        { key: 'geniusLock',         label: 'Genius Lock' },
+        { key: 'finalFinish',        label: 'Final Finish' },
+      ];
+      for (const { key, label } of named) {
+        const row = ao[key] as Record<string, string> | undefined;
+        if (!row || !hasAmt(row.final)) continue;
+        const details = [row.frameType, row.meshType, row.woodFrame, row.details]
+          .filter(Boolean).join('. ');
+        const desc = `${label}${qtyStr(row.qty)}${details ? ' ' + details : ''}`;
+        lines.push(`ADD: ${desc}. ${fmtAmt(row.final)}`);
+      }
+      // Custom add rows
+      for (const cr of (ao.customRows || []) as Array<Record<string, string>>) {
+        if (!hasAmt(cr.final)) continue;
+        const desc = `${cr.item || ''}${qtyStr(cr.qty)}${cr.details ? ' ' + cr.details : ''}`;
+        lines.push(`ADD: ${desc.trim()}. ${fmtAmt(cr.final)}`);
+      }
+      // Deduct rows
+      for (const dr of (ao.deductRows || []) as Array<Record<string, string>>) {
+        if (!hasAmt(dr.final)) continue;
+        const n = Math.abs(parseFloat((dr.final || '').replace(/[^0-9.-]/g, '')) || 0);
+        const amount = `($\u00A0${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+        const desc = `${dr.item || ''}${qtyStr(dr.qty)}${dr.details ? ' ' + dr.details : ''}`;
+        lines.push(`DEDUCT: ${desc.trim()}. ${amount}`);
+      }
       return lines.join('<br>');
     })(),
     productTypeDetails: (() => {
