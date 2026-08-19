@@ -5437,7 +5437,8 @@ export default function SummaryPage() {
                               onChange={(e) => setAo(key, field, e.target.value)}
                               className="w-full px-2 py-1.5 text-left text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 min-w-[96px] bg-white"
                             >
-                              <option value="">{placeholder || '—'}</option>
+                              {/* hidden so it shows as the placeholder but isn't a pickable list item */}
+                              <option value="" disabled hidden>{placeholder || '—'}</option>
                               {extra.map((o) => <option key={o} value={o}>{o}</option>)}
                               {options.map((o) => <option key={o} value={o}>{o}</option>)}
                             </select>
