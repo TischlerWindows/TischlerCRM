@@ -493,14 +493,19 @@ function getJambDepth(typeName: string, sashMm: number): string | null {
     const patternMatch = typeName.match(/Pattern\s+(\S+)/i);
     const pattern = patternMatch ? patternMatch[1]!.toUpperCase() : '';
     if (pattern === '1F' || pattern === '11') return '7-7/8"';
+    if (pattern === 'F1F') return '7-9/16"';
     if (pattern === 'F11F') return '9-5/8"';
     if (pattern === 'P1') return '6-1/16"';
     if (pattern === 'P12') return '9-9/16"';
     if (pattern === '12F') return '11-1/2"';
     if (pattern === '123F') return '15-7/16"';
     if (pattern === 'P123') return '13-1/2"';
-    // F1F, F11F, P11P, F1221F, P1221P, F123321F, P123321P, F12344321F, P12344321P
-    // and any other unlisted pattern: fall back to the generic note
+    if (pattern === 'P11P') return '12"';
+    if (pattern === 'F1221F') return '15-9/16"';
+    if (pattern === 'P1221P') return '18"';
+    if (pattern === 'P123321P') return '15-9/16"';
+    // F123321F, F12344321F, P12344321P and any other unlisted pattern:
+    // fall back to the generic note
     return 'Jamb depth varies depending upon sash configuration';
   }
   // Outswing folding
