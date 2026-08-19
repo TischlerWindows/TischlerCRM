@@ -845,7 +845,7 @@ export function buildTokenMap(
           // Only emit patterns that don't have their own pto entry (those are
           // already handled by the 'L&R D: X' branch above).
           const unhandledPatterns = Array.from(activeTypes).filter(
-            (t) => t.startsWith('L&R D:') && !(Array.isArray(pto[t]) && pto[t].length > 0)
+            (t) => t.startsWith('L&R D:') && !((pto[t] ?? []).length > 0)
           );
           const bareActive = activeTypes.has('L&R D');
           for (const patternType of unhandledPatterns) {
