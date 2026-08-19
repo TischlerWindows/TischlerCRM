@@ -188,13 +188,13 @@ function buildRoughHardwareText(
     // keys share the same options, so merge under the bare key.
     const lrOptions = lrActiveTypes.flatMap((t) => pto[t] ?? pto['L&R D'] ?? []);
     if (lrOptions.includes('SS RH')) {
-      parts.push(section('L&R DOORS with SS / RH:',
+      parts.push(section('LIFT & ROLL DOORS with SS / RH:',
         'Lift-rolling doors with corrosion resistant metal alloy rough hardware with stainless steel meeting stile interlocks and locking bolts. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices.' + BB +
         'Lift-rolling doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
       ));
     }
     if (lrOptions.includes('Standard RH')) {
-      parts.push(section('L&R DOORS:',
+      parts.push(section('LIFT & ROLL DOORS:',
         'Lift rolling doors with corrosion resistant metal alloy rough hardware. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices' + BB +
         'Lift-rolling doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
       ));
