@@ -484,8 +484,19 @@ function getJambDepth(typeName: string, sashMm: number): string | null {
     if (sashMm === 90) return '9-7/16"';
     return null;
   }
-  // L&R D / Lift and Roll — jamb depth varies by sash configuration
+  // L&R D / Lift and Roll — jamb depth depends on the pattern sub-type
   if (lo.includes('l&r') || (lo.includes('lift') && (lo.includes('roll') || lo.includes('rolling')))) {
+    // Pattern-specific jamb depths; extracted from typeName after the colon (e.g. 'L&R D: Pattern 1F')
+    const patternMatch = typeName.match(/Pattern\s+(\S+)/i);
+    const pattern = patternMatch ? patternMatch[1]!.toUpperCase() : '';
+    if (pattern === '1F' || pattern === '11') return '7-7/8"';
+    if (pattern === 'P1') return '6-1/16"';
+    if (pattern === 'P12') return '9-9/16"';
+    if (pattern === '12F') return '11-1/2"';
+    if (pattern === '123F') return '15-7/16"';
+    if (pattern === 'P123') return '13-1/2"';
+    // F1F, F11F, P11P, F1221F, P1221P, F123321F, P123321P, F12344321F, P12344321P
+    // and any other unlisted pattern: fall back to the generic note
     return 'Jamb depth varies depending upon sash configuration';
   }
   // Outswing folding
