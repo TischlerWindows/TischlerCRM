@@ -1933,7 +1933,7 @@ export default function DynamicForm({
 
         {/* Actions -- normal mode */}
         {!isWizardMode && !showReview && (
-          <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
+          <div className="sticky bottom-0 flex justify-end gap-3 p-6 border-t bg-gray-50 z-10">
             {onCancel && (
               <Button
                 type="button"
@@ -1963,7 +1963,7 @@ export default function DynamicForm({
 
         {/* Actions -- review mode */}
         {showReview && (
-          <div className="flex items-center justify-between p-6 border-t bg-gray-50">
+          <div className="sticky bottom-0 flex items-center justify-between p-6 border-t bg-gray-50 z-10">
             <div className="text-sm text-gray-500 font-medium">
               Review Complete
             </div>

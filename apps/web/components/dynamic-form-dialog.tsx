@@ -88,7 +88,8 @@ export default function DynamicFormDialog({
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
-          className="w-[95vw] max-w-6xl h-[95vh] max-h-[95vh] p-0"
+          className="w-[95vw] max-w-6xl p-0 flex flex-col"
+          style={{ height: 'min(95dvh, 95vh)', maxHeight: 'min(95dvh, 95vh)' }}
           onPointerDownOutside={(e) => {
             if (formTouchedRef.current) {
               e.preventDefault();
@@ -111,8 +112,8 @@ export default function DynamicFormDialog({
             </DialogTitle>
           </DialogHeader>
           <div
-            className="overflow-hidden"
-            style={{ height: 'calc(95vh - 80px)', pointerEvents: 'auto' }}
+            className="overflow-hidden flex-1 min-h-0"
+            style={{ pointerEvents: 'auto' }}
             onChange={() => { formTouchedRef.current = true; }}
             onClick={(e) => {
               // Mark touched on interactive element clicks (selects, checkboxes, picklists)
