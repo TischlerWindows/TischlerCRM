@@ -1065,6 +1065,9 @@ function drawRichBody(
         doc.moveDown(0.1);
         drawHorizontalLine(doc);
         doc.moveDown(0.15);
+      } else if (underlineLabel) {
+        // Breathing room between ADD:/DEDUCT: option rows so they don't run together.
+        doc.moveDown(0.4);
       }
     }
     flushHtml(html.slice(lastIndex));
@@ -1094,6 +1097,9 @@ function drawBlock(
       doc.moveDown(0.1);
       drawHorizontalLine(doc);
       doc.moveDown(0.15);
+    } else if (block.underlineLabel) {
+      // Breathing room between ADD:/DEDUCT: option rows so they don't run together.
+      doc.moveDown(0.4);
     }
     return;
   }
