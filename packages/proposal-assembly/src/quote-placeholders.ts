@@ -490,6 +490,7 @@ function getJambDepth(typeName: string, sashMm: number): string | null {
     const patternMatch = typeName.match(/Pattern\s+(\S+)/i);
     const pattern = patternMatch ? patternMatch[1]!.toUpperCase() : '';
     if (pattern === '1F' || pattern === '11') return '7-7/8"';
+    if (pattern === 'F11F') return '9-5/8"';
     if (pattern === 'P1') return '6-1/16"';
     if (pattern === 'P12') return '9-9/16"';
     if (pattern === '12F') return '11-1/2"';
