@@ -19,7 +19,7 @@ const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
     // Allow p with style so margin-left (indent) and text-align survive.
     p: ['style'],
     // Pricing row data attributes
-    pricingrow: ['label', 'value', 'bold', 'underline', 'labelunderline'],
+    pricingrow: ['label', 'value', 'bold', 'underline', 'labelunderline', 'labelsuffix'],
   },
   allowedStyles: {
     span: {
@@ -44,9 +44,13 @@ const PARSE_OPTIONS = {
       const bold = el.attribs?.bold === 'true';
       const underline = el.attribs?.underline === 'true';
       const labelUnderline = el.attribs?.labelunderline === 'true';
+      const labelSuffix = el.attribs?.labelsuffix ?? '';
       return (
         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: underline ? '1px solid #888' : undefined, paddingBottom: underline ? '2px' : undefined, marginBottom: underline ? '2px' : labelUnderline ? '8px' : undefined, fontWeight: bold ? 700 : undefined }}>
-          <span style={{ textDecoration: labelUnderline ? 'underline' : undefined }}>{label}</span>
+          <span>
+            <span style={{ textDecoration: labelUnderline ? 'underline' : undefined }}>{label}</span>
+            {labelSuffix}
+          </span>
           <span>{value}</span>
         </div>
       );

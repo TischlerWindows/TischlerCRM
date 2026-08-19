@@ -34,7 +34,7 @@ export type Block =
   | { kind: 'bullet'; runs: StyledRun[]; marginLeft?: number }
   | { kind: 'number'; index: number; runs: StyledRun[]; marginLeft?: number }
   /** Two-column key-value row rendered with right-aligned amount. */
-  | { kind: 'pricing-row'; label: string; value: string; bold?: boolean; underline?: boolean; underlineLabel?: boolean };
+  | { kind: 'pricing-row'; label: string; value: string; bold?: boolean; underline?: boolean; underlineLabel?: boolean; labelSuffix?: string };
 
 export function htmlToBlocks(html: string): Block[] {
   if (!html || !html.trim()) return [];
@@ -104,6 +104,7 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
               bold: childEl.getAttribute('bold') === 'true',
               underline: childEl.getAttribute('underline') === 'true',
               underlineLabel: childEl.getAttribute('labelunderline') === 'true',
+              labelSuffix: childEl.getAttribute('labelsuffix') ?? undefined,
             });
           } else if (childTag === 'BR') {
             // <br> has no children so collectRuns yields nothing; push the
@@ -149,7 +150,8 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
     const bold = el.getAttribute('bold') === 'true';
     const underline = el.getAttribute('underline') === 'true';
     const underlineLabel = el.getAttribute('labelunderline') === 'true';
-    out.push({ kind: 'pricing-row', label, value, bold, underline, underlineLabel });
+    const labelSuffix = el.getAttribute('labelsuffix') ?? undefined;
+    out.push({ kind: 'pricing-row', label, value, bold, underline, underlineLabel, labelSuffix });
     return;
   }
   if (tag === 'UL') {

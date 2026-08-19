@@ -1059,8 +1059,9 @@ function drawRichBody(
       const bold = getAttr(attrs, 'bold') === 'true';
       const underline = getAttr(attrs, 'underline') === 'true';
       const underlineLabel = getAttr(attrs, 'labelunderline') === 'true';
+      const labelSuffix = getAttr(attrs, 'labelsuffix') || undefined;
 
-      drawKeyValueRow(doc, ctx, label, value, { bold, underlineLabel });
+      drawKeyValueRow(doc, ctx, label, value, { bold, underlineLabel, labelSuffix });
       if (underline) {
         doc.moveDown(0.1);
         drawHorizontalLine(doc);
@@ -1092,7 +1093,7 @@ function drawBlock(
   const blockIndent = indent + ('marginLeft' in block ? Math.round(((block as any).marginLeft ?? 0) * 0.75) : 0);
 
   if (block.kind === 'pricing-row') {
-    drawKeyValueRow(doc, ctx, block.label, block.value, { bold: !!block.bold, underlineLabel: !!block.underlineLabel });
+    drawKeyValueRow(doc, ctx, block.label, block.value, { bold: !!block.bold, underlineLabel: !!block.underlineLabel, labelSuffix: block.labelSuffix });
     if (block.underline) {
       doc.moveDown(0.1);
       drawHorizontalLine(doc);
@@ -1206,14 +1207,20 @@ function drawKeyValueRow(
   ctx: BrandContext,
   label: string,
   value: string,
-  opts: { bold?: boolean; underlineLabel?: boolean } = {},
+  opts: { bold?: boolean; underlineLabel?: boolean; labelSuffix?: string } = {},
 ): void {
   const usable = doc.page.width - 2 * PAGE_MARGIN;
   const labelWidth = usable * 0.7;
   doc.font(opts.bold ? ctx.fonts.bold : ctx.fonts.regular);
   const y = doc.y;
-  const labelHeight = doc.heightOfString(label, { width: labelWidth });
-  doc.text(label, PAGE_MARGIN, y, { continued: false, width: labelWidth, underline: !!opts.underlineLabel });
+  const labelHeight = doc.heightOfString(label + (opts.labelSuffix ?? ''), { width: labelWidth });
+  if (opts.labelSuffix) {
+    // Two continued runs so only the main label (not the qty/detail suffix) is underlined.
+    doc.text(label, PAGE_MARGIN, y, { continued: true, width: labelWidth, underline: !!opts.underlineLabel });
+    doc.text(opts.labelSuffix, { continued: false, underline: false });
+  } else {
+    doc.text(label, PAGE_MARGIN, y, { continued: false, width: labelWidth, underline: !!opts.underlineLabel });
+  }
   doc.text(value, PAGE_MARGIN + labelWidth, y, {
     width: usable * 0.3,
     align: 'right',

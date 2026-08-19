@@ -810,8 +810,22 @@ export function buildTokenMap(
       const escAttr = (s: string): string =>
         s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       // Each row renders via the same <pricingrow> mechanism used for the
-      // BASE BID PRICE breakdown: "ADD:"/"DEDUCT:" + description underlined
+      // BASE BID PRICE breakdown: "ADD:"/"DEDUCT:" + item name underlined
       // (labelunderline="true"), amount right-aligned against the page margin.
+      // The qty/details clause goes in labelsuffix so it renders WITHOUT
+      // the underline. Three nbsp separate the "ADD:"/"DEDUCT:" prefix from
+      // the item name — plain spaces get collapsed by the browser preview.
+      const GAP = '\u00A0\u00A0\u00A0';
+      const makeRow = (
+        kind: 'ADD' | 'DEDUCT',
+        itemLabel: string,
+        qty: string | undefined,
+        details: string,
+        amount: string,
+      ): string => {
+        const suffix = `${qtyStr(qty)}${details ? ' ' + details : ''}.`;
+        return `<pricingrow label="${escAttr(`${kind}:${GAP}${itemLabel}`)}" labelsuffix="${escAttr(suffix)}" value="${escAttr(amount)}" labelunderline="true"></pricingrow>`;
+      };
       const rows: string[] = [];
 
       // Named add-on rows
@@ -834,22 +848,19 @@ export function buildTokenMap(
         if (!row || !hasAmt(row.final)) continue;
         const details = [row.frameType, row.meshType, row.woodFrame, row.details]
           .filter(Boolean).join('. ');
-        const desc = `${label}${qtyStr(row.qty)}${details ? ' ' + details : ''}`;
-        rows.push(`<pricingrow label="ADD: ${escAttr(desc)}." value="${escAttr(fmtAmt(row.final))}" labelunderline="true"></pricingrow>`);
+        rows.push(makeRow('ADD', label, row.qty, details, fmtAmt(row.final)));
       }
       // Custom add rows
       for (const cr of (ao.customRows || []) as Array<Record<string, string>>) {
         if (!hasAmt(cr.final)) continue;
-        const desc = `${cr.item || ''}${qtyStr(cr.qty)}${cr.details ? ' ' + cr.details : ''}`.trim();
-        rows.push(`<pricingrow label="ADD: ${escAttr(desc)}." value="${escAttr(fmtAmt(cr.final))}" labelunderline="true"></pricingrow>`);
+        rows.push(makeRow('ADD', (cr.item || '').trim(), cr.qty, cr.details || '', fmtAmt(cr.final)));
       }
       // Deduct rows
       for (const dr of (ao.deductRows || []) as Array<Record<string, string>>) {
         if (!hasAmt(dr.final)) continue;
         const n = Math.abs(parseFloat((dr.final || '').replace(/[^0-9.-]/g, '')) || 0);
         const amount = `($\u00A0${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
-        const desc = `${dr.item || ''}${qtyStr(dr.qty)}${dr.details ? ' ' + dr.details : ''}`.trim();
-        rows.push(`<pricingrow label="DEDUCT: ${escAttr(desc)}." value="${escAttr(amount)}" labelunderline="true"></pricingrow>`);
+        rows.push(makeRow('DEDUCT', (dr.item || '').trim(), dr.qty, dr.details || '', amount));
       }
       return rows.join('');
     })(),
