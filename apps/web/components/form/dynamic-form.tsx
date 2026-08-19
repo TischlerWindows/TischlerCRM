@@ -1377,14 +1377,24 @@ export default function DynamicForm({
     <PendingTeamMemberPoolProvider>
     <>
       <form onKeyDown={handleFormKeyDown} className="flex flex-col h-full">
-        {/* Wizard Step Indicator */}
+        {/* Wizard Step Indicator — hidden in landscape mobile (<500px tall) to save vertical space */}
         {isWizardMode && (
-          <div className="px-6 pt-5 pb-3 bg-white border-b">
-            <div
-              ref={stepIndicatorRef}
-              className="flex items-center overflow-x-auto scrollbar-hide"
-              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-            >
+          <>
+            {/* Compact pill shown only in small-height landscape (phones rotated) */}
+            <div className="hidden [@media(max-height:500px)]:flex items-center justify-center gap-2 px-4 py-1.5 bg-white border-b text-xs text-gray-600">
+              <div className={cn('w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold', showReview ? 'bg-brand-navy text-white' : 'bg-brand-navy text-white')}>
+                {showReview ? wizardSections.length + 1 : currentStep + 1}
+              </div>
+              <span className="font-medium text-gray-800">{showReview ? 'Review' : (wizardSections[currentStep]?.regionLabel || wizardSections[currentStep]?.section.label)}</span>
+              <span className="text-gray-400">— Step {showReview ? wizardSections.length + 1 : currentStep + 1} of {wizardSections.length + 1}</span>
+            </div>
+            {/* Full step indicator — hidden only in small-height landscape */}
+            <div className="[@media(max-height:500px)]:hidden px-6 pt-5 pb-3 bg-white border-b">
+              <div
+                ref={stepIndicatorRef}
+                className="flex items-center overflow-x-auto scrollbar-hide"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
               {wizardSections.map((ws, index) => {
                 const isBeforeCurrent = showReview ? true : index < currentStep;
                 const isCurrent = !showReview && index === currentStep;
@@ -1461,6 +1471,7 @@ export default function DynamicForm({
               </div>
             </div>
           </div>
+          </>
         )}
 
         {/* Tabs */}
@@ -1890,7 +1901,7 @@ export default function DynamicForm({
 
         {/* Actions -- wizard mode */}
         {isWizardMode && !showReview && (
-          <div className="flex items-center justify-between p-6 border-t bg-gray-50">
+          <div className="sticky bottom-0 flex items-center justify-between p-6 [@media(max-height:500px)]:py-2 border-t bg-gray-50 z-10">
             <div className="text-sm text-gray-500">
               Step {currentStep + 1} of {wizardSections.length + 1}
             </div>
