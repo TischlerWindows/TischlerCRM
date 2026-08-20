@@ -849,12 +849,24 @@ export function buildTokenMap(
         { key: 'geniusLock',         label: 'Genius Lock' },
         { key: 'finalFinish',        label: 'Final Finish' },
       ];
+      // Fixed boilerplate spec text for add-ons whose "item name"/description
+      // is standardized copy rather than free-typed data. Label overrides
+      // replace the item name entirely; detail overrides are appended after
+      // any qty (both render un-underlined, matching the reference PDF).
+      const DEFAULT_ITEM_LABEL: Record<string, string> = {
+        finalFinish: 'Factory applied final finish coat of paint or stain (same finish both sides.)',
+      };
+      const DEFAULT_DETAILS: Record<string, string> = {
+        finalFinish: 'Stain to 110-micron thickness or paint to 120-micron thickness',
+        magneticContact: 'This system is used to detect forced entry or open position of the window or door. A 10\u2019 lead wire from the magnetic contact will be left on the outside of the frame for connection to the central alarm system. The contact will be located at the head closest to the handle for doors, the sill closest to the handle for casements and the sill and head for double hungs',
+      };
       for (const { key, label } of named) {
         const row = ao[key] as Record<string, string> | undefined;
         if (!row || !hasAmt(row.final)) continue;
-        const details = [row.frameType, row.meshType, row.woodFrame, row.details]
+        const details = [row.frameType, row.meshType, row.woodFrame, row.details, DEFAULT_DETAILS[key]]
           .filter(Boolean).join('. ');
-        rows.push(makeRow('ADD', label, row.qty, details, fmtAmt(row.final)));
+        const itemLabel = DEFAULT_ITEM_LABEL[key] ?? label;
+        rows.push(makeRow('ADD', itemLabel, row.qty, details, fmtAmt(row.final)));
       }
       // Custom add rows
       for (const cr of (ao.customRows || []) as Array<Record<string, string>>) {
