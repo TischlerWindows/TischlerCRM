@@ -2504,16 +2504,26 @@ export default function SummaryPage() {
     const aoColTextColors: { [colIdx: number]: [number, number, number] } = { 4: [37, 99, 235], 5: [37, 99, 235], 6: [22, 163, 74], 7: [37, 99, 235], 8: [37, 99, 235], 9: [22, 163, 74] };
     const aoFmt = (key: string, field: string) => fmtDollar(aoV(key, field));
     const aoFmtNet = (key: string) => { const n = pv(aoV(key, 'netEuro')); return n ? '€' + fmtInt(n) : '—'; };
+    // Combines labeled Frame/Wood/Mesh Type fields with the free-text Details
+    // textbox (Window Screens/Door Screen Sash/Roll Screens) into one cell.
+    const aoDetailsCell = (key: string, labeled: Array<[string, string]>): string => {
+      const parts = labeled
+        .map(([label, field]) => { const v = (ao[key] as any)?.[field]; return v ? `${label}: ${v}` : ''; })
+        .filter(Boolean);
+      const details = (ao[key] as any)?.details;
+      if (details) parts.push(details);
+      return parts.length > 0 ? parts.join(' | ') : '—';
+    };
     const aoRows = [
-      ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoFmtNet('windowScreens'), aoFmt('windowScreens', 'full'), aoFmt('windowScreens', 'pct'), aoFmt('windowScreens', 'final'), ...aoCalc('windowScreens')],
-      ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoFmtNet('doorScreenSash'), aoFmt('doorScreenSash', 'full'), aoFmt('doorScreenSash', 'pct'), aoFmt('doorScreenSash', 'final'), ...aoCalc('doorScreenSash')],
+      ['Window Screens', aoV('windowScreens', 'qty'), aoDetailsCell('windowScreens', [['Frame', 'frameType'], ['Mesh', 'meshType']]), aoFmtNet('windowScreens'), aoFmt('windowScreens', 'full'), aoFmt('windowScreens', 'pct'), aoFmt('windowScreens', 'final'), ...aoCalc('windowScreens')],
+      ['Door Screen Sash', aoV('doorScreenSash', 'qty'), aoDetailsCell('doorScreenSash', [['Wood', 'woodFrame'], ['Mesh', 'meshType']]), aoFmtNet('doorScreenSash'), aoFmt('doorScreenSash', 'full'), aoFmt('doorScreenSash', 'pct'), aoFmt('doorScreenSash', 'final'), ...aoCalc('doorScreenSash')],
       ['Entry Door', aoV('entryDoor', 'qty'), aoV('entryDoor', 'details'), aoFmtNet('entryDoor'), aoFmt('entryDoor', 'full'), aoFmt('entryDoor', 'pct'), aoFmt('entryDoor', 'final'), ...aoCalc('entryDoor')],
       ['Jamb Extensions', '—', '—', aoFmtNet('jambExtensions'), aoFmt('jambExtensions', 'full'), aoFmt('jambExtensions', 'pct'), aoFmt('jambExtensions', 'final'), ...aoCalc('jambExtensions')],
       ['Magnetic Contact', aoV('magneticContact', 'qty'), '—', aoFmtNet('magneticContact'), aoFmt('magneticContact', 'full'), aoFmt('magneticContact', 'pct'), aoFmt('magneticContact', 'final'), ...aoCalc('magneticContact')],
       ['Split Finish', '—', '—', aoFmtNet('splitFinish'), aoFmt('splitFinish', 'full'), aoFmt('splitFinish', 'pct'), aoFmt('splitFinish', 'final'), ...aoCalc('splitFinish')],
       ['Integrated Contacts', aoV('integratedContacts', 'qty'), '—', aoFmtNet('integratedContacts'), aoFmt('integratedContacts', 'full'), aoFmt('integratedContacts', 'pct'), aoFmt('integratedContacts', 'final'), ...aoCalc('integratedContacts')],
       ['Pool Contacts', aoV('poolContacts', 'qty'), '—', aoFmtNet('poolContacts'), aoFmt('poolContacts', 'full'), aoFmt('poolContacts', 'pct'), aoFmt('poolContacts', 'final'), ...aoCalc('poolContacts')],
-      ['Roll Screens', aoV('rollScreens', 'qty'), '—', aoFmtNet('rollScreens'), aoFmt('rollScreens', 'full'), aoFmt('rollScreens', 'pct'), aoFmt('rollScreens', 'final'), ...aoCalc('rollScreens')],
+      ['Roll Screens', aoV('rollScreens', 'qty'), aoDetailsCell('rollScreens', [['Frame', 'frameType'], ['Mesh', 'meshType']]), aoFmtNet('rollScreens'), aoFmt('rollScreens', 'full'), aoFmt('rollScreens', 'pct'), aoFmt('rollScreens', 'final'), ...aoCalc('rollScreens')],
       ['Shade Boxes', '—', '—', aoFmtNet('shadeBoxes'), aoFmt('shadeBoxes', 'full'), aoFmt('shadeBoxes', 'pct'), aoFmt('shadeBoxes', 'final'), ...aoCalc('shadeBoxes')],
       ['Genius Lock', aoV('geniusLock', 'qty'), '—', aoFmtNet('geniusLock'), aoFmt('geniusLock', 'full'), aoFmt('geniusLock', 'pct'), aoFmt('geniusLock', 'final'), ...aoCalc('geniusLock')],
       ['Final Finish', '—', '—', aoFmtNet('finalFinish'), aoFmt('finalFinish', 'full'), aoFmt('finalFinish', 'pct'), aoFmt('finalFinish', 'final'), ...aoCalc('finalFinish')],
