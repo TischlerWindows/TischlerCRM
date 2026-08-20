@@ -194,14 +194,7 @@ const WINDOW_SCREEN_FRAME_TYPES = [
 ];
 
 // Add-on table: Door Screen Sash "Wood Frame" options
-const DOOR_SCREEN_WOOD_FRAME_TYPES = [
-  'Low Wind (Brush) Manual',
-  'Low Wind (Brush) Motorized',
-  'Zip Motorized',
-  'Manual Horizontal',
-  'Centor',
-  'Wood Framed Door Screens',
-];
+const DOOR_SCREEN_WOOD_FRAME_TYPES = ['Wood Framed Door Screens'];
 
 // Add-on table: Roll Screens "Frame Type" options (the pre-existing Door Screen Sash list)
 const ROLL_SCREEN_FRAME_TYPES = [
