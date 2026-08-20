@@ -191,7 +191,6 @@ const WINDOW_SCREEN_FRAME_TYPES = [
   'Aluminum Window Screens',
   'Wood-covered Aluminum Window Screens',
   'Wood Framed Window Screens',
-  'Wood Framed Door Screens',
 ];
 
 // Add-on table: Door Screen Sash "Wood Frame" options
@@ -201,9 +200,19 @@ const DOOR_SCREEN_WOOD_FRAME_TYPES = [
   'Zip Motorized',
   'Manual Horizontal',
   'Centor',
+  'Wood Framed Door Screens',
 ];
 
-// Add-on table: "Mesh Type" options, shared by Window Screens and Door Screen Sash
+// Add-on table: Roll Screens "Frame Type" options (the pre-existing Door Screen Sash list)
+const ROLL_SCREEN_FRAME_TYPES = [
+  'Low Wind (Brush) Manual',
+  'Low Wind (Brush) Motorized',
+  'Zip Motorized',
+  'Manual Horizontal',
+  'Centor',
+];
+
+// Add-on table: "Mesh Type" options, shared by Window Screens, Door Screen Sash and Roll Screens
 const SCREEN_MESH_TYPES = ['Fiberglass', 'Clearview', 'Bronze', 'Dog'];
 
 /** Returns the valid option set for a given product type string.
@@ -856,7 +865,7 @@ interface Summary {
     splitFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     integratedContacts: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     poolContacts: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
-    rollScreens: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    rollScreens: { qty: string; frameType: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     shadeBoxes: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     geniusLock: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     customRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }>;
@@ -1529,7 +1538,7 @@ export default function SummaryPage() {
         splitFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         integratedContacts: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         poolContacts: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
-        rollScreens: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        rollScreens: { qty: '', frameType: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         shadeBoxes: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         geniusLock: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         customRows: [],
@@ -5633,7 +5642,8 @@ export default function SummaryPage() {
                                     {aoToggleBtn('rollScreens')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Roll Screens</td>
                                     <td className="px-1 py-1">{inp('rollScreens', 'qty', 'Qty')}</td>
-                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{selLeft('rollScreens', 'frameType', ROLL_SCREEN_FRAME_TYPES, 'Frame Type')}</td>
+                                    <td className="px-1 py-1">{selLeft('rollScreens', 'meshType', SCREEN_MESH_TYPES, 'Mesh Type')}</td>
                                     <td className="px-1 py-1">{inp('rollScreens', 'netEuro')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('rollScreens', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('rollScreens', 'pct')}</td>
