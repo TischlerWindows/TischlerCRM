@@ -850,15 +850,15 @@ interface Summary {
   };
   grandTotalAdjustment?: { full: string; pct: string; final: string; finalAdj: string };
   addOns: {
-    windowScreens: { qty: string; frameType: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
-    doorScreenSash: { qty: string; woodFrame: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    windowScreens: { qty: string; frameType: string; meshType: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    doorScreenSash: { qty: string; woodFrame: string; meshType: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     entryDoor: { qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     jambExtensions: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     magneticContact: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     splitFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     integratedContacts: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     poolContacts: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
-    rollScreens: { qty: string; frameType: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    rollScreens: { qty: string; frameType: string; meshType: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     shadeBoxes: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     geniusLock: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     customRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }>;
@@ -1523,15 +1523,15 @@ export default function SummaryPage() {
         euroDoors: { full: '', pct: '', final: '', finalAdj: '' },
       },
       addOns: {
-        windowScreens: { qty: '', frameType: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
-        doorScreenSash: { qty: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        windowScreens: { qty: '', frameType: '', meshType: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        doorScreenSash: { qty: '', woodFrame: '', meshType: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         entryDoor: { qty: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         jambExtensions: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         magneticContact: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         splitFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         integratedContacts: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         poolContacts: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
-        rollScreens: { qty: '', frameType: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        rollScreens: { qty: '', frameType: '', meshType: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         shadeBoxes: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         geniusLock: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         customRows: [],
@@ -5549,8 +5549,13 @@ export default function SummaryPage() {
                                     {aoToggleBtn('windowScreens')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Window Screens</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'qty', 'Qty')}</td>
-                                    <td className="px-1 py-1">{selLeft('windowScreens', 'frameType', WINDOW_SCREEN_FRAME_TYPES, 'Frame Type')}</td>
-                                    <td className="px-1 py-1">{selLeft('windowScreens', 'meshType', SCREEN_MESH_TYPES, 'Mesh Type')}</td>
+                                    <td className="px-1 py-1 align-top" colSpan={2}>
+                                      <div className="flex gap-1">
+                                        <div className="flex-1">{selLeft('windowScreens', 'frameType', WINDOW_SCREEN_FRAME_TYPES, 'Frame Type')}</div>
+                                        <div className="flex-1">{selLeft('windowScreens', 'meshType', SCREEN_MESH_TYPES, 'Mesh Type')}</div>
+                                      </div>
+                                      <div className="mt-1">{inpLeft('windowScreens', 'details', 'Details')}</div>
+                                    </td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'netEuro')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'pct')}</td>
@@ -5568,8 +5573,13 @@ export default function SummaryPage() {
                                     {aoToggleBtn('doorScreenSash')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Door Screen Sash</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'qty', 'Qty')}</td>
-                                    <td className="px-1 py-1">{selLeft('doorScreenSash', 'woodFrame', DOOR_SCREEN_WOOD_FRAME_TYPES, 'Wood Frame')}</td>
-                                    <td className="px-1 py-1">{selLeft('doorScreenSash', 'meshType', SCREEN_MESH_TYPES, 'Mesh Type')}</td>
+                                    <td className="px-1 py-1 align-top" colSpan={2}>
+                                      <div className="flex gap-1">
+                                        <div className="flex-1">{selLeft('doorScreenSash', 'woodFrame', DOOR_SCREEN_WOOD_FRAME_TYPES, 'Wood Frame')}</div>
+                                        <div className="flex-1">{selLeft('doorScreenSash', 'meshType', SCREEN_MESH_TYPES, 'Mesh Type')}</div>
+                                      </div>
+                                      <div className="mt-1">{inpLeft('doorScreenSash', 'details', 'Details')}</div>
+                                    </td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'netEuro')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'pct')}</td>
@@ -5695,8 +5705,13 @@ export default function SummaryPage() {
                                     {aoToggleBtn('rollScreens')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Roll Screens</td>
                                     <td className="px-1 py-1">{inp('rollScreens', 'qty', 'Qty')}</td>
-                                    <td className="px-1 py-1">{selLeft('rollScreens', 'frameType', ROLL_SCREEN_FRAME_TYPES, 'Frame Type')}</td>
-                                    <td className="px-1 py-1">{selLeft('rollScreens', 'meshType', SCREEN_MESH_TYPES, 'Mesh Type')}</td>
+                                    <td className="px-1 py-1 align-top" colSpan={2}>
+                                      <div className="flex gap-1">
+                                        <div className="flex-1">{selLeft('rollScreens', 'frameType', ROLL_SCREEN_FRAME_TYPES, 'Frame Type')}</div>
+                                        <div className="flex-1">{selLeft('rollScreens', 'meshType', SCREEN_MESH_TYPES, 'Mesh Type')}</div>
+                                      </div>
+                                      <div className="mt-1">{inpLeft('rollScreens', 'details', 'Details')}</div>
+                                    </td>
                                     <td className="px-1 py-1">{inp('rollScreens', 'netEuro')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('rollScreens', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('rollScreens', 'pct')}</td>
