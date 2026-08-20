@@ -2719,6 +2719,66 @@ export default function SummaryPage() {
     return s.doorRows;
   };
 
+  // Live "Total" row for the Page 1 Windows/Doors grids — mirrors buildTotalRow()
+  // in the PDF export (sum of Qty/Sq Ft/Op. Sashes/Fields/Site Mullions/NET €,
+  // with NET €(Each) shown as the blended per-unit average).
+  const computeGridTotals = (rows: (SummaryRow | DoorRow)[]) => {
+    const sum = (field: string) => rows.reduce((acc, r) => acc + (parseFloat((r as any)[field]) || 0), 0);
+    const qty = sum('qty');
+    const netEuroTotal = sum('netEuroTotal');
+    return {
+      qty,
+      sqFeetTotal: sum('sqFeetTotal'),
+      operableSashesTotal: sum('operableSashesTotal'),
+      fieldsTotal: sum('fieldsTotal'),
+      siteMullionsTotal: sum('siteMullionsTotal'),
+      netEuroTotal,
+      netEuroUnit: qty > 0 ? netEuroTotal / qty : 0,
+    };
+  };
+
+  const renderGridTotalRow = (rows: (SummaryRow | DoorRow)[], keyPrefix: string) => {
+    const t = computeGridTotals(rows);
+    const fmtN = (v: number) => v ? Math.round(v).toLocaleString('en-US') : '';
+    const fmtEuro = (v: number) => v ? `\u20AC${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+    const td = (content?: React.ReactNode, extra?: string) => (
+      <td className={`px-0.5 py-1.5 text-xs text-gray-900${extra ? ` ${extra}` : ''}`}>{content}</td>
+    );
+    return (
+      <tr key={`${keyPrefix}-total`} className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+        <td className="px-0.5 py-1.5 text-xs text-gray-900" style={tusPositionLocked ? { position: 'sticky', left: 0, zIndex: 10, background: '#f9fafb' } : {}}>Total</td>
+        {td()}
+        {td(fmtN(t.qty))}
+        {td()}{td()}{td()}{td()}{td()}
+        {td(fmtN(t.sqFeetTotal))}
+        {td()}
+        {td(fmtN(t.operableSashesTotal))}
+        {td()}{td()}{td()}{td()}
+        {showType3 && td()}
+        {showType3 && td()}
+        {showType4 && td()}
+        {showType4 && td()}
+        {td()}
+        {td()}
+        {td(fmtN(t.fieldsTotal))}
+        {td()}
+        {td(fmtN(t.siteMullionsTotal))}
+        {td(t.netEuroUnit ? `\u20AC${t.netEuroUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '')}
+        {td(fmtEuro(t.netEuroTotal))}
+        {showMagneticContact && td()}
+        {showMagneticContact && td()}
+        {showShadeBoxesNoTrim && td()}
+        {showShadeBoxesNoTrim && td()}
+        {showShadeBoxesWithTrim && td()}
+        {showShadeBoxesWithTrim && td()}
+        {showFinalFinish && td()}
+        {showFinalFinish && td()}
+        {td()}
+        {td()}
+      </tr>
+    );
+  };
+
   const mutateRows = (s: Summary, fn: (rows: SummaryRow[]) => SummaryRow[]): Summary => {
     if (s.hasMultipleLocations && s.subLocations?.length) {
       const locId = getActiveLocId(s);
@@ -6353,6 +6413,7 @@ export default function SummaryPage() {
                           </td>
                         </tr>
                       ))}
+                      {renderGridTotalRow(getActiveRows(editingSummary), 'win')}
                     </tbody>
                   </table>
                 </div>
@@ -6622,6 +6683,7 @@ export default function SummaryPage() {
                           </td>
                         </tr>
                       ))}
+                      {renderGridTotalRow(getActiveDoorRows(editingSummary), 'door')}
                     </tbody>
                   </table>
                 </div>
