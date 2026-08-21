@@ -50,6 +50,11 @@ describe('"Included in Base Bid" add-on rows', () => {
 
     // grandTotal = 1000 (quoteTotals) + 500 (windowScreens, base-bid add) - 200 (deduct row, base-bid) = 1300
     expect(tokens.FinalPrice).toContain('$1,300.00');
+    // Each base-bid row also gets its own visible "Item: $Amount" breakdown line.
+    expect(tokens.FinalPrice).toContain('Window Screens:');
+    expect(tokens.FinalPrice).toContain('$500.00');
+    expect(tokens.FinalPrice).toContain('DH Concealed Balance:');
+    expect(tokens.FinalPrice).toContain('($ 200.00)');
     // The base-bid Window Screens row must NOT show up in {{options}} (no ADD:/$500 line)...
     expect(tokens.options).not.toContain('Window Screens');
     // ...but the non-base-bid Door Screen Sash row still does.

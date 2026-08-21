@@ -337,6 +337,52 @@ function computeBaseBidAddOnDelta(rawAo: Record<string, any> | undefined): numbe
   return total;
 }
 
+const BASE_BID_NAMED_LABELS: Array<{ key: string; label: string }> = [
+  { key: 'windowScreens',      label: 'Window Screens' },
+  { key: 'doorScreenSash',     label: 'Door Screen Sash' },
+  { key: 'entryDoor',          label: 'Entry Door' },
+  { key: 'jambExtensions',     label: 'Jamb Extensions' },
+  { key: 'magneticContact',    label: 'Magnetic Alarm Contacts' },
+  { key: 'splitFinish',        label: 'Split Finish' },
+  { key: 'integratedContacts', label: 'Integrated Contacts' },
+  { key: 'poolContacts',       label: 'Pool Alarm Contacts' },
+  { key: 'rollScreens',        label: 'Roll Screens' },
+  { key: 'shadeBoxes',         label: 'Shade Boxes' },
+  { key: 'geniusLock',         label: 'Genius Lock' },
+  { key: 'finalFinish',        label: 'Final Finish' },
+  { key: 'installation',       label: 'Installation' },
+];
+
+/**
+ * One visible "Item: $Amount" line per add-on row marked "Included in Base
+ * Bid", so the {{FinalPrice}} breakdown actually shows what got folded into
+ * BASE BID PRICE instead of silently changing just the total.
+ */
+function getBaseBidAddOnEntries(rawAo: Record<string, any> | undefined): Array<{ label: string; amount: string }> {
+  if (!rawAo) return [];
+  const pv = (v: string | undefined) => parseFloat((v || '').replace(/[^0-9.-]/g, '')) || 0;
+  const entries: Array<{ label: string; amount: string }> = [];
+  for (const { key, label } of BASE_BID_NAMED_LABELS) {
+    const row = rawAo[key] as Record<string, any> | undefined;
+    const amount = pv(row?.final);
+    if (isBaseBidRow(row) && amount !== 0) entries.push({ label: `${label}:`, amount: formatDollar(String(amount)) });
+  }
+  for (const cr of (rawAo.customRows || []) as Array<Record<string, any>>) {
+    const amount = pv(cr.final);
+    if (isBaseBidRow(cr) && amount !== 0) entries.push({ label: `${(cr.item || 'Custom').trim()}:`, amount: formatDollar(String(amount)) });
+  }
+  for (const dr of (rawAo.deductRows || []) as Array<Record<string, any>>) {
+    const amount = pv(dr.final);
+    if (isBaseBidRow(dr) && amount !== 0) {
+      entries.push({
+        label: `${(dr.item || 'Deduct').trim()}:`,
+        amount: `($ ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`,
+      });
+    }
+  }
+  return entries;
+}
+
 /**
  * Builds the {{options}} (ADD:/DEDUCT: + $ amount) and {{BaseBidoptions}}
  * (plain underlined description, no prefix, no $ amount) token strings from
@@ -841,7 +887,8 @@ export function buildTokenMap(
     return rows.join('');
   };
 
-  const finalEntries = getCategoryEntries(effQuoteTotals);
+  const baseBidAddOnEntries = getBaseBidAddOnEntries(summary.addOns as Record<string, any>);
+  const finalEntries = [...getCategoryEntries(effQuoteTotals), ...baseBidAddOnEntries];
   const finalPrice = makePricingRows(finalEntries, 'BASE BID PRICE:', baseBidAmount);
 
   const multipleLocationsFinalPrice = (() => {
@@ -855,6 +902,8 @@ export function buildTokenMap(
         allEntries.push({ label: `${locLabel} – ${cat.label}`, amount: cat.amount });
       }
     }
+    // Add-on rows are job-wide (not per sub-location), so append them once.
+    allEntries.push(...baseBidAddOnEntries);
     return makePricingRows(allEntries, 'BASE BID PRICE:', baseBidAmount);
   })();
 
