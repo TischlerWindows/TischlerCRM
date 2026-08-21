@@ -1211,9 +1211,21 @@ function drawKeyValueRow(
 ): void {
   const usable = doc.page.width - 2 * PAGE_MARGIN;
   const labelWidth = usable * 0.7;
+  const valueWidth = usable * 0.3;
   doc.font(opts.bold ? ctx.fonts.bold : ctx.fonts.regular);
-  const y = doc.y;
   const labelHeight = doc.heightOfString(label + (opts.labelSuffix ?? ''), { width: labelWidth });
+  const valueHeight = doc.heightOfString(value, { width: valueWidth });
+  const rowHeight = Math.max(labelHeight, valueHeight);
+
+  // Manually paginate BEFORE drawing — letting PDFKit's own mid-text auto-page
+  // kick in here would leave the `doc.y = y + rowHeight` line below pointing at
+  // the wrong (stale) page, producing large blank gaps / extra pages.
+  const maxY = doc.page.height - PAGE_MARGIN;
+  if (doc.y + rowHeight > maxY) {
+    doc.addPage();
+  }
+
+  const y = doc.y;
   if (opts.labelSuffix) {
     // Two continued runs so only the main label (not the qty/detail suffix) is underlined.
     doc.text(label, PAGE_MARGIN, y, { continued: true, width: labelWidth, underline: !!opts.underlineLabel });
@@ -1222,13 +1234,13 @@ function drawKeyValueRow(
     doc.text(label, PAGE_MARGIN, y, { continued: false, width: labelWidth, underline: !!opts.underlineLabel });
   }
   doc.text(value, PAGE_MARGIN + labelWidth, y, {
-    width: usable * 0.3,
+    width: valueWidth,
     align: 'right',
   });
-  // The value call's implicit y-advance is based on its own (single) line —
-  // restore doc.y to below the label's full wrapped height so a long,
-  // multi-line label doesn't get overwritten by the next block.
-  doc.y = y + labelHeight;
+  // The value call's implicit y-advance only accounts for its own text — use
+  // the taller of label/value so a long, multi-line label OR value doesn't
+  // get overwritten by the next block.
+  doc.y = y + rowHeight;
 }
 
 function normalizeHex(input: string | undefined | null): string | null {

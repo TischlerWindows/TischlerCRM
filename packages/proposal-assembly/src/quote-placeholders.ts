@@ -347,12 +347,12 @@ function buildOptionsTokens(rawAo: Record<string, any> | undefined): { options: 
   const fmtAmt = (v: string | undefined): string => {
     const n = parseFloat((v || '').replace(/[^0-9.-]/g, ''));
     if (!n) return '';
-    return '$\u00A0' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return '$ ' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
   const hasAmt = (v: string | undefined) => Math.abs(parseFloat((v || '').replace(/[^0-9.-]/g, '')) || 0) > 0;
   const qtyStr = (qty: string | undefined) => {
     const n = parseFloat(qty || '');
-    return n > 0 ? ` (Qty.\u00A0${qty}.)` : '';
+    return n > 0 ? ` (Qty. ${qty}.)` : '';
   };
   const escHtml = (s: string): string =>
     s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -360,9 +360,10 @@ function buildOptionsTokens(rawAo: Record<string, any> | undefined): { options: 
   // the BASE BID PRICE breakdown: "ADD:"/"DEDUCT:" + item name underlined
   // (labelunderline="true"), amount right-aligned against the page margin.
   // The qty/details clause goes in labelsuffix so it renders WITHOUT
-  // the underline. Three nbsp separate the "ADD:"/"DEDUCT:" prefix from
-  // the item name — plain spaces get collapsed by the browser preview.
-  const GAP = '\u00A0\u00A0\u00A0';
+  // the underline. A plain space separates the "ADD:"/"DEDUCT:" prefix from
+  // the item name — non-breaking spaces render as tofu/box glyphs in the
+  // embedded brand PDF fonts, so avoid \u00A0 anywhere in this builder.
+  const GAP = ' ';
   const makeRow = (
     kind: 'ADD' | 'DEDUCT',
     itemLabel: string,
@@ -438,7 +439,7 @@ function buildOptionsTokens(rawAo: Record<string, any> | undefined): { options: 
       baseBidLines.push(makeBaseBidLine(itemLabel, dr.qty, dr.details || ''));
     } else {
       const n = Math.abs(parseFloat((dr.final || '').replace(/[^0-9.-]/g, '')) || 0);
-      const amount = `($\u00A0${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+      const amount = `($ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
       rows.push(makeRow('DEDUCT', itemLabel, dr.qty, dr.details || '', amount));
     }
   }
