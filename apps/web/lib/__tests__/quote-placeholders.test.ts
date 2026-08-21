@@ -1,4 +1,5 @@
-import { findUnresolvedTokens, formatDate, resolveTokensWithDiagnostics } from '@crm/proposal-assembly';
+import { findUnresolvedTokens, formatDate, resolveTokensWithDiagnostics, buildTokenMap } from '@crm/proposal-assembly';
+import type { SummaryForPlaceholders } from '@crm/proposal-assembly';
 
 describe('quote placeholder diagnostics', () => {
   it('reports unresolved tokens while preserving the unresolved marker in text', () => {
@@ -17,5 +18,51 @@ describe('quote placeholder diagnostics', () => {
 
   it('formats date-only strings without timezone shifting the day', () => {
     expect(formatDate('2025-08-15')).toBe('August 15, 2025');
+  });
+});
+
+describe('"Included in Base Bid" add-on rows', () => {
+  const baseSummary: SummaryForPlaceholders = {
+    name: '', opportunityNumber: '', plansDated: '', jobType: '', glassType: '',
+    finish: '', sdl: '', spacerBarColors: '', spacerBarType: '', woodType: '',
+    contactReceivingQuote: '', accountReceivingQuote: '', accountShippingAddress: '',
+    address: '', salesman: '', estimator: '', contactEmail: '', contactPrimaryPhone: '',
+    quoteType: '',
+    quoteTotals: {
+      euroWindows: { full: '', pct: '', final: '', finalAdj: '1000' },
+      doubleHung: { full: '', pct: '', final: '', finalAdj: '0' },
+      euroDoors: { full: '', pct: '', final: '', finalAdj: '0' },
+    },
+    addOns: {
+      windowScreens: { qty: '2', final: '500', includedInBaseBid: 'true' },
+      doorScreenSash: { qty: '1', final: '300' },
+      entryDoor: { qty: '0', final: '0' },
+      jambExtensions: { final: '0' },
+      magneticContact: { qty: '0', final: '0' },
+      finalFinish: { final: '0' },
+      installation: { final: '0' },
+      deductRows: [{ item: 'DH Concealed Balance', qty: '', details: '', final: '200', includedInBaseBid: 'true' }],
+    },
+  };
+
+  it('excludes base-bid rows from {{options}} and folds their $ into {{FinalPrice}}', () => {
+    const tokens = buildTokenMap(baseSummary);
+
+    // grandTotal = 1000 (quoteTotals) + 500 (windowScreens, base-bid add) - 200 (deduct row, base-bid) = 1300
+    expect(tokens.FinalPrice).toContain('$1,300.00');
+    // The base-bid Window Screens row must NOT show up in {{options}} (no ADD:/$500 line)...
+    expect(tokens.options).not.toContain('Window Screens');
+    // ...but the non-base-bid Door Screen Sash row still does.
+    expect(tokens.options).toContain('Door Screen Sash');
+  });
+
+  it('lists base-bid rows in {{BaseBidoptions}} without the ADD:/DEDUCT: prefix or $ amount', () => {
+    const tokens = buildTokenMap(baseSummary);
+
+    expect(tokens.BaseBidoptions).toContain('Window Screens');
+    expect(tokens.BaseBidoptions).toContain('DH Concealed Balance');
+    expect(tokens.BaseBidoptions).not.toContain('ADD:');
+    expect(tokens.BaseBidoptions).not.toContain('DEDUCT:');
+    expect(tokens.BaseBidoptions).not.toContain('$500');
   });
 });
