@@ -5418,15 +5418,15 @@ export default function SummaryPage() {
                       {/* ── Add-On Items ── */}
                       {(() => {
                         const ao = editingSummary.addOns || {} as any;
-                        const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
+                        const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', details: '', includedInBaseBid: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
                         const getAo = (key: string) => ({ ...defaultAo, ...(ao as any)[key] });
                         const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'rollScreens', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
-                        const customRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }> = (ao.customRows || []) as any;
-                        const addCustomRow = () => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: [...customRows, { item: '', qty: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' }] } });
+                        const customRows: Array<{ item: string; qty: string; details: string; includedInBaseBid: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }> = (ao.customRows || []) as any;
+                        const addCustomRow = () => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: [...customRows, { item: '', qty: '', details: '', includedInBaseBid: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' }] } });
                         const removeCustomRow = (idx: number) => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: customRows.filter((_, i) => i !== idx) } });
                         const setCustomRow = (idx: number, field: string, value: string) => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: customRows.map((r, i) => i === idx ? { ...r, [field]: value } : r) } });
-                        const deductRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }> = (ao.deductRows || []) as any;
-                        const addDeductRow = () => setEditingSummary({ ...editingSummary, addOns: { ...ao, deductRows: [...deductRows, { item: '', qty: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' }] } });
+                        const deductRows: Array<{ item: string; qty: string; details: string; includedInBaseBid: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }> = (ao.deductRows || []) as any;
+                        const addDeductRow = () => setEditingSummary({ ...editingSummary, addOns: { ...ao, deductRows: [...deductRows, { item: '', qty: '', details: '', includedInBaseBid: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' }] } });
                         const removeDeductRow = (idx: number) => setEditingSummary({ ...editingSummary, addOns: { ...ao, deductRows: deductRows.filter((_, i) => i !== idx) } });
                         const setDeductRow = (idx: number, field: string, value: string) => setEditingSummary({ ...editingSummary, addOns: { ...ao, deductRows: deductRows.map((r, i) => i === idx ? { ...r, [field]: value } : r) } });
                         const calcCr = (cr: typeof customRows[0]) => { const net = parseFloat(cr.netEuro) || 0; return { full: net ? (parseFloat(cr.full) || 0) / net : 0, disc: net ? (parseFloat(cr.pct) || 0) / net : 0, final: net ? (parseFloat(cr.final) || 0) / net : 0 }; };
@@ -5526,6 +5526,19 @@ export default function SummaryPage() {
                             </button>
                           </td>
                         );
+                        // Checked rows are excluded from {{options}}'s ADD:/DEDUCT: $ lines and
+                        // folded into {{FinalPrice}} + {{BaseBidoptions}} instead (proposal builder).
+                        const aoBaseBidCheckbox = (key: string) => (
+                          <td className="px-1 py-1 text-center">
+                            <input
+                              type="checkbox"
+                              checked={getAo(key).includedInBaseBid === 'true'}
+                              onChange={(e) => setAo(key, 'includedInBaseBid', e.target.checked ? 'true' : '')}
+                              className="w-4 h-4 text-brand-navy rounded border-gray-300 focus:ring-brand-navy/40"
+                              title="Included in Base Bid"
+                            />
+                          </td>
+                        );
 
                         return (
                           <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
@@ -5539,6 +5552,7 @@ export default function SummaryPage() {
                                   <tr className="bg-gray-50 border-b border-gray-200">
                                     <th className="py-2 sticky left-0 z-10 bg-gray-50" style={{ width: '24px' }}></th>
                                     <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-[24px] z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap min-w-[120px] md:min-w-0">Item</th>
+                                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap" style={{ width: '80px' }}>Base Bid</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[72px] md:min-w-0">Qty</th>
                                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[192px] md:min-w-0" colSpan={2}>Details</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[88px] md:min-w-0">NET €</th>
@@ -5558,6 +5572,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('windowScreens')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Window Screens</td>
+                                    {aoBaseBidCheckbox('windowScreens')}
                                     <td className="px-1 py-1">{inp('windowScreens', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1 align-top" colSpan={2}>
                                       <div className="flex gap-1">
@@ -5582,6 +5597,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('doorScreenSash')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Door Screen Sash</td>
+                                    {aoBaseBidCheckbox('doorScreenSash')}
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1 align-top" colSpan={2}>
                                       <div className="flex gap-1">
@@ -5606,6 +5622,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('entryDoor')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Entry Door</td>
+                                    {aoBaseBidCheckbox('entryDoor')}
                                     <td className="px-1 py-1">{inp('entryDoor', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}>{inpLeft('entryDoor', 'details', 'Details')}</td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'netEuro')}</td>
@@ -5624,6 +5641,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('jambExtensions')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Jamb Extensions</td>
+                                    {aoBaseBidCheckbox('jambExtensions')}
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('jambExtensions', 'netEuro')}</td>
@@ -5642,6 +5660,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('magneticContact')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Magnetic Contact</td>
+                                    {aoBaseBidCheckbox('magneticContact')}
                                     <td className="px-1 py-1">{inp('magneticContact', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'netEuro')}</td>
@@ -5660,6 +5679,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('splitFinish')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Split Finish</td>
+                                    {aoBaseBidCheckbox('splitFinish')}
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('splitFinish', 'netEuro')}</td>
@@ -5678,6 +5698,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('integratedContacts')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Integrated Contacts</td>
+                                    {aoBaseBidCheckbox('integratedContacts')}
                                     <td className="px-1 py-1">{inp('integratedContacts', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('integratedContacts', 'netEuro')}</td>
@@ -5696,6 +5717,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('poolContacts')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Pool Contacts</td>
+                                    {aoBaseBidCheckbox('poolContacts')}
                                     <td className="px-1 py-1">{inp('poolContacts', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('poolContacts', 'netEuro')}</td>
@@ -5714,6 +5736,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('rollScreens')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Roll Screens</td>
+                                    {aoBaseBidCheckbox('rollScreens')}
                                     <td className="px-1 py-1">{inp('rollScreens', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1 align-top" colSpan={2}>
                                       <div className="flex gap-1">
@@ -5738,6 +5761,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('shadeBoxes')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Shade Boxes</td>
+                                    {aoBaseBidCheckbox('shadeBoxes')}
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('shadeBoxes', 'netEuro')}</td>
@@ -5756,6 +5780,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('geniusLock')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Genius Lock</td>
+                                    {aoBaseBidCheckbox('geniusLock')}
                                     <td className="px-1 py-1">{inp('geniusLock', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('geniusLock', 'netEuro')}</td>
@@ -5775,6 +5800,7 @@ export default function SummaryPage() {
                                     <tr key={idx} className="hover:bg-gray-50 bg-amber-50/30">
                                       <td className="px-1 py-1"></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.item} onChange={e => setCustomRow(idx, 'item', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Item name" /></td>
+                                      <td className="px-1 py-1 text-center"><input type="checkbox" checked={cr.includedInBaseBid === 'true'} onChange={e => setCustomRow(idx, 'includedInBaseBid', e.target.checked ? 'true' : '')} className="w-4 h-4 text-brand-navy rounded border-gray-300 focus:ring-brand-navy/40" title="Included in Base Bid" /></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.qty} onChange={e => setCustomRow(idx, 'qty', e.target.value)} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Qty" /></td>
                                       <td className="px-1 py-1" colSpan={2}><textarea ref={autoSize} rows={1} value={cr.details} onChange={e => { setCustomRow(idx, 'details', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 resize-none overflow-hidden" placeholder="Details" style={{ lineHeight: '1.25rem', minHeight: '2rem' }} /></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[€,]/g, '') ? '\u20ac' + parseFloat(cr.netEuro.replace(/[€,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setCustomRow(idx, 'netEuro', e.target.value.replace(/[€,]/g, ''))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
@@ -5798,6 +5824,7 @@ export default function SummaryPage() {
                                           <input type="text" value={cr.item} onChange={e => setDeductRow(idx, 'item', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 bg-white" placeholder="Deduct item name" />
                                         </div>
                                       </td>
+                                      <td className="px-1 py-1 text-center"><input type="checkbox" checked={cr.includedInBaseBid === 'true'} onChange={e => setDeductRow(idx, 'includedInBaseBid', e.target.checked ? 'true' : '')} className="w-4 h-4 text-brand-navy rounded border-gray-300 focus:ring-brand-navy/40" title="Included in Base Bid" /></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.qty} onChange={e => setDeductRow(idx, 'qty', e.target.value)} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 bg-white" placeholder="Qty" /></td>
                                       <td className="px-1 py-1" colSpan={2}><textarea ref={autoSize} rows={1} value={cr.details} onChange={e => { setDeductRow(idx, 'details', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} className="w-full px-2 py-1.5 text-left text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 resize-none overflow-hidden bg-white" placeholder="Details" style={{ lineHeight: '1.25rem', minHeight: '2rem' }} /></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[€,]/g, '') ? '€' + parseFloat(cr.netEuro.replace(/[€,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setDeductRow(idx, 'netEuro', e.target.value.replace(/[€,]/g, ''))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 bg-white" placeholder="—" /></td>
@@ -5816,6 +5843,7 @@ export default function SummaryPage() {
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('finalFinish')}
                                     <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Final Finish</td>
+                                    {aoBaseBidCheckbox('finalFinish')}
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('finalFinish', 'netEuro')}</td>
@@ -5866,6 +5894,7 @@ export default function SummaryPage() {
                                             </button>
                                           </div>
                                         </td>
+                                        {aoBaseBidCheckbox('installation')}
                                         <td className="px-4 py-2"></td>
                                         <td className="px-1 py-1" colSpan={2}></td>
                                         <td className="px-1 py-1">{inp('installation', 'netEuro')}</td>
@@ -5881,7 +5910,7 @@ export default function SummaryPage() {
                                       {instRows.map((row, idx) => (
                                         <tr key={idx} className="bg-gray-50/50 hover:bg-gray-100/50">
                                           <td className="sticky left-0 z-10 bg-gray-50/50"></td>
-                                          <td className="pl-7 pr-1 py-1 sticky left-[24px] z-10 bg-gray-50/50 shadow-[inset_-1px_0_0_#f3f4f6]" colSpan={4}>
+                                          <td className="pl-7 pr-1 py-1 sticky left-[24px] z-10 bg-gray-50/50 shadow-[inset_-1px_0_0_#f3f4f6]" colSpan={5}>
                                             <input
                                               type="text"
                                               value={row.label}
@@ -5911,7 +5940,7 @@ export default function SummaryPage() {
                                       {hasSubRows && (
                                         <tr className="border-t-2 border-gray-300 bg-gray-100/60">
                                           <td className="sticky left-0 z-10 bg-gray-100/60"></td>
-                                          <td className="pl-7 pr-1 py-1.5 sticky left-[24px] z-10 bg-gray-100/60 shadow-[inset_-1px_0_0_#f3f4f6] font-semibold text-xs text-gray-700" colSpan={7}>Installation Total</td>
+                                          <td className="pl-7 pr-1 py-1.5 sticky left-[24px] z-10 bg-gray-100/60 shadow-[inset_-1px_0_0_#f3f4f6] font-semibold text-xs text-gray-700" colSpan={8}>Installation Total</td>
                                           <td className="px-2 py-1.5 text-right text-sm font-bold text-green-700 bg-green-50/60">{fmtInstPrice(instGrandTotal)}</td>
                                           <td colSpan={5}></td>
                                         </tr>
@@ -5925,7 +5954,7 @@ export default function SummaryPage() {
                                     return aoKeys.filter(k => hiddenAoRows.has(k)).map(k => (
                                       <tr key={k} className="hover:bg-gray-50 border-t border-dashed border-gray-200">
                                         {aoToggleBtn(k)}
-                                        <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>{aoLabels[k]}</td>
+                                        <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={14}>{aoLabels[k]}</td>
                                       </tr>
                                     ));
                                   })()}
@@ -5938,6 +5967,7 @@ export default function SummaryPage() {
                                       <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
                                         <td className="sticky left-0 z-10 bg-gray-50"></td>
                                         <td className="px-3 py-3 text-gray-900 sticky left-[24px] z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap">TOTAL</td>
+                                        <td className="px-2 py-3"></td>
                                         <td className="px-2 py-3"></td>
                                         <td className="px-2 py-3" colSpan={2}></td>
                                         <td className="px-2 py-3"></td>
@@ -5974,7 +6004,7 @@ export default function SummaryPage() {
                                       <tr className="bg-brand-navy/5 font-bold border-t-2 border-brand-navy/30">
                                         <td className="sticky left-0 z-10 bg-brand-navy/5"></td>
                                         <td className="px-3 py-3 text-brand-navy sticky left-[24px] z-10 bg-brand-navy/5 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap">GRAND TOTAL (JOB)</td>
-                                        <td className="px-2 py-3" colSpan={5}></td>
+                                        <td className="px-2 py-3" colSpan={6}></td>
                                         <td className="px-2 py-3"></td>
                                         <td className="px-2 py-3 text-right text-brand-navy text-base" colSpan={2}>{jobGrandTotal ? '$' + fmtAo(jobGrandTotal) : '—'}</td>
                                         <td className="px-2 py-3" colSpan={4}></td>
@@ -5983,7 +6013,7 @@ export default function SummaryPage() {
                                   })()}
                                   {/* Add Custom Row / Add Deduct Row buttons */}
                                   <tr>
-                                    <td colSpan={14} className="px-4 py-2 border-t border-gray-200">
+                                    <td colSpan={15} className="px-4 py-2 border-t border-gray-200">
                                       <div className="flex items-center gap-4">
                                         <button onClick={addCustomRow} className="inline-flex items-center gap-1.5 text-xs text-brand-navy hover:text-brand-navy/70 font-medium">
                                           <Plus className="w-3.5 h-3.5" /> Add Custom Row

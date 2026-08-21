@@ -305,6 +305,147 @@ export interface ContactData {
   lastName?: string;
 }
 
+// ── "Included in Base Bid" add-on rows ──────────────────────────────
+// A row's `includedInBaseBid` checkbox (Summary Page 2 Add-On Items table)
+// moves it out of the {{options}} ADD:/DEDUCT: list (with its $ amount) and
+// instead folds its dollar amount into {{FinalPrice}}'s BASE BID PRICE total,
+// while its plain description (no prefix, no $) appears in {{BaseBidoptions}}.
+function isBaseBidRow(row: Record<string, any> | undefined): boolean {
+  return row?.includedInBaseBid === 'true' || row?.includedInBaseBid === true;
+}
+
+/** Net $ delta (add-ons add, deducts subtract) from rows marked "Included in Base Bid". */
+function computeBaseBidAddOnDelta(rawAo: Record<string, any> | undefined): number {
+  if (!rawAo) return 0;
+  const pv = (v: string | undefined) => parseFloat((v || '').replace(/[^0-9.-]/g, '')) || 0;
+  const NAMED_KEYS = [
+    'windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact',
+    'splitFinish', 'integratedContacts', 'poolContacts', 'rollScreens', 'shadeBoxes',
+    'geniusLock', 'finalFinish', 'installation',
+  ];
+  let total = 0;
+  for (const key of NAMED_KEYS) {
+    const row = rawAo[key] as Record<string, any> | undefined;
+    if (isBaseBidRow(row)) total += pv(row?.final);
+  }
+  for (const cr of (rawAo.customRows || []) as Array<Record<string, any>>) {
+    if (isBaseBidRow(cr)) total += pv(cr.final);
+  }
+  for (const dr of (rawAo.deductRows || []) as Array<Record<string, any>>) {
+    if (isBaseBidRow(dr)) total -= pv(dr.final);
+  }
+  return total;
+}
+
+/**
+ * Builds the {{options}} (ADD:/DEDUCT: + $ amount) and {{BaseBidoptions}}
+ * (plain underlined description, no prefix, no $ amount) token strings from
+ * the same add-on rows, splitting on each row's "Included in Base Bid" flag.
+ */
+function buildOptionsTokens(rawAo: Record<string, any> | undefined): { options: string; baseBidOptions: string } {
+  const ao = rawAo || {};
+  const fmtAmt = (v: string | undefined): string => {
+    const n = parseFloat((v || '').replace(/[^0-9.-]/g, ''));
+    if (!n) return '';
+    return '$\u00A0' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  const hasAmt = (v: string | undefined) => Math.abs(parseFloat((v || '').replace(/[^0-9.-]/g, '')) || 0) > 0;
+  const qtyStr = (qty: string | undefined) => {
+    const n = parseFloat(qty || '');
+    return n > 0 ? ` (Qty.\u00A0${qty}.)` : '';
+  };
+  const escHtml = (s: string): string =>
+    s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Each ADD:/DEDUCT: row renders via the same <pricingrow> mechanism used for
+  // the BASE BID PRICE breakdown: "ADD:"/"DEDUCT:" + item name underlined
+  // (labelunderline="true"), amount right-aligned against the page margin.
+  // The qty/details clause goes in labelsuffix so it renders WITHOUT
+  // the underline. Three nbsp separate the "ADD:"/"DEDUCT:" prefix from
+  // the item name — plain spaces get collapsed by the browser preview.
+  const GAP = '\u00A0\u00A0\u00A0';
+  const makeRow = (
+    kind: 'ADD' | 'DEDUCT',
+    itemLabel: string,
+    qty: string | undefined,
+    details: string,
+    amount: string,
+  ): string => {
+    const suffix = `${qtyStr(qty)}${details ? ' ' + details : ''}.`;
+    return `<pricingrow label="${escHtml(`${kind}:${GAP}${itemLabel}`)}" labelsuffix="${escHtml(suffix)}" value="${escHtml(amount)}" labelunderline="true"></pricingrow>`;
+  };
+  // Base-bid rows drop the ADD:/DEDUCT: prefix and the $ amount — only the
+  // underlined item name + un-underlined qty/details remain.
+  const makeBaseBidLine = (itemLabel: string, qty: string | undefined, details: string): string => {
+    const suffix = `${qtyStr(qty)}${details ? ' ' + details : ''}.`;
+    return `<p><u>${escHtml(itemLabel)}</u>${escHtml(suffix)}</p>`;
+  };
+
+  const rows: string[] = [];
+  const baseBidLines: string[] = [];
+
+  const named: Array<{ key: string; label: string }> = [
+    { key: 'windowScreens',      label: 'Window Screens' },
+    { key: 'doorScreenSash',     label: 'Door Screen Sash' },
+    { key: 'entryDoor',          label: 'Entry Door' },
+    { key: 'jambExtensions',     label: 'Jamb Extensions' },
+    { key: 'magneticContact',    label: 'Magnetic Alarm Contacts' },
+    { key: 'splitFinish',        label: 'Split Finish' },
+    { key: 'integratedContacts', label: 'Integrated Contacts' },
+    { key: 'poolContacts',       label: 'Pool Alarm Contacts' },
+    { key: 'rollScreens',        label: 'Roll Screens' },
+    { key: 'shadeBoxes',         label: 'Shade Boxes' },
+    { key: 'geniusLock',         label: 'Genius Lock' },
+    { key: 'finalFinish',        label: 'Final Finish' },
+  ];
+  // Fixed boilerplate spec text for add-ons whose "item name"/description
+  // is standardized copy rather than free-typed data. Label overrides
+  // replace the item name entirely; detail overrides are appended after
+  // any qty (both render un-underlined, matching the reference PDF).
+  const DEFAULT_ITEM_LABEL: Record<string, string> = {
+    finalFinish: 'Factory applied final finish coat of paint or stain (same finish both sides.)',
+  };
+  const DEFAULT_DETAILS: Record<string, string> = {
+    finalFinish: 'Stain to 110-micron thickness or paint to 120-micron thickness',
+    magneticContact: 'This system is used to detect forced entry or open position of the window or door. A 10\u2019 lead wire from the magnetic contact will be left on the outside of the frame for connection to the central alarm system. The contact will be located at the head closest to the handle for doors, the sill closest to the handle for casements and the sill and head for double hungs',
+  };
+  for (const { key, label } of named) {
+    const row = ao[key] as Record<string, string> | undefined;
+    if (!row || !hasAmt(row.final)) continue;
+    const details = [row.frameType, row.meshType, row.woodFrame, row.details, DEFAULT_DETAILS[key]]
+      .filter(Boolean).join('. ');
+    const itemLabel = DEFAULT_ITEM_LABEL[key] ?? label;
+    if (isBaseBidRow(row)) {
+      baseBidLines.push(makeBaseBidLine(itemLabel, row.qty, details));
+    } else {
+      rows.push(makeRow('ADD', itemLabel, row.qty, details, fmtAmt(row.final)));
+    }
+  }
+  // Custom add rows
+  for (const cr of (ao.customRows || []) as Array<Record<string, any>>) {
+    if (!hasAmt(cr.final)) continue;
+    const itemLabel = (cr.item || '').trim();
+    if (isBaseBidRow(cr)) {
+      baseBidLines.push(makeBaseBidLine(itemLabel, cr.qty, cr.details || ''));
+    } else {
+      rows.push(makeRow('ADD', itemLabel, cr.qty, cr.details || '', fmtAmt(cr.final)));
+    }
+  }
+  // Deduct rows
+  for (const dr of (ao.deductRows || []) as Array<Record<string, any>>) {
+    if (!hasAmt(dr.final)) continue;
+    const itemLabel = (dr.item || '').trim();
+    if (isBaseBidRow(dr)) {
+      baseBidLines.push(makeBaseBidLine(itemLabel, dr.qty, dr.details || ''));
+    } else {
+      const n = Math.abs(parseFloat((dr.final || '').replace(/[^0-9.-]/g, '')) || 0);
+      const amount = `($\u00A0${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+      rows.push(makeRow('DEDUCT', itemLabel, dr.qty, dr.details || '', amount));
+    }
+  }
+
+  return { options: rows.join(''), baseBidOptions: baseBidLines.join('') };
+}
+
 // ── Formatting helpers ─────────────────────────────────────────────
 
 /**
@@ -660,7 +801,10 @@ export function buildTokenMap(
   const doubleHungFinal = parseInt(effQuoteTotals?.doubleHung?.finalAdj || '0', 10) || 0;
   const euroDoorsFinal = parseInt(effQuoteTotals?.euroDoors?.finalAdj || '0', 10) || 0;
   const grandAdj = parseInt(summary.grandTotalAdjustment?.finalAdj || '0', 10) || 0;
-  const grandTotal = euroWindowsFinal + doubleHungFinal + euroDoorsFinal + grandAdj;
+  // Add-on rows checked "Included in Base Bid" fold their $ amount into the
+  // BASE BID PRICE total instead of appearing as a separate ADD:/DEDUCT: line.
+  const baseBidAddOnDelta = computeBaseBidAddOnDelta(summary.addOns as Record<string, any>);
+  const grandTotal = euroWindowsFinal + doubleHungFinal + euroDoorsFinal + grandAdj + baseBidAddOnDelta;
 
   type CategoryEntry = { label: string; amount: string };
 
@@ -712,6 +856,8 @@ export function buildTokenMap(
     }
     return makePricingRows(allEntries, 'BASE BID PRICE:', baseBidAmount);
   })();
+
+  const optionsTokens = buildOptionsTokens(summary.addOns as Record<string, any>);
 
   const tokens: Record<string, string> = {
     // Project info
@@ -800,88 +946,8 @@ export function buildTokenMap(
       lines.push(`Total: ${formatDollar(String(grandTotal))}`);
       return lines.join('<br>');
     })(),
-    options: (() => {
-      const ao = summary.addOns as Record<string, any>;
-      if (!ao) return '';
-      const fmtAmt = (v: string | undefined): string => {
-        const n = parseFloat((v || '').replace(/[^0-9.-]/g, ''));
-        if (!n) return '';
-        return '$\u00A0' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      };
-      const hasAmt = (v: string | undefined) => Math.abs(parseFloat((v || '').replace(/[^0-9.-]/g, '')) || 0) > 0;
-      const qtyStr = (qty: string | undefined) => {
-        const n = parseFloat(qty || '');
-        return n > 0 ? ` (Qty.\u00A0${qty}.)` : '';
-      };
-      const escAttr = (s: string): string =>
-        s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      // Each row renders via the same <pricingrow> mechanism used for the
-      // BASE BID PRICE breakdown: "ADD:"/"DEDUCT:" + item name underlined
-      // (labelunderline="true"), amount right-aligned against the page margin.
-      // The qty/details clause goes in labelsuffix so it renders WITHOUT
-      // the underline. Three nbsp separate the "ADD:"/"DEDUCT:" prefix from
-      // the item name — plain spaces get collapsed by the browser preview.
-      const GAP = '\u00A0\u00A0\u00A0';
-      const makeRow = (
-        kind: 'ADD' | 'DEDUCT',
-        itemLabel: string,
-        qty: string | undefined,
-        details: string,
-        amount: string,
-      ): string => {
-        const suffix = `${qtyStr(qty)}${details ? ' ' + details : ''}.`;
-        return `<pricingrow label="${escAttr(`${kind}:${GAP}${itemLabel}`)}" labelsuffix="${escAttr(suffix)}" value="${escAttr(amount)}" labelunderline="true"></pricingrow>`;
-      };
-      const rows: string[] = [];
-
-      // Named add-on rows
-      const named: Array<{ key: string; label: string }> = [
-        { key: 'windowScreens',      label: 'Window Screens' },
-        { key: 'doorScreenSash',     label: 'Door Screen Sash' },
-        { key: 'entryDoor',          label: 'Entry Door' },
-        { key: 'jambExtensions',     label: 'Jamb Extensions' },
-        { key: 'magneticContact',    label: 'Magnetic Alarm Contacts' },
-        { key: 'splitFinish',        label: 'Split Finish' },
-        { key: 'integratedContacts', label: 'Integrated Contacts' },
-        { key: 'poolContacts',       label: 'Pool Alarm Contacts' },
-        { key: 'rollScreens',        label: 'Roll Screens' },
-        { key: 'shadeBoxes',         label: 'Shade Boxes' },
-        { key: 'geniusLock',         label: 'Genius Lock' },
-        { key: 'finalFinish',        label: 'Final Finish' },
-      ];
-      // Fixed boilerplate spec text for add-ons whose "item name"/description
-      // is standardized copy rather than free-typed data. Label overrides
-      // replace the item name entirely; detail overrides are appended after
-      // any qty (both render un-underlined, matching the reference PDF).
-      const DEFAULT_ITEM_LABEL: Record<string, string> = {
-        finalFinish: 'Factory applied final finish coat of paint or stain (same finish both sides.)',
-      };
-      const DEFAULT_DETAILS: Record<string, string> = {
-        finalFinish: 'Stain to 110-micron thickness or paint to 120-micron thickness',
-        magneticContact: 'This system is used to detect forced entry or open position of the window or door. A 10\u2019 lead wire from the magnetic contact will be left on the outside of the frame for connection to the central alarm system. The contact will be located at the head closest to the handle for doors, the sill closest to the handle for casements and the sill and head for double hungs',
-      };
-      for (const { key, label } of named) {
-        const row = ao[key] as Record<string, string> | undefined;
-        if (!row || !hasAmt(row.final)) continue;
-        const details = [row.frameType, row.meshType, row.woodFrame, row.details, DEFAULT_DETAILS[key]]
-          .filter(Boolean).join('. ');
-        const itemLabel = DEFAULT_ITEM_LABEL[key] ?? label;
-        rows.push(makeRow('ADD', itemLabel, row.qty, details, fmtAmt(row.final)));
-      }
-      // Custom add rows
-      for (const cr of (ao.customRows || []) as Array<Record<string, string>>) {
-        if (!hasAmt(cr.final)) continue;
-        rows.push(makeRow('ADD', (cr.item || '').trim(), cr.qty, cr.details || '', fmtAmt(cr.final)));
-      }
-      // Deduct rows
-      for (const dr of (ao.deductRows || []) as Array<Record<string, string>>) {
-        if (!hasAmt(dr.final)) continue;
-        const n = Math.abs(parseFloat((dr.final || '').replace(/[^0-9.-]/g, '')) || 0);
-        const amount = `($\u00A0${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
-        rows.push(makeRow('DEDUCT', (dr.item || '').trim(), dr.qty, dr.details || '', amount));
-      }
-      return rows.join('');
-    })(),
+    options: optionsTokens.options,
+    BaseBidoptions: optionsTokens.baseBidOptions,
     productTypeDetails: (() => {
       const pto = (summary as any).productTypeOptions as Record<string, string[]> | undefined;
       if (!pto) return '';
