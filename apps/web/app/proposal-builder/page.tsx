@@ -88,6 +88,7 @@ const BUILT_IN_TOKENS: TokenMappingData[] = [
   { id: '__builtin_tdlType', tokenName: 'tdlType', label: 'TDL Type', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'tdlType', format: 'TEXT' },
   { id: '__builtin_tdlInches', tokenName: 'tdlInches', label: 'TDL Inches', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'tdlInches', format: 'TEXT' },
   { id: '__builtin_finialSection', tokenName: 'finialSection', label: 'Finial Section', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'finialSection', format: 'TEXT' },
+  { id: '__builtin_baseBidOptions', tokenName: 'BaseBidoptions', label: 'Base Bid Options — items checked "Included in Base Bid" in the Add-On table', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'BaseBidoptions', format: 'TEXT' },
 ];
 
 export default function QuoteBuilderPage() {

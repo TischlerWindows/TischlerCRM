@@ -96,6 +96,7 @@ export const BUILT_IN_TOKEN_MAPPINGS: BuiltInTokenMappingSeed[] = [
   { tokenName: 'installationPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.installation.final', format: 'CURRENCY', label: 'Installation Price', category: 'Add-ons' },
   { tokenName: 'installationDetails', sourceObject: 'SUMMARY', sourcePath: 'installationDetails', format: 'TEXT', label: 'Installation Details (sub-rows + total)', category: 'Add-ons' },
   { tokenName: 'options', sourceObject: 'SUMMARY', sourcePath: 'options', format: 'TEXT', label: 'Options — all ADD / DEDUCT line items from the Add-On table', category: 'Add-ons' },
+  { tokenName: 'BaseBidoptions', sourceObject: 'SUMMARY', sourcePath: 'BaseBidoptions', format: 'TEXT', label: 'Base Bid Options — items checked "Included in Base Bid" in the Add-On table', category: 'Add-ons' },
 
   // System
   { tokenName: 'todayDate', sourceObject: 'SYSTEM', sourcePath: 'currentDate', format: 'DATE', label: 'Today\'s Date', category: 'Project' },
