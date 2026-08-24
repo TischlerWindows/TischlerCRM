@@ -1173,22 +1173,37 @@ const TOKEN_REGEX = /\{\{(\w+)\}\}/g;
 /**
  * Matches a `<p>` whose ENTIRE content is a single `{{token}}` placeholder
  * (Tiptap always wraps body content in a paragraph, even a chip-only body).
+ * Captures the bare token name.
  */
-const SOLO_TOKEN_PARAGRAPH = /<p[^>]*>(?:\s|&nbsp;)*(\{\{\w+\}\})(?:\s|&nbsp;)*<\/p>/g;
+const SOLO_TOKEN_PARAGRAPH = /<p[^>]*>(?:\s|&nbsp;)*\{\{(\w+)\}\}(?:\s|&nbsp;)*<\/p>/g;
+
+/** A token value that starts with its own block-level container tag. */
+const BLOCK_LEVEL_VALUE = /^\s*<(p|pricingrow|ul|ol|div)[\s/>]/i;
 
 /**
  * Replace all {{tokenName}} placeholders in text with values from the token map.
  * Unknown tokens are left as-is (helpful for debugging).
  */
 export function resolveTokens(text: string, tokens: Record<string, string>): string {
-  // Block-level tokens (FinalPrice, MultipleLocationsFinalPrice, options,
-  // BaseBidoptions, installationDetails, ...) resolve to their own <p>/
-  // <pricingrow> markup. If the editor's saved body is just `<p>{{Token}}</p>`
-  // (the common case — a block whose entire body is one token chip),
-  // substituting in place would nest that markup inside another <p>, which
-  // renders as a phantom leading blank line / misaligned first line. Unwrap
-  // the paragraph first so the token's own markup isn't nested unnecessarily.
-  const unwrapped = text.replace(SOLO_TOKEN_PARAGRAPH, '$1');
+  // Some tokens (FinalPrice, MultipleLocationsFinalPrice, options,
+  // BaseBidoptions) resolve to their own <p>/<pricingrow> markup. If the
+  // editor's saved body is just `<p>{{Token}}</p>` (the common case — a
+  // block whose entire body is one token chip), substituting in place would
+  // nest that markup inside another <p>, which renders as a phantom leading
+  // blank line / misaligned first line. Unwrap the paragraph first so the
+  // token's own block markup isn't nested unnecessarily.
+  // Tokens whose value is plain text or purely INLINE markup (e.g.
+  // productTypeDetails/installationDetails, built from <strong>/<br> with no
+  // wrapping block tag) must stay wrapped in their original <p> — unwrapping
+  // those breaks bold formatting and <br> spacing (both are only handled
+  // correctly by consumers when nested inside a proper <p>).
+  const unwrapped = text.replace(SOLO_TOKEN_PARAGRAPH, (match, tokenName: string) => {
+    const value = tokens[tokenName];
+    if (value !== undefined && BLOCK_LEVEL_VALUE.test(value)) {
+      return `{{${tokenName}}}`;
+    }
+    return match;
+  });
   return unwrapped.replace(TOKEN_REGEX, (match, tokenName: string) => {
     const value = tokens[tokenName];
     return value !== undefined ? value : match; // Keep original if no mapping

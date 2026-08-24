@@ -35,6 +35,16 @@ describe('quote placeholder diagnostics', () => {
     const result = resolveTokens('<p>Hello {{contactName}}!</p>', { contactName: 'Matthew' });
     expect(result).toBe('<p>Hello Matthew!</p>');
   });
+
+  it('does NOT unwrap a solo token whose value is inline-only markup (no wrapping block tag)', () => {
+    // productTypeDetails/installationDetails resolve to <strong>/<br> runs with
+    // no wrapping <p> of their own — unwrapping the editor's <p> here would
+    // drop their bold formatting and <br><br> spacing (both need a real <p>).
+    const result = resolveTokens('<p>{{productTypeDetails}}</p>', {
+      productTypeDetails: '<strong>Lift & Roll Door: Pattern 1F</strong> with 2-13/16" Thick Sash<br><br><strong>Next</strong>',
+    });
+    expect(result).toBe('<p><strong>Lift & Roll Door: Pattern 1F</strong> with 2-13/16" Thick Sash<br><br><strong>Next</strong></p>');
+  });
 });
 
 describe('"Included in Base Bid" add-on rows', () => {
