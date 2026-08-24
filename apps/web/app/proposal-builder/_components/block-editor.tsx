@@ -25,6 +25,7 @@ const DRIVER_FIELDS = [
   { value: 'tdlType', label: 'TDL Type' },
   { value: 'sdlTdlSelection', label: 'SDL/TDL Selected' },
   { value: 'hasMultipleLocations', label: 'Multiple Locations' },
+  { value: 'hasBaseBidItems', label: 'Has Base Bid Items' },
 ];
 
 /** Maps driver field key → the Opportunity schema field whose picklistValues provide match choices. */
@@ -51,6 +52,9 @@ const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
   // literal string "true"/"false" during variant matching — keep these values
   // in sync with that (see matchValueMatchesContext in quote-conditions.ts).
   hasMultipleLocations: ['true', 'false'],
+  // Matched against QuoteContext.hasBaseBidItems — true if any add-on row has
+  // its "Included in Base Bid" checkbox checked (see quote-conditions.ts).
+  hasBaseBidItems: ['true', 'false'],
   productTypes: [
     // Hung windows
     'Single Hung Concealed Balance',

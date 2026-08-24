@@ -62,6 +62,24 @@ export interface SummaryForConditions {
   subLocations?: { rows: SummaryRow[]; doorRows: DoorRow[] }[];
 }
 
+/** Named add-on keys whose row object may carry an "Included in Base Bid" checkbox. */
+const BASE_BID_CHECK_KEYS = [
+  'windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact',
+  'splitFinish', 'integratedContacts', 'poolContacts', 'rollScreens', 'shadeBoxes',
+  'geniusLock', 'finalFinish', 'installation',
+];
+
+/** True if any named/custom/deduct add-on row has `includedInBaseBid` checked. */
+function hasAnyBaseBidRow(rawAo: Record<string, any> | undefined): boolean {
+  if (!rawAo) return false;
+  const isChecked = (row: Record<string, any> | undefined) =>
+    row?.includedInBaseBid === 'true' || row?.includedInBaseBid === true;
+  if (BASE_BID_CHECK_KEYS.some((key) => isChecked(rawAo[key]))) return true;
+  if ((rawAo.customRows || []).some((cr: Record<string, any>) => isChecked(cr))) return true;
+  if ((rawAo.deductRows || []).some((dr: Record<string, any>) => isChecked(dr))) return true;
+  return false;
+}
+
 /** The flattened context object the conditions engine evaluates against. */
 export interface QuoteContext {
   // Product type presence
@@ -118,6 +136,8 @@ export interface QuoteContext {
   // For placeholder resolution (pricing)
   plansDated: string;
   hasMultipleLocations: boolean;
+  /** True if any add-on row (named, custom, or deduct) has its "Included in Base Bid" checkbox checked. */
+  hasBaseBidItems: boolean;
 }
 
 /** SpecCondition as returned from the API. */
@@ -420,6 +440,7 @@ export function buildQuoteContext(summary: SummaryForConditions): QuoteContext {
     // Metadata
     plansDated: summary.plansDated || '',
     hasMultipleLocations: summary.hasMultipleLocations || false,
+    hasBaseBidItems: hasAnyBaseBidRow(summary.addOns as Record<string, any>),
   };
 }
 
