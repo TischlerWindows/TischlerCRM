@@ -46,7 +46,7 @@ const PARSE_OPTIONS = {
       const labelUnderline = el.attribs?.labelunderline === 'true';
       const labelSuffix = el.attribs?.labelsuffix ?? '';
       return (
-        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: underline ? '1px solid #888' : undefined, paddingBottom: underline ? '2px' : undefined, marginBottom: underline ? '2px' : labelUnderline ? '8px' : undefined, fontWeight: bold ? 700 : undefined }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: underline ? '1px solid #888' : undefined, paddingBottom: underline ? '2px' : undefined, marginBottom: underline ? '2px' : labelUnderline ? '16px' : undefined, fontWeight: bold ? 700 : undefined }}>
           <span>
             <span style={{ textDecoration: labelUnderline ? 'underline' : undefined }}>{label}</span>
             {labelSuffix}
