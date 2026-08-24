@@ -1035,7 +1035,9 @@ function drawRichBody(
     let match: RegExpExecArray | null;
 
     const getAttr = (attrs: string, name: string) => {
-      const m = new RegExp(`${name}="([^"]*?)"`).exec(attrs);
+      // Anchor on a preceding whitespace/start-of-string so `underline="..."`
+      // doesn't also match as a substring of `labelunderline="..."`.
+      const m = new RegExp(`(?:^|\\s)${name}="([^"]*?)"`).exec(attrs);
       return m ? m[1] ?? '' : '';
     };
 
