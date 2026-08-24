@@ -1171,11 +1171,25 @@ export function buildTokenMap(
 const TOKEN_REGEX = /\{\{(\w+)\}\}/g;
 
 /**
+ * Matches a `<p>` whose ENTIRE content is a single `{{token}}` placeholder
+ * (Tiptap always wraps body content in a paragraph, even a chip-only body).
+ */
+const SOLO_TOKEN_PARAGRAPH = /<p[^>]*>(?:\s|&nbsp;)*(\{\{\w+\}\})(?:\s|&nbsp;)*<\/p>/g;
+
+/**
  * Replace all {{tokenName}} placeholders in text with values from the token map.
  * Unknown tokens are left as-is (helpful for debugging).
  */
 export function resolveTokens(text: string, tokens: Record<string, string>): string {
-  return text.replace(TOKEN_REGEX, (match, tokenName: string) => {
+  // Block-level tokens (FinalPrice, MultipleLocationsFinalPrice, options,
+  // BaseBidoptions, installationDetails, ...) resolve to their own <p>/
+  // <pricingrow> markup. If the editor's saved body is just `<p>{{Token}}</p>`
+  // (the common case — a block whose entire body is one token chip),
+  // substituting in place would nest that markup inside another <p>, which
+  // renders as a phantom leading blank line / misaligned first line. Unwrap
+  // the paragraph first so the token's own markup isn't nested unnecessarily.
+  const unwrapped = text.replace(SOLO_TOKEN_PARAGRAPH, '$1');
+  return unwrapped.replace(TOKEN_REGEX, (match, tokenName: string) => {
     const value = tokens[tokenName];
     return value !== undefined ? value : match; // Keep original if no mapping
   });

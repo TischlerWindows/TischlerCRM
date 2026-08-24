@@ -1,4 +1,4 @@
-import { findUnresolvedTokens, formatDate, resolveTokensWithDiagnostics, buildTokenMap } from '@crm/proposal-assembly';
+import { findUnresolvedTokens, formatDate, resolveTokens, resolveTokensWithDiagnostics, buildTokenMap } from '@crm/proposal-assembly';
 import type { SummaryForPlaceholders } from '@crm/proposal-assembly';
 
 describe('quote placeholder diagnostics', () => {
@@ -18,6 +18,22 @@ describe('quote placeholder diagnostics', () => {
 
   it('formats date-only strings without timezone shifting the day', () => {
     expect(formatDate('2025-08-15')).toBe('August 15, 2025');
+  });
+
+  it('unwraps a <p> that wraps nothing but a single block-level token, avoiding nested <p>', () => {
+    // Tiptap always wraps a body in <p>...</p>, even a chip-only body like
+    // {{BaseBidoptions}} — its resolved value is itself <p> markup, so
+    // substituting in place would otherwise nest a <p> inside a <p>.
+    const result = resolveTokens('<p>{{BaseBidoptions}}</p>', {
+      BaseBidoptions: '<p><u>Window Screens</u> (Qty. 1.).</p>',
+    });
+    expect(result).toBe('<p><u>Window Screens</u> (Qty. 1.).</p>');
+    expect(result).not.toContain('<p><p>');
+  });
+
+  it('leaves plain (non-block) tokens substituted in place inside their paragraph', () => {
+    const result = resolveTokens('<p>Hello {{contactName}}!</p>', { contactName: 'Matthew' });
+    expect(result).toBe('<p>Hello Matthew!</p>');
   });
 });
 
