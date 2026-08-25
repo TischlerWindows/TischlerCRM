@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "dotenv -e .env -- tsx watch src/server.ts",
-    "build": "esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --packages=external && node --eval \"const{cpSync}=require('fs');cpSync('src/lib/proposal-pdf/glass-types','dist/glass-types',{recursive:true,force:true});\"",
+    "build": "esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --packages=external && node --eval \"const{cpSync,existsSync}=require('fs');cpSync('src/lib/proposal-pdf/glass-types','dist/glass-types',{recursive:true,force:true});if(existsSync('src/lib/proposal-pdf/dade-county-impact-products.pdf'))cpSync('src/lib/proposal-pdf/dade-county-impact-products.pdf','dist/dade-county-impact-products.pdf',{force:true});\"",
     "start": "node dist/server.js",
     "build:lambda": "esbuild src/lambda.ts --bundle --platform=node --format=cjs --outfile=dist/lambda.cjs",
     "package:lambda": "mkdir -p dist/lambda && copy dist\\lambda.cjs dist\\lambda\\index.js && powershell Compress-Archive -Path dist\\lambda\\index.js -DestinationPath dist\\lambda.zip -Force",

@@ -9,6 +9,7 @@ import {
   type PageLogoFile,
 } from '../lib/proposal-pdf/renderer.js';
 import { collectGlassTypeKeys, appendGlassSheets } from '../lib/proposal-pdf/glass-sheets.js';
+import { appendDadeImpactSheet } from '../lib/proposal-pdf/dade-impact-sheet.js';
 
 const renderSchema = z.object({
   summaryId: z.string().min(1),
@@ -135,6 +136,13 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
       } catch (err) {
         app.log.warn({ err }, 'Glass sheet append failed — returning proposal without sheets');
       }
+    }
+
+    // ── Append the Impact Resistant Products sheet for Dade County jobs ──
+    try {
+      pdfBuffer = await appendDadeImpactSheet(pdfBuffer, (summary as Record<string, unknown>).jobType as string | undefined);
+    } catch (err) {
+      app.log.warn({ err }, 'Dade impact sheet append failed — returning proposal without it');
     }
 
     const safeName = (result.pdfData.projectName || 'Proposal').replace(/[^A-Za-z0-9_-]+/g, '_');
