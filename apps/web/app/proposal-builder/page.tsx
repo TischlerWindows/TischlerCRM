@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useMemo, useRef, type KeyboardEvent }
 import { Loader2, AlertCircle, X, ChevronLeft, ChevronRight, PanelLeftClose, PanelRightClose } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { getSetting } from '@/lib/preferences';
-import { showPdfInPopup } from '@/lib/pdf-preview';
 import { assembleProposal } from '@crm/proposal-assembly';
 import type { SpecPresetData } from '@crm/proposal-assembly';
 import { useResizableSidePanels } from '@/lib/use-resizable-side-panels';
@@ -870,7 +869,7 @@ export default function QuoteBuilderPage() {
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       if (previewWindow && !previewWindow.closed) {
-        showPdfInPopup(previewWindow, url);
+        previewWindow.location.href = url;
       } else {
         const link = document.createElement('a');
         link.href = url;
