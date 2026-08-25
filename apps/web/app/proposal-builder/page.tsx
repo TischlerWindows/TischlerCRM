@@ -844,10 +844,47 @@ export default function QuoteBuilderPage() {
 
   // ── Template PDF preview ──────────────────────────────────────
 
-  const handlePreviewPDF = () => {
+  const handlePreviewPDF = async () => {
     if (!selectedTemplateId) { setError('No template selected.'); return; }
     if (!selectedSummaryId) { setError('Pick a summary to preview against.'); return; }
-    showPdfInPopup(selectedTemplateId, selectedSummaryId);
+    // Open the preview window synchronously inside the user-gesture handler.
+    // Browsers block window.open() called after an `await` even with target=_blank.
+    const previewWindow = window.open('', '_blank');
+    setIsPreviewingPDF(true);
+    setError(null);
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const token = apiClient.getToken();
+      const response = await fetch(`${apiBase}/proposal-pdf/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ templateId: selectedTemplateId, summaryId: selectedSummaryId }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(detail.error || `Failed to render PDF (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      if (previewWindow && !previewWindow.closed) {
+        showPdfInPopup(previewWindow, url);
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'proposal.pdf';
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: unknown) {
+      previewWindow?.close();
+      const message = err instanceof Error ? err.message : 'Failed to generate proposal PDF';
+      setError(message);
+    } finally {
+      setIsPreviewingPDF(false);
+    }
   };
 
   // ── True PDF inline preview ───────────────────────────────────
