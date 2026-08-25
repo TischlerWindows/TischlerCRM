@@ -844,51 +844,13 @@ export default function QuoteBuilderPage() {
 
   // ── Template PDF preview ──────────────────────────────────────
 
-  const handlePreviewPDF = async () => {
+  const handlePreviewPDF = () => {
     if (!selectedTemplateId) { setError('No template selected.'); return; }
     if (!selectedSummaryId) { setError('Pick a summary to preview against.'); return; }
-    // Open the preview window synchronously inside the user-gesture handler.
-    // Browsers (Safari, Firefox, strict Chrome) block window.open() called
-    // after an `await` — even with target=_blank. We navigate the window once
-    // the PDF blob is ready.
-    const previewWindow = window.open('', '_blank');
-    setIsPreviewingPDF(true);
-    setError(null);
-    try {
-      // Server-side render via PDFKit. Returns a PDF blob we open in a new tab.
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      const token = apiClient.getToken();
-      const response = await fetch(`${apiBase}/proposal-pdf/render`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ templateId: selectedTemplateId, summaryId: selectedSummaryId }),
-      });
-      if (!response.ok) {
-        const detail = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error(detail.error || `Failed to render PDF (${response.status})`);
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      if (previewWindow && !previewWindow.closed) {
-        showPdfInPopup(previewWindow, url);
-      } else {
-        // Popup blocker killed the synchronous open — fall back to a download.
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'proposal.pdf';
-        link.click();
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (err: unknown) {
-      previewWindow?.close();
-      const message = err instanceof Error ? err.message : 'Failed to generate proposal PDF';
-      setError(message);
-    } finally {
-      setIsPreviewingPDF(false);
-    }
+    // Open the dedicated react-pdf preview page — it fetches the PDF directly
+    // and renders it with externalLinkTarget="_blank" so annotation links
+    // (e.g. the Dade County sheet) always open in a new tab, not the same one.
+    showPdfInPopup(selectedTemplateId, selectedSummaryId);
   };
 
   // ── True PDF inline preview ───────────────────────────────────

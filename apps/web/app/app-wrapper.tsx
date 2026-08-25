@@ -128,7 +128,10 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   // excluded here too, otherwise its h-screen root gets nested under this
   // wrapper's own sticky header + h-dvh container and overflows, clipping
   // the top of its own toolbar (the Save button lives there).
-  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/proposal-builder') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
+  // /proposal-preview is the bare full-viewport react-pdf viewer opened in a
+  // new tab from Proposal Builder's "Preview PDF" — it must render with zero
+  // app chrome too.
+  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/proposal-builder') && !pathname?.startsWith('/proposal-preview') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
 
   // Always refresh schema from the API on mount / when user changes.
   // The persisted Zustand cache provides a value for the very first paint

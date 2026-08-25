@@ -5,7 +5,6 @@ import { X, FileText } from 'lucide-react';
 import type { ProposalAssemblyResult } from '@crm/proposal-assembly';
 import type { PageLogoRule } from '@crm/types';
 import { apiClient } from '@/lib/api-client';
-import { showPdfInPopup } from '@/lib/pdf-preview';
 import { LetterPreview, type BrandFontMap } from './letter-preview';
 
 interface Props {
@@ -131,8 +130,10 @@ export function HardEditModal({ result, brandFonts, pageLogos, templateId, summa
       }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
+      // Hard Edit has body overrides that can't be passed to the /proposal-preview
+      // route, so open the blob directly in a new tab; the user can download it.
       if (previewWindow && !previewWindow.closed) {
-        showPdfInPopup(previewWindow, url);
+        previewWindow.location.href = url;
       } else {
         // Popup blocker killed the synchronous open — fall back to a download.
         const link = document.createElement('a');
