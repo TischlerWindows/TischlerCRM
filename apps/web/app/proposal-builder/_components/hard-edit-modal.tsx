@@ -5,6 +5,7 @@ import { X, FileText } from 'lucide-react';
 import type { ProposalAssemblyResult } from '@crm/proposal-assembly';
 import type { PageLogoRule } from '@crm/types';
 import { apiClient } from '@/lib/api-client';
+import { showPdfInPopup } from '@/lib/pdf-preview';
 import { LetterPreview, type BrandFontMap } from './letter-preview';
 
 interface Props {
@@ -131,7 +132,7 @@ export function HardEditModal({ result, brandFonts, pageLogos, templateId, summa
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       if (previewWindow && !previewWindow.closed) {
-        previewWindow.location.href = url;
+        showPdfInPopup(previewWindow, url);
       } else {
         // Popup blocker killed the synchronous open — fall back to a download.
         const link = document.createElement('a');
