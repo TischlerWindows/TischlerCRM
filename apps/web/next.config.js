@@ -10,6 +10,13 @@ const nextConfig = {
     // Allow builds to succeed even with TypeScript errors (for production deploy)
     ignoreBuildErrors: true,
   },
+  webpack: (config) => {
+    // pdfjs-dist uses new URL('pdf.worker.min.mjs', import.meta.url) which
+    // triggers webpack's asset/resource loader and bundles the worker into
+    // _next/static/chunks/ so it's served from the same origin (no CDN).
+    config.resolve.alias.canvas = false;
+    return config;
+  },
   async headers() {
     const securityHeaders = [
       { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
