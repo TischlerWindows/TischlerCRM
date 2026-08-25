@@ -8,11 +8,9 @@ import { useSearchParams } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 
-// Let webpack bundle the worker so it works without external CDN access.
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString();
+// Served from public/pdf.worker.min.mjs (copied during build), so webpack
+// never processes it (avoids the 'import.meta outside module' Terser crash).
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 export default function ProposalPdfViewerClient() {
   const params = useSearchParams();
