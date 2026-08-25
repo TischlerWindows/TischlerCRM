@@ -103,6 +103,33 @@ const OPPORTUNITY_SUBFOLDERS = [
 /** Sub-subfolders created inside the Opportunity's '9. Photos' folder. */
 const OPPORTUNITY_PHOTOS_SUBFOLDERS = ['Site', 'Finished'];
 
+/**
+ * Create the full Opportunity subfolder structure (the 9 numbered folders,
+ * the '9. Photos' Site/Finished pair, and the OPP#### working folder inside
+ * '1. Estimation'). Idempotent — pre-existing folders (409) are ignored.
+ * Used both when an Opportunity is linked to a Property and when it stands
+ * alone (no Property attached) so both cases get the identical 9-folder set.
+ */
+async function createOpportunityFolderStructure(
+  accessToken: string,
+  childPath: string,
+  safeName: string,
+): Promise<void> {
+  for (const sf of OPPORTUNITY_SUBFOLDERS) {
+    try {
+      await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/${sf}`, autorename: false });
+    } catch { /* already exists — ignore */ }
+  }
+  for (const sub of OPPORTUNITY_PHOTOS_SUBFOLDERS) {
+    try {
+      await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/9. Photos/${sub}`, autorename: false });
+    } catch { /* already exists — ignore */ }
+  }
+  try {
+    await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/1. Estimation/${safeName}`, autorename: false });
+  } catch { /* already exists — ignore */ }
+}
+
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
 function oauthResultPage(status: 'connected' | 'error', reason?: string): string {
   const data = JSON.stringify({ type: 'dropbox-oauth-result', status, reason });
@@ -1101,12 +1128,6 @@ export async function tryEnsureLinkedFolder(
       propertyId = await resolvePropertyIdViaOpportunity(childData, childObjectApiName);
     }
 
-    if (!propertyId) {
-      console.log(`[dropbox] No property ID found in child data keys: ${Object.keys(childData).filter(k => k.toLowerCase().includes('prop')).join(', ')}`);
-      return;
-    }
-    console.log(`[dropbox] Found propertyId=${propertyId} for ${childObjectApiName} ${childRecordId}`);
-
     // Try to get access token for the creating user first, then fall back to
     // any org-level Dropbox-connected user so folder creation isn't blocked
     // when the current user hasn't connected Dropbox.
@@ -1133,6 +1154,38 @@ export async function tryEnsureLinkedFolder(
         return;
       }
     }
+
+    if (!propertyId) {
+      console.log(`[dropbox] No property ID found in child data keys: ${Object.keys(childData).filter(k => k.toLowerCase().includes('prop')).join(', ')}`);
+      // Opportunities don't require a linked Property — give them a
+      // top-level folder with the full 9-folder structure instead of
+      // silently creating nothing (Lead/WorkOrder/Service genuinely live
+      // only under a Property, so they're left alone here).
+      if (childObjectApiName === 'Opportunity') {
+        const oppObjSA = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
+        const oppRecSA = oppObjSA ? await prisma.record.findFirst({ where: { id: childRecordId, objectId: oppObjSA.id }, select: { createdAt: true } }) : null;
+        const standaloneName = deriveOpportunityFolderName(childData, oppRecSA?.createdAt) || deriveDropboxFolderName(childData, childRecordId, childObjectApiName);
+        const safeStandaloneName = standaloneName.replace(/[\\/:*?"<>|]/g, '_').trim();
+        const standalonePath = buildFolderPath('Opportunity', childRecordId, standaloneName);
+        try {
+          const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
+            path: standalonePath,
+            autorename: false,
+          }) as { metadata: { id: string } };
+          await storeFolderIdOnRecord(childRecordId, result.metadata.id);
+          console.log(`[dropbox] Created standalone (no-Property) Opportunity folder: ${standalonePath}`);
+        } catch (err: any) {
+          if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
+            console.error('[dropbox] Standalone Opportunity folder creation failed:', err.message);
+            return;
+          }
+          await backfillFolderId(accessToken, childRecordId, standalonePath);
+        }
+        await createOpportunityFolderStructure(accessToken, standalonePath, safeStandaloneName);
+      }
+      return;
+    }
+    console.log(`[dropbox] Found propertyId=${propertyId} for ${childObjectApiName} ${childRecordId}`);
 
     // Verify it's actually a Property record
     const propertyObj = await prisma.customObject.findFirst({
@@ -1316,16 +1369,10 @@ export async function tryEnsureLinkedFolder(
       const expectedPrefix = `${parentPath}/${subfolder}/`.toLowerCase();
       if (existingChildFolder.fullPath.toLowerCase().startsWith(expectedPrefix)) {
         console.log(`[dropbox] Linked folder already tracked at correct location for ${childRecordId}: ${existingChildFolder.fullPath}`);
-        // For Opportunities, always re-ensure the Estimation subfolder even when the
-        // main OPP folder already exists — it may have been manually deleted.
+        // For Opportunities, always re-ensure the full subfolder structure even when
+        // the main OPP folder already exists — subfolders may have been manually deleted.
         if (childObjectApiName === 'Opportunity') {
-          try {
-            await dropboxApi(accessToken, '/files/create_folder_v2', {
-              path: `${childPath}/1. Estimation/${safeName}`,
-              autorename: false,
-            });
-            console.log(`[dropbox] Re-created estimation sub-folder: ${childPath}/1. Estimation/${safeName}`);
-          } catch { /* already exists — fine */ }
+          await createOpportunityFolderStructure(accessToken, childPath, safeName);
         }
         return;
       }
@@ -1355,31 +1402,7 @@ export async function tryEnsureLinkedFolder(
     // Create subfolders for Opportunity records — always attempt (idempotent) so
     // subfolders are present whether the folder was just created or already existed.
     if (childObjectApiName === 'Opportunity') {
-      for (const sf of OPPORTUNITY_SUBFOLDERS) {
-        try {
-          await dropboxApi(accessToken, '/files/create_folder_v2', {
-            path: `${childPath}/${sf}`,
-            autorename: false,
-          });
-        } catch { /* folder already exists — ignore */ }
-      }
-      // Create Site / Finished inside 9. Photos
-      for (const sub of OPPORTUNITY_PHOTOS_SUBFOLDERS) {
-        try {
-          await dropboxApi(accessToken, '/files/create_folder_v2', {
-            path: `${childPath}/9. Photos/${sub}`,
-            autorename: false,
-          });
-        } catch { /* folder already exists — ignore */ }
-      }
-      // Create an OPP#### folder inside 1. Estimation for working files
-      try {
-        await dropboxApi(accessToken, '/files/create_folder_v2', {
-          path: `${childPath}/1. Estimation/${safeName}`,
-          autorename: false,
-        });
-        console.log(`[dropbox] Created estimation sub-folder: ${childPath}/1. Estimation/${safeName}`);
-      } catch { /* folder already exists — ignore */ }
+      await createOpportunityFolderStructure(accessToken, childPath, safeName);
     }
 
     // ── Copy files from related record folder ──
@@ -2345,8 +2368,10 @@ export async function dropboxRoutes(app: FastifyInstance) {
           }
         } catch { /* non-fatal */ }
       }
-      // For Opportunity records, always re-ensure the Estimation subfolder.  It may
-      // have been manually deleted; re-creating it is idempotent (409 = already exists).
+      // For Opportunity records, always re-ensure the full subfolder structure.
+      // It may have been manually deleted, or (for Opportunities without a
+      // linked Property) never fully created in the first place; re-creating
+      // is idempotent (409 = already exists).
       if (objectApiName === 'Opportunity') {
         try {
           const oppObjE = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
@@ -2359,11 +2384,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
             if (!_eIsReq) {
               const estName = deriveOpportunityFolderName(rDataE, oppRecE.createdAt) || deriveDropboxFolderName(rDataE, recordId, 'Opportunity');
               const estSafe = estName.replace(/[\\/:*?"<>|]/g, '_').trim();
-              const estimationSubPath = `${storedFolder.fullPath}/1. Estimation/${estSafe}`;
-              try {
-                await dropboxApi(accessToken, '/files/create_folder_v2', { path: estimationSubPath, autorename: false });
-                console.log(`[dropbox] Re-ensured estimation sub-folder: ${estimationSubPath}`);
-              } catch { /* already exists — fine */ }
+              await createOpportunityFolderStructure(accessToken, storedFolder.fullPath, estSafe);
             }
           }
         } catch { /* non-fatal */ }
@@ -2570,20 +2591,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
               // Create (or recreate) Opportunity subfolders — always attempt so
               // they're restored if the folder was deleted and recreated.
               if (objectApiName === 'Opportunity') {
-                for (const sf of OPPORTUNITY_SUBFOLDERS) {
-                  try {
-                    await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/${sf}`, autorename: false });
-                  } catch { /* already exists — ignore */ }
-                }
-                for (const sub of OPPORTUNITY_PHOTOS_SUBFOLDERS) {
-                  try {
-                    await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/9. Photos/${sub}`, autorename: false });
-                  } catch { /* already exists — ignore */ }
-                }
-                // Create OPP#### working folder inside 1. Estimation
-                try {
-                  await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/1. Estimation/${safeName}`, autorename: false });
-                } catch { /* already exists — ignore */ }
+                await createOpportunityFolderStructure(accessToken, childPath, safeName);
               }
 
               return reply.send({ created: true, path: childPath, linked: true, folderName: childFolderName });
@@ -2644,6 +2652,13 @@ export async function dropboxRoutes(app: FastifyInstance) {
           }
         }
       }
+    }
+
+    // Opportunities without a linked Property still get the full 9-folder
+    // structure (only when the top-level folder is newly created here).
+    if (created && objectApiName === 'Opportunity') {
+      const safeName = (folderName || recordId).replace(/[\\/:*?"<>|]/g, '_').trim();
+      await createOpportunityFolderStructure(accessToken, folderPath, safeName);
     }
 
     reply.send({ created, path: folderPath, folderName: folderName || undefined });
@@ -2724,23 +2739,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     // Create subfolders for Opportunity / Project records
     if (created && (childObjectApiName === 'Opportunity' || childObjectApiName === 'Project')) {
-      for (const sf of OPPORTUNITY_SUBFOLDERS) {
-        try {
-          await dropboxApi(accessToken, '/files/create_folder_v2', {
-            path: `${childPath}/${sf}`,
-            autorename: false,
-          });
-        } catch { /* folder already exists — ignore */ }
-      }
-      // Create Site / Finished inside 9. Photos
-      for (const sub of OPPORTUNITY_PHOTOS_SUBFOLDERS) {
-        try {
-          await dropboxApi(accessToken, '/files/create_folder_v2', {
-            path: `${childPath}/9. Photos/${sub}`,
-            autorename: false,
-          });
-        } catch { /* folder already exists — ignore */ }
-      }
+      await createOpportunityFolderStructure(accessToken, childPath, safeName);
     }
 
     reply.send({ created, path: childPath });
