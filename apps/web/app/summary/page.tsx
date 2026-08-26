@@ -2183,6 +2183,7 @@ export default function SummaryPage() {
     const specHasHung = specWinRows.some(r => r.type?.toLowerCase?.()?.includes('hung'));
     addSpec('Glass Type', s.glassType === 'Custom Option' ? s.glassTypeCustom : s.glassType);
     if (specHasHung) addSpec('Hung Glass Type', s.hungType === 'Custom Option' ? s.hungTypeCustom : s.hungType);
+    if ((s.additionalGlassTypes || []).length > 0) addSpec('Additional Glass Type(s)', (s.additionalGlassTypes || []).join(', '));
     addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
     addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
     addSpec('Spacer Bar Type', s.spacerBarType);
