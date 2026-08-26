@@ -4579,8 +4579,9 @@ export default function SummaryPage() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Additional Glass Types for Proposal</label>
                         {(() => {
-                          const options = getOppPicklistFiltered('Opportunity__glassType');
+                          const options = [...getOppPicklistFiltered('Opportunity__glassType'), 'Custom'];
                           const selected = editingSummary.additionalGlassTypes || [];
+                          const customSelected = selected.find(v => !options.slice(0, -1).includes(v) && v !== 'Custom');
                           return (
                             <details className="relative">
                               <summary className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white cursor-pointer flex items-center justify-between select-none list-none focus:outline-none focus:ring-1 focus:ring-brand-navy/40">
@@ -4594,20 +4595,48 @@ export default function SummaryPage() {
                                   <label key={v} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
                                     <input
                                       type="checkbox"
-                                      checked={selected.includes(v)}
+                                      checked={v === 'Custom' ? !!customSelected : selected.includes(v)}
                                       onChange={(e) => {
-                                        setEditingSummary({
-                                          ...editingSummary,
-                                          additionalGlassTypes: e.target.checked
-                                            ? [...selected, v]
-                                            : selected.filter(x => x !== v),
-                                        });
+                                        if (v === 'Custom') {
+                                          // toggle: add/remove the custom text entry slot
+                                          setEditingSummary({
+                                            ...editingSummary,
+                                            additionalGlassTypes: e.target.checked
+                                              ? [...selected, '']
+                                              : selected.filter(x => options.slice(0, -1).includes(x)),
+                                          });
+                                        } else {
+                                          setEditingSummary({
+                                            ...editingSummary,
+                                            additionalGlassTypes: e.target.checked
+                                              ? [...selected, v]
+                                              : selected.filter(x => x !== v),
+                                          });
+                                        }
                                       }}
                                       className="w-3.5 h-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy/20"
                                     />
                                     <span className="text-sm text-gray-700">{v}</span>
                                   </label>
                                 ))}
+                                {/* Inline text input when Custom is checked */}
+                                {(selected.some(v => !getOppPicklistFiltered('Opportunity__glassType').includes(v))) && (
+                                  <div className="px-3 py-1.5">
+                                    <input
+                                      type="text"
+                                      value={customSelected ?? ''}
+                                      onChange={(e) => {
+                                        const nonCustom = selected.filter(v => getOppPicklistFiltered('Opportunity__glassType').includes(v));
+                                        setEditingSummary({
+                                          ...editingSummary,
+                                          additionalGlassTypes: [...nonCustom, e.target.value],
+                                        });
+                                      }}
+                                      placeholder="Enter custom glass type…"
+                                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy/40"
+                                    />
+                                  </div>
+                                )}
                               </div>
                             </details>
                           );
