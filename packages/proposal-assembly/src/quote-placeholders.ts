@@ -22,7 +22,7 @@ function getValidOptionsForType(t: string): string[] {
       ? ['Threshold #6', 'Threshold #6C', 'Threshold ADA']
       : ['Threshold #7', 'Threshold #8', 'Threshold ADA'];
   }
-  if (lo === 'l&r d' || lo.startsWith('l&r d:') || lo.startsWith('l&r d ')) return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
+  if (lo === 'l&r d' || lo.startsWith('l&r d:') || lo.startsWith('l&r d ') || lo.startsWith('lift and roll window:')) return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
   if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
     return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #6', 'Threshold #6C', 'Threshold ADA'];
   }
@@ -180,8 +180,9 @@ function buildRoughHardwareText(
   }
 
   // Include L&R D pattern types (stored as 'L&R D: Pattern X') alongside bare 'L&R D'.
+  // Also include 'Lift and Roll Window: Pattern X' patterns.
   const lrActiveTypes = Array.from(activeTypes).filter(
-    (t) => t === 'L&R D' || t.startsWith('L&R D:') || t === 'Lift and Roll Window'
+    (t) => t === 'L&R D' || t.startsWith('L&R D:') || t === 'Lift and Roll Window' || t.startsWith('Lift and Roll Window:')
   );
   if (lrActiveTypes.length > 0) {
     // Product-type options are keyed by 'L&R D' (the bare type); pattern sub-type
@@ -588,10 +589,13 @@ function pluralizeTypeName(name: string): string {
 
 function expandProductTypeName(name: string): string {
   // L&R D with a sub-pattern (e.g. 'L&R D: Pattern 1F') must NOT go through
-  // pluralizeTypeName's compound-name splitting because 'Pattern 1F' has no
-  // known plural rule — return it directly after the abbreviation expansion.
+  // pluralizeTypeName's compound-name splitting — return it directly.
   if (/^L&R D:/.test(name)) {
     return 'Lift & Roll Door: ' + name.slice('L&R D:'.length).trim();
+  }
+  // Same for Lift and Roll Window patterns
+  if (/^Lift and Roll Window:/i.test(name)) {
+    return 'Lift & Roll Window: ' + name.replace(/^Lift and Roll Window:\s*/i, '');
   }
   const expanded = name
     .replace(/\bL&R D\b/g, 'Lift & Roll Door')
@@ -1026,6 +1030,7 @@ export function buildTokenMap(
             if (!t) return null;
             if (t === 'Fixed with Sash' && r[subOptMap[f]!]) return `Fixed with Sash: ${r[subOptMap[f]!]}`;
             if (t === 'L&R D' && r[subOptMap[f]!]) return `L&R D: ${r[subOptMap[f]!]}`;
+            if (t === 'Lift and Roll Window' && r[subOptMap[f]!]) return `Lift and Roll Window: ${r[subOptMap[f]!]}`;
             return t;
           }).filter((t): t is string => Boolean(t))
         )
@@ -1034,9 +1039,9 @@ export function buildTokenMap(
       const seenDisplayNames = new Set<string>();
 
       for (const [typeName, opts] of Object.entries(pto)) {
-        // L&R D pattern keys ('L&R D: Pattern X') are formatted directly as single
+        // L&R D and Lift and Roll Window pattern keys are formatted directly as single
         // entries — don't let the colon-split path below mis-pluralise 'Pattern 1Fs'.
-        if (typeName.startsWith('L&R D:')) {
+        if (typeName.startsWith('L&R D:') || typeName.startsWith('Lift and Roll Window:')) {
           if (activeTypes.size > 0 && !activeTypes.has(typeName)) continue;
           if (!Array.isArray(opts) || opts.length === 0) continue;
           const validSet = new Set(getValidOptionsForType(typeName));
@@ -1049,11 +1054,13 @@ export function buildTokenMap(
           continue;
         }
 
-        // Bare 'L&R D' key: emit entries for any active patterns that don't have
-        // their own pto key (acts as a fallback / pre-patterns legacy path).
+        // Bare 'L&R D' / 'Lift and Roll Window' key: emit entries for any active patterns
+        // that don't have their own pto key (fallback / pre-patterns legacy path).
         const isLrBase = typeName === 'L&R D';
+        const isLrwBase = typeName === 'Lift and Roll Window';
         const isActive = activeTypes.has(typeName) ||
-          (isLrBase && Array.from(activeTypes).some((t) => t.startsWith('L&R D:')));
+          (isLrBase && Array.from(activeTypes).some((t) => t.startsWith('L&R D:'))) ||
+          (isLrwBase && Array.from(activeTypes).some((t) => t.startsWith('Lift and Roll Window:')));
         if (activeTypes.size > 0 && !isActive) continue;
         if (!Array.isArray(opts) || opts.length === 0) continue;
         const validSet = new Set(getValidOptionsForType(typeName));
@@ -1061,12 +1068,24 @@ export function buildTokenMap(
         if (filteredOpts.length === 0) continue;
 
         if (isLrBase) {
-          // Only emit patterns that don't have their own pto entry (those are
-          // already handled by the 'L&R D: X' branch above).
           const unhandledPatterns = Array.from(activeTypes).filter(
             (t) => t.startsWith('L&R D:') && !((pto[t] ?? []).length > 0)
           );
           const bareActive = activeTypes.has('L&R D');
+          for (const patternType of unhandledPatterns) {
+            const displayName = expandProductTypeName(patternType);
+            if (seenDisplayNames.has(displayName)) continue;
+            seenDisplayNames.add(displayName);
+            lines.push(buildFirstLine(patternType, filteredOpts) + '<br>');
+          }
+          if (!bareActive) continue;
+        }
+
+        if (isLrwBase) {
+          const unhandledPatterns = Array.from(activeTypes).filter(
+            (t) => t.startsWith('Lift and Roll Window:') && !((pto[t] ?? []).length > 0)
+          );
+          const bareActive = activeTypes.has('Lift and Roll Window');
           for (const patternType of unhandledPatterns) {
             const displayName = expandProductTypeName(patternType);
             if (seenDisplayNames.has(displayName)) continue;
@@ -1094,11 +1113,9 @@ export function buildTokenMap(
         }
       }
 
-      // Final pass: emit any active L&R D patterns not yet in the output.
-      // This covers patterns with no pto options set — we can still show the
-      // pattern name and pattern-specific jamb depth without a sash thickness.
+      // Final pass: emit any active L&R D / Lift and Roll Window patterns not yet in the output.
       for (const patternType of Array.from(activeTypes)) {
-        if (!patternType.startsWith('L&R D:')) continue;
+        if (!patternType.startsWith('L&R D:') && !patternType.startsWith('Lift and Roll Window:')) continue;
         const displayName = expandProductTypeName(patternType);
         if (seenDisplayNames.has(displayName)) continue;
         seenDisplayNames.add(displayName);
@@ -1128,6 +1145,7 @@ export function buildTokenMap(
             if (!t) return null;
             if (t === 'Fixed with Sash' && r[rhSubOpt[f]!]) return `Fixed with Sash: ${r[rhSubOpt[f]!]}`;
             if (t === 'L&R D' && r[rhSubOpt[f]!]) return `L&R D: ${r[rhSubOpt[f]!]}`;
+            if (t === 'Lift and Roll Window' && r[rhSubOpt[f]!]) return `Lift and Roll Window: ${r[rhSubOpt[f]!]}`;
             return t;
           }).filter((t): t is string => Boolean(t))
         )
@@ -1154,6 +1172,7 @@ export function buildTokenMap(
             if (!t) return null;
             if (t === 'Fixed with Sash' && r[fiSubOpt[f]!]) return `Fixed with Sash: ${r[fiSubOpt[f]!]}`;
             if (t === 'L&R D' && r[fiSubOpt[f]!]) return `L&R D: ${r[fiSubOpt[f]!]}`;
+            if (t === 'Lift and Roll Window' && r[fiSubOpt[f]!]) return `Lift and Roll Window: ${r[fiSubOpt[f]!]}`;
             return t;
           }).filter((t): t is string => Boolean(t))
         )

@@ -6378,18 +6378,24 @@ export default function SummaryPage() {
                             <CellInput rowId={row.id} field="qty2" value={row.qty2} onChange={(v) => updateRow(row.id, 'qty2', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <CellDropdown rowId={row.id} field="type" value={row.type} onChange={(v) => updateRow(row.id, 'type', v)} options={WINDOW_TYPES} redirectOnValue={{ value: 'Fixed with Sash', toField: 'typeSubOption' }} />
+                            <CellDropdown rowId={row.id} field="type" value={row.type} onChange={(v) => updateRow(row.id, 'type', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift and Roll Window'], toField: 'typeSubOption' }} />
                             {row.type === 'Fixed with Sash' && (
                               <CellDropdown rowId={row.id} field="typeSubOption" value={row.typeSubOption || ''} onChange={(v) => updateRow(row.id, 'typeSubOption', v)} options={WINDOW_TYPES} />
+                            )}
+                            {row.type === 'Lift and Roll Window' && (
+                              <CellDropdown rowId={row.id} field="typeSubOption" value={row.typeSubOption || ''} onChange={(v) => updateRow(row.id, 'typeSubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateRow(row.id, 'type', ''); }} />
                             )}
                           </td>
                           <td className="px-0.5 py-1 align-top">
                             <CellInput rowId={row.id} field="qty3" value={row.qty3} onChange={(v) => updateRow(row.id, 'qty3', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <CellDropdown rowId={row.id} field="type2" value={row.type2} onChange={(v) => updateRow(row.id, 'type2', v)} options={WINDOW_TYPES} redirectOnValue={{ value: 'Fixed with Sash', toField: 'type2SubOption' }} />
+                            <CellDropdown rowId={row.id} field="type2" value={row.type2} onChange={(v) => updateRow(row.id, 'type2', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift and Roll Window'], toField: 'type2SubOption' }} />
                             {row.type2 === 'Fixed with Sash' && (
                               <CellDropdown rowId={row.id} field="type2SubOption" value={row.type2SubOption || ''} onChange={(v) => updateRow(row.id, 'type2SubOption', v)} options={WINDOW_TYPES} />
+                            )}
+                            {row.type2 === 'Lift and Roll Window' && (
+                              <CellDropdown rowId={row.id} field="type2SubOption" value={row.type2SubOption || ''} onChange={(v) => updateRow(row.id, 'type2SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateRow(row.id, 'type2', ''); }} />
                             )}
                           </td>
                           {showType3 && (
@@ -6399,9 +6405,12 @@ export default function SummaryPage() {
                           )}
                           {showType3 && (
                             <td className="px-0.5 py-1 align-top">
-                              <CellDropdown rowId={row.id} field="type3" value={row.type3} onChange={(v) => updateRow(row.id, 'type3', v)} options={WINDOW_TYPES} redirectOnValue={{ value: 'Fixed with Sash', toField: 'type3SubOption' }} />
+                              <CellDropdown rowId={row.id} field="type3" value={row.type3} onChange={(v) => updateRow(row.id, 'type3', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift and Roll Window'], toField: 'type3SubOption' }} />
                               {row.type3 === 'Fixed with Sash' && (
                                 <CellDropdown rowId={row.id} field="type3SubOption" value={row.type3SubOption || ''} onChange={(v) => updateRow(row.id, 'type3SubOption', v)} options={WINDOW_TYPES} />
+                              )}
+                              {row.type3 === 'Lift and Roll Window' && (
+                                <CellDropdown rowId={row.id} field="type3SubOption" value={row.type3SubOption || ''} onChange={(v) => updateRow(row.id, 'type3SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateRow(row.id, 'type3', ''); }} />
                               )}
                             </td>
                           )}
@@ -6412,9 +6421,12 @@ export default function SummaryPage() {
                           )}
                           {showType4 && (
                             <td className="px-0.5 py-1 align-top">
-                              <CellDropdown rowId={row.id} field="type4" value={row.type4} onChange={(v) => updateRow(row.id, 'type4', v)} options={WINDOW_TYPES} redirectOnValue={{ value: 'Fixed with Sash', toField: 'type4SubOption' }} />
+                              <CellDropdown rowId={row.id} field="type4" value={row.type4} onChange={(v) => updateRow(row.id, 'type4', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift and Roll Window'], toField: 'type4SubOption' }} />
                               {row.type4 === 'Fixed with Sash' && (
                                 <CellDropdown rowId={row.id} field="type4SubOption" value={row.type4SubOption || ''} onChange={(v) => updateRow(row.id, 'type4SubOption', v)} options={WINDOW_TYPES} />
+                              )}
+                              {row.type4 === 'Lift and Roll Window' && (
+                                <CellDropdown rowId={row.id} field="type4SubOption" value={row.type4SubOption || ''} onChange={(v) => updateRow(row.id, 'type4SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateRow(row.id, 'type4', ''); }} />
                               )}
                             </td>
                           )}
