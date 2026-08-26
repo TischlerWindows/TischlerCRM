@@ -22,7 +22,11 @@ function getValidOptionsForType(t: string): string[] {
       ? ['Threshold #6', 'Threshold #6C', 'Threshold ADA']
       : ['Threshold #7', 'Threshold #8', 'Threshold ADA'];
   }
-  if (lo === 'l&r d' || lo.startsWith('l&r d:') || lo.startsWith('l&r d ') || lo.startsWith('lift and roll window:')) return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
+  if (lo === 'l&r d' || lo.startsWith('l&r d:') || lo.startsWith('l&r d ') || lo.startsWith('lift and roll window:') || lo.startsWith('lift & slide d:') || lo.startsWith('lift & slide window:') || lo === 'lift & slide d' || lo === 'lift & slide window') return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
+  // Arcadia-specific door names map to the same options as their Tischler equivalents
+  if (lo === 'inswing d' || lo === 'outswing d' || lo === 'inswing french d' || lo === 'outswing french d') {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH'];
+  }
   if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
     return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #6', 'Threshold #6C', 'Threshold ADA'];
   }
@@ -182,7 +186,7 @@ function buildRoughHardwareText(
   // Include L&R D pattern types (stored as 'L&R D: Pattern X') alongside bare 'L&R D'.
   // Also include 'Lift and Roll Window: Pattern X' patterns.
   const lrActiveTypes = Array.from(activeTypes).filter(
-    (t) => t === 'L&R D' || t.startsWith('L&R D:') || t === 'Lift and Roll Window' || t.startsWith('Lift and Roll Window:')
+    (t) => t === 'L&R D' || t.startsWith('L&R D:') || t === 'Lift and Roll Window' || t.startsWith('Lift and Roll Window:') || t === 'Lift & Slide D' || t.startsWith('Lift & Slide D:') || t === 'Lift & Slide Window' || t.startsWith('Lift & Slide Window:')
   );
   if (lrActiveTypes.length > 0) {
     // Product-type options are keyed by 'L&R D' (the bare type); pattern sub-type
@@ -593,9 +597,12 @@ function expandProductTypeName(name: string): string {
   if (/^L&R D:/.test(name)) {
     return 'Lift & Roll Door: ' + name.slice('L&R D:'.length).trim();
   }
-  // Same for Lift and Roll Window patterns
-  if (/^Lift and Roll Window:/i.test(name)) {
-    return 'Lift & Roll Window: ' + name.replace(/^Lift and Roll Window:\s*/i, '');
+  // Arcadia Lift & Slide patterns
+  if (/^Lift & Slide D:/i.test(name)) {
+    return 'Lift & Slide Door: ' + name.replace(/^Lift & Slide D:\s*/i, '');
+  }
+  if (/^Lift & Slide Window:/i.test(name)) {
+    return 'Lift & Slide Window: ' + name.replace(/^Lift & Slide Window:\s*/i, '');
   }
   const expanded = name
     .replace(/\bL&R D\b/g, 'Lift & Roll Door')
@@ -679,8 +686,8 @@ function getJambDepth(typeName: string, sashMm: number): string | null {
     if (sashMm === 90) return '9-7/16"';
     return null;
   }
-  // L&R D / Lift and Roll — jamb depth depends on the pattern sub-type
-  if (lo.includes('l&r') || (lo.includes('lift') && (lo.includes('roll') || lo.includes('rolling')))) {
+  // L&R D / Lift and Roll / Lift & Slide — jamb depth depends on the pattern sub-type
+  if (lo.includes('l&r') || (lo.includes('lift') && (lo.includes('roll') || lo.includes('rolling') || lo.includes('slide')))) {
     // Pattern-specific jamb depths; extracted from typeName after the colon (e.g. 'L&R D: Pattern 1F')
     const patternMatch = typeName.match(/Pattern\s+(\S+)/i);
     const pattern = patternMatch ? patternMatch[1]!.toUpperCase() : '';
@@ -1031,6 +1038,8 @@ export function buildTokenMap(
             if (t === 'Fixed with Sash' && r[subOptMap[f]!]) return `Fixed with Sash: ${r[subOptMap[f]!]}`;
             if (t === 'L&R D' && r[subOptMap[f]!]) return `L&R D: ${r[subOptMap[f]!]}`;
             if (t === 'Lift and Roll Window' && r[subOptMap[f]!]) return `Lift and Roll Window: ${r[subOptMap[f]!]}`;
+            if (t === 'Lift & Slide Window' && r[subOptMap[f]!]) return `Lift & Slide Window: ${r[subOptMap[f]!]}`;
+            if (t === 'Lift & Slide D' && r[subOptMap[f]!]) return `Lift & Slide D: ${r[subOptMap[f]!]}`;
             return t;
           }).filter((t): t is string => Boolean(t))
         )
@@ -1041,7 +1050,7 @@ export function buildTokenMap(
       for (const [typeName, opts] of Object.entries(pto)) {
         // L&R D and Lift and Roll Window pattern keys are formatted directly as single
         // entries — don't let the colon-split path below mis-pluralise 'Pattern 1Fs'.
-        if (typeName.startsWith('L&R D:') || typeName.startsWith('Lift and Roll Window:')) {
+        if (typeName.startsWith('L&R D:') || typeName.startsWith('Lift and Roll Window:') || typeName.startsWith('Lift & Slide D:') || typeName.startsWith('Lift & Slide Window:')) {
           if (activeTypes.size > 0 && !activeTypes.has(typeName)) continue;
           if (!Array.isArray(opts) || opts.length === 0) continue;
           const validSet = new Set(getValidOptionsForType(typeName));
@@ -1057,10 +1066,10 @@ export function buildTokenMap(
         // Bare 'L&R D' / 'Lift and Roll Window' key: emit entries for any active patterns
         // that don't have their own pto key (fallback / pre-patterns legacy path).
         const isLrBase = typeName === 'L&R D';
-        const isLrwBase = typeName === 'Lift and Roll Window';
+        const isLrwBase = typeName === 'Lift and Roll Window' || typeName === 'Lift & Slide Window' || typeName === 'Lift & Slide D';
         const isActive = activeTypes.has(typeName) ||
           (isLrBase && Array.from(activeTypes).some((t) => t.startsWith('L&R D:'))) ||
-          (isLrwBase && Array.from(activeTypes).some((t) => t.startsWith('Lift and Roll Window:')));
+          (isLrwBase && Array.from(activeTypes).some((t) => t.startsWith(typeName + ':')));
         if (activeTypes.size > 0 && !isActive) continue;
         if (!Array.isArray(opts) || opts.length === 0) continue;
         const validSet = new Set(getValidOptionsForType(typeName));
@@ -1113,9 +1122,9 @@ export function buildTokenMap(
         }
       }
 
-      // Final pass: emit any active L&R D / Lift and Roll Window patterns not yet in the output.
+      // Final pass: emit any active pattern types not yet in the output.
       for (const patternType of Array.from(activeTypes)) {
-        if (!patternType.startsWith('L&R D:') && !patternType.startsWith('Lift and Roll Window:')) continue;
+        if (!patternType.startsWith('L&R D:') && !patternType.startsWith('Lift and Roll Window:') && !patternType.startsWith('Lift & Slide D:') && !patternType.startsWith('Lift & Slide Window:')) continue;
         const displayName = expandProductTypeName(patternType);
         if (seenDisplayNames.has(displayName)) continue;
         seenDisplayNames.add(displayName);
@@ -1146,6 +1155,8 @@ export function buildTokenMap(
             if (t === 'Fixed with Sash' && r[rhSubOpt[f]!]) return `Fixed with Sash: ${r[rhSubOpt[f]!]}`;
             if (t === 'L&R D' && r[rhSubOpt[f]!]) return `L&R D: ${r[rhSubOpt[f]!]}`;
             if (t === 'Lift and Roll Window' && r[rhSubOpt[f]!]) return `Lift and Roll Window: ${r[rhSubOpt[f]!]}`;
+            if (t === 'Lift & Slide Window' && r[rhSubOpt[f]!]) return `Lift & Slide Window: ${r[rhSubOpt[f]!]}`;
+            if (t === 'Lift & Slide D' && r[rhSubOpt[f]!]) return `Lift & Slide D: ${r[rhSubOpt[f]!]}`;
             return t;
           }).filter((t): t is string => Boolean(t))
         )
@@ -1173,6 +1184,8 @@ export function buildTokenMap(
             if (t === 'Fixed with Sash' && r[fiSubOpt[f]!]) return `Fixed with Sash: ${r[fiSubOpt[f]!]}`;
             if (t === 'L&R D' && r[fiSubOpt[f]!]) return `L&R D: ${r[fiSubOpt[f]!]}`;
             if (t === 'Lift and Roll Window' && r[fiSubOpt[f]!]) return `Lift and Roll Window: ${r[fiSubOpt[f]!]}`;
+            if (t === 'Lift & Slide Window' && r[fiSubOpt[f]!]) return `Lift & Slide Window: ${r[fiSubOpt[f]!]}`;
+            if (t === 'Lift & Slide D' && r[fiSubOpt[f]!]) return `Lift & Slide D: ${r[fiSubOpt[f]!]}`;
             return t;
           }).filter((t): t is string => Boolean(t))
         )

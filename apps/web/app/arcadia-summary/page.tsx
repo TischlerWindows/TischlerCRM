@@ -128,7 +128,6 @@ const WINDOW_TYPES = [
   'Inswing',
   'Push Outswing',
   'Crank Outswing',
-  'Offset Simulated DH (2 Glass Fields)',
   'Simulated DH (1 glass Field and a 44MM)',
   'Direct Glaze',
   'Fixed with Sash',
@@ -136,43 +135,26 @@ const WINDOW_TYPES = [
   'Awning',
   'Tilt-in',
   'Pivot',
-  'Single Hung Concealed Balance',
-  'Double Hung Concealed Balance',
-  'Triple Hung Concealed Balance',
-  'Single Hung Weight and Chain',
-  'Double Hung Weight and Chain',
-  'Triple Hung Weight and Chain',
-  'Double Hung Cross Cable Balance System',
-  'Triple Hung Cross Cable Balance System',
   'Inswing French',
   'Inswing T & T French',
   'Outswing French',
-  'French Offset Simulated DH (2 Glass Fields)',
   'French Simulated DH (1 glass Field and a 44MM)',
-  'Lift and Roll Window',
+  'Lift & Slide Window',
   'Inswing Folding Window',
   'Outswing Folding Window'
 ];
 
 // Door type options
 const DOOR_TYPES = [
-  'Inswing GD',
-  'Outswing GD',
+  'Inswing D',
+  'Outswing D',
   'Outswing Folding',
   'Inswing Folding',
-  'L&R D',
-  'Inswing DD',
-  'Outswing DD',
+  'Lift & Slide D',
   'Fixed with Sash',
   'Direct Glaze',
-  'Inswing House Door',
-  'Outswing House Door',
-  'Inswing French House Door',
-  'Outswing French House Door',
-  'Inswing French GD',
-  'Outswing French GD',
-  'Inswing French DD',
-  'Outswing French DD',
+  'Inswing French D',
+  'Outswing French D',
   'Inswing Pivot',
   'Outswing Pivot'
 ];
@@ -2215,8 +2197,8 @@ export default function SummaryPage() {
         const t = r[f];
         if (!t) return null;
         if (t === 'Fixed with Sash' && r[subOptFieldMap[f]!]) return `Fixed with Sash: ${r[subOptFieldMap[f]!]}`;
-        if (t === 'L&R D' && r[subOptFieldMap[f]!]) return `L&R D: ${r[subOptFieldMap[f]!]}`;
-        if (t === 'Lift and Roll Window' && r[subOptFieldMap[f]!]) return `Lift and Roll Window: ${r[subOptFieldMap[f]!]}`;
+        if (t === 'Lift & Slide D' && r[subOptFieldMap[f]!]) return `Lift & Slide D: ${r[subOptFieldMap[f]!]}`;
+        if (t === 'Lift & Slide Window' && r[subOptFieldMap[f]!]) return `Lift & Slide Window: ${r[subOptFieldMap[f]!]}`;
         return t;
       }).filter(Boolean))
     )) as string[];
@@ -2232,7 +2214,7 @@ export default function SummaryPage() {
           .filter((r: any) => allTypeFields.some(f => {
             const t = r[f];
             if (!t) return false;
-            const norm = (t === 'Fixed with Sash' && r[subOptFieldMap[f]!]) ? `Fixed with Sash: ${r[subOptFieldMap[f]!]}` : (t === 'L&R D' && r[subOptFieldMap[f]!]) ? `L&R D: ${r[subOptFieldMap[f]!]}` : (t === 'Lift and Roll Window' && r[subOptFieldMap[f]!]) ? `Lift and Roll Window: ${r[subOptFieldMap[f]!]}` : t;
+            const norm = (t === 'Fixed with Sash' && r[subOptFieldMap[f]!]) ? `Fixed with Sash: ${r[subOptFieldMap[f]!]}` : (t === 'Lift & Slide D' && r[subOptFieldMap[f]!]) ? `Lift & Slide D: ${r[subOptFieldMap[f]!]}` : (t === 'Lift & Slide Window' && r[subOptFieldMap[f]!]) ? `Lift & Slide Window: ${r[subOptFieldMap[f]!]}` : t;
             return norm === typeName;
           }))
           .map((r: any) => {
@@ -3074,7 +3056,7 @@ export default function SummaryPage() {
             updatedRow.type2,
             updatedRow.type3,
             updatedRow.type4
-          ].some(t => t === 'Lift and Roll Window' || t === 'L&R D');
+          ].some(t => t === 'Lift & Slide Window' || t === 'Lift & Slide D');
           
           updatedRow.magneticContactUnit = operableSashesEach ?
             (operableSashesEach * (isLiftAndRoll ? 96 : 40)).toString() : '';
@@ -3112,7 +3094,7 @@ export default function SummaryPage() {
             updatedRow.type2,
             updatedRow.type3,
             updatedRow.type4
-          ].some(t => t === 'Lift and Roll Window' || t === 'L&R D');
+          ].some(t => t === 'Lift & Slide Window' || t === 'Lift & Slide D');
           
           const operableSashesEach = parseFloat(updatedRow.operableSashesEach);
           updatedRow.magneticContactUnit = operableSashesEach ? 
@@ -3389,7 +3371,7 @@ export default function SummaryPage() {
             updatedRow.type2,
             updatedRow.type3,
             updatedRow.type4
-          ].some(t => t === 'Lift and Roll Window' || t === 'L&R D');
+          ].some(t => t === 'Lift & Slide Window' || t === 'Lift & Slide D');
           
           updatedRow.magneticContactUnit = operableSashesEach ?
             (operableSashesEach * (isLiftAndRoll ? 96 : 40)).toString() : '';
@@ -3427,7 +3409,7 @@ export default function SummaryPage() {
             updatedRow.type2,
             updatedRow.type3,
             updatedRow.type4
-          ].some(t => t === 'Lift and Roll Window' || t === 'L&R D');
+          ].some(t => t === 'Lift & Slide Window' || t === 'Lift & Slide D');
           
           const operableSashesEach = parseFloat(updatedRow.operableSashesEach);
           updatedRow.magneticContactUnit = operableSashesEach ? 
@@ -4399,8 +4381,8 @@ export default function SummaryPage() {
                             const t = (r as any)[f];
                             if (!t) return null;
                             if (t === 'Fixed with Sash' && (r as any)[subOptFieldMapEd[f]!]) return `Fixed with Sash: ${(r as any)[subOptFieldMapEd[f]!]}`;
-                            if (t === 'L&R D' && (r as any)[subOptFieldMapEd[f]!]) return `L&R D: ${(r as any)[subOptFieldMapEd[f]!]}`;
-                            if (t === 'Lift and Roll Window' && (r as any)[subOptFieldMapEd[f]!]) return `Lift and Roll Window: ${(r as any)[subOptFieldMapEd[f]!]}`;
+                            if (t === 'Lift & Slide D' && (r as any)[subOptFieldMapEd[f]!]) return `Lift & Slide D: ${(r as any)[subOptFieldMapEd[f]!]}`;
+                            if (t === 'Lift & Slide Window' && (r as any)[subOptFieldMapEd[f]!]) return `Lift & Slide Window: ${(r as any)[subOptFieldMapEd[f]!]}`;
                             return t;
                           }).filter(Boolean))
                         )) as string[];
@@ -4427,13 +4409,13 @@ export default function SummaryPage() {
                             <label className="block text-sm font-medium text-gray-700">Product Type Options</label>
                             {uniqueTypes.map(typeName => {
                               const opts = getOptionsForType(typeName);
-                              // L&R D pattern key uses colon in storage; fall back to bare 'L&R D'
+                              // Lift & Slide D pattern key uses colon in storage; fall back to bare 'Lift & Slide D'
                               // pto if no pattern-specific entry has been saved yet.
                               const ptoKey = typeName;
-                              const fallbackKey = typeName.startsWith('L&R D:') ? 'L&R D' : null;
+                              const fallbackKey = typeName.startsWith('Lift & Slide D:') ? 'Lift & Slide D' : null;
                               const selected = (pto[ptoKey] ?? (fallbackKey ? pto[fallbackKey] : undefined) ?? []).filter((o: string) => opts.includes(o));
-                              const displayLabel = typeName.startsWith('L&R D:')
-                                ? 'L&R D ' + typeName.slice('L&R D:'.length).trim()
+                              const displayLabel = typeName.startsWith('Lift & Slide D:')
+                                ? 'Lift & Slide D ' + typeName.slice('Lift & Slide D:'.length).trim()
                                 : typeName;
                               let prevCategory: string | null = null;
                               return (
@@ -6380,11 +6362,11 @@ export default function SummaryPage() {
                             <CellInput rowId={row.id} field="qty2" value={row.qty2} onChange={(v) => updateRow(row.id, 'qty2', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <CellDropdown rowId={row.id} field="type" value={row.type} onChange={(v) => updateRow(row.id, 'type', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift and Roll Window'], toField: 'typeSubOption' }} />
+                            <CellDropdown rowId={row.id} field="type" value={row.type} onChange={(v) => updateRow(row.id, 'type', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift & Slide Window'], toField: 'typeSubOption' }} />
                             {row.type === 'Fixed with Sash' && (
                               <CellDropdown rowId={row.id} field="typeSubOption" value={row.typeSubOption || ''} onChange={(v) => updateRow(row.id, 'typeSubOption', v)} options={WINDOW_TYPES} />
                             )}
-                            {row.type === 'Lift and Roll Window' && (
+                            {row.type === 'Lift & Slide Window' && (
                               <CellDropdown rowId={row.id} field="typeSubOption" value={row.typeSubOption || ''} onChange={(v) => updateRow(row.id, 'typeSubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateRow(row.id, 'type', ''); }} />
                             )}
                           </td>
@@ -6392,11 +6374,11 @@ export default function SummaryPage() {
                             <CellInput rowId={row.id} field="qty3" value={row.qty3} onChange={(v) => updateRow(row.id, 'qty3', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <CellDropdown rowId={row.id} field="type2" value={row.type2} onChange={(v) => updateRow(row.id, 'type2', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift and Roll Window'], toField: 'type2SubOption' }} />
+                            <CellDropdown rowId={row.id} field="type2" value={row.type2} onChange={(v) => updateRow(row.id, 'type2', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift & Slide Window'], toField: 'type2SubOption' }} />
                             {row.type2 === 'Fixed with Sash' && (
                               <CellDropdown rowId={row.id} field="type2SubOption" value={row.type2SubOption || ''} onChange={(v) => updateRow(row.id, 'type2SubOption', v)} options={WINDOW_TYPES} />
                             )}
-                            {row.type2 === 'Lift and Roll Window' && (
+                            {row.type2 === 'Lift & Slide Window' && (
                               <CellDropdown rowId={row.id} field="type2SubOption" value={row.type2SubOption || ''} onChange={(v) => updateRow(row.id, 'type2SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateRow(row.id, 'type2', ''); }} />
                             )}
                           </td>
@@ -6407,11 +6389,11 @@ export default function SummaryPage() {
                           )}
                           {showType3 && (
                             <td className="px-0.5 py-1 align-top">
-                              <CellDropdown rowId={row.id} field="type3" value={row.type3} onChange={(v) => updateRow(row.id, 'type3', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift and Roll Window'], toField: 'type3SubOption' }} />
+                              <CellDropdown rowId={row.id} field="type3" value={row.type3} onChange={(v) => updateRow(row.id, 'type3', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift & Slide Window'], toField: 'type3SubOption' }} />
                               {row.type3 === 'Fixed with Sash' && (
                                 <CellDropdown rowId={row.id} field="type3SubOption" value={row.type3SubOption || ''} onChange={(v) => updateRow(row.id, 'type3SubOption', v)} options={WINDOW_TYPES} />
                               )}
-                              {row.type3 === 'Lift and Roll Window' && (
+                              {row.type3 === 'Lift & Slide Window' && (
                                 <CellDropdown rowId={row.id} field="type3SubOption" value={row.type3SubOption || ''} onChange={(v) => updateRow(row.id, 'type3SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateRow(row.id, 'type3', ''); }} />
                               )}
                             </td>
@@ -6423,11 +6405,11 @@ export default function SummaryPage() {
                           )}
                           {showType4 && (
                             <td className="px-0.5 py-1 align-top">
-                              <CellDropdown rowId={row.id} field="type4" value={row.type4} onChange={(v) => updateRow(row.id, 'type4', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift and Roll Window'], toField: 'type4SubOption' }} />
+                              <CellDropdown rowId={row.id} field="type4" value={row.type4} onChange={(v) => updateRow(row.id, 'type4', v)} options={WINDOW_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift & Slide Window'], toField: 'type4SubOption' }} />
                               {row.type4 === 'Fixed with Sash' && (
                                 <CellDropdown rowId={row.id} field="type4SubOption" value={row.type4SubOption || ''} onChange={(v) => updateRow(row.id, 'type4SubOption', v)} options={WINDOW_TYPES} />
                               )}
-                              {row.type4 === 'Lift and Roll Window' && (
+                              {row.type4 === 'Lift & Slide Window' && (
                                 <CellDropdown rowId={row.id} field="type4SubOption" value={row.type4SubOption || ''} onChange={(v) => updateRow(row.id, 'type4SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateRow(row.id, 'type4', ''); }} />
                               )}
                             </td>
@@ -6650,11 +6632,11 @@ export default function SummaryPage() {
                             <CellInput rowId={row.id} field="qty2" value={row.qty2} onChange={(v) => updateDoorRow(row.id, 'qty2', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <CellDropdown rowId={row.id} field="type" value={row.type} onChange={(v) => updateDoorRow(row.id, 'type', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'L&R D'], toField: 'typeSubOption' }} />
+                            <CellDropdown rowId={row.id} field="type" value={row.type} onChange={(v) => updateDoorRow(row.id, 'type', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift & Slide D'], toField: 'typeSubOption' }} />
                             {row.type === 'Fixed with Sash' && (
                               <CellDropdown rowId={row.id} field="typeSubOption" value={row.typeSubOption || ''} onChange={(v) => updateDoorRow(row.id, 'typeSubOption', v)} options={DOOR_TYPES} />
                             )}
-                            {row.type === 'L&R D' && (
+                            {row.type === 'Lift & Slide D' && (
                               <CellDropdown rowId={row.id} field="typeSubOption" value={row.typeSubOption || ''} onChange={(v) => updateDoorRow(row.id, 'typeSubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateDoorRow(row.id, 'type', ''); }} />
                             )}
                           </td>
@@ -6662,11 +6644,11 @@ export default function SummaryPage() {
                             <CellInput rowId={row.id} field="qty3" value={row.qty3} onChange={(v) => updateDoorRow(row.id, 'qty3', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <CellDropdown rowId={row.id} field="type2" value={row.type2} onChange={(v) => updateDoorRow(row.id, 'type2', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'L&R D'], toField: 'type2SubOption' }} />
+                            <CellDropdown rowId={row.id} field="type2" value={row.type2} onChange={(v) => updateDoorRow(row.id, 'type2', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift & Slide D'], toField: 'type2SubOption' }} />
                             {row.type2 === 'Fixed with Sash' && (
                               <CellDropdown rowId={row.id} field="type2SubOption" value={row.type2SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type2SubOption', v)} options={DOOR_TYPES} />
                             )}
-                            {row.type2 === 'L&R D' && (
+                            {row.type2 === 'Lift & Slide D' && (
                               <CellDropdown rowId={row.id} field="type2SubOption" value={row.type2SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type2SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateDoorRow(row.id, 'type2', ''); }} />
                             )}
                           </td>
@@ -6677,11 +6659,11 @@ export default function SummaryPage() {
                           )}
                           {showType3 && (
                             <td className="px-0.5 py-1 align-top">
-                              <CellDropdown rowId={row.id} field="type3" value={row.type3} onChange={(v) => updateDoorRow(row.id, 'type3', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'L&R D'], toField: 'type3SubOption' }} />
+                              <CellDropdown rowId={row.id} field="type3" value={row.type3} onChange={(v) => updateDoorRow(row.id, 'type3', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift & Slide D'], toField: 'type3SubOption' }} />
                               {row.type3 === 'Fixed with Sash' && (
                                 <CellDropdown rowId={row.id} field="type3SubOption" value={row.type3SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type3SubOption', v)} options={DOOR_TYPES} />
                               )}
-                              {row.type3 === 'L&R D' && (
+                              {row.type3 === 'Lift & Slide D' && (
                                 <CellDropdown rowId={row.id} field="type3SubOption" value={row.type3SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type3SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateDoorRow(row.id, 'type3', ''); }} />
                               )}
                             </td>
@@ -6693,11 +6675,11 @@ export default function SummaryPage() {
                           )}
                           {showType4 && (
                             <td className="px-0.5 py-1 align-top">
-                              <CellDropdown rowId={row.id} field="type4" value={row.type4} onChange={(v) => updateDoorRow(row.id, 'type4', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'L&R D'], toField: 'type4SubOption' }} />
+                              <CellDropdown rowId={row.id} field="type4" value={row.type4} onChange={(v) => updateDoorRow(row.id, 'type4', v)} options={DOOR_TYPES} redirectOnValue={{ value: ['Fixed with Sash', 'Lift & Slide D'], toField: 'type4SubOption' }} />
                               {row.type4 === 'Fixed with Sash' && (
                                 <CellDropdown rowId={row.id} field="type4SubOption" value={row.type4SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type4SubOption', v)} options={DOOR_TYPES} />
                               )}
-                              {row.type4 === 'L&R D' && (
+                              {row.type4 === 'Lift & Slide D' && (
                                 <CellDropdown rowId={row.id} field="type4SubOption" value={row.type4SubOption || ''} onChange={(v) => updateDoorRow(row.id, 'type4SubOption', v)} options={LR_DOOR_PATTERNS} onEditEnd={(v) => { if (!v) updateDoorRow(row.id, 'type4', ''); }} />
                               )}
                             </td>
