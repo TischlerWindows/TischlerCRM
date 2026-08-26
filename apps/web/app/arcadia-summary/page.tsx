@@ -1032,7 +1032,7 @@ export default function SummaryPage() {
       const opportunityName = searchParams.get('opportunityName') || '';
       const opportunityNumber = searchParams.get('opportunityNumber') || '';
       // Clear query params so refreshing doesn't re-create
-      router.replace('/summary');
+      router.replace('/arcadia-summary');
       // Fetch the opportunity record to pre-populate fields
       (async () => {
         let oppFields: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string; plansDated?: string; contactReceivingQuote?: string; accountReceivingQuote?: string; accountShippingAddress?: string; contactPrimaryPhone?: string; contactEmail?: string; contactCellPhone?: string } = {};
@@ -1083,7 +1083,7 @@ export default function SummaryPage() {
     if (editId) {
       const found = summaries.find(s => s.id === editId);
       if (found) {
-        router.replace('/summary');
+        router.replace('/arcadia-summary');
         void openSummaryForEdit(found);
       }
     }
