@@ -2183,7 +2183,9 @@ export default function SummaryPage() {
     const specHasHung = specWinRows.some(r => r.type?.toLowerCase?.()?.includes('hung'));
     addSpec('Glass Type', s.glassType === 'Custom Option' ? s.glassTypeCustom : s.glassType);
     if (specHasHung) addSpec('Hung Glass Type', s.hungType === 'Custom Option' ? s.hungTypeCustom : s.hungType);
-    if ((s.additionalGlassTypes || []).length > 0) addSpec('Additional Glass Type(s)', (s.additionalGlassTypes || []).join(', '));
+    // Additional Glass Types is excluded from the 3-col grid and rendered full-width below it.
+    const additionalGlassLabel = 'Additional Glass Type(s)';
+    const additionalGlassValue = (s.additionalGlassTypes || []).filter(Boolean).join(', ');
     addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
     addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
     addSpec('Spacer Bar Type', s.spacerBarType);
@@ -2198,7 +2200,21 @@ export default function SummaryPage() {
       }
       y += 12;
     }
-    y += 2;
+    // Render Additional Glass Types full-width so long values don't overflow into neighbour cells.
+    if (additionalGlassValue) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(...gray80 as [number, number, number]);
+      doc.text(additionalGlassLabel.toUpperCase(), 15, y);
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 30, 30);
+      const fullW = pw2 - 10;
+      const wrappedLines: string[] = doc.splitTextToSize(additionalGlassValue, fullW);
+      doc.text(wrappedLines, 15, y + 4);
+      y += 4 + wrappedLines.length * 4 + 4;
+    } else {
+      y += 2;
+    }
 
     // ── Product Type Options ──
     const ptoSaved = Array.isArray(s.productTypeOptions) ? {} : ((s.productTypeOptions as Record<string, string[]>) || {});
