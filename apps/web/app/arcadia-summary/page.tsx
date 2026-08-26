@@ -2215,6 +2215,8 @@ export default function SummaryPage() {
         const t = r[f];
         if (!t) return null;
         if (t === 'Fixed with Sash' && r[subOptFieldMap[f]!]) return `Fixed with Sash: ${r[subOptFieldMap[f]!]}`;
+        if (t === 'L&R D' && r[subOptFieldMap[f]!]) return `L&R D: ${r[subOptFieldMap[f]!]}`;
+        if (t === 'Lift and Roll Window' && r[subOptFieldMap[f]!]) return `Lift and Roll Window: ${r[subOptFieldMap[f]!]}`;
         return t;
       }).filter(Boolean))
     )) as string[];
@@ -2230,7 +2232,7 @@ export default function SummaryPage() {
           .filter((r: any) => allTypeFields.some(f => {
             const t = r[f];
             if (!t) return false;
-            const norm = (t === 'Fixed with Sash' && r[subOptFieldMap[f]!]) ? `Fixed with Sash: ${r[subOptFieldMap[f]!]}` : t;
+            const norm = (t === 'Fixed with Sash' && r[subOptFieldMap[f]!]) ? `Fixed with Sash: ${r[subOptFieldMap[f]!]}` : (t === 'L&R D' && r[subOptFieldMap[f]!]) ? `L&R D: ${r[subOptFieldMap[f]!]}` : (t === 'Lift and Roll Window' && r[subOptFieldMap[f]!]) ? `Lift and Roll Window: ${r[subOptFieldMap[f]!]}` : t;
             return norm === typeName;
           }))
           .map((r: any) => {
@@ -4398,6 +4400,7 @@ export default function SummaryPage() {
                             if (!t) return null;
                             if (t === 'Fixed with Sash' && (r as any)[subOptFieldMapEd[f]!]) return `Fixed with Sash: ${(r as any)[subOptFieldMapEd[f]!]}`;
                             if (t === 'L&R D' && (r as any)[subOptFieldMapEd[f]!]) return `L&R D: ${(r as any)[subOptFieldMapEd[f]!]}`;
+                            if (t === 'Lift and Roll Window' && (r as any)[subOptFieldMapEd[f]!]) return `Lift and Roll Window: ${(r as any)[subOptFieldMapEd[f]!]}`;
                             return t;
                           }).filter(Boolean))
                         )) as string[];
