@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useRef, createContext, useContext, Fragment } from 'react';
 import { useIsMobileViewport, useIsLandscapeMobile } from '@/lib/use-is-mobile-viewport';
@@ -2028,7 +2028,7 @@ export default function SummaryPage() {
       'TuS Pos', 'Arch Pos', 'Qty', 'W (MM)', 'H (MM)', 'W (Ft/In)', 'H (Ft/In)',
       'Sq Ft Ea', 'Sq Ft Tot', 'Op.Sash Ea', 'Op.Sash Tot',
       'Type', 'Remarks',
-      'Fields Tot', 'Site Mull', '\u20AC/Unit', 'NET \u20AC Tot',
+      'Fields Tot', 'Site Mull', '$/Unit', 'NET $ Tot',
     ];
     const dtColW = [12, 40, 9, 12, 12, 12, 11, 12, 12, 11, 11, 30, 18, 13, 13, 14, 14];
     const buildDtRow = (r: any): string[] => [
@@ -2276,7 +2276,7 @@ export default function SummaryPage() {
 
     // ── Quote Totals ──
     y = drawSectionTitle(doc, y, 'Quote Totals');
-    const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%_', 'FINAL', 'FINAL W/ADJ', 'Full', 'Disc', 'Final', 'Adj'];
+    const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET $', 'Full', '%_', 'FINAL', 'FINAL W/ADJ', 'Full', 'Disc', 'Final', 'Adj'];
     const qtColW = [22, 9, 9, 14, 18, 17, 16, 16, 16, 9, 9, 9, 9];
     const qtColColors: { [colIdx: number]: [number, number, number] } = { 9: [219, 234, 254], 10: [219, 234, 254], 11: [220, 252, 231], 12: [243, 232, 255] };
     const qtColTextColors: { [colIdx: number]: [number, number, number] } = { 5: [37, 99, 235], 6: [37, 99, 235], 7: [22, 163, 74], 8: [126, 34, 206], 9: [37, 99, 235], 10: [37, 99, 235], 11: [22, 163, 74], 12: [126, 34, 206] };
@@ -2287,7 +2287,7 @@ export default function SummaryPage() {
     const fmtDollar = (v: string | undefined) => { const n = pv(v); return n ? '$' + fmtInt(n) : '—'; };
     const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
       label, fmtInt(qty), fmtInt(fields), fmtInt(sqFt),
-      net ? '\u20AC' + fmtInt(net) : '—',
+      net ? '$' + fmtInt(net) : '—',
       fmtDollar(cat?.full), fmtDollar(cat?.pct), fmtDollar(cat?.final), fmtDollar(cat?.finalAdj),
     ];
 
@@ -2498,12 +2498,12 @@ export default function SummaryPage() {
       const r = (v: string | undefined) => (net && pv(v)) ? (pv(v) / net).toFixed(2) : '—';
       return [r(ao[key]?.full), r(ao[key]?.pct), r(ao[key]?.final)];
     };
-    const aoHeaders = ['Item', 'Qty', 'Details', 'NET \u20AC', 'Full', '%_', 'Final', 'Full', 'Disc', 'Final'];
+    const aoHeaders = ['Item', 'Qty', 'Details', 'NET $', 'Full', '%_', 'Final', 'Full', 'Disc', 'Final'];
     const aoColW = [25, 10, 32, 18, 17, 17, 18, 10, 10, 10];
     const aoCalcColColors: { [colIdx: number]: [number, number, number] } = { 7: [219, 234, 254], 8: [219, 234, 254], 9: [220, 252, 231] };
     const aoColTextColors: { [colIdx: number]: [number, number, number] } = { 4: [37, 99, 235], 5: [37, 99, 235], 6: [22, 163, 74], 7: [37, 99, 235], 8: [37, 99, 235], 9: [22, 163, 74] };
     const aoFmt = (key: string, field: string) => fmtDollar(aoV(key, field));
-    const aoFmtNet = (key: string) => { const n = pv(aoV(key, 'netEuro')); return n ? '€' + fmtInt(n) : '—'; };
+    const aoFmtNet = (key: string) => { const n = pv(aoV(key, 'netEuro')); return n ? '$' + fmtInt(n) : '—'; };
     // Combines labeled Frame/Wood/Mesh Type fields with the free-text Details
     // textbox (Window Screens/Door Screen Sash/Roll Screens) into one cell.
     const aoDetailsCell = (key: string, labeled: Array<[string, string]>): string => {
@@ -2530,12 +2530,12 @@ export default function SummaryPage() {
       ...(ao.customRows || []).map((cr: any) => {
         const net = pv(cr.netEuro);
         const r = (v: string | undefined) => (net && pv(v)) ? (pv(v) / net).toFixed(2) : '—';
-        return [cr.item || 'Custom', cr.qty || '—', cr.details || '—', net ? '\u20ac' + fmtInt(net) : '—', fmtDollar(cr.full), fmtDollar(cr.pct), fmtDollar(cr.final), r(cr.full), r(cr.pct), r(cr.final)];
+        return [cr.item || 'Custom', cr.qty || '—', cr.details || '—', net ? '$' + fmtInt(net) : '—', fmtDollar(cr.full), fmtDollar(cr.pct), fmtDollar(cr.final), r(cr.full), r(cr.pct), r(cr.final)];
       }),
       ...(ao.deductRows || []).map((cr: any) => {
         const net = pv(cr.netEuro);
         const r = (v: string | undefined) => (net && pv(v)) ? (pv(v) / net).toFixed(2) : '—';
-        return ['(-) ' + (cr.item || 'Deduct'), cr.qty || '—', cr.details || '—', net ? '\u20ac' + fmtInt(net) : '—', fmtDollar(cr.full) !== '\u2014' ? '('+fmtDollar(cr.full)+')' : '\u2014', fmtDollar(cr.pct) !== '\u2014' ? '('+fmtDollar(cr.pct)+')' : '\u2014', fmtDollar(cr.final) !== '\u2014' ? '('+fmtDollar(cr.final)+')' : '\u2014', r(cr.full), r(cr.pct), r(cr.final)];
+        return ['(-) ' + (cr.item || 'Deduct'), cr.qty || '—', cr.details || '—', net ? '$' + fmtInt(net) : '—', fmtDollar(cr.full) !== '\u2014' ? '('+fmtDollar(cr.full)+')' : '\u2014', fmtDollar(cr.pct) !== '\u2014' ? '('+fmtDollar(cr.pct)+')' : '\u2014', fmtDollar(cr.final) !== '\u2014' ? '('+fmtDollar(cr.final)+')' : '\u2014', r(cr.full), r(cr.pct), r(cr.final)];
       }),
       ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
     ].filter(row => [row[3], row[4], row[5], row[6]].some(v => v !== '—'));
@@ -2730,8 +2730,8 @@ export default function SummaryPage() {
   };
 
   // Live "Total" row for the Page 1 Windows/Doors grids — mirrors buildTotalRow()
-  // in the PDF export (sum of Qty/Sq Ft/Op. Sashes/Fields/Site Mullions/NET €,
-  // with NET €(Each) shown as the blended per-unit average).
+  // in the PDF export (sum of Qty/Sq Ft/Op. Sashes/Fields/Site Mullions/NET $,
+  // with NET $(Each) shown as the blended per-unit average).
   const computeGridTotals = (rows: (SummaryRow | DoorRow)[]) => {
     const sum = (field: string) => rows.reduce((acc, r) => acc + (parseFloat((r as any)[field]) || 0), 0);
     const qty = sum('qty');
@@ -2750,7 +2750,7 @@ export default function SummaryPage() {
   const renderGridTotalRow = (rows: (SummaryRow | DoorRow)[], keyPrefix: string) => {
     const t = computeGridTotals(rows);
     const fmtN = (v: number) => v ? Math.round(v).toLocaleString('en-US') : '';
-    const fmtEuro = (v: number) => v ? `\u20AC${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+    const fmtEuro = (v: number) => v ? `${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
     const td = (content?: React.ReactNode, extra?: string) => (
       <td className={`px-0.5 py-1.5 text-xs text-gray-900${extra ? ` ${extra}` : ''}`}>{content}</td>
     );
@@ -2773,7 +2773,7 @@ export default function SummaryPage() {
         {td(fmtN(t.fieldsTotal))}
         {td()}
         {td(fmtN(t.siteMullionsTotal))}
-        {td(t.netEuroUnit ? `\u20AC${t.netEuroUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '')}
+        {td(t.netEuroUnit ? `${t.netEuroUnit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '')}
         {td(fmtEuro(t.netEuroTotal))}
         {showMagneticContact && td()}
         {showMagneticContact && td()}
@@ -3041,7 +3041,7 @@ export default function SummaryPage() {
           // Also calculate Site Mullions (Total) - whole number
           const siteMullionsEach = parseFloat(updatedRow.siteMullionsEach);
           updatedRow.siteMullionsTotal = siteMullionsEach && qty ? Math.round(siteMullionsEach * qty).toString() : '';
-          // Also calculate Net € (Total) - currency format
+          // Also calculate Net $ (Total) - currency format
           const netEuroEach = parseFloat(updatedRow.netEuroEach);
           updatedRow.netEuroTotal = netEuroEach && qty ? (netEuroEach * qty).toFixed(2) : '';
           // Also calculate Magnetic Contact Per Position
@@ -3089,7 +3089,7 @@ export default function SummaryPage() {
           updatedRow.fieldsTotal = fieldsEach && qty ? Math.round(fieldsEach * qty).toString() : '';
         }
         
-        // Auto-calculate Net € (Total) when Net € (Each) changes - currency format
+        // Auto-calculate Net $ (Total) when Net $ (Each) changes - currency format
         if (field === 'netEuroEach') {
           const netEuroEach = parseFloat(value);
           const qty = parseFloat(updatedRow.qty);
@@ -3356,7 +3356,7 @@ export default function SummaryPage() {
           // Also calculate Site Mullions (Total) - whole number
           const siteMullionsEach = parseFloat(updatedRow.siteMullionsEach);
           updatedRow.siteMullionsTotal = siteMullionsEach && qty ? Math.round(siteMullionsEach * qty).toString() : '';
-          // Also calculate Net € (Total) - currency format
+          // Also calculate Net $ (Total) - currency format
           const netEuroEach = parseFloat(updatedRow.netEuroEach);
           updatedRow.netEuroTotal = netEuroEach && qty ? (netEuroEach * qty).toFixed(2) : '';
           // Also calculate Magnetic Contact Per Position
@@ -3404,7 +3404,7 @@ export default function SummaryPage() {
           updatedRow.fieldsTotal = fieldsEach && qty ? Math.round(fieldsEach * qty).toString() : '';
         }
         
-        // Auto-calculate Net € (Total) when Net € (Each) changes - currency format
+        // Auto-calculate Net $ (Total) when Net $ (Each) changes - currency format
         if (field === 'netEuroEach') {
           const netEuroEach = parseFloat(value);
           const qty = parseFloat(updatedRow.qty);
@@ -5082,14 +5082,14 @@ export default function SummaryPage() {
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[44px] md:min-w-0">Qty</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[48px] md:min-w-0">Fields</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[52px] md:min-w-0">Sq Ft</th>
-                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[88px] md:min-w-0">NET €</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[88px] md:min-w-0">NET $</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">Full</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">%</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">Final</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">+Adj</th>
-                                  <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">€ Full</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">$ Full</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">Disc</th>
-                                  <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">€ Final</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">$ Final</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">+Adj</th>
                                 </tr>
                               </thead>
@@ -5099,7 +5099,7 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewF)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewSq)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{ewN ? `€${fmtInt(ewN)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{ewN ? `$${fmtInt(ewN)}` : '—'}</td>
                                   {inputCell('euroWindows','full')}{inputCell('euroWindows','pct')}{inputCell('euroWindows','final')}{inputCell('euroWindows','finalAdj')}
                                   <td className="px-4 py-3 text-right text-blue-600 border-l-4 border-blue-300 bg-blue-50/30">{lEwCalc.full ? fmt(lEwCalc.full) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-blue-600 bg-blue-50/30">{lEwCalc.disc ? fmt(lEwCalc.disc) : '—'}</td>
@@ -5111,7 +5111,7 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhF)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhSq)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{dhN ? `€${fmtInt(dhN)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{dhN ? `$${fmtInt(dhN)}` : '—'}</td>
                                   {inputCell('doubleHung','full')}{inputCell('doubleHung','pct')}{inputCell('doubleHung','final')}{inputCell('doubleHung','finalAdj')}
                                   <td className="px-4 py-3 text-right text-blue-400 border-l-4 border-blue-300 bg-blue-50/30">{lDhCalc.full ? fmt(lDhCalc.full) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-blue-400 bg-blue-50/30">{lDhCalc.disc ? fmt(lDhCalc.disc) : '—'}</td>
@@ -5123,7 +5123,7 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dF)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dSq)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{dN ? `€${fmtInt(dN)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{dN ? `$${fmtInt(dN)}` : '—'}</td>
                                   {inputCell('euroDoors','full')}{inputCell('euroDoors','pct')}{inputCell('euroDoors','final')}{inputCell('euroDoors','finalAdj')}
                                   <td className="px-4 py-3 text-right text-blue-600 border-l-4 border-blue-300 bg-blue-50/30">{lEdCalc.full ? fmt(lEdCalc.full) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-blue-600 bg-blue-50/30">{lEdCalc.disc ? fmt(lEdCalc.disc) : '—'}</td>
@@ -5135,7 +5135,7 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totF)}</td>
                                   <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totSq)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-900">{totN ? `€${fmtInt(totN)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900">{totN ? `$${fmtInt(totN)}` : '—'}</td>
                                   {(['full','pct','final','finalAdj'] as const).map(f => {
                                     const s = (p((locQtot?.euroWindows as any)?.[f])||0)+(p((locQtot?.doubleHung as any)?.[f])||0)+(p((locQtot?.euroDoors as any)?.[f])||0);
                                     return <td key={f} className="px-4 py-3 text-right text-gray-900">{s ? `$${fmtInt(s)}` : '—'}</td>;
@@ -5177,15 +5177,15 @@ export default function SummaryPage() {
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[44px] md:min-w-0">Qty</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[48px] md:min-w-0">Fields</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[52px] md:min-w-0">Sq Ft</th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[88px] md:min-w-0">NET €</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[88px] md:min-w-0">NET $</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">Full</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">%</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">Final</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">+Adj</th>
                                 {/* Calculated Totals headers — separated by thick border */}
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">€ Full</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">$ Full</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">Disc</th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">€ Final</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">$ Final</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">+Adj</th>
                               </tr>
                             </thead>
@@ -5201,7 +5201,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmtInt(euroWindowNet)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{euroWindowNet ? `$${fmtInt(euroWindowNet)}` : '—'}</td>
                                 {(['full','pct','final','finalAdj'] as const).map(f => catCell('euroWindows', f))}
                                 <td className="px-4 py-3 text-right text-blue-600 border-l-4 border-blue-300 bg-blue-50/30">{ewCalc.full ? fmt(ewCalc.full) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-blue-600 bg-blue-50/30">{ewCalc.disc ? fmt(ewCalc.disc) : '—'}</td>
@@ -5228,7 +5228,7 @@ export default function SummaryPage() {
                                     <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Qty</td>
                                     <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Fields</td>
                                     <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Sq Ft</td>
-                                    <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">NET €</td>
+                                    <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">NET $</td>
                                     <td colSpan={8}></td>
                                   </tr>
                                   {grouped.map(([type, vals]) => (
@@ -5237,7 +5237,7 @@ export default function SummaryPage() {
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.qty)}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.fields)}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.sqFt)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `€${fmtInt(vals.net)}` : '—'}</td>
+                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `$${fmtInt(vals.net)}` : '—'}</td>
                                       <td colSpan={8}></td>
                                     </tr>
                                   ))}
@@ -5254,7 +5254,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `€${fmtInt(doubleHungNet)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `$${fmtInt(doubleHungNet)}` : '—'}</td>
                                 {(['full','pct','final','finalAdj'] as const).map(f => catCell('doubleHung', f))}
                                 <td className="px-4 py-3 text-right text-blue-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? fmt(dhCalc.full) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-blue-400 bg-blue-50/30">{dhCalc.disc ? fmt(dhCalc.disc) : '—'}</td>
@@ -5281,7 +5281,7 @@ export default function SummaryPage() {
                                     <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Qty</td>
                                     <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Fields</td>
                                     <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Sq Ft</td>
-                                    <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">NET €</td>
+                                    <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">NET $</td>
                                     <td colSpan={8}></td>
                                   </tr>
                                   {grouped.map(([type, vals]) => (
@@ -5290,7 +5290,7 @@ export default function SummaryPage() {
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.qty)}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.fields)}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.sqFt)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `€${fmtInt(vals.net)}` : '—'}</td>
+                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `$${fmtInt(vals.net)}` : '—'}</td>
                                       <td colSpan={8}></td>
                                     </tr>
                                   ))}
@@ -5307,7 +5307,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{doorNet ? `€${fmtInt(doorNet)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{doorNet ? `$${fmtInt(doorNet)}` : '—'}</td>
                                 {(['full','pct','final','finalAdj'] as const).map(f => catCell('euroDoors', f))}
                                 <td className="px-4 py-3 text-right text-blue-600 border-l-4 border-blue-300 bg-blue-50/30">{edCalc.full ? fmt(edCalc.full) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-blue-600 bg-blue-50/30">{edCalc.disc ? fmt(edCalc.disc) : '—'}</td>
@@ -5334,7 +5334,7 @@ export default function SummaryPage() {
                                     <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Qty</td>
                                     <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Fields</td>
                                     <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Sq Ft</td>
-                                    <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">NET €</td>
+                                    <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">NET $</td>
                                     <td colSpan={8}></td>
                                   </tr>
                                   {grouped.map(([type, vals]) => (
@@ -5343,7 +5343,7 @@ export default function SummaryPage() {
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.qty)}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.fields)}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.sqFt)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `€${fmtInt(vals.net)}` : '—'}</td>
+                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `$${fmtInt(vals.net)}` : '—'}</td>
                                       <td colSpan={8}></td>
                                     </tr>
                                   ))}
@@ -5355,7 +5355,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmtInt(totalNet)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `$${fmtInt(totalNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => {
                                   const sumQt = editingSummary.hasMultipleLocations
                                     ? (editingSummary.subLocations ?? []).reduce((acc, l) => {
@@ -5393,7 +5393,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmtInt(totalNet)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `$${fmtInt(totalNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => {
                                   const adj = parseFloat((editingSummary.grandTotalAdjustment as any)?.[f] || '0') || 0;
                                   // When multi-location, sum across all subLocations; otherwise use top-level quoteTotals
@@ -5474,10 +5474,10 @@ export default function SummaryPage() {
                         const inp = (key: string, field: string, placeholder?: string) => {
                           const isDollar = field === 'full' || field === 'pct' || field === 'final';
                           const isEuro = field === 'netEuro';
-                          const fmtEuro = (v: string) => fmtMoneyInput(v, '€');
+                          const fmtEuro = (v: string) => fmtMoneyInput(v, '$');
                           const raw = getAo(key)[field] || '';
                           const displayVal = isDollar ? fmtQtInput(raw) : isEuro ? fmtEuro(raw) : raw;
-                          const onChange = (e: React.ChangeEvent<HTMLInputElement>) => setAo(key, field, isDollar ? stripQtInput(e.target.value) : isEuro ? e.target.value.replace(/[€,]/g, '') : e.target.value);
+                          const onChange = (e: React.ChangeEvent<HTMLInputElement>) => setAo(key, field, isDollar ? stripQtInput(e.target.value) : isEuro ? e.target.value.replace(/[$,]/g, '') : e.target.value);
                           const textColor = isDollar ? (field === 'final' ? 'text-green-700' : 'text-blue-700') : '';
                           return <input type="text" value={displayVal} onChange={onChange} className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${textColor}`} placeholder={placeholder || '—'} />;
                         };
@@ -5555,14 +5555,14 @@ export default function SummaryPage() {
                                     <th className="px-2 py-2 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap" style={{ width: '80px' }}>Base Bid</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[72px] md:min-w-0">Qty</th>
                                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[192px] md:min-w-0" colSpan={2}>Details</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[88px] md:min-w-0">NET €</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[88px] md:min-w-0">NET $</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">Full</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">%</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">Final</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">€ Full</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">$ Full</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">Disc</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">€ Final</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap min-w-[88px] md:min-w-0">$ Final</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60"></th>
                                   </tr>
                                 </thead>
@@ -5803,7 +5803,7 @@ export default function SummaryPage() {
                                       <td className="px-1 py-1 text-center"><input type="checkbox" checked={cr.includedInBaseBid === 'true'} onChange={e => setCustomRow(idx, 'includedInBaseBid', e.target.checked ? 'true' : '')} className="w-4 h-4 text-brand-navy rounded border-gray-300 focus:ring-brand-navy/40" title="Included in Base Bid" /></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.qty} onChange={e => setCustomRow(idx, 'qty', e.target.value)} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Qty" /></td>
                                       <td className="px-1 py-1" colSpan={2}><textarea ref={autoSize} rows={1} value={cr.details} onChange={e => { setCustomRow(idx, 'details', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 resize-none overflow-hidden" placeholder="Details" style={{ lineHeight: '1.25rem', minHeight: '2rem' }} /></td>
-                                      <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[€,]/g, '') ? '\u20ac' + parseFloat(cr.netEuro.replace(/[€,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setCustomRow(idx, 'netEuro', e.target.value.replace(/[€,]/g, ''))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
+                                      <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[$,]/g, '') ? '$' + parseFloat(cr.netEuro.replace(/[$,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setCustomRow(idx, 'netEuro', e.target.value.replace(/[$,]/g, ''))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
                                       <td className="px-1 py-1 bg-blue-50/30"><input type="text" value={fmtQtInput(cr.full)} onChange={e => setCustomRow(idx, 'full', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-blue-700" placeholder="—" /></td>
                                       <td className="px-1 py-1 bg-blue-50/30"><input type="text" value={fmtQtInput(cr.pct)} onChange={e => setCustomRow(idx, 'pct', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-blue-700" placeholder="—" /></td>
                                       <td className="px-1 py-1 bg-green-50/30"><input type="text" value={fmtQtInput(cr.final)} onChange={e => setCustomRow(idx, 'final', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-green-700" placeholder="—" /></td>
@@ -5827,7 +5827,7 @@ export default function SummaryPage() {
                                       <td className="px-1 py-1 text-center"><input type="checkbox" checked={cr.includedInBaseBid === 'true'} onChange={e => setDeductRow(idx, 'includedInBaseBid', e.target.checked ? 'true' : '')} className="w-4 h-4 text-brand-navy rounded border-gray-300 focus:ring-brand-navy/40" title="Included in Base Bid" /></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.qty} onChange={e => setDeductRow(idx, 'qty', e.target.value)} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 bg-white" placeholder="Qty" /></td>
                                       <td className="px-1 py-1" colSpan={2}><textarea ref={autoSize} rows={1} value={cr.details} onChange={e => { setDeductRow(idx, 'details', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} className="w-full px-2 py-1.5 text-left text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 resize-none overflow-hidden bg-white" placeholder="Details" style={{ lineHeight: '1.25rem', minHeight: '2rem' }} /></td>
-                                      <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[€,]/g, '') ? '€' + parseFloat(cr.netEuro.replace(/[€,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setDeductRow(idx, 'netEuro', e.target.value.replace(/[€,]/g, ''))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 bg-white" placeholder="—" /></td>
+                                      <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[$,]/g, '') ? '$' + parseFloat(cr.netEuro.replace(/[$,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setDeductRow(idx, 'netEuro', e.target.value.replace(/[$,]/g, ''))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 bg-white" placeholder="—" /></td>
                                       <td className="px-1 py-1 bg-red-100/40"><input type="text" value={fmtQtInput(cr.full)} onChange={e => setDeductRow(idx, 'full', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 text-red-700 bg-white" placeholder="—" /></td>
                                       <td className="px-1 py-1 bg-red-100/40"><input type="text" value={fmtQtInput(cr.pct)} onChange={e => setDeductRow(idx, 'pct', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 text-red-700 bg-white" placeholder="—" /></td>
                                       <td className="px-1 py-1 bg-red-100/40"><input type="text" value={fmtQtInput(cr.final)} onChange={e => setDeductRow(idx, 'final', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-red-200 rounded focus:ring-1 focus:ring-red-400/40 text-red-700 bg-white" placeholder="—" /></td>
@@ -6084,9 +6084,8 @@ export default function SummaryPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40"
                   >
                     <option value="">Select job type</option>
-                    <option value="Premium">Premium</option>
-                    <option value="Coastal">Coastal</option>
-                    <option value="Dade County">Dade County</option>
+                    <option value="Standard">Standard</option>
+                    <option value="Impact (FBC)">Impact (FBC)</option>
                   </select>
                 </div>
                 <div>
@@ -6324,8 +6323,8 @@ export default function SummaryPage() {
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>Fields (Total)</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}># Site Mullions (Each)</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}># Site Mullions (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET $ (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET $ (Total)</th>
                         {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>}
                         {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>}
                         {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>}
@@ -6437,7 +6436,7 @@ export default function SummaryPage() {
                             <CellInput rowId={row.id} field="netEuroEach" value={row.netEuroEach} onChange={(v) => updateRow(row.id, 'netEuroEach', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.netEuroTotal ? `€${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
+                            <ReadOnlyCellInput value={row.netEuroTotal ? `$${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
                           </td>
                           {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactUnit} /></td>}
                           {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactPosition} /></td>}
@@ -6582,8 +6581,8 @@ export default function SummaryPage() {
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>Fields (Total)</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}># Site Mullions (Each)</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}># Site Mullions (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET $ (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET $ (Total)</th>
                         {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>}
                         {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>}
                         {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>}
@@ -6707,7 +6706,7 @@ export default function SummaryPage() {
                             <CellInput rowId={row.id} field="netEuroEach" value={row.netEuroEach} onChange={(v) => updateDoorRow(row.id, 'netEuroEach', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.netEuroTotal ? `€${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
+                            <ReadOnlyCellInput value={row.netEuroTotal ? `$${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
                           </td>
                           {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactUnit} /></td>}
                           {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactPosition} /></td>}
