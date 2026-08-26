@@ -151,6 +151,7 @@ export interface RecordTabRendererProps {
 
 interface InternalRendererProps extends RecordTabRendererProps {
   enabledWidgetIds: Set<string>;
+  inlineDrafts?: Record<string, unknown>;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -269,7 +270,9 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
 
   const inlineEdit = useInlineEdit();
 
-  const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
+  // Merge live draft values into the visibility context so conditional
+  // formatting reacts in real time while inline editing is active.
+  const layoutVisibilityData = { ...record, ...formulaValues, ...(inlineEdit?.editingAll ? inlineEdit.drafts : {}) } as Record<string, unknown>;
   const regions = (tab as any).regions as LayoutSection[];
 
   const visibleRegions = regions.filter((region) => {
@@ -659,7 +662,7 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
     enabledWidgetIds,
   } = props;
 
-  const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
+  const layoutVisibilityData = { ...record, ...formulaValues, ...(props.inlineDrafts ?? {}) } as Record<string, unknown>;
   const legacyTab = tab as any;
   const sorted = [...(legacyTab.sections ?? [])].sort((a: any, b: any) => a.order - b.order);
 
@@ -964,7 +967,9 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
 export function RecordTabRenderer(props: RecordTabRendererProps): React.ReactNode {
   const { tab } = props;
   const { ids: enabledWidgetIds } = useEnabledWidgetIds();
-  const internalProps: InternalRendererProps = { ...props, enabledWidgetIds };
+  const inlineEdit = useInlineEdit();
+  const inlineDrafts = inlineEdit?.editingAll ? inlineEdit.drafts : undefined;
+  const internalProps: InternalRendererProps = { ...props, enabledWidgetIds, inlineDrafts };
 
   if ('regions' in tab && Array.isArray((tab as any).regions)) {
     return renderNewModelTab(internalProps);

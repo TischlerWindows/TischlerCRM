@@ -11,6 +11,9 @@ interface InlineEditContextValue {
    * field on the record switches into edit mode simultaneously. */
   editingAll: boolean;
   saving: boolean;
+  /** Snapshot of all current draft values — merging this into the visibility
+   * context makes conditional-formatting react live while inline editing. */
+  drafts: Record<string, unknown>;
   getDraft: (apiName: string, fallback: unknown) => unknown;
   setDraft: (apiName: string, value: unknown) => void;
   startEditAll: () => void;
@@ -118,8 +121,8 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
   }, [objectApiName, recordId, drafts, onSaved, showToast]);
 
   const value = useMemo<InlineEditContextValue>(
-    () => ({ editingAll, saving, getDraft, setDraft, startEditAll, cancelEditAll, saveAll, registerSlotRef }),
-    [editingAll, saving, getDraft, setDraft, startEditAll, cancelEditAll, saveAll, registerSlotRef],
+    () => ({ editingAll, saving, drafts, getDraft, setDraft, startEditAll, cancelEditAll, saveAll, registerSlotRef }),
+    [editingAll, saving, drafts, getDraft, setDraft, startEditAll, cancelEditAll, saveAll, registerSlotRef],
   );
 
   return <InlineEditContext.Provider value={value}>{children}</InlineEditContext.Provider>;
