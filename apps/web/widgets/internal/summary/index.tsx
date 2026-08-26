@@ -1,13 +1,12 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Plus,
+  ChevronDown,
   FileText,
   Pencil,
   Trash2,
-  ExternalLink,
   Star,
   CalendarDays,
   User,
@@ -62,6 +61,8 @@ export default function SummaryWidget({ record, object }: WidgetProps) {
   const [summaries, setSummaries] = useState<Summary[]>([])
   const [allSummaries, setAllSummaries] = useState<Summary[]>([])
   const [loading, setLoading] = useState(true)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const recordId = (record?.id ?? record?.Id ?? '') as string
   const oppName =
@@ -87,14 +88,26 @@ export default function SummaryWidget({ record, object }: WidgetProps) {
     loadSummaries()
   }, [loadSummaries])
 
-  const handleCreate = () => {
-    // Navigate to the summary page with the opportunity pre-filled
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleCreate = (type: 'tischler' | 'arcadia') => {
+    setDropdownOpen(false)
+    const route = type === 'arcadia' ? '/arcadia-summary' : '/summary'
     const params = new URLSearchParams({
       fromOpportunity: recordId,
       opportunityName: oppName,
       opportunityNumber: oppNumber,
     })
-    router.push(`/summary?${params.toString()}`)
+    router.push(`${route}?${params.toString()}`)
   }
 
   const handleOpen = (summaryId: string) => {
@@ -156,14 +169,34 @@ export default function SummaryWidget({ record, object }: WidgetProps) {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={handleCreate}
-          className="inline-flex items-center gap-1.5 rounded-md bg-brand-navy px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-navy/90 transition-colors"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          New Summary
-        </button>
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => setDropdownOpen((o) => !o)}
+            className="inline-flex items-center gap-1.5 rounded-md bg-brand-navy px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-navy/90 transition-colors"
+          >
+            + New Summary
+            <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', dropdownOpen && 'rotate-180')} />
+          </button>
+          {dropdownOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => handleCreate('tischler')}
+                className="w-full px-4 py-2.5 text-left text-xs font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+              >
+                Tischler Fensterwerk Summary
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCreate('arcadia')}
+                className="w-full px-4 py-2.5 text-left text-xs font-medium text-gray-800 hover:bg-gray-50 transition-colors border-t border-gray-100"
+              >
+                Arcadia Summary
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content */}
