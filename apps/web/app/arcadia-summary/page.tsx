@@ -970,6 +970,9 @@ export default function SummaryPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!activeCellId || editingCellId) return;
+      // Don't intercept keystrokes when the user is typing in a real form field.
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement)?.isContentEditable) return;
       const dir = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down'
         : e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right'
         : e.key === 'Tab' ? 'right' : null;
