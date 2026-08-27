@@ -852,7 +852,7 @@ interface Summary {
   };
   product: string;
   productTypeOptions: Record<string, string[]>;
-  woodType: string;
+  productSeries: string[];
   finish: string;
   glassType: string;
   glassTypeCustom: string;
@@ -1552,8 +1552,7 @@ export default function SummaryPage() {
       },
       productTypeOptions: {},
       product: opts?.oppFields?.product || '',
-      woodType: opts?.oppFields?.woodType || '',
-      woodTypeCustom: opts?.oppFields?.woodTypeCustom || '',
+      productSeries: [],
       finish: opts?.oppFields?.finish || '',
       glassType: opts?.oppFields?.glassType || '',
       glassTypeCustom: opts?.oppFields?.glassTypeCustom || '',
@@ -2184,7 +2183,7 @@ export default function SummaryPage() {
       if (v) specFields.push([label, v]);
     };
     addSpec('Product', s.product || s.jobType);
-    addSpec('Wood Type', s.woodType === 'Custom Option' ? s.woodTypeCustom : s.woodType);
+    addSpec('Product Series', (s.productSeries || []).join(', '));
     addSpec('Finish', s.finish);
     const specWinRows: SummaryRow[] = s.hasMultipleLocations && s.subLocations?.length
       ? s.subLocations.flatMap(l => l.rows)
@@ -4541,31 +4540,36 @@ export default function SummaryPage() {
                         );
                       })()}
 
-                      {/* Row 3: Wood Type + Finish */}
+                      {/* Row 3: Product Series + Finish */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Wood Type</label>
-                          <select
-                            value={editingSummary.woodType === 'Custom Option' ? 'Custom Option' : (editingSummary.woodType || '')}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, woodType: e.target.value, woodTypeCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.woodTypeCustom })}
-                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.woodType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
-                          >
-                            <option value="">Select wood type...</option>
-                            {getOppPicklistFiltered('Opportunity__woodType').map(v => (
-                              <option key={v} value={v}>{v}</option>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Product Series</label>
+                          <div className="flex flex-col gap-1.5 border border-gray-300 rounded-lg px-3 py-2 bg-white">
+                            {[
+                              'TSX-30 Single Glazed 1 7/16"',
+                              'TSX-40 Dual Glazed 1 13/16"',
+                              'TSX-50 Dual Glazed 2 1/4"',
+                              'TSX-50 Triple Glazed 2 1/4"',
+                            ].map(opt => (
+                              <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
+                                  checked={(editingSummary.productSeries || []).includes(opt)}
+                                  onChange={(e) => {
+                                    const current = editingSummary.productSeries || [];
+                                    setEditingSummary({
+                                      ...editingSummary,
+                                      productSeries: e.target.checked
+                                        ? [...current, opt]
+                                        : current.filter(v => v !== opt),
+                                    });
+                                  }}
+                                />
+                                {opt}
+                              </label>
                             ))}
-                            <option value="Custom Option">Custom Option</option>
-                          </select>
-                          {editingSummary.woodType === 'Custom Option' && (
-                            <input
-                              type="text"
-                              autoFocus
-                              value={editingSummary.woodTypeCustom || ''}
-                              onChange={(e) => setEditingSummary({ ...editingSummary, woodTypeCustom: e.target.value })}
-                              placeholder="Enter custom value..."
-                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
-                            />
-                          )}
+                          </div>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Finish</label>
