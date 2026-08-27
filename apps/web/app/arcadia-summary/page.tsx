@@ -2184,17 +2184,15 @@ export default function SummaryPage() {
     };
     addSpec('Product', s.product || s.jobType);
     addSpec('Product Series', (s.productSeries || []).join(', '));
-    addSpec('Finish', s.finish);
+    addSpec('Metal Finish', s.finish);
     const specWinRows: SummaryRow[] = s.hasMultipleLocations && s.subLocations?.length
       ? s.subLocations.flatMap(l => l.rows)
       : (s.rows || []);
     const specHasHung = specWinRows.some(r => r.type?.toLowerCase?.()?.includes('hung'));
     addSpec('Glass Type', s.glassType === 'Custom Option' ? s.glassTypeCustom : s.glassType);
     if (specHasHung) addSpec('Hung Glass Type', s.hungType === 'Custom Option' ? s.hungTypeCustom : s.hungType);
-    addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
-    addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
-    addSpec('Spacer Bar Type', s.spacerBarType);
-    addSpec('Spacer Bar Colors', s.spacerBarColors);
+    addSpec('SDL', s.sdl);
+    addSpec('TDL', s.tdl);
     addSpec('Finials', s.finials);
     addSpec('Hinge Finish Specification', s.hingeFinishSpecification);
     if ((s.projectContains || []).length > 0) addSpec('Project Contains', s.projectContains!.join(', '));
@@ -4572,7 +4570,7 @@ export default function SummaryPage() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Finish</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Metal Finish</label>
                           <select
                             value={editingSummary.finish || ''}
                             onChange={(e) => setEditingSummary({ ...editingSummary, finish: e.target.value })}
@@ -4686,84 +4684,30 @@ export default function SummaryPage() {
                         })()}
                       </div>
 
-                      {/* Row: Spacer Bar Type + Spacer Bar Colors */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Type</label>
-                          <select
-                            value={editingSummary.spacerBarType || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBarType: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                          >
-                            <option value="">Select spacer bar type...</option>
-                            {getOppPicklistFiltered('Opportunity__spacer_bar_type').map(v => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Colors</label>
-                          <select
-                            value={editingSummary.spacerBarColors || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBarColors: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                          >
-                            <option value="">Select spacer bar colors...</option>
-                            {getOppPicklistFiltered('Opportunity__spacerBarColors').map(v => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
                       {/* Row: SDL + TDL */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">SDL</label>
                           <select
-                            value={editingSummary.sdl === 'Custom Option' ? 'Custom Option' : (editingSummary.sdl || '')}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, sdl: e.target.value, sdlCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.sdlCustom })}
-                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.sdl === 'Custom Option' ? ' italic text-blue-600' : ''}`}
+                            value={editingSummary.sdl || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, sdl: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select SDL...</option>
-                            <option>22MM</option>
-                            <option>44MM</option>
-                            <option value="Custom Option">Custom Option</option>
+                            <option>SDL 7/8&quot;</option>
+                            <option>SDL 5/8&quot;</option>
                           </select>
-                          {editingSummary.sdl === 'Custom Option' && (
-                            <input
-                              type="text"
-                              autoFocus
-                              value={editingSummary.sdlCustom || ''}
-                              onChange={(e) => setEditingSummary({ ...editingSummary, sdlCustom: e.target.value })}
-                              placeholder="Enter custom value..."
-                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
-                            />
-                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">TDL</label>
                           <select
-                            value={editingSummary.tdl === 'Custom Option' ? 'Custom Option' : (editingSummary.tdl || '')}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, tdl: e.target.value, tdlCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.tdlCustom })}
-                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.tdl === 'Custom Option' ? ' italic text-blue-600' : ''}`}
+                            value={editingSummary.tdl || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, tdl: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select TDL...</option>
-                            <option>48MM</option>
-                            <option>70MM</option>
-                            <option>125MM</option>
-                            <option value="Custom Option">Custom Option</option>
+                            <option>TDL 1 5/16&quot;</option>
                           </select>
-                          {editingSummary.tdl === 'Custom Option' && (
-                            <input
-                              type="text"
-                              autoFocus
-                              value={editingSummary.tdlCustom || ''}
-                              onChange={(e) => setEditingSummary({ ...editingSummary, tdlCustom: e.target.value })}
-                              placeholder="Enter custom value..."
-                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
-                            />
-                          )}
                         </div>
                       </div>
 
