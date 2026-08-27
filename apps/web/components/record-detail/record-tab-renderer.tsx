@@ -272,7 +272,12 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
 
   // Merge live draft values into the visibility context so conditional
   // formatting reacts in real time while inline editing is active.
-  const layoutVisibilityData = { ...record, ...formulaValues, ...(inlineEdit?.editingAll ? inlineEdit.drafts : {}) } as Record<string, unknown>;
+  // Spread both the raw draft keys (prefixed, e.g. Opportunity__field) AND
+  // their bare versions so conditions authored with either form see the draft.
+  const rawDrafts = inlineEdit?.editingAll ? inlineEdit.drafts : {};
+  const bareDrafts: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(rawDrafts)) bareDrafts[k.replace(/^[A-Za-z]+__/, '')] = v;
+  const layoutVisibilityData = { ...record, ...formulaValues, ...rawDrafts, ...bareDrafts } as Record<string, unknown>;
   const regions = (tab as any).regions as LayoutSection[];
 
   const visibleRegions = regions.filter((region) => {
@@ -586,7 +591,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                         </div>
                         <div className="text-sm text-gray-900" style={valueStyle}>
                           {inlineEdit && isInlineEditableField(fd, fieldIsReadOnly) ? (
-                            <InlineEditableField fieldDef={fd} value={raw}>
+                            <InlineEditableField fieldDef={fd} value={raw} formData={layoutVisibilityData}>
                               {valueNode}
                             </InlineEditableField>
                           ) : (
@@ -662,7 +667,10 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
     enabledWidgetIds,
   } = props;
 
-  const layoutVisibilityData = { ...record, ...formulaValues, ...(props.inlineDrafts ?? {}) } as Record<string, unknown>;
+  const rawDrafts = props.inlineDrafts ?? {};
+  const bareDrafts: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(rawDrafts)) bareDrafts[k.replace(/^[A-Za-z]+__/, '')] = v;
+  const layoutVisibilityData = { ...record, ...formulaValues, ...rawDrafts, ...bareDrafts } as Record<string, unknown>;
   const legacyTab = tab as any;
   const sorted = [...(legacyTab.sections ?? [])].sort((a: any, b: any) => a.order - b.order);
 

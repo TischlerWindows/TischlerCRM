@@ -749,6 +749,7 @@ interface SummaryRow {
   shadeBoxesWithSideTrimUnit: string;
   shadeBoxesWithSideTrimPosition: string;
   magneticContactUnit: string;
+  magneticContactQty: string;
   magneticContactPosition: string;
   finalFinishUnit: string;
   finalFinishPosition: string;
@@ -791,6 +792,7 @@ interface DoorRow {
   shadeBoxesWithSideTrimUnit: string;
   shadeBoxesWithSideTrimPosition: string;
   magneticContactUnit: string;
+  magneticContactQty: string;
   magneticContactPosition: string;
   finalFinishUnit: string;
   finalFinishPosition: string;
@@ -915,7 +917,7 @@ export default function SummaryPage() {
     'qty2', 'type', 'qty3', 'type2', 'qty4', 'type3', 'qty5', 'type4',
     'specialRemarks', 'fieldsEach', 'fieldsTotal', 'siteMullionsEach', 'siteMullionsTotal',
     'netEuroEach', 'netEuroTotal', 'shadeBoxesNoSideTrimUnit', 'shadeBoxesNoSideTrimPosition',
-    'shadeBoxesWithSideTrimUnit', 'shadeBoxesWithSideTrimPosition', 'magneticContactUnit', 'magneticContactPosition'
+    'shadeBoxesWithSideTrimUnit', 'shadeBoxesWithSideTrimPosition', 'magneticContactUnit', 'magneticContactQty', 'magneticContactPosition'
   ];
   const [searchTerm, setSearchTerm] = useState('');
   const [showNewSummary, setShowNewSummary] = useState(false);
@@ -950,7 +952,9 @@ export default function SummaryPage() {
   };
   /** Get per-unit value for a custom column on a row. */
   const getCustomColUnit = (row: SummaryRow | DoorRow, id: string): string => ((row as any)[`cc_${id}_unit`] as string) || '';
-  /** Get per-position value (read-only, = per-unit × qty). */
+  /** Get the dedicated qty for a custom column on a row. */
+  const getCustomColQty = (row: SummaryRow | DoorRow, id: string): string => ((row as any)[`cc_${id}_qty`] as string) || '';
+  /** Get per-position value (read-only, = per-unit × this column's own qty). */
   const getCustomColPos = (row: SummaryRow | DoorRow, id: string): string => ((row as any)[`cc_${id}_pos`] as string) || '';
 
   const [activePage, setActivePage] = useState<1 | 2>(1);
@@ -1491,6 +1495,7 @@ export default function SummaryPage() {
         shadeBoxesWithSideTrimUnit: '',
         shadeBoxesWithSideTrimPosition: '',
         magneticContactUnit: '',
+        magneticContactQty: '',
         magneticContactPosition: '',
         finalFinishUnit: '',
         finalFinishPosition: ''
@@ -1528,6 +1533,7 @@ export default function SummaryPage() {
         shadeBoxesWithSideTrimUnit: '',
         shadeBoxesWithSideTrimPosition: '',
         magneticContactUnit: '',
+        magneticContactQty: '',
         magneticContactPosition: '',
         finalFinishUnit: '',
         finalFinishPosition: ''
@@ -2888,6 +2894,7 @@ export default function SummaryPage() {
       shadeBoxesWithSideTrimUnit: '',
       shadeBoxesWithSideTrimPosition: '',
       magneticContactUnit: '',
+      magneticContactQty: '',
       magneticContactPosition: '',
       finalFinishUnit: '',
       finalFinishPosition: ''
@@ -2932,6 +2939,7 @@ export default function SummaryPage() {
       shadeBoxesWithSideTrimUnit: '',
       shadeBoxesWithSideTrimPosition: '',
       magneticContactUnit: '',
+      magneticContactQty: '',
       magneticContactPosition: '',
       finalFinishUnit: '',
       finalFinishPosition: ''
@@ -3091,9 +3099,6 @@ export default function SummaryPage() {
           // Also calculate Net € (Total) - currency format
           const netEuroEach = parseFloat(updatedRow.netEuroEach);
           updatedRow.netEuroTotal = netEuroEach && qty ? (netEuroEach * qty).toFixed(2) : '';
-          // Also calculate Magnetic Contact Per Position
-          const magneticContactUnit = parseFloat(updatedRow.magneticContactUnit);
-          updatedRow.magneticContactPosition = magneticContactUnit && qty ? Math.round(magneticContactUnit * qty).toString() : '';
           // Also calculate Shade Boxes with No Trim Per Position
           const shadeBoxesNoSideTrimUnit = parseFloat(updatedRow.shadeBoxesNoSideTrimUnit);
           updatedRow.shadeBoxesNoSideTrimPosition = shadeBoxesNoSideTrimUnit && qty ?
@@ -3105,11 +3110,6 @@ export default function SummaryPage() {
         // Also calculate Final Finish Per Position
           const finalFinishUnit = parseFloat(updatedRow.finalFinishUnit);
           updatedRow.finalFinishPosition = finalFinishUnit && qty ? Math.round(finalFinishUnit * qty).toString() : '';
-          // Recalculate per-position for any custom columns when qty changes
-          for (const col of (editingSummary?.customColumns || [])) {
-            const ccU = parseFloat((updatedRow as any)['cc_' + col.id + '_unit'] || '');
-            (updatedRow as any)['cc_' + col.id + '_pos'] = ccU && qty ? Math.round(ccU * qty).toString() : '';
-          }
         }
         
         // Auto-calculate Operable Sashes (Total) when Operable Sashes (Each) changes - whole number
@@ -3129,9 +3129,10 @@ export default function SummaryPage() {
           updatedRow.magneticContactUnit = operableSashesEach ?
             (operableSashesEach * (isLiftAndRoll ? 96 : 40)).toString() : '';
           
-          // Also calculate Magnetic Contact Per Position
+          // Also calculate Magnetic Contact Per Position (uses its own dedicated Qty column)
           const magneticContactUnit = parseFloat(updatedRow.magneticContactUnit);
-          updatedRow.magneticContactPosition = magneticContactUnit && qty ? Math.round(magneticContactUnit * qty).toString() : '';
+          const magneticContactQty = parseFloat(updatedRow.magneticContactQty);
+          updatedRow.magneticContactPosition = magneticContactUnit && magneticContactQty ? Math.round(magneticContactUnit * magneticContactQty).toString() : '';
         }
         
         // Auto-calculate Fields (Total) when Fields (Each) changes - whole number
@@ -3167,13 +3168,35 @@ export default function SummaryPage() {
           const operableSashesEach = parseFloat(updatedRow.operableSashesEach);
           updatedRow.magneticContactUnit = operableSashesEach ? 
             (operableSashesEach * (isLiftAndRoll ? 96 : 40)).toString() : '';
+          
+          // Also calculate Magnetic Contact Per Position (uses its own dedicated Qty column)
+          const magneticContactUnit = parseFloat(updatedRow.magneticContactUnit);
+          const magneticContactQty = parseFloat(updatedRow.magneticContactQty);
+          updatedRow.magneticContactPosition = magneticContactUnit && magneticContactQty ? Math.round(magneticContactUnit * magneticContactQty).toString() : '';
         }
 
-        // Handle custom column unit changes — auto-calc per-position = per-unit * qty
+        // Auto-calculate Magnetic Contact Per Position when its dedicated Qty changes
+        if (field === 'magneticContactQty') {
+          const magneticContactUnit = parseFloat(updatedRow.magneticContactUnit);
+          const magneticContactQty = parseFloat(value);
+          updatedRow.magneticContactPosition = magneticContactUnit && magneticContactQty ? Math.round(magneticContactUnit * magneticContactQty).toString() : '';
+        }
+
+        // Handle custom column unit changes — auto-calc per-position = per-unit * this column's own qty
         if (typeof field === 'string' && field.startsWith('cc_') && field.endsWith('_unit')) {
-          const qty = parseFloat(updatedRow.qty);
+          const qtyKey = field.replace(/_unit$/, '_qty');
+          const qty = parseFloat((updatedRow as any)[qtyKey] || '');
           const u = parseFloat(value);
           const posKey = field.replace(/_unit$/, '_pos');
+          (updatedRow as any)[posKey] = u && qty ? Math.round(u * qty).toString() : '';
+        }
+
+        // Handle custom column qty changes — auto-calc per-position = per-unit * qty
+        if (typeof field === 'string' && field.startsWith('cc_') && field.endsWith('_qty')) {
+          const unitKey = field.replace(/_qty$/, '_unit');
+          const u = parseFloat((updatedRow as any)[unitKey] || '');
+          const qty = parseFloat(value);
+          const posKey = field.replace(/_qty$/, '_pos');
           (updatedRow as any)[posKey] = u && qty ? Math.round(u * qty).toString() : '';
         }
         
@@ -3218,6 +3241,7 @@ export default function SummaryPage() {
       shadeBoxesWithSideTrimUnit: '',
       shadeBoxesWithSideTrimPosition: '',
       magneticContactUnit: '',
+      magneticContactQty: '',
       magneticContactPosition: '',
       finalFinishUnit: '',
       finalFinishPosition: ''
@@ -3262,6 +3286,7 @@ export default function SummaryPage() {
       shadeBoxesWithSideTrimUnit: '',
       shadeBoxesWithSideTrimPosition: '',
       magneticContactUnit: '',
+      magneticContactQty: '',
       magneticContactPosition: '',
       finalFinishUnit: '',
       finalFinishPosition: ''
@@ -3419,9 +3444,6 @@ export default function SummaryPage() {
           // Also calculate Net € (Total) - currency format
           const netEuroEach = parseFloat(updatedRow.netEuroEach);
           updatedRow.netEuroTotal = netEuroEach && qty ? (netEuroEach * qty).toFixed(2) : '';
-          // Also calculate Magnetic Contact Per Position
-          const magneticContactUnit = parseFloat(updatedRow.magneticContactUnit);
-          updatedRow.magneticContactPosition = magneticContactUnit && qty ? Math.round(magneticContactUnit * qty).toString() : '';
           // Also calculate Shade Boxes with No Trim Per Position
           const shadeBoxesNoSideTrimUnit = parseFloat(updatedRow.shadeBoxesNoSideTrimUnit);
           updatedRow.shadeBoxesNoSideTrimPosition = shadeBoxesNoSideTrimUnit && qty ?
@@ -3433,11 +3455,6 @@ export default function SummaryPage() {
         // Also calculate Final Finish Per Position
           const finalFinishUnit = parseFloat(updatedRow.finalFinishUnit);
           updatedRow.finalFinishPosition = finalFinishUnit && qty ? Math.round(finalFinishUnit * qty).toString() : '';
-          // Recalculate per-position for any custom columns when qty changes
-          for (const col of (editingSummary?.customColumns || [])) {
-            const ccU = parseFloat((updatedRow as any)['cc_' + col.id + '_unit'] || '');
-            (updatedRow as any)['cc_' + col.id + '_pos'] = ccU && qty ? Math.round(ccU * qty).toString() : '';
-          }
         }
         
         // Auto-calculate Operable Sashes (Total) when Operable Sashes (Each) changes - whole number
@@ -3457,9 +3474,10 @@ export default function SummaryPage() {
           updatedRow.magneticContactUnit = operableSashesEach ?
             (operableSashesEach * (isLiftAndRoll ? 96 : 40)).toString() : '';
           
-          // Also calculate Magnetic Contact Per Position
+          // Also calculate Magnetic Contact Per Position (uses its own dedicated Qty column)
           const magneticContactUnit = parseFloat(updatedRow.magneticContactUnit);
-          updatedRow.magneticContactPosition = magneticContactUnit && qty ? Math.round(magneticContactUnit * qty).toString() : '';
+          const magneticContactQty = parseFloat(updatedRow.magneticContactQty);
+          updatedRow.magneticContactPosition = magneticContactUnit && magneticContactQty ? Math.round(magneticContactUnit * magneticContactQty).toString() : '';
         }
         
         // Auto-calculate Fields (Total) when Fields (Each) changes - whole number
@@ -3495,13 +3513,35 @@ export default function SummaryPage() {
           const operableSashesEach = parseFloat(updatedRow.operableSashesEach);
           updatedRow.magneticContactUnit = operableSashesEach ? 
             (operableSashesEach * (isLiftAndRoll ? 96 : 40)).toString() : '';
+          
+          // Also calculate Magnetic Contact Per Position (uses its own dedicated Qty column)
+          const magneticContactUnit = parseFloat(updatedRow.magneticContactUnit);
+          const magneticContactQty = parseFloat(updatedRow.magneticContactQty);
+          updatedRow.magneticContactPosition = magneticContactUnit && magneticContactQty ? Math.round(magneticContactUnit * magneticContactQty).toString() : '';
         }
 
-        // Handle custom column unit changes — auto-calc per-position = per-unit * qty
+        // Auto-calculate Magnetic Contact Per Position when its dedicated Qty changes
+        if (field === 'magneticContactQty') {
+          const magneticContactUnit = parseFloat(updatedRow.magneticContactUnit);
+          const magneticContactQty = parseFloat(value);
+          updatedRow.magneticContactPosition = magneticContactUnit && magneticContactQty ? Math.round(magneticContactUnit * magneticContactQty).toString() : '';
+        }
+
+        // Handle custom column unit changes — auto-calc per-position = per-unit * this column's own qty
         if (typeof field === 'string' && field.startsWith('cc_') && field.endsWith('_unit')) {
-          const qty = parseFloat(updatedRow.qty);
+          const qtyKey = field.replace(/_unit$/, '_qty');
+          const qty = parseFloat((updatedRow as any)[qtyKey] || '');
           const u = parseFloat(value);
           const posKey = field.replace(/_unit$/, '_pos');
+          (updatedRow as any)[posKey] = u && qty ? Math.round(u * qty).toString() : '';
+        }
+
+        // Handle custom column qty changes — auto-calc per-position = per-unit * qty
+        if (typeof field === 'string' && field.startsWith('cc_') && field.endsWith('_qty')) {
+          const unitKey = field.replace(/_qty$/, '_unit');
+          const u = parseFloat((updatedRow as any)[unitKey] || '');
+          const qty = parseFloat(value);
+          const posKey = field.replace(/_qty$/, '_pos');
           (updatedRow as any)[posKey] = u && qty ? Math.round(u * qty).toString() : '';
         }
         
@@ -6421,12 +6461,12 @@ export default function SummaryPage() {
                       {/* Spanning header row */}
                       <tr>
                         <th className="px-0.5 py-1 bg-gray-100 border-r border-gray-300" colSpan={22 + (showType3 ? 2 : 0) + (showType4 ? 2 : 0)}></th>
-                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Magnetic Contact</th>}
+                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={3}>Magnetic Contact</th>}
                         {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>}
                         {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>}
                         {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>}
                         {customColumns.map(col => (
-                          <th key={col.id} className="px-0.5 py-1 text-center text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-300" colSpan={2}>{col.label}</th>
+                          <th key={col.id} className="px-0.5 py-1 text-center text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-300" colSpan={3}>{col.label}</th>
                         ))}
                         <th className="px-0.5 py-1"></th>
                       </tr>
@@ -6459,6 +6499,7 @@ export default function SummaryPage() {
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Each)</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Total)</th>
                         {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50" style={{minWidth:'70px'}}>Qty</th>}
                         {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>}
                         {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>}
                         {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300" style={{minWidth:'100px'}}>Per Position</th>}
@@ -6469,6 +6510,7 @@ export default function SummaryPage() {
                         {customColumns.map(col => (
                           <Fragment key={col.id}>
                             <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-l border-purple-300" style={{minWidth:'100px'}}>Per Unit</th>
+                            <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50" style={{minWidth:'70px'}}>Qty</th>
                             <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-r border-purple-300" style={{minWidth:'100px'}}>Per Position</th>
                           </Fragment>
                         ))}
@@ -6590,6 +6632,7 @@ export default function SummaryPage() {
                             <ReadOnlyCellInput value={row.netEuroTotal ? `€${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
                           </td>
                           {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactUnit} /></td>}
+                          {showMagneticContact && <td className="px-0.5 py-1 align-top"><CellInput rowId={row.id} field="magneticContactQty" value={row.magneticContactQty} onChange={(v) => updateRow(row.id, 'magneticContactQty', v)} /></td>}
                           {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactPosition} /></td>}
                           {showShadeBoxesNoTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimUnit} /></td>}
                           {showShadeBoxesNoTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimPosition} /></td>}
@@ -6600,6 +6643,7 @@ export default function SummaryPage() {
                           {customColumns.map(col => (
                             <Fragment key={col.id}>
                               <td className="px-0.5 py-1 align-top"><CellInput rowId={row.id} field={'cc_' + col.id + '_unit' as any} value={getCustomColUnit(row, col.id)} onChange={(v) => updateRow(row.id, 'cc_' + col.id + '_unit' as any, v)} /></td>
+                              <td className="px-0.5 py-1 align-top"><CellInput rowId={row.id} field={'cc_' + col.id + '_qty' as any} value={getCustomColQty(row, col.id)} onChange={(v) => updateRow(row.id, 'cc_' + col.id + '_qty' as any, v)} /></td>
                               <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={getCustomColPos(row, col.id)} /></td>
                             </Fragment>
                           ))}
@@ -6732,12 +6776,12 @@ export default function SummaryPage() {
                       {/* Spanning header row */}
                       <tr>
                         <th className="px-0.5 py-1 bg-gray-100 border-r border-gray-300" colSpan={22 + (showType3 ? 2 : 0) + (showType4 ? 2 : 0)}></th>
-                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Magnetic Contact</th>}
+                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={3}>Magnetic Contact</th>}
                         {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>}
                         {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>}
                         {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>}
                         {customColumns.map(col => (
-                          <th key={col.id} className="px-0.5 py-1 text-center text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-300" colSpan={2}>{col.label}</th>
+                          <th key={col.id} className="px-0.5 py-1 text-center text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-300" colSpan={3}>{col.label}</th>
                         ))}
                         <th className="px-0.5 py-1"></th>
                       </tr>
@@ -6770,6 +6814,7 @@ export default function SummaryPage() {
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Each)</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Total)</th>
                         {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50" style={{minWidth:'70px'}}>Qty</th>}
                         {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>}
                         {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>}
                         {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300" style={{minWidth:'100px'}}>Per Position</th>}
@@ -6780,6 +6825,7 @@ export default function SummaryPage() {
                         {customColumns.map(col => (
                           <Fragment key={col.id}>
                             <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-l border-purple-300" style={{minWidth:'100px'}}>Per Unit</th>
+                            <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50" style={{minWidth:'70px'}}>Qty</th>
                             <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-r border-purple-300" style={{minWidth:'100px'}}>Per Position</th>
                           </Fragment>
                         ))}
@@ -6901,6 +6947,7 @@ export default function SummaryPage() {
                             <ReadOnlyCellInput value={row.netEuroTotal ? `€${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
                           </td>
                           {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactUnit} /></td>}
+                          {showMagneticContact && <td className="px-0.5 py-1 align-top"><CellInput rowId={row.id} field="magneticContactQty" value={row.magneticContactQty} onChange={(v) => updateDoorRow(row.id, 'magneticContactQty', v)} /></td>}
                           {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactPosition} /></td>}
                           {showShadeBoxesNoTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimUnit} /></td>}
                           {showShadeBoxesNoTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimPosition} /></td>}
@@ -6911,6 +6958,7 @@ export default function SummaryPage() {
                           {customColumns.map(col => (
                             <Fragment key={col.id}>
                               <td className="px-0.5 py-1 align-top"><CellInput rowId={row.id} field={'cc_' + col.id + '_unit' as any} value={getCustomColUnit(row, col.id)} onChange={(v) => updateDoorRow(row.id, 'cc_' + col.id + '_unit' as any, v)} /></td>
+                              <td className="px-0.5 py-1 align-top"><CellInput rowId={row.id} field={'cc_' + col.id + '_qty' as any} value={getCustomColQty(row, col.id)} onChange={(v) => updateDoorRow(row.id, 'cc_' + col.id + '_qty' as any, v)} /></td>
                               <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={getCustomColPos(row, col.id)} /></td>
                             </Fragment>
                           ))}
