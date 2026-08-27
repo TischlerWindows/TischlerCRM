@@ -897,6 +897,8 @@ interface Summary {
   lastModifiedBy: string;
   lastModifiedAt: string;
   isFavorite?: boolean;
+  /** Which summary type created this record — used to filter Proposal Builder templates. */
+  summaryType?: string;
   /** User-defined extra columns (up to 6) shown in the windows/doors grids. */
   customColumns?: Array<{ id: string; label: string }>;
 }
@@ -1600,7 +1602,8 @@ export default function SummaryPage() {
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
       lastModifiedBy: 'Development User',
-      lastModifiedAt: new Date().toISOString()
+      lastModifiedAt: new Date().toISOString(),
+      summaryType: 'tischler'
     };
     setEditingSummary(newSummary);
     setShowNewSummary(true);
@@ -4153,7 +4156,7 @@ export default function SummaryPage() {
         <div className="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-[95vw] h-full sm:h-auto sm:max-h-[95dvh] flex flex-col">
             <div className="p-3 sm:p-6 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2 print:hidden">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Edit Summary</h2>
+                <h2 className="text-xl font-bold text-gray-900">Edit Tischler Fensterwerk Summary</h2>
                 <p className="text-sm text-gray-600 mt-1">Fill in the summary data</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">

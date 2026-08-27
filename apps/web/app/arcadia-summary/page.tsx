@@ -911,6 +911,26 @@ export default function SummaryPage() {
   const [showShadeBoxesNoTrim, setShowShadeBoxesNoTrim] = useState(false);
   const [showShadeBoxesWithTrim, setShowShadeBoxesWithTrim] = useState(false);
   const [showFinalFinish, setShowFinalFinish] = useState(false);
+  const MAX_CUSTOM_COLS = 6;
+  const customColumns = (editingSummary?.customColumns || []) as Array<{ id: string; label: string }>;
+  const addCustomColumn = () => {
+    if (!editingSummary || customColumns.length >= MAX_CUSTOM_COLS) return;
+    const id = `cc${Date.now()}`;
+    setEditingSummary({ ...editingSummary, customColumns: [...customColumns, { id, label: `Custom ${customColumns.length + 1}` }] });
+  };
+  const removeCustomColumn = (id: string) => {
+    if (!editingSummary) return;
+    setEditingSummary({ ...editingSummary, customColumns: customColumns.filter(c => c.id !== id) });
+  };
+  const renameCustomColumn = (id: string, label: string) => {
+    if (!editingSummary) return;
+    setEditingSummary({ ...editingSummary, customColumns: customColumns.map(c => c.id === id ? { ...c, label } : c) });
+  };
+  /** Get per-unit value for a custom column on a row. */
+  const getCustomColUnit = (row: SummaryRow | DoorRow, id: string): string => ((row as any)[`cc_${id}_unit`] as string) || '';
+  /** Get per-position value (read-only, = per-unit × qty). */
+  const getCustomColPos = (row: SummaryRow | DoorRow, id: string): string => ((row as any)[`cc_${id}_pos`] as string) || '';
+
   const [activePage, setActivePage] = useState<1 | 2>(1);
   const [activeLocationId, setActiveLocationId] = useState<string>('');
   const [expandedQtRows, setExpandedQtRows] = useState<Record<string, boolean>>({});
@@ -1560,7 +1580,8 @@ export default function SummaryPage() {
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
       lastModifiedBy: 'Development User',
-      lastModifiedAt: new Date().toISOString()
+      lastModifiedAt: new Date().toISOString(),
+      summaryType: 'arcadia'
     };
     setEditingSummary(newSummary);
     setShowNewSummary(true);
@@ -3045,6 +3066,11 @@ export default function SummaryPage() {
         // Also calculate Final Finish Per Position
           const finalFinishUnit = parseFloat(updatedRow.finalFinishUnit);
           updatedRow.finalFinishPosition = finalFinishUnit && qty ? Math.round(finalFinishUnit * qty).toString() : '';
+          // Recalculate per-position for any custom columns when qty changes
+          for (const col of (editingSummary?.customColumns || [])) {
+            const ccU = parseFloat((updatedRow as any)['cc_' + col.id + '_unit'] || '');
+            (updatedRow as any)['cc_' + col.id + '_pos'] = ccU && qty ? Math.round(ccU * qty).toString() : '';
+          }
         }
         
         // Auto-calculate Operable Sashes (Total) when Operable Sashes (Each) changes - whole number
@@ -3102,6 +3128,14 @@ export default function SummaryPage() {
           const operableSashesEach = parseFloat(updatedRow.operableSashesEach);
           updatedRow.magneticContactUnit = operableSashesEach ? 
             (operableSashesEach * (isLiftAndRoll ? 96 : 40)).toString() : '';
+        }
+
+        // Handle custom column unit changes — auto-calc per-position = per-unit * qty
+        if (typeof field === 'string' && field.startsWith('cc_') && field.endsWith('_unit')) {
+          const qty = parseFloat(updatedRow.qty);
+          const u = parseFloat(value);
+          const posKey = field.replace(/_unit$/, '_pos');
+          (updatedRow as any)[posKey] = u && qty ? Math.round(u * qty).toString() : '';
         }
         
         return updatedRow;
@@ -3360,6 +3394,11 @@ export default function SummaryPage() {
         // Also calculate Final Finish Per Position
           const finalFinishUnit = parseFloat(updatedRow.finalFinishUnit);
           updatedRow.finalFinishPosition = finalFinishUnit && qty ? Math.round(finalFinishUnit * qty).toString() : '';
+          // Recalculate per-position for any custom columns when qty changes
+          for (const col of (editingSummary?.customColumns || [])) {
+            const ccU = parseFloat((updatedRow as any)['cc_' + col.id + '_unit'] || '');
+            (updatedRow as any)['cc_' + col.id + '_pos'] = ccU && qty ? Math.round(ccU * qty).toString() : '';
+          }
         }
         
         // Auto-calculate Operable Sashes (Total) when Operable Sashes (Each) changes - whole number
@@ -3417,6 +3456,14 @@ export default function SummaryPage() {
           const operableSashesEach = parseFloat(updatedRow.operableSashesEach);
           updatedRow.magneticContactUnit = operableSashesEach ? 
             (operableSashesEach * (isLiftAndRoll ? 96 : 40)).toString() : '';
+        }
+
+        // Handle custom column unit changes — auto-calc per-position = per-unit * qty
+        if (typeof field === 'string' && field.startsWith('cc_') && field.endsWith('_unit')) {
+          const qty = parseFloat(updatedRow.qty);
+          const u = parseFloat(value);
+          const posKey = field.replace(/_unit$/, '_pos');
+          (updatedRow as any)[posKey] = u && qty ? Math.round(u * qty).toString() : '';
         }
         
         return updatedRow;
@@ -4070,7 +4117,7 @@ export default function SummaryPage() {
         <div className="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-[95vw] h-full sm:h-auto sm:max-h-[95dvh] flex flex-col">
             <div className="p-3 sm:p-6 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2 print:hidden">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Edit Summary</h2>
+                <h2 className="text-xl font-bold text-gray-900">Edit Arcadia Summary</h2>
                 <p className="text-sm text-gray-600 mt-1">Fill in the summary data</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -6264,6 +6311,32 @@ export default function SummaryPage() {
                       />
                       Final Finish
                     </label>
+                    {customColumns.length < MAX_CUSTOM_COLS && (
+                      <button
+                        type="button"
+                        onClick={addCustomColumn}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-white/20 text-white rounded hover:bg-white/30 border border-white/30"
+                        title="Add a custom column (up to 6)"
+                      >
+                        + Col
+                      </button>
+                    )}
+                    {customColumns.map(col => (
+                      <span key={col.id} className="flex items-center gap-1">
+                        <input
+                          value={col.label}
+                          onChange={(e) => renameCustomColumn(col.id, e.target.value)}
+                          className="px-1.5 py-0.5 text-xs text-gray-900 rounded bg-white/90 border border-white/30 w-20"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeCustomColumn(col.id)}
+                          className="text-white/70 hover:text-white text-sm leading-none"
+                          title="Remove this column"
+                        >×</button>
+                      </span>
+                    ))}
                     <button
                       onClick={handleAddRow}
                       className="inline-flex items-center px-3 py-1.5 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
@@ -6283,6 +6356,9 @@ export default function SummaryPage() {
                         {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>}
                         {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>}
                         {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>}
+                        {customColumns.map(col => (
+                          <th key={col.id} className="px-0.5 py-1 text-center text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-300" colSpan={2}>{col.label}</th>
+                        ))}
                         <th className="px-0.5 py-1"></th>
                       </tr>
                       {/* Main header row */}
@@ -6321,6 +6397,12 @@ export default function SummaryPage() {
                         {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Position</th>}
                         {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300" style={{minWidth:'100px'}}>Per Unit</th>}
                         {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        {customColumns.map(col => (
+                          <Fragment key={col.id}>
+                            <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-l border-purple-300" style={{minWidth:'100px'}}>Per Unit</th>
+                            <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-r border-purple-300" style={{minWidth:'100px'}}>Per Position</th>
+                          </Fragment>
+                        ))}
                         <th className="px-0.5 py-1"></th>
                         <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 bg-gray-50 border-l-2 border-gray-400" style={{minWidth:'80px'}}></th>
                       </tr>
@@ -6446,6 +6528,12 @@ export default function SummaryPage() {
                           {showShadeBoxesWithTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimPosition} /></td>}
                           {showFinalFinish && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishUnit} /></td>}
                           {showFinalFinish && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishPosition} /></td>}
+                          {customColumns.map(col => (
+                            <Fragment key={col.id}>
+                              <td className="px-0.5 py-1 align-top"><CellInput rowId={row.id} field={'cc_' + col.id + '_unit' as any} value={getCustomColUnit(row, col.id)} onChange={(v) => updateRow(row.id, 'cc_' + col.id + '_unit' as any, v)} /></td>
+                              <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={getCustomColPos(row, col.id)} /></td>
+                            </Fragment>
+                          ))}
                           <td className="px-0.5 py-1"></td>
                           <td className="px-0.5 py-1">
                             <div className="flex gap-1 justify-end mr-2">
@@ -6534,6 +6622,32 @@ export default function SummaryPage() {
                       />
                       Final Finish
                     </label>
+                    {customColumns.length < MAX_CUSTOM_COLS && (
+                      <button
+                        type="button"
+                        onClick={addCustomColumn}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-white/20 text-white rounded hover:bg-white/30 border border-white/30"
+                        title="Add a custom column (up to 6)"
+                      >
+                        + Col
+                      </button>
+                    )}
+                    {customColumns.map(col => (
+                      <span key={col.id} className="flex items-center gap-1">
+                        <input
+                          value={col.label}
+                          onChange={(e) => renameCustomColumn(col.id, e.target.value)}
+                          className="px-1.5 py-0.5 text-xs text-gray-900 rounded bg-white/90 border border-white/30 w-20"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeCustomColumn(col.id)}
+                          className="text-white/70 hover:text-white text-sm leading-none"
+                          title="Remove this column"
+                        >×</button>
+                      </span>
+                    ))}
                     <button
                       onClick={handleAddDoorRow}
                       className="inline-flex items-center px-3 py-1.5 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
@@ -6553,6 +6667,9 @@ export default function SummaryPage() {
                         {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>}
                         {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>}
                         {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>}
+                        {customColumns.map(col => (
+                          <th key={col.id} className="px-0.5 py-1 text-center text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-300" colSpan={2}>{col.label}</th>
+                        ))}
                         <th className="px-0.5 py-1"></th>
                       </tr>
                       {/* Main header row */}
@@ -6591,6 +6708,12 @@ export default function SummaryPage() {
                         {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Position</th>}
                         {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300" style={{minWidth:'100px'}}>Per Unit</th>}
                         {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        {customColumns.map(col => (
+                          <Fragment key={col.id}>
+                            <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-l border-purple-300" style={{minWidth:'100px'}}>Per Unit</th>
+                            <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-r border-purple-300" style={{minWidth:'100px'}}>Per Position</th>
+                          </Fragment>
+                        ))}
                         <th className="px-0.5 py-1"></th>
                         <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 bg-gray-50 border-l-2 border-gray-400" style={{minWidth:'80px'}}></th>
                       </tr>
@@ -6716,6 +6839,12 @@ export default function SummaryPage() {
                           {showShadeBoxesWithTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimPosition} /></td>}
                           {showFinalFinish && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishUnit} /></td>}
                           {showFinalFinish && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishPosition} /></td>}
+                          {customColumns.map(col => (
+                            <Fragment key={col.id}>
+                              <td className="px-0.5 py-1 align-top"><CellInput rowId={row.id} field={'cc_' + col.id + '_unit' as any} value={getCustomColUnit(row, col.id)} onChange={(v) => updateDoorRow(row.id, 'cc_' + col.id + '_unit' as any, v)} /></td>
+                              <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={getCustomColPos(row, col.id)} /></td>
+                            </Fragment>
+                          ))}
                           <td className="px-0.5 py-1"></td>
                           <td className="px-0.5 py-1">
                             <div className="flex gap-1 justify-end mr-2">

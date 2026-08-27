@@ -9,6 +9,7 @@ const createTemplateSchema = z.object({
   description: z.string().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  summaryType: z.string().nullable().optional(),
 });
 
 const hexColor = z
@@ -22,6 +23,7 @@ const updateTemplateSchema = z.object({
   description: z.string().nullable().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  summaryType: z.string().nullable().optional(),
   // Brand wiring — admin picks which Company Resources the template uses.
   // Each font role maps to a BrandFont. The renderer registers them with
   // PDFKit and falls back to Helvetica variants when unset.

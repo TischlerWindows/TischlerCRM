@@ -986,6 +986,11 @@ model QuoteTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Which summary type this template is designed for.
+  // null = universal (shown for every summary type).
+  // "tischler" | "arcadia" match the url-path suffix of /summary vs /arcadia-summary.
+  summaryType String?
+
   // Brand wiring — admins pick which Company Resources this template uses.
   // Per the Tischler brand guide, each role uses a specific typeface:
   //   - title    → Helvetica Neue Bold Condensed (wordmark, big headers)
