@@ -2191,8 +2191,8 @@ export default function SummaryPage() {
     const specHasHung = specWinRows.some(r => r.type?.toLowerCase?.()?.includes('hung'));
     addSpec('Glass Type', s.glassType === 'Custom Option' ? s.glassTypeCustom : s.glassType);
     if (specHasHung) addSpec('Hung Glass Type', s.hungType === 'Custom Option' ? s.hungTypeCustom : s.hungType);
-    addSpec('SDL', s.sdl);
-    addSpec('TDL', s.tdl);
+    addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
+    addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
     addSpec('Finials', s.finials);
     addSpec('Hinge Finish Specification', s.hingeFinishSpecification);
     if ((s.projectContains || []).length > 0) addSpec('Project Contains', s.projectContains!.join(', '));
@@ -4689,25 +4689,47 @@ export default function SummaryPage() {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">SDL</label>
                           <select
-                            value={editingSummary.sdl || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, sdl: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                            value={editingSummary.sdl === 'Custom Option' ? 'Custom Option' : (editingSummary.sdl || '')}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, sdl: e.target.value, sdlCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.sdlCustom })}
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.sdl === 'Custom Option' ? ' italic text-blue-600' : ''}`}
                           >
                             <option value="">Select SDL...</option>
                             <option>SDL 7/8&quot;</option>
                             <option>SDL 5/8&quot;</option>
+                            <option value="Custom Option">Custom Option</option>
                           </select>
+                          {editingSummary.sdl === 'Custom Option' && (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingSummary.sdlCustom || ''}
+                              onChange={(e) => setEditingSummary({ ...editingSummary, sdlCustom: e.target.value })}
+                              placeholder="Enter custom value..."
+                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                            />
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">TDL</label>
                           <select
-                            value={editingSummary.tdl || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, tdl: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                            value={editingSummary.tdl === 'Custom Option' ? 'Custom Option' : (editingSummary.tdl || '')}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, tdl: e.target.value, tdlCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.tdlCustom })}
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.tdl === 'Custom Option' ? ' italic text-blue-600' : ''}`}
                           >
                             <option value="">Select TDL...</option>
                             <option>TDL 1 5/16&quot;</option>
+                            <option value="Custom Option">Custom Option</option>
                           </select>
+                          {editingSummary.tdl === 'Custom Option' && (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingSummary.tdlCustom || ''}
+                              onChange={(e) => setEditingSummary({ ...editingSummary, tdlCustom: e.target.value })}
+                              placeholder="Enter custom value..."
+                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                            />
+                          )}
                         </div>
                       </div>
 
