@@ -220,4 +220,112 @@ export async function quoteTemplateRoutes(app: FastifyInstance) {
       reply.code(500).send({ error: 'Failed to delete template', detail: err?.message });
     }
   });
+
+  // POST /quote-templates/:id/duplicate — deep-copy a template with all presets,
+  // conditions, variants, and token mappings (admin only).
+  app.post('/quote-templates/:id/duplicate', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
+    const { id } = req.params as { id: string };
+    try {
+      const source = await prisma.quoteTemplate.findUnique({
+        where: { id },
+        include: {
+          presets: {
+            include: { conditions: true, variants: true },
+          },
+          tokenMappings: true,
+        },
+      });
+      if (!source) return reply.code(404).send({ error: 'Template not found' });
+
+      const newTemplateId = generateId('QuoteTemplate');
+      const newTemplate = await prisma.$transaction(async (tx) => {
+        const tmpl = await tx.quoteTemplate.create({
+          data: {
+            id: newTemplateId,
+            name: `${source.name} (Copy)`,
+            description: source.description,
+            isDefault: false,
+            isActive: source.isActive,
+            summaryType: source.summaryType,
+            pageLogos: source.pageLogos as object,
+            signatureFontId: source.signatureFontId,
+            titleFontId: source.titleFontId,
+            subtitleFontId: source.subtitleFontId,
+            headingFontId: source.headingFontId,
+            bodyFontId: source.bodyFontId,
+            accentColorHex: source.accentColorHex,
+            emphasisColorHex: source.emphasisColorHex,
+          },
+        });
+
+        // Deep-copy presets, conditions, variants
+        for (const preset of source.presets) {
+          const newPresetId = generateId('SpecPreset');
+          await tx.specPreset.create({
+            data: {
+              id: newPresetId,
+              templateId: newTemplateId,
+              order: preset.order,
+              title: preset.title,
+              body: preset.body,
+              section: preset.section,
+              blockType: preset.blockType,
+              config: preset.config as object | undefined,
+              isAlwaysIncluded: preset.isAlwaysIncluded,
+              driverField: preset.driverField,
+              isActive: preset.isActive,
+              conditions: {
+                create: preset.conditions.map((c) => ({
+                  id: generateId('SpecCondition'),
+                  field: c.field,
+                  operator: c.operator,
+                  value: c.value,
+                  logic: c.logic,
+                })),
+              },
+              variants: {
+                create: preset.variants.map((v) => ({
+                  id: generateId('SpecVariant'),
+                  matchValue: v.matchValue,
+                  matchLabel: v.matchLabel,
+                  title: v.title,
+                  body: v.body,
+                  order: v.order,
+                  isActive: v.isActive,
+                })),
+              },
+            },
+          });
+        }
+
+        // Deep-copy token mappings
+        for (const tm of source.tokenMappings) {
+          await tx.tokenMapping.create({
+            data: {
+              id: generateId('TokenMapping'),
+              templateId: newTemplateId,
+              tokenName: tm.tokenName,
+              sourceObject: tm.sourceObject,
+              sourcePath: tm.sourcePath,
+              format: tm.format,
+              label: tm.label,
+              category: tm.category,
+              isBuiltIn: tm.isBuiltIn,
+              isActive: tm.isActive,
+            },
+          });
+        }
+
+        return tmpl;
+      });
+
+      reply.code(201).send(newTemplate);
+    } catch (err: any) {
+      app.log.error(err, 'POST /quote-templates/:id/duplicate failed');
+      reply.code(500).send({ error: 'Failed to duplicate template', detail: err?.message });
+    }
+  });
 }

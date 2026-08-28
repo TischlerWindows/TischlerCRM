@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon, PenLine, Plus, X, Pencil } from 'lucide-react';
+import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon, PenLine, Plus, X, Pencil, Copy } from 'lucide-react';
 import Link from 'next/link';
 
 interface QuoteTemplate {
@@ -26,6 +26,7 @@ interface Props {
   onSelectTemplate: (id: string) => void;
   onCreateTemplate: (name: string, summaryType: string | null) => Promise<void>;
   onUpdateTemplate: (id: string, name: string, summaryType: string | null) => Promise<void>;
+  onDuplicateTemplate: (id: string) => Promise<void>;
   summaries: { id?: string; name?: string; summaryType?: string }[];
   selectedSummaryId: string;
   onSelectSummary: (id: string) => void;
@@ -49,6 +50,7 @@ export function TopBar({
   onSelectTemplate,
   onCreateTemplate,
   onUpdateTemplate,
+  onDuplicateTemplate,
   summaries,
   selectedSummaryId,
   onSelectSummary,
@@ -73,6 +75,7 @@ export function TopBar({
   const [editSummaryType, setEditSummaryType] = useState<string>('');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null;
 
@@ -110,6 +113,16 @@ export function TopBar({
       setShowEditModal(false);
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleDuplicate = async () => {
+    if (!selectedTemplateId) return;
+    setDuplicating(true);
+    try {
+      await onDuplicateTemplate(selectedTemplateId);
+    } finally {
+      setDuplicating(false);
     }
   };
 
@@ -159,6 +172,16 @@ export function TopBar({
             className="flex items-center justify-center w-6 h-6 rounded bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
           >
             <Pencil className="w-3 h-3" />
+          </button>
+        )}
+        {selectedTemplateId && (
+          <button
+            onClick={handleDuplicate}
+            disabled={duplicating}
+            title="Duplicate this template (copies all blocks)"
+            className="flex items-center justify-center w-6 h-6 rounded bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors disabled:opacity-50"
+          >
+            {duplicating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
           </button>
         )}
       </div>
