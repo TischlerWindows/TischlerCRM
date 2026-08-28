@@ -277,7 +277,15 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
   const rawDrafts = inlineEdit?.editingAll ? inlineEdit.drafts : {};
   const bareDrafts: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(rawDrafts)) bareDrafts[k.replace(/^[A-Za-z]+__/, '')] = v;
-  const layoutVisibilityData = { ...record, ...formulaValues, ...rawDrafts, ...bareDrafts } as Record<string, unknown>;
+  // Also add prefixed aliases for bare record keys: record data often stores fields
+  // without the Object__ prefix, but picklist dependency conditions use prefixed names.
+  const prefixedRecord: Record<string, unknown> = {};
+  if (objectDef?.apiName) {
+    for (const [k, v] of Object.entries(record ?? {})) {
+      if (!k.includes('__')) prefixedRecord[`${objectDef.apiName}__${k}`] = v;
+    }
+  }
+  const layoutVisibilityData = { ...record, ...formulaValues, ...rawDrafts, ...bareDrafts, ...prefixedRecord } as Record<string, unknown>;
   const regions = (tab as any).regions as LayoutSection[];
 
   const visibleRegions = regions.filter((region) => {
@@ -667,10 +675,17 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
     enabledWidgetIds,
   } = props;
 
-  const rawDrafts = props.inlineDrafts ?? {};
-  const bareDrafts: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(rawDrafts)) bareDrafts[k.replace(/^[A-Za-z]+__/, '')] = v;
-  const layoutVisibilityData = { ...record, ...formulaValues, ...rawDrafts, ...bareDrafts } as Record<string, unknown>;
+  const rawDrafts2 = props.inlineDrafts ?? {};
+  const bareDrafts2: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(rawDrafts2)) bareDrafts2[k.replace(/^[A-Za-z]+__/, '')] = v;
+  // Also add prefixed aliases for bare record keys (same reason as renderNewModelTab)
+  const prefixedRecord2: Record<string, unknown> = {};
+  if (objectDef?.apiName) {
+    for (const [k, v] of Object.entries(record ?? {})) {
+      if (!k.includes('__')) prefixedRecord2[`${objectDef.apiName}__${k}`] = v;
+    }
+  }
+  const layoutVisibilityData = { ...record, ...formulaValues, ...rawDrafts2, ...bareDrafts2, ...prefixedRecord2 } as Record<string, unknown>;
   const legacyTab = tab as any;
   const sorted = [...(legacyTab.sections ?? [])].sort((a: any, b: any) => a.order - b.order);
 
