@@ -1,6 +1,7 @@
 'use client';
 
-import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon, PenLine } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon, PenLine, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 
 interface QuoteTemplate {
@@ -16,6 +17,7 @@ interface Props {
   templates: QuoteTemplate[];
   selectedTemplateId: string | null;
   onSelectTemplate: (id: string) => void;
+  onCreateTemplate: (name: string, summaryType: string | null) => Promise<void>;
   summaries: { id?: string; name?: string }[];
   selectedSummaryId: string;
   onSelectSummary: (id: string) => void;
@@ -37,6 +39,7 @@ export function TopBar({
   templates,
   selectedTemplateId,
   onSelectTemplate,
+  onCreateTemplate,
   summaries,
   selectedSummaryId,
   onSelectSummary,
@@ -53,6 +56,23 @@ export function TopBar({
   previewMode,
   onChangePreviewMode,
 }: Props) {
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newSummaryType, setNewSummaryType] = useState<string>('');
+  const [creating, setCreating] = useState(false);
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      await onCreateTemplate(newName.trim(), newSummaryType || null);
+      setShowNewModal(false);
+      setNewName('');
+      setNewSummaryType('');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   return (
     <div className="flex items-center gap-4 px-5 py-2.5 bg-[#1e3a5f] text-white">
@@ -70,21 +90,85 @@ export function TopBar({
 
       <div className="h-5 w-px bg-white/20" />
 
-      {/* Template selector */}
-      <div className="relative">
-        <select
-          value={selectedTemplateId || ''}
-          onChange={(e) => onSelectTemplate(e.target.value)}
-          className="appearance-none pl-3 pr-7 py-1.5 text-xs bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+      {/* Template selector + New button */}
+      <div className="flex items-center gap-1.5">
+        <div className="relative">
+          <select
+            value={selectedTemplateId || ''}
+            onChange={(e) => onSelectTemplate(e.target.value)}
+            className="appearance-none pl-3 pr-7 py-1.5 text-xs bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+          >
+            {templates.map((t) => (
+              <option key={t.id} value={t.id} className="text-gray-900">
+                {t.name} {t.isDefault ? '(Default)' : ''}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" />
+        </div>
+        <button
+          onClick={() => setShowNewModal(true)}
+          title="Create new template"
+          className="flex items-center justify-center w-6 h-6 rounded bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
         >
-          {templates.map((t) => (
-            <option key={t.id} value={t.id} className="text-gray-900">
-              {t.name} {t.isDefault ? '(Default)' : ''}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" />
+          <Plus className="w-3.5 h-3.5" />
+        </button>
       </div>
+
+      {/* New Template modal */}
+      {showNewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowNewModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-80 text-gray-900" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold">New Template</h2>
+              <button onClick={() => setShowNewModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Template Name</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setShowNewModal(false); }}
+                  placeholder="e.g. Arcadia Quote Letter"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/30 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Summary Type (optional)</label>
+                <select
+                  value={newSummaryType}
+                  onChange={(e) => setNewSummaryType(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/30 focus:outline-none bg-white"
+                >
+                  <option value="">Universal — works with all summaries</option>
+                  <option value="tischler">Tischler Fensterwerk Summary</option>
+                  <option value="arcadia">Arcadia Summary</option>
+                </select>
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button
+                  onClick={() => setShowNewModal(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreate}
+                  disabled={!newName.trim() || creating}
+                  className="px-4 py-2 text-sm font-medium bg-brand-navy text-white rounded-lg hover:bg-brand-navy/90 disabled:opacity-50"
+                >
+                  {creating ? 'Creating…' : 'Create'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary selector */}
       <div className="relative">

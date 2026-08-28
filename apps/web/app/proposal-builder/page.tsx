@@ -64,6 +64,8 @@ interface QuoteTemplate {
   description: string | null;
   isDefault: boolean;
   isActive: boolean;
+  /** null = universal; 'tischler' | 'arcadia' (or any future slug) = type-specific. */
+  summaryType?: string | null;
 }
 
 interface TokenMappingData {
@@ -258,6 +260,13 @@ export default function QuoteBuilderPage() {
       return [];
     }
   }, []);
+
+  const handleCreateTemplate = useCallback(async (name: string, summaryType: string | null) => {
+    const created = await apiClient.post<QuoteTemplate>('/quote-templates', { name, summaryType });
+    const updated = await loadTemplates();
+    const found = updated.find((t) => t.id === created.id);
+    if (found) handleSelectTemplate(found.id);
+  }, [loadTemplates]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadPresets = useCallback(async (templateId: string) => {
     try {
@@ -1377,6 +1386,7 @@ export default function QuoteBuilderPage() {
         templates={templates}
         selectedTemplateId={selectedTemplateId}
         onSelectTemplate={handleSelectTemplate}
+        onCreateTemplate={handleCreateTemplate}
         summaries={summaries}
         selectedSummaryId={selectedSummaryId}
         onSelectSummary={setSelectedSummaryId}
