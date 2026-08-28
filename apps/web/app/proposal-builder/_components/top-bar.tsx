@@ -1,24 +1,32 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon, PenLine, Plus, X } from 'lucide-react';
+import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon, PenLine, Plus, X, Pencil } from 'lucide-react';
 import Link from 'next/link';
 
 interface QuoteTemplate {
   id: string;
   name: string;
   isDefault: boolean;
+  summaryType?: string | null;
 }
 
 export type BuilderMode = 'blocks' | 'branding';
 export type PreviewMode = 'html' | 'pdf';
+
+const SUMMARY_TYPE_OPTIONS = [
+  { value: '', label: 'Universal — works with all summaries' },
+  { value: 'tischler', label: 'Tischler Fensterwerk Summary' },
+  { value: 'arcadia', label: 'Arcadia Summary' },
+];
 
 interface Props {
   templates: QuoteTemplate[];
   selectedTemplateId: string | null;
   onSelectTemplate: (id: string) => void;
   onCreateTemplate: (name: string, summaryType: string | null) => Promise<void>;
-  summaries: { id?: string; name?: string }[];
+  onUpdateTemplate: (id: string, name: string, summaryType: string | null) => Promise<void>;
+  summaries: { id?: string; name?: string; summaryType?: string }[];
   selectedSummaryId: string;
   onSelectSummary: (id: string) => void;
   onPreviewPDF: () => void;
@@ -40,6 +48,7 @@ export function TopBar({
   selectedTemplateId,
   onSelectTemplate,
   onCreateTemplate,
+  onUpdateTemplate,
   summaries,
   selectedSummaryId,
   onSelectSummary,
@@ -57,9 +66,21 @@ export function TopBar({
   onChangePreviewMode,
 }: Props) {
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [newSummaryType, setNewSummaryType] = useState<string>('');
+  const [editName, setEditName] = useState('');
+  const [editSummaryType, setEditSummaryType] = useState<string>('');
   const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null;
+
+  // Filter summaries to match the selected template's summaryType.
+  // Universal templates (null/empty) show all summaries.
+  const filteredSummaries = selectedTemplate?.summaryType
+    ? summaries.filter((s) => !s.summaryType || s.summaryType === selectedTemplate.summaryType)
+    : summaries;
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -71,6 +92,24 @@ export function TopBar({
       setNewSummaryType('');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openEditModal = () => {
+    if (!selectedTemplate) return;
+    setEditName(selectedTemplate.name);
+    setEditSummaryType(selectedTemplate.summaryType || '');
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedTemplateId || !editName.trim()) return;
+    setUpdating(true);
+    try {
+      await onUpdateTemplate(selectedTemplateId, editName.trim(), editSummaryType || null);
+      setShowEditModal(false);
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -90,7 +129,7 @@ export function TopBar({
 
       <div className="h-5 w-px bg-white/20" />
 
-      {/* Template selector + New button */}
+      {/* Template selector + New + Edit buttons */}
       <div className="flex items-center gap-1.5">
         <div className="relative">
           <select
@@ -113,6 +152,15 @@ export function TopBar({
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
+        {selectedTemplateId && (
+          <button
+            onClick={openEditModal}
+            title="Edit template name / summary type"
+            className="flex items-center justify-center w-6 h-6 rounded bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors"
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+        )}
       </div>
 
       {/* New Template modal */}
@@ -170,17 +218,66 @@ export function TopBar({
         </div>
       )}
 
-      {/* Summary selector */}
+      {/* Edit Template modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowEditModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-80 text-gray-900" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold">Edit Template</h2>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Template Name</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleUpdate(); if (e.key === 'Escape') setShowEditModal(false); }}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/30 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Summary Type</label>
+                <select
+                  value={editSummaryType}
+                  onChange={(e) => setEditSummaryType(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/30 focus:outline-none bg-white"
+                >
+                  {SUMMARY_TYPE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 justify-end pt-1">
+                <button onClick={() => setShowEditModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+                <button
+                  onClick={handleUpdate}
+                  disabled={!editName.trim() || updating}
+                  className="px-4 py-2 text-sm font-medium bg-brand-navy text-white rounded-lg hover:bg-brand-navy/90 disabled:opacity-50"
+                >
+                  {updating ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Summary selector — filtered to match the selected template's summaryType */}
       <div className="relative">
         <select
           value={selectedSummaryId}
           onChange={(e) => onSelectSummary(e.target.value)}
           className="appearance-none pl-3 pr-7 py-1.5 text-xs bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-white/30"
         >
-          {summaries.length === 0 ? (
-            <option value="" className="text-gray-900">No summaries</option>
+          {filteredSummaries.length === 0 ? (
+            <option value="" className="text-gray-900">No matching summaries</option>
           ) : (
-            summaries.map((s) => (
+            filteredSummaries.map((s) => (
               <option key={s.id || s.name} value={s.id || ''} className="text-gray-900">
                 {s.name || 'Untitled'}
               </option>

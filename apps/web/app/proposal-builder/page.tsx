@@ -268,6 +268,11 @@ export default function QuoteBuilderPage() {
     if (found) handleSelectTemplate(found.id);
   }, [loadTemplates]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleUpdateTemplate = useCallback(async (id: string, name: string, summaryType: string | null) => {
+    await apiClient.patch(`/quote-templates/${id}`, { name, summaryType });
+    await loadTemplates();
+  }, [loadTemplates]);
+
   const loadPresets = useCallback(async (templateId: string) => {
     try {
       const data = await apiClient.get<SpecPresetData[]>(`/spec-presets?templateId=${templateId}`);
@@ -1387,6 +1392,7 @@ export default function QuoteBuilderPage() {
         selectedTemplateId={selectedTemplateId}
         onSelectTemplate={handleSelectTemplate}
         onCreateTemplate={handleCreateTemplate}
+        onUpdateTemplate={handleUpdateTemplate}
         summaries={summaries}
         selectedSummaryId={selectedSummaryId}
         onSelectSummary={setSelectedSummaryId}
