@@ -78,12 +78,15 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
   }, []);
 
   const cancelEditAll = useCallback(() => {
+    const y = typeof window !== 'undefined' ? window.scrollY : 0;
     setDrafts({});
     setEditingAll(false);
+    requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'instant' }));
   }, []);
 
   const saveAll = useCallback(async () => {
     if (!recordId) return;
+    const scrollY = typeof window !== 'undefined' ? window.scrollY : 0;
     setSaving(true);
     try {
       if (Object.keys(drafts).length > 0) {
@@ -113,6 +116,7 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
       }
       setDrafts({});
       setEditingAll(false);
+      requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
     } catch (err: any) {
       showToast(err?.message || 'Failed to save changes', 'error');
     } finally {

@@ -47,6 +47,9 @@ export function getFieldDef(
     if (objField?.lookupObject) def.lookupObject = objField.lookupObject;
     if (objField?.relationshipName) def.relationshipName = objField.relationshipName;
     if (objField?.targetFields) def.targetFields = objField.targetFields;
+    if (objField?.picklistValues) def.picklistValues = objField.picklistValues;
+    if (objField?.picklistColors) def.picklistColors = objField.picklistColors;
+    if (objField?.picklistDependencies) def.picklistDependencies = objField.picklistDependencies;
     return def;
   }
 
