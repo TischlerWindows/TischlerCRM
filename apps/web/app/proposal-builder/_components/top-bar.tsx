@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon, PenLine, Plus, X, Pencil, Copy } from 'lucide-react';
+import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon, PenLine, Plus, X, Pencil, Copy, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface QuoteTemplate {
@@ -27,6 +27,7 @@ interface Props {
   onCreateTemplate: (name: string, summaryType: string | null) => Promise<void>;
   onUpdateTemplate: (id: string, name: string, summaryType: string | null) => Promise<void>;
   onDuplicateTemplate: (id: string) => Promise<void>;
+  onDeleteTemplate: (id: string) => Promise<void>;
   summaries: { id?: string; name?: string; summaryType?: string }[];
   selectedSummaryId: string;
   onSelectSummary: (id: string) => void;
@@ -51,6 +52,7 @@ export function TopBar({
   onCreateTemplate,
   onUpdateTemplate,
   onDuplicateTemplate,
+  onDeleteTemplate,
   summaries,
   selectedSummaryId,
   onSelectSummary,
@@ -76,6 +78,7 @@ export function TopBar({
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null;
 
@@ -123,6 +126,17 @@ export function TopBar({
       await onDuplicateTemplate(selectedTemplateId);
     } finally {
       setDuplicating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedTemplateId || !selectedTemplate) return;
+    if (!confirm(`Delete template "${selectedTemplate.name}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await onDeleteTemplate(selectedTemplateId);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -182,6 +196,16 @@ export function TopBar({
             className="flex items-center justify-center w-6 h-6 rounded bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors disabled:opacity-50"
           >
             {duplicating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
+          </button>
+        )}
+        {selectedTemplateId && !selectedTemplate?.isDefault && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            title="Delete this template"
+            className="flex items-center justify-center w-6 h-6 rounded bg-white/10 border border-red-300/40 text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+          >
+            {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
           </button>
         )}
       </div>
