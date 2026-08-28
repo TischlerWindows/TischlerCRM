@@ -2193,8 +2193,6 @@ export default function SummaryPage() {
     if (specHasHung) addSpec('Hung Glass Type', s.hungType === 'Custom Option' ? s.hungTypeCustom : s.hungType);
     addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
     addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
-    addSpec('Finials', s.finials);
-    addSpec('Hinge Finish Specification', s.hingeFinishSpecification);
     if ((s.projectContains || []).length > 0) addSpec('Project Contains', s.projectContains!.join(', '));
     for (let i = 0; i < specFields.length; i += 3) {
       for (let j = 0; j < 3 && i + j < specFields.length; j++) {
@@ -4577,9 +4575,16 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select finish...</option>
-                            {getOppPicklistFiltered('Opportunity__finishSpecifications').map(v => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
+                            <option>Painted Steel</option>
+                            <option>Painted Steel Split Finish</option>
+                            <option>Cor-Ten Finish</option>
+                            <option>304 Satin Finish Stainless</option>
+                            <option>316 Polished Stainless</option>
+                            <option>Marine Finish</option>
+                            <option>Painted Aluminum</option>
+                            <option>Painted Aluminum Split Finish</option>
+                            <option>Anodized Aluminum</option>
+                            <option>Maritme Finish(Air-lux)</option>
                           </select>
                         </div>
                       </div>
@@ -4730,36 +4735,6 @@ export default function SummaryPage() {
                               className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
                             />
                           )}
-                        </div>
-                      </div>
-
-                      {/* Row: Finials + Hinge Finish Specification */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Finials</label>
-                          <select
-                            value={editingSummary.finials || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, finials: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                          >
-                            <option value="">Select...</option>
-                            {getOppPicklistFiltered('Opportunity__finials').map(v => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Hinge Finish Specification</label>
-                          <select
-                            value={editingSummary.hingeFinishSpecification || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, hingeFinishSpecification: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                          >
-                            <option value="">Select...</option>
-                            {getOppPicklistFiltered('Opportunity__hingeFinishSpecification').map(v => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
-                          </select>
                         </div>
                       </div>
 
