@@ -1187,6 +1187,17 @@ export const useSchemaStore = create<SchemaStore>()(
     {
       name: 'crm-schema-cache',
       partialize: (state) => ({ schema: state.schema }),
+      // Zustand's own automatic rehydration runs asynchronously after store
+      // creation and can complete AFTER app-wrapper.tsx's `loadSchema()` has
+      // already replaced `schema` with a fresh network response — silently
+      // reverting it back to the stale cached blob (e.g. missing newly-saved
+      // picklistDependencies) with no visible error, and immune to a hard
+      // refresh since it's sourced from localStorage, not HTTP cache.
+      // `getCachedSchema()` above already provides the synchronous first-paint
+      // seed we need, so disable the redundant/racy auto-rehydrate entirely —
+      // this persist config is now write-only (partialize still saves fresh
+      // schema back to localStorage on every change).
+      skipHydration: true,
     }
   )
 );
