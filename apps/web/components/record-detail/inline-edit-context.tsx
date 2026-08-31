@@ -16,7 +16,7 @@ interface InlineEditContextValue {
   drafts: Record<string, unknown>;
   getDraft: (apiName: string, fallback: unknown) => unknown;
   setDraft: (apiName: string, value: unknown) => void;
-  startEditAll: () => void;
+  startEditAll: (anchorEl?: HTMLElement | null) => void;
   cancelEditAll: () => void;
   saveAll: () => Promise<void>;
   /** Returns a stable ref for a TeamMemberSlot field (creating it on first
@@ -60,25 +60,47 @@ function getScrollContainer(): HTMLElement | { scrollTop: number } {
 }
 
 /**
- * Pin the container's scrollTop to `y` across every layout shift for a short
- * window, not just the next frame. Toggling bulk edit mode changes every
- * field's rendered height at once, and some editors (lookups, TeamMemberSlot,
- * widgets) finish mounting/resizing a frame or more later — a single
- * requestAnimationFrame restore gets silently undone by those later shifts.
+ * A frozen scrollTop is not enough: when bulk edit mode toggles, EVERY
+ * inline-editable field switches at once, so fields ABOVE the one the user
+ * actually clicked can also grow/shrink, pushing the clicked field to a
+ * different position even while the container's scrollTop is unchanged.
+ * Instead, anchor to the clicked field's own row element and keep ITS
+ * viewport position (`getBoundingClientRect().top`) frozen across the
+ * transition, adjusting scrollTop by whatever delta is needed each frame —
+ * this stays correct regardless of what else on the page changes height.
  *
- * A ResizeObserver on the container itself does NOT work here: the container
- * has a fixed outer box (`flex-1` + `overflow-y-auto`), so only its
- * *content*'s scrollHeight grows — the observed border-box never changes
- * size, so ResizeObserver never fires. Instead, re-assert `y` on every
- * animation frame for the duration; this catches any cause of drift
- * (async-mounting editors, images, browser scroll-anchoring) regardless of
- * why the content height changed.
+ * Some editors (lookups, TeamMemberSlot, widgets) finish mounting/resizing a
+ * frame or more later, so this re-asserts every animation frame for a short
+ * window rather than fixing it up once.
  */
-function pinScrollFor(container: HTMLElement | { scrollTop: number }, y: number, durationMs = 600): void {
-  container.scrollTop = y;
+interface ScrollAnchor {
+  el: HTMLElement | null;
+  top: number;
+  containerScrollTop: number;
+}
+
+function captureScrollAnchor(container: HTMLElement | { scrollTop: number }, anchorEl?: HTMLElement | null): ScrollAnchor {
+  return {
+    el: anchorEl ?? null,
+    top: anchorEl ? anchorEl.getBoundingClientRect().top : 0,
+    containerScrollTop: container.scrollTop,
+  };
+}
+
+function pinScrollFor(container: HTMLElement | { scrollTop: number }, anchor: ScrollAnchor, durationMs = 600): void {
+  const el = container as HTMLElement;
+  const apply = () => {
+    if (anchor.el && anchor.el.isConnected) {
+      const delta = anchor.el.getBoundingClientRect().top - anchor.top;
+      if (delta !== 0) el.scrollTop += delta;
+    } else {
+      el.scrollTop = anchor.containerScrollTop;
+    }
+  };
+  apply();
   const start = performance.now();
   const tick = (now: number) => {
-    container.scrollTop = y;
+    apply();
     if (now - start < durationMs) {
       requestAnimationFrame(tick);
     }
@@ -92,14 +114,11 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
   const [saving, setSaving] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
   const slotRefsRef = useRef<Map<string, React.RefObject<TeamMemberSlotHandle>>>(new Map());
-  // Scroll position captured the moment editing starts. Entering/exiting bulk
-  // edit mode changes every field's rendered height at once (editable controls
-  // are taller than the compact read-only display), which shifts content above
-  // the current viewport and moves the page even though the user didn't scroll.
-  // Restoring to THIS single anchor on both start and end (rather than a value
-  // re-captured at cancel/save time, which would already reflect the shifted/
-  // taller edit-mode layout) keeps the view visually stationary end-to-end.
-  const scrollAnchorRef = useRef<number | null>(null);
+  // Anchor captured the moment editing starts (the clicked field's own row +
+  // its viewport position at that instant). Reused as-is on cancel/save so
+  // the view returns to exactly where it was, not a value re-captured after
+  // the edit-mode layout has already shifted things around.
+  const scrollAnchorRef = useRef<ScrollAnchor | null>(null);
 
   const registerSlotRef = useCallback((apiName: string) => {
     if (!slotRefsRef.current.has(apiName)) {
@@ -117,27 +136,27 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
     setDrafts((prev) => ({ ...prev, [apiName]: value }));
   }, []);
 
-  const startEditAll = useCallback(() => {
+  const startEditAll = useCallback((anchorEl?: HTMLElement | null) => {
     const container = getScrollContainer();
-    const y = container.scrollTop;
-    scrollAnchorRef.current = y;
+    const anchor = captureScrollAnchor(container, anchorEl);
+    scrollAnchorRef.current = anchor;
     setDrafts({});
     setEditingAll(true);
-    pinScrollFor(container, y);
+    pinScrollFor(container, anchor);
   }, []);
 
   const cancelEditAll = useCallback(() => {
     const container = getScrollContainer();
-    const y = scrollAnchorRef.current ?? container.scrollTop;
+    const anchor = scrollAnchorRef.current ?? captureScrollAnchor(container);
     setDrafts({});
     setEditingAll(false);
-    pinScrollFor(container, y);
+    pinScrollFor(container, anchor);
   }, []);
 
   const saveAll = useCallback(async () => {
     if (!recordId) return;
     const container = getScrollContainer();
-    const scrollY = scrollAnchorRef.current ?? container.scrollTop;
+    const anchor = scrollAnchorRef.current ?? captureScrollAnchor(container);
     setSaving(true);
     try {
       if (Object.keys(drafts).length > 0) {
@@ -167,7 +186,7 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
       }
       setDrafts({});
       setEditingAll(false);
-      pinScrollFor(container, scrollY);
+      pinScrollFor(container, anchor);
     } catch (err: any) {
       showToast(err?.message || 'Failed to save changes', 'error');
     } finally {

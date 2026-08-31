@@ -517,7 +517,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                               <div className="min-w-0 flex-1">{slotField}</div>
                               <button
                                 type="button"
-                                onClick={inlineEdit.startEditAll}
+                                onClick={(e) => inlineEdit.startEditAll(e.currentTarget.parentElement as HTMLElement)}
                                 aria-label={`Edit ${f.labelOverride || f.label || 'field'}`}
                                 className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-brand-navy"
                               >
