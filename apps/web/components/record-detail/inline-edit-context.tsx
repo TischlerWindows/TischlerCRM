@@ -65,6 +65,14 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
   const [saving, setSaving] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
   const slotRefsRef = useRef<Map<string, React.RefObject<TeamMemberSlotHandle>>>(new Map());
+  // Scroll position captured the moment editing starts. Entering/exiting bulk
+  // edit mode changes every field's rendered height at once (editable controls
+  // are taller than the compact read-only display), which shifts content above
+  // the current viewport and moves the page even though the user didn't scroll.
+  // Restoring to THIS single anchor on both start and end (rather than a value
+  // re-captured at cancel/save time, which would already reflect the shifted/
+  // taller edit-mode layout) keeps the view visually stationary end-to-end.
+  const scrollAnchorRef = useRef<number | null>(null);
 
   const registerSlotRef = useCallback((apiName: string) => {
     if (!slotRefsRef.current.has(apiName)) {
@@ -83,13 +91,17 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
   }, []);
 
   const startEditAll = useCallback(() => {
+    const container = getScrollContainer();
+    const y = container.scrollTop;
+    scrollAnchorRef.current = y;
     setDrafts({});
     setEditingAll(true);
+    requestAnimationFrame(() => { container.scrollTop = y; });
   }, []);
 
   const cancelEditAll = useCallback(() => {
     const container = getScrollContainer();
-    const y = container.scrollTop;
+    const y = scrollAnchorRef.current ?? container.scrollTop;
     setDrafts({});
     setEditingAll(false);
     requestAnimationFrame(() => { container.scrollTop = y; });
@@ -98,7 +110,7 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
   const saveAll = useCallback(async () => {
     if (!recordId) return;
     const container = getScrollContainer();
-    const scrollY = container.scrollTop;
+    const scrollY = scrollAnchorRef.current ?? container.scrollTop;
     setSaving(true);
     try {
       if (Object.keys(drafts).length > 0) {
