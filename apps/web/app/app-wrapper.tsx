@@ -550,7 +550,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Content */}
-      <div className={cn('flex-1', allowPageScroll ? 'overflow-y-auto' : 'overflow-hidden')}>
+      <div id="app-scroll-container" className={cn('flex-1', allowPageScroll ? 'overflow-y-auto' : 'overflow-hidden')}>
         {children}
       </div>
 

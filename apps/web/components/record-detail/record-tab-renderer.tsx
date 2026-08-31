@@ -285,7 +285,9 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
       if (!k.includes('__')) prefixedRecord[`${objectDef.apiName}__${k}`] = v;
     }
   }
-  const layoutVisibilityData = { ...record, ...formulaValues, ...rawDrafts, ...bareDrafts, ...prefixedRecord } as Record<string, unknown>;
+  // Draft overlays MUST be spread last so a live in-progress edit always wins
+  // over the record/prefixed-alias snapshot underneath it.
+  const layoutVisibilityData = { ...record, ...formulaValues, ...prefixedRecord, ...rawDrafts, ...bareDrafts } as Record<string, unknown>;
   const regions = (tab as any).regions as LayoutSection[];
 
   const visibleRegions = regions.filter((region) => {
@@ -685,7 +687,9 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
       if (!k.includes('__')) prefixedRecord2[`${objectDef.apiName}__${k}`] = v;
     }
   }
-  const layoutVisibilityData = { ...record, ...formulaValues, ...rawDrafts2, ...bareDrafts2, ...prefixedRecord2 } as Record<string, unknown>;
+  // Draft overlays MUST be spread last so a live in-progress edit always wins
+  // over the record/prefixed-alias snapshot underneath it.
+  const layoutVisibilityData = { ...record, ...formulaValues, ...prefixedRecord2, ...rawDrafts2, ...bareDrafts2 } as Record<string, unknown>;
   const legacyTab = tab as any;
   const sorted = [...(legacyTab.sections ?? [])].sort((a: any, b: any) => a.order - b.order);
 

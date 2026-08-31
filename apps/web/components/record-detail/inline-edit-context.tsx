@@ -49,6 +49,16 @@ interface InlineEditProviderProps {
  * umbrella Save/Cancel (rendered via <InlineEditToolbar>) commits every
  * field's draft in a single batched update, or discards them all.
  */
+/** The app's main content area scrolls internally (#app-scroll-container in
+ * app-wrapper.tsx) — the browser window itself never scrolls. Falls back to
+ * the window/documentElement so this still works outside that layout. */
+function getScrollContainer(): HTMLElement | { scrollTop: number } {
+  const el = typeof document !== 'undefined' ? document.getElementById('app-scroll-container') : null;
+  if (el) return el;
+  const root = typeof document !== 'undefined' ? (document.scrollingElement as HTMLElement | null) : null;
+  return root ?? { scrollTop: 0 };
+}
+
 export function InlineEditProvider({ objectApiName, recordId, onSaved, children }: InlineEditProviderProps) {
   const { showToast } = useToast();
   const [editingAll, setEditingAll] = useState(false);
@@ -78,15 +88,17 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
   }, []);
 
   const cancelEditAll = useCallback(() => {
-    const y = typeof window !== 'undefined' ? window.scrollY : 0;
+    const container = getScrollContainer();
+    const y = container.scrollTop;
     setDrafts({});
     setEditingAll(false);
-    requestAnimationFrame(() => window.scrollTo({ top: y, behavior: 'instant' }));
+    requestAnimationFrame(() => { container.scrollTop = y; });
   }, []);
 
   const saveAll = useCallback(async () => {
     if (!recordId) return;
-    const scrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+    const container = getScrollContainer();
+    const scrollY = container.scrollTop;
     setSaving(true);
     try {
       if (Object.keys(drafts).length > 0) {
@@ -116,7 +128,7 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
       }
       setDrafts({});
       setEditingAll(false);
-      requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+      requestAnimationFrame(() => { container.scrollTop = scrollY; });
     } catch (err: any) {
       showToast(err?.message || 'Failed to save changes', 'error');
     } finally {
