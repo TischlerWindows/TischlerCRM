@@ -65,30 +65,25 @@ function getScrollContainer(): HTMLElement | { scrollTop: number } {
  * field's rendered height at once, and some editors (lookups, TeamMemberSlot,
  * widgets) finish mounting/resizing a frame or more later — a single
  * requestAnimationFrame restore gets silently undone by those later shifts.
- * A ResizeObserver on the container reasserts `y` on every size change until
- * the window elapses, then disconnects.
+ *
+ * A ResizeObserver on the container itself does NOT work here: the container
+ * has a fixed outer box (`flex-1` + `overflow-y-auto`), so only its
+ * *content*'s scrollHeight grows — the observed border-box never changes
+ * size, so ResizeObserver never fires. Instead, re-assert `y` on every
+ * animation frame for the duration; this catches any cause of drift
+ * (async-mounting editors, images, browser scroll-anchoring) regardless of
+ * why the content height changed.
  */
-function pinScrollFor(container: HTMLElement | { scrollTop: number }, y: number, durationMs = 500): void {
+function pinScrollFor(container: HTMLElement | { scrollTop: number }, y: number, durationMs = 600): void {
   container.scrollTop = y;
-  if (!('nodeType' in (container as any)) && typeof (container as any).addEventListener !== 'function') {
-    // Non-element fallback (shouldn't happen in practice) — no observer possible.
-    return;
-  }
-  const el = container as HTMLElement;
-  if (typeof ResizeObserver === 'undefined') {
-    requestAnimationFrame(() => { el.scrollTop = y; });
-    return;
-  }
-  const ro = new ResizeObserver(() => { el.scrollTop = y; });
-  ro.observe(el);
-  // Belt-and-suspenders: also reassert on the next couple of frames in case
-  // the shift comes from a child growing without changing the container's
-  // own observed box (ResizeObserver only fires for the observed element).
-  requestAnimationFrame(() => {
-    el.scrollTop = y;
-    requestAnimationFrame(() => { el.scrollTop = y; });
-  });
-  setTimeout(() => ro.disconnect(), durationMs);
+  const start = performance.now();
+  const tick = (now: number) => {
+    container.scrollTop = y;
+    if (now - start < durationMs) {
+      requestAnimationFrame(tick);
+    }
+  };
+  requestAnimationFrame(tick);
 }
 
 export function InlineEditProvider({ objectApiName, recordId, onSaved, children }: InlineEditProviderProps) {
