@@ -53,6 +53,9 @@ interface InlineEditableFieldProps {
   value: unknown;
   /** The normally-rendered read-only display (e.g. <MemoizedFieldValue />). */
   children: React.ReactNode;
+  /** Record merged with live drafts — lets dependent-picklist filtering see
+   * other fields' in-progress edits instead of only their last-saved values. */
+  formData?: Record<string, unknown>;
 }
 
 /**
@@ -62,7 +65,7 @@ interface InlineEditableFieldProps {
  * — there's no per-field Save/Cancel; one umbrella <InlineEditToolbar>
  * commits (or discards) every field's draft in a single batched update.
  */
-export function InlineEditableField({ fieldDef, value, children }: InlineEditableFieldProps) {
+export function InlineEditableField({ fieldDef, value, children, formData }: InlineEditableFieldProps) {
   const inlineEdit = useInlineEdit();
 
   if (!inlineEdit || !isInlineEditableField(fieldDef)) {
@@ -93,6 +96,7 @@ export function InlineEditableField({ fieldDef, value, children }: InlineEditabl
           draft={draft}
           setDraft={(v) => setDraft(fieldDef.apiName, v)}
           onKeyDown={handleKeyDown}
+          formData={formData}
         />
       </div>
     );
@@ -120,14 +124,17 @@ function FieldEditor({
   draft,
   setDraft,
   onKeyDown,
+  formData,
 }: {
   fieldDef: FieldDef;
   draft: unknown;
   setDraft: (v: unknown) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
+  formData?: Record<string, unknown>;
 }): React.ReactNode {
   const common =
     'w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy';
+  const dependencyFormData = formData ?? {};
 
   switch (fieldDef.type) {
     case 'Checkbox':
@@ -141,18 +148,16 @@ function FieldEditor({
         />
       );
 
-    // Dependent-picklist filtering normally reads other CURRENT field values
-    // via `formData` — inline editing doesn't have the full record's live
-    // draft state wired through, so it passes an empty context, which
-    // `filterPicklistValues` treats the same as "no controlling value set"
-    // and shows every option (a disclosed simplification, not a bug).
+    // Dependent-picklist filtering reads other CURRENT field values via
+    // `formData` — this is the record merged with live drafts, so it stays
+    // in sync as the controlling field is edited inline.
     case 'Picklist':
       return (
         <PicklistInput
           fieldDef={fieldDef}
           value={draft}
           onChange={setDraft}
-          formData={{}}
+          formData={dependencyFormData}
           visibilityCtx={NO_VISIBILITY_CTX}
         />
       );
@@ -163,7 +168,7 @@ function FieldEditor({
           fieldDef={fieldDef}
           value={draft}
           onChange={setDraft}
-          formData={{}}
+          formData={dependencyFormData}
           visibilityCtx={NO_VISIBILITY_CTX}
         />
       );
@@ -173,7 +178,7 @@ function FieldEditor({
           fieldDef={fieldDef}
           value={draft}
           onChange={setDraft}
-          formData={{}}
+          formData={dependencyFormData}
           visibilityCtx={NO_VISIBILITY_CTX}
         />
       );
@@ -183,7 +188,7 @@ function FieldEditor({
           fieldDef={fieldDef}
           value={draft}
           onChange={setDraft}
-          formData={{}}
+          formData={dependencyFormData}
           visibilityCtx={NO_VISIBILITY_CTX}
         />
       );
