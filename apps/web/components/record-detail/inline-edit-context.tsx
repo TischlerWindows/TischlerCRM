@@ -59,6 +59,38 @@ function getScrollContainer(): HTMLElement | { scrollTop: number } {
   return root ?? { scrollTop: 0 };
 }
 
+/**
+ * Pin the container's scrollTop to `y` across every layout shift for a short
+ * window, not just the next frame. Toggling bulk edit mode changes every
+ * field's rendered height at once, and some editors (lookups, TeamMemberSlot,
+ * widgets) finish mounting/resizing a frame or more later — a single
+ * requestAnimationFrame restore gets silently undone by those later shifts.
+ * A ResizeObserver on the container reasserts `y` on every size change until
+ * the window elapses, then disconnects.
+ */
+function pinScrollFor(container: HTMLElement | { scrollTop: number }, y: number, durationMs = 500): void {
+  container.scrollTop = y;
+  if (!('nodeType' in (container as any)) && typeof (container as any).addEventListener !== 'function') {
+    // Non-element fallback (shouldn't happen in practice) — no observer possible.
+    return;
+  }
+  const el = container as HTMLElement;
+  if (typeof ResizeObserver === 'undefined') {
+    requestAnimationFrame(() => { el.scrollTop = y; });
+    return;
+  }
+  const ro = new ResizeObserver(() => { el.scrollTop = y; });
+  ro.observe(el);
+  // Belt-and-suspenders: also reassert on the next couple of frames in case
+  // the shift comes from a child growing without changing the container's
+  // own observed box (ResizeObserver only fires for the observed element).
+  requestAnimationFrame(() => {
+    el.scrollTop = y;
+    requestAnimationFrame(() => { el.scrollTop = y; });
+  });
+  setTimeout(() => ro.disconnect(), durationMs);
+}
+
 export function InlineEditProvider({ objectApiName, recordId, onSaved, children }: InlineEditProviderProps) {
   const { showToast } = useToast();
   const [editingAll, setEditingAll] = useState(false);
@@ -96,7 +128,7 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
     scrollAnchorRef.current = y;
     setDrafts({});
     setEditingAll(true);
-    requestAnimationFrame(() => { container.scrollTop = y; });
+    pinScrollFor(container, y);
   }, []);
 
   const cancelEditAll = useCallback(() => {
@@ -104,7 +136,7 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
     const y = scrollAnchorRef.current ?? container.scrollTop;
     setDrafts({});
     setEditingAll(false);
-    requestAnimationFrame(() => { container.scrollTop = y; });
+    pinScrollFor(container, y);
   }, []);
 
   const saveAll = useCallback(async () => {
@@ -140,7 +172,7 @@ export function InlineEditProvider({ objectApiName, recordId, onSaved, children 
       }
       setDrafts({});
       setEditingAll(false);
-      requestAnimationFrame(() => { container.scrollTop = scrollY; });
+      pinScrollFor(container, scrollY);
     } catch (err: any) {
       showToast(err?.message || 'Failed to save changes', 'error');
     } finally {
