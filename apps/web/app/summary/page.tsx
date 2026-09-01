@@ -1423,6 +1423,7 @@ export default function SummaryPage() {
       linkedOpportunityId: record.id,
       opportunityNumber: record.opportunityNumber || record.Opportunity__opportunityNumber || '',
       address,
+      summaryType: 'tischler',
     };
     const updatedSummaries = [duplicated, ...summaries];
     try {
@@ -1720,6 +1721,7 @@ export default function SummaryPage() {
       name: `${original.name || 'Untitled Summary'} (Copy)`,
       lastModifiedAt: new Date().toISOString(),
       isFavorite: false,
+      summaryType: 'tischler',
     };
     const updatedSummaries = [duplicated, ...summaries];
     setSummaries(updatedSummaries);
@@ -2705,7 +2707,12 @@ export default function SummaryPage() {
       const validSet = new Set(getOptionsForType(typeName));
       prunedPto[typeName] = Array.isArray(opts) ? opts.filter((o: string) => validSet.has(o)) : [];
     }
-    const summaryToSave = { ...editingSummary, productTypeOptions: prunedPto };
+    // Force-stamp summaryType on every save, not just brand-new summaries —
+    // otherwise a summary created before this field existed (or edited without
+    // ever passing through the "new summary" initializer) stays untagged
+    // forever, which makes it appear as "universal" in Proposal Builder's
+    // template-scoped summary filter (untagged == matches every template).
+    const summaryToSave = { ...editingSummary, productTypeOptions: prunedPto, summaryType: 'tischler' as const };
 
     if (isNew) {
       // Newly-created summaries aren't lockable until they exist server-side;
