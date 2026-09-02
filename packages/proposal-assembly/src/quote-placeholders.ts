@@ -307,19 +307,14 @@ function buildArcadiaRoughHardwareText(
     (t) => t === 'Lift & Slide D' || t.startsWith('Lift & Slide D:')
   );
   if (lsActiveTypes.length > 0) {
-    // Unlike Tischler's L&R D, don't require an explicit SS RH/Standard RH
-    // pick to emit this section — the "Product Type Options" panel where
-    // that's set is easy to miss, and users reasonably expect the section
-    // to appear just from adding a Lift & Slide door. Default to the
-    // Standard RH copy; only show the upgraded SS RH copy when explicitly
-    // selected.
     const lsOptions = lsActiveTypes.flatMap((t) => pto[t] ?? pto['Lift & Slide D'] ?? []);
     if (lsOptions.includes('SS RH')) {
       parts.push(section('LIFT & SLIDE DOORS:',
         'Lift & slide doors with corrosion resistant metal alloy rough hardware with stainless steel meeting stile interlocks and locking bolts. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices.' + BB +
         'Lift & slide doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
       ));
-    } else {
+    }
+    if (lsOptions.includes('Standard RH')) {
       parts.push(section('LIFT & SLIDE DOORS:',
         'Lift & slide doors with corrosion resistant metal alloy rough hardware. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices' + BB +
         'Lift & slide doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
