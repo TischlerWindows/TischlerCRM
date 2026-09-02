@@ -394,6 +394,21 @@ export default function QuoteBuilderPage() {
     })();
   }, []);
 
+  // Reconcile once both the default template and the summary list have
+  // loaded (they load in independent effects, in unpredictable order) — the
+  // initial `stored[0]` default above picks whichever summary happens to be
+  // first in the array with no regard for the default template's
+  // summaryType, so an Arcadia-tagged summary loading first (or the default
+  // template happening to be Arcadia) can silently pair with a mismatched
+  // summary on first render.
+  useEffect(() => {
+    if (!selectedTemplateId || summaries.length === 0) return;
+    const tpl = templates.find((t) => t.id === selectedTemplateId);
+    if (!tpl?.summaryType) return;
+    const validSummaries = summaries.filter((s) => !s.summaryType || s.summaryType === tpl.summaryType);
+    setSelectedSummaryId((c) => (validSummaries.some((s) => s.id === c) ? c : validSummaries[0]?.id || ''));
+  }, [selectedTemplateId, templates, summaries]);
+
   // Warn before unload when there are unsaved editor changes.
   useEffect(() => {
     const baseline = editorBaseline;
@@ -649,6 +664,8 @@ export default function QuoteBuilderPage() {
   const handleSelectTemplate = async (id: string) => {
     setSelectedTemplateId(id);
     clearEditor();
+    // Selected-summary reconciliation for the new template's summaryType
+    // happens in the effect below (also handles the initial-load race).
     await Promise.all([
       loadPresets(id),
       loadTokenMappings(id),
