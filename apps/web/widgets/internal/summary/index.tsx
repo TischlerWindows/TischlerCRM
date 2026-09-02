@@ -54,6 +54,8 @@ interface Summary {
   lastModifiedBy: string
   lastModifiedAt: string
   isFavorite?: boolean
+  /** Which page created this record — determines which page re-opens it for editing. */
+  summaryType?: string
 }
 
 export default function SummaryWidget({ record, object }: WidgetProps) {
@@ -111,11 +113,17 @@ export default function SummaryWidget({ record, object }: WidgetProps) {
   }
 
   const handleOpen = (summaryId: string) => {
-    // Navigate to the summary page and auto-open this summary for editing
+    // Navigate to the summary page and auto-open this summary for editing.
+    // MUST route by the summary's own summaryType, not always /summary —
+    // otherwise an Arcadia summary opens in the Tischler page's edit modal,
+    // which then force-stamps summaryType: 'tischler' on save, silently
+    // converting it (visible as "Edit Tischler Fensterwerk Summary" title).
+    const summary = allSummaries.find((s) => s.id === summaryId)
+    const route = summary?.summaryType === 'arcadia' ? '/arcadia-summary' : '/summary'
     const params = new URLSearchParams({
       editSummary: summaryId,
     })
-    router.push(`/summary?${params.toString()}`)
+    router.push(`${route}?${params.toString()}`)
   }
 
   const handleDelete = async (summaryId: string) => {
