@@ -42,6 +42,7 @@ export async function tokenMappingRoutes(app: FastifyInstance) {
         { tokenName: 'sdlInches', sourceObject: 'SUMMARY', sourcePath: 'sdlInches', format: 'TEXT', label: 'SDL (fractional inches)', category: 'Materials' },
         { tokenName: 'tdlType', sourceObject: 'SUMMARY', sourcePath: 'tdlType', format: 'TEXT', label: 'TDL (mm)', category: 'Materials' },
         { tokenName: 'tdlInches', sourceObject: 'SUMMARY', sourcePath: 'tdlInches', format: 'TEXT', label: 'TDL (fractional inches)', category: 'Materials' },
+        { tokenName: 'arcadiaRoughHardware', sourceObject: 'SUMMARY', sourcePath: 'arcadiaRoughHardware', format: 'TEXT', label: 'Arcadia Rough Hardware', category: 'Products' },
       ] as const;
       const existingNames = new Set(
         (await prisma.tokenMapping.findMany({ where: { templateId, isBuiltIn: true }, select: { tokenName: true } })).map((m) => m.tokenName)

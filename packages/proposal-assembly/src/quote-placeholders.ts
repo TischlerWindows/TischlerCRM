@@ -209,6 +209,122 @@ function buildRoughHardwareText(
   return parts.join(BB);
 }
 
+// Arcadia's metal lift-slide door system uses 'Lift & Slide D' as its type
+// name (Tischler's wood equivalent is 'L&R D' / "Lift & Roll Door") — same
+// section structure, sub-option pattern matching (e.g. 'Lift & Slide D:
+// Pattern F1F') and hardware-option copy as buildRoughHardwareText, just
+// keyed off the Arcadia type name instead.
+function buildArcadiaRoughHardwareText(
+  activeTypes: Set<string>,
+  pto: Record<string, string[]>,
+): string {
+  const activeList = Array.from(activeTypes).map((t) => t.toLowerCase());
+  const hasGD = activeList.some((t) => GD_TYPES_LOWER.has(t));
+  const hasHouseDoor = activeList.some((t) => HOUSE_DOOR_TYPES_LOWER.has(t));
+  const hasWindows = activeList.some((t) =>
+    WINDOW_NON_HUNG_TYPES_LOWER.has(t) ||
+    t.includes('offset simulated') ||
+    t.includes('simulated dh') ||
+    t.includes('simulated double hung')
+  );
+
+  const parts: string[] = [];
+
+  const doorLabels: string[] = [];
+  if (hasGD) doorLabels.push('GARDEN DOORS');
+  if (hasHouseDoor) doorLabels.push('HOUSE DOORS');
+  const hasDoorLike = doorLabels.length > 0;
+  if (hasWindows) doorLabels.push('WINDOWS');
+  const header = doorLabels.length > 1
+    ? doorLabels.slice(0, -1).join(', ') + ' & ' + doorLabels[doorLabels.length - 1] + ':'
+    : doorLabels[0] + ':';
+
+  const crankOutText = activeList.includes(CRANK_OUT_TYPE_LOWER)
+    ? BB + 'Crank-out casements with stainless steel Roto scissor crank out hardware and 3-point locking system. One crank per casement sash. Hardware is available in four finishes – Earth Brown, Coppertone, Dark Brown, and Metallic Brown. Color samples available upon request. Not available in a brushed nickel finish.'
+    : '';
+
+  if (hasDoorLike && hasWindows) {
+    parts.push(section(header,
+      'The Tischler system is a stainless steel multi-point locking system for garden doors and a corrosion resistant metal alloy perimeter locking system at jamb, head and sill for windows.' + BB +
+      'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
+      'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays. Garden doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional.' + BB +
+      'Standard TUS lock cylinders (not re-keyable.)' +
+      crankOutText
+    ));
+  } else if (hasDoorLike) {
+    parts.push(section(header,
+      'The Tischler system is a stainless steel multi-point locking system for garden doors.' + BB +
+      'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
+      'Garden doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional.' + BB +
+      'Standard TUS lock cylinders (not re-keyable.)'
+    ));
+  } else if (hasWindows) {
+    parts.push(section(header,
+      'The Tischler system is a corrosion resistant metal alloy perimeter locking system at jamb, head and sill for windows.' + BB +
+      'This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
+      'Standard aluminum construction handles in white or dark brown. One interior handle per window (offset handles for outswing casement.) Outswing casements with sliding casement stays.' +
+      crankOutText
+    ));
+  }
+
+  if (activeList.some((t) => DOMESTIC_DOOR_TYPES_LOWER.has(t))) {
+    parts.push(section('DOMESTIC DOORS:',
+      'Doors incorporate a multi-point locking corrosion resistant metal alloy rough hardware.' + BB +
+      'Standard aluminum construction handles in white or dark brown. Domestic doors with interior/exterior operable lever handles with lock cylinder (active sash) and interior operable handle (inactive sash.) Exterior dummy handle (inactive sash) is optional. Standard TUS lock cylinders (not re-keyable.) Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.' + BB +
+      'Domestic doors with 4”x4” butt hinges.'
+    ));
+  }
+
+  if (activeList.some((t) => FOLDING_DOOR_TYPES_LOWER.has(t))) {
+    parts.push(section('FOLDING DOORS:',
+      'Folding doors incorporate a multi-point locking corrosion resistant metal alloy rough hardware. This locking system creates a tight seal in addition to extra protection against intrusion.' + BB +
+      'Standard aluminum construction handles in white or dark brown. Folding doors with interior operable handles (active sash) and exterior pulls. Upgraded (final) finish hardware at an additional cost.'
+    ));
+  }
+
+  const HUNG_KINDS = [
+    { label: 'Single', concealedKey: 'Single Hung Concealed Balance', wcKey: 'Single Hung Weight and Chain' },
+    { label: 'Double', concealedKey: 'Double Hung Concealed Balance', wcKey: 'Double Hung Weight and Chain' },
+    { label: 'Triple', concealedKey: 'Triple Hung Concealed Balance', wcKey: 'Triple Hung Weight and Chain' },
+  ];
+  for (const { label, concealedKey, wcKey } of HUNG_KINDS) {
+    if (activeTypes.has(concealedKey)) {
+      parts.push(section(`${label.toUpperCase()} HUNG CONCEALED BALANCE:`,
+        `${label} hung window operation is a concealed stainless steel constant force spring balance system allowing sash operation of equal force. Clear opening is subject to size and sash weight` + BB +
+        `${label} with standard polished brass sash locks and stops.`
+      ));
+    }
+    if (activeTypes.has(wcKey)) {
+      parts.push(section(`${label.toUpperCase()} HUNG WEIGHT & CHAIN:`,
+        `${label} hung window operation is a weight and chain balance system. Chains and pulleys are supplied in standard solid brass. Weights and chains are supplied loose for installation on site by others` + BB +
+        `${label} with standard polished brass sash locks and stops.`
+      ));
+    }
+  }
+
+  // Same pattern mechanism as L&R D ('Lift & Slide D: Pattern X' alongside bare 'Lift & Slide D').
+  const lsActiveTypes = Array.from(activeTypes).filter(
+    (t) => t === 'Lift & Slide D' || t.startsWith('Lift & Slide D:')
+  );
+  if (lsActiveTypes.length > 0) {
+    const lsOptions = lsActiveTypes.flatMap((t) => pto[t] ?? pto['Lift & Slide D'] ?? []);
+    if (lsOptions.includes('SS RH')) {
+      parts.push(section('LIFT & SLIDE DOORS:',
+        'Lift & slide doors with corrosion resistant metal alloy rough hardware with stainless steel meeting stile interlocks and locking bolts. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices.' + BB +
+        'Lift & slide doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
+      ));
+    }
+    if (lsOptions.includes('Standard RH')) {
+      parts.push(section('LIFT & SLIDE DOORS:',
+        'Lift & slide doors with corrosion resistant metal alloy rough hardware. Operation lifts the sash disengaging seals and locking mechanism for smooth operation. Closing operation engages perimeter seal and secures sash to the jamb with multiple locking devices' + BB +
+        'Lift & slide doors with interior operable handles and recessed exterior pulls. Upgraded (final) finish hardware and re-keyable cylinders at an additional cost.'
+      ));
+    }
+  }
+
+  return parts.join(BB);
+}
+
 const OUTSWING_WINDOW_TYPES_LOWER = new Set(['push outswing', 'crank outswing']);
 
 function buildFinialSectionText(
@@ -1162,6 +1278,33 @@ export function buildTokenMap(
         )
       );
       return buildRoughHardwareText(rhActive, rhPto);
+    })(),
+    arcadiaRoughHardware: (() => {
+      const rhPto = ((summary as any).productTypeOptions as Record<string, string[]> | undefined) ?? {};
+      const rhFields = ['type', 'type2', 'type3', 'type4'];
+      const rhSubOpt: Record<string, string> = {
+        type: 'typeSubOption', type2: 'type2SubOption',
+        type3: 'type3SubOption', type4: 'type4SubOption',
+      };
+      const rhRows: unknown[] = [
+        ...((summary as any).rows || []),
+        ...((summary as any).doorRows || []),
+        ...(((summary as any).subLocations || []) as any[]).flatMap(
+          (l: any) => [...(l.rows || []), ...(l.doorRows || [])]
+        ),
+      ];
+      const rhActive = new Set<string>(
+        rhRows.flatMap((r: any) =>
+          rhFields.map((f) => {
+            const t = r[f];
+            if (!t) return null;
+            if (t === 'Fixed with Sash' && r[rhSubOpt[f]!]) return `Fixed with Sash: ${r[rhSubOpt[f]!]}`;
+            if (t === 'Lift & Slide D' && r[rhSubOpt[f]!]) return `Lift & Slide D: ${r[rhSubOpt[f]!]}`;
+            return t;
+          }).filter((t): t is string => Boolean(t))
+        )
+      );
+      return buildArcadiaRoughHardwareText(rhActive, rhPto);
     })(),
     finialSection: (() => {
       const fiFields = ['type', 'type2', 'type3', 'type4'];

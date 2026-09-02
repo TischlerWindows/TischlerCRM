@@ -85,6 +85,7 @@ const BUILT_IN_TOKENS: TokenMappingData[] = [
   { id: '__builtin_installationTotalPrice', tokenName: 'installationTotalPrice', label: 'Installation Total Price', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'installationTotalPrice', format: 'TEXT' },
   { id: '__builtin_productTypeDetails', tokenName: 'productTypeDetails', label: 'Product Type Details', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'productTypeDetails', format: 'TEXT' },
   { id: '__builtin_roughHardware', tokenName: 'roughHardware', label: 'Rough Hardware', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'roughHardware', format: 'TEXT' },
+  { id: '__builtin_arcadiaRoughHardware', tokenName: 'arcadiaRoughHardware', label: 'Arcadia Rough Hardware', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'arcadiaRoughHardware', format: 'TEXT' },
   { id: '__builtin_sdlType', tokenName: 'sdlType', label: 'SDL Type', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'sdlType', format: 'TEXT' },
   { id: '__builtin_sdlInches', tokenName: 'sdlInches', label: 'SDL Inches', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'sdlInches', format: 'TEXT' },
   { id: '__builtin_tdlType', tokenName: 'tdlType', label: 'TDL Type', category: 'Built-in', sourceObject: 'SUMMARY', sourcePath: 'tdlType', format: 'TEXT' },
