@@ -178,6 +178,20 @@ const WINDOW_SCREEN_FRAME_TYPES = [
 // Add-on table: Door Screen Sash "Wood Frame" options
 const DOOR_SCREEN_WOOD_FRAME_TYPES = ['Wood Framed Door Screens'];
 
+// Arcadia Glass Type / Additional Glass Types for Proposal — hardcoded, not
+// pulled from the shared Opportunity__glassType picklist (that's Tischler's list).
+const ARCADIA_GLASS_TYPE_OPTIONS = [
+  'Guardian 62/27',
+  'Guardian 62/27 IS 20',
+  'Guardian 62/27 Low-Iron',
+  'Guardian 70/36',
+  'Guardian 70/36 IS 20',
+  'Guardian 70/36 Low-Iron',
+  'Turtle Glass Crystal Grey SN 68',
+  'Triple Pane Tempered Safety Glass',
+  'Custom Please Specify',
+];
+
 // Add-on table: Roll Screens "Frame Type" options (the pre-existing Door Screen Sash list)
 const ROLL_SCREEN_FRAME_TYPES = [
   'Low Wind (Brush) Manual',
@@ -2191,7 +2205,7 @@ export default function SummaryPage() {
       ? s.subLocations.flatMap(l => l.rows)
       : (s.rows || []);
     const specHasHung = specWinRows.some(r => r.type?.toLowerCase?.()?.includes('hung'));
-    addSpec('Glass Type', s.glassType === 'Custom Option' ? s.glassTypeCustom : s.glassType);
+    addSpec('Arcadia Glass Type', s.glassType === 'Custom Please Specify' ? s.glassTypeCustom : s.glassType);
     if (specHasHung) addSpec('Hung Glass Type', s.hungType === 'Custom Option' ? s.hungTypeCustom : s.hungType);
     addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
     addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
@@ -4605,19 +4619,18 @@ export default function SummaryPage() {
                         return (
                           <div className={hasHung ? 'grid grid-cols-1 sm:grid-cols-2 gap-6' : ''}>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Arcadia Glass Type</label>
                               <select
-                                value={editingSummary.glassType === 'Custom Option' ? 'Custom Option' : (editingSummary.glassType || '')}
-                                onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value, glassTypeCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.glassTypeCustom })}
-                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.glassType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
+                                value={editingSummary.glassType === 'Custom Please Specify' ? 'Custom Please Specify' : (editingSummary.glassType || '')}
+                                onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value, glassTypeCustom: e.target.value !== 'Custom Please Specify' ? '' : editingSummary.glassTypeCustom })}
+                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.glassType === 'Custom Please Specify' ? ' italic text-blue-600' : ''}`}
                               >
                                 <option value="">Select glass type...</option>
-                                {getOppPicklistFiltered('Opportunity__glassType').map(v => (
+                                {ARCADIA_GLASS_TYPE_OPTIONS.map(v => (
                                   <option key={v} value={v}>{v}</option>
                                 ))}
-                                <option value="Custom Option">Custom Option</option>
                               </select>
-                              {editingSummary.glassType === 'Custom Option' && (
+                              {editingSummary.glassType === 'Custom Please Specify' && (
                                 <input
                                   type="text"
                                   autoFocus
@@ -4661,7 +4674,7 @@ export default function SummaryPage() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Additional Glass Types for Proposal</label>
                         {(() => {
-                          const options = getOppPicklistFiltered('Opportunity__glassType');
+                          const options = ARCADIA_GLASS_TYPE_OPTIONS;
                           const selected = editingSummary.additionalGlassTypes || [];
                           return (
                             <details className="relative">
