@@ -94,7 +94,9 @@ export default function ClockInWidget({ record }: WidgetProps) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
+  const [editingTimeField, setEditingTimeField] = useState<'clockIn' | 'clockOut'>('clockIn')
   const [editingClockInTime, setEditingClockInTime] = useState('')
+  const [editingClockOutTime, setEditingClockOutTime] = useState('')
 
   const load = useCallback(async () => {
     if (!recordId) { setLoading(false); return }
@@ -189,29 +191,37 @@ export default function ClockInWidget({ record }: WidgetProps) {
   const canManageEntry = (entry: ClockInRecord) =>
     user?.role === 'ADMIN' || entry.clockedInByUserId === user?.id
 
-  const startEditingTime = (entry: ClockInRecord) => {
+  const startEditingTime = (entry: ClockInRecord, field: 'clockIn' | 'clockOut') => {
     if (!canManageEntry(entry) || busy) return
     setEditingEntryId(entry.id)
+    setEditingTimeField(field)
     setEditingClockInTime(toDateTimeLocal(entry.clockInTime))
+    setEditingClockOutTime(toDateTimeLocal(entry.clockOutTime))
   }
 
   const cancelEditingTime = () => {
     setEditingEntryId(null)
+    setEditingTimeField('clockIn')
     setEditingClockInTime('')
+    setEditingClockOutTime('')
   }
 
   const saveEditingTime = async (entry: ClockInRecord) => {
-    if (!editingClockInTime || !canManageEntry(entry) || busy) return
-    const clockInDate = new Date(editingClockInTime)
-    if (isNaN(clockInDate.getTime())) {
-      showToast('Enter a valid clock-in time.', 'error')
+    const editedTime = editingTimeField === 'clockIn' ? editingClockInTime : editingClockOutTime
+    if (!editedTime || !canManageEntry(entry) || busy) return
+    const editedDate = new Date(editedTime)
+    if (isNaN(editedDate.getTime())) {
+      showToast(`Enter a valid clock-${editingTimeField === 'clockIn' ? 'in' : 'out'} time.`, 'error')
       return
     }
     setBusy(true)
     try {
-      const data: Record<string, unknown> = { clockInTime: clockInDate.toISOString() }
-      if (entry.clockOutTime) {
-        const clockOutDate = new Date(entry.clockOutTime)
+      const clockInDate = new Date(editingTimeField === 'clockIn' ? editedTime : editingClockInTime)
+      const clockOutDate = new Date(editingTimeField === 'clockOut' ? editedTime : editingClockOutTime)
+      const data: Record<string, unknown> = {
+        [editingTimeField === 'clockIn' ? 'clockInTime' : 'clockOutTime']: editedDate.toISOString(),
+      }
+      if (!isNaN(clockInDate.getTime()) && !isNaN(clockOutDate.getTime())) {
         data.durationMinutes = Math.max(0, Math.round((clockOutDate.getTime() - clockInDate.getTime()) / 60000))
       }
       await recordsService.updateRecord('ClockIn', entry.id, { data })
@@ -308,17 +318,19 @@ export default function ClockInWidget({ record }: WidgetProps) {
                   <tr key={e.id} className="align-top text-gray-700">
                     <td className="px-4 py-3 font-medium text-gray-900">{e.clockedInByName || 'Unknown'}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {editingEntryId === e.id ? (
+                      {editingEntryId === e.id && editingTimeField === 'clockIn' ? (
                         <div className="flex items-center gap-1">
                           <input
                             type="datetime-local"
-                            value={editingClockInTime}
-                            onChange={(event) => setEditingClockInTime(event.target.value)}
+                            value={editingTimeField === 'clockIn' ? editingClockInTime : editingClockOutTime}
+                            onChange={(event) => editingTimeField === 'clockIn'
+                              ? setEditingClockInTime(event.target.value)
+                              : setEditingClockOutTime(event.target.value)}
                             disabled={busy}
                             className="h-8 rounded border border-gray-300 px-2 text-xs text-gray-700"
-                            aria-label="Edit clock-in time"
+                            aria-label={`Edit clock-${editingTimeField === 'clockIn' ? 'in' : 'out'} time`}
                           />
-                          <button type="button" onClick={() => saveEditingTime(e)} disabled={busy || !editingClockInTime} className="rounded p-1 text-green-700 hover:bg-green-50 disabled:opacity-50" aria-label="Save clock-in time" title="Save clock-in time">
+                          <button type="button" onClick={() => saveEditingTime(e)} disabled={busy || !(editingTimeField === 'clockIn' ? editingClockInTime : editingClockOutTime)} className="rounded p-1 text-green-700 hover:bg-green-50 disabled:opacity-50" aria-label="Save edited time" title="Save edited time">
                             <Check className="h-4 w-4" />
                           </button>
                           <button type="button" onClick={cancelEditingTime} disabled={busy} className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-50" aria-label="Cancel editing clock-in time" title="Cancel editing clock-in time">
@@ -326,7 +338,7 @@ export default function ClockInWidget({ record }: WidgetProps) {
                           </button>
                         </div>
                       ) : canManageEntry(e) ? (
-                        <button type="button" onClick={() => startEditingTime(e)} className="inline-flex items-center gap-1 text-left text-brand-navy hover:underline" title="Edit clock-in time">
+                        <button type="button" onClick={() => startEditingTime(e, 'clockIn')} className="inline-flex items-center gap-1 text-left text-brand-navy hover:underline" title="Edit clock-in time">
                           {fmtTime(e.clockInTime)}
                           <Pencil className="h-3 w-3" />
                         </button>
@@ -338,7 +350,29 @@ export default function ClockInWidget({ record }: WidgetProps) {
                       <LocationCell address={locationLabel(e.clockInAddress, e.clockInLatitude, e.clockInLongitude)} href={inLink} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {e.clockOutTime ? fmtTime(e.clockOutTime) : <span className="font-medium text-amber-600">In progress</span>}
+                      {editingEntryId === e.id && editingTimeField === 'clockOut' ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="datetime-local"
+                            value={editingClockOutTime}
+                            onChange={(event) => setEditingClockOutTime(event.target.value)}
+                            disabled={busy}
+                            className="h-8 rounded border border-gray-300 px-2 text-xs text-gray-700"
+                            aria-label="Edit clock-out time"
+                          />
+                          <button type="button" onClick={() => saveEditingTime(e)} disabled={busy || !editingClockOutTime} className="rounded p-1 text-green-700 hover:bg-green-50 disabled:opacity-50" aria-label="Save clock-out time" title="Save clock-out time">
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button type="button" onClick={cancelEditingTime} disabled={busy} className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-50" aria-label="Cancel editing clock-out time" title="Cancel editing clock-out time">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : e.clockOutTime ? canManageEntry(e) ? (
+                        <button type="button" onClick={() => startEditingTime(e, 'clockOut')} className="inline-flex items-center gap-1 text-left text-brand-navy hover:underline" title="Edit clock-out time">
+                          {fmtTime(e.clockOutTime)}
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      ) : fmtTime(e.clockOutTime) : <span className="font-medium text-amber-600">In progress</span>}
                     </td>
                     <td className="px-4 py-3">
                       {e.clockOutTime ? <LocationCell address={locationLabel(e.clockOutAddress, e.clockOutLatitude, e.clockOutLongitude)} href={outLink} /> : '—'}
