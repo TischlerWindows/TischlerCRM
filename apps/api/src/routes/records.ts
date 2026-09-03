@@ -55,6 +55,20 @@ async function checkObjectPermission(
   return false;
 }
 
+function canManageClockInRecord(
+  record: { data: unknown },
+  apiName: string,
+  userId: string,
+  userRole: string,
+): boolean {
+  if (userRole === 'ADMIN' || apiName.toLowerCase() !== 'clockin') return true;
+  const data = record.data && typeof record.data === 'object'
+    ? record.data as Record<string, unknown>
+    : {};
+  const owner = data.clockedInByUserId ?? data[`${apiName}__clockedInByUserId`];
+  return typeof owner === 'string' && owner === userId;
+}
+
 export async function recordRoutes(app: FastifyInstance) {
   // ── Global search across all search-enabled objects ──────────────────
 
@@ -1142,6 +1156,17 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Record not found' });
     }
 
+    if (!canManageClockInRecord(existingRecord, apiName, userId, userRole)) {
+      return reply.code(403).send({ error: 'You can only edit your own Clock In records' });
+    }
+
+    if (userRole !== 'ADMIN' && apiName.toLowerCase() === 'clockin') {
+      const proposedOwner = updateData.clockedInByUserId ?? updateData[`${apiName}__clockedInByUserId`];
+      if (proposedOwner !== undefined && proposedOwner !== userId) {
+        return reply.code(403).send({ error: 'You cannot change Clock In record ownership' });
+      }
+    }
+
     // Strip auto-number fields — these are system-generated and must not be overwritten
     // by non-admin users. Admins may override them explicitly, but empty values are
     // always stripped to prevent accidentally clearing an existing number.
@@ -1425,6 +1450,10 @@ export async function recordRoutes(app: FastifyInstance) {
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
+    }
+
+    if (!canManageClockInRecord(existingRecord, apiName, userId, userRole)) {
+      return reply.code(403).send({ error: 'You can only delete your own Clock In records' });
     }
 
     // Audit: log record deletion
