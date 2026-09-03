@@ -831,6 +831,11 @@ class ApiClient {
     }>(`/places/details?${params}`);
   }
 
+  async reverseGeocode(lat: number, lng: number) {
+    const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+    return this.request<{ address: string | null }>(`/places/reverse-geocode?${params}`);
+  }
+
   // ── Outlook / Microsoft ────────────────────────────────────────────────────
 
   async getOutlookStatus() {

@@ -258,4 +258,43 @@ export async function placesRoutes(app: FastifyInstance) {
       reply.code(502).send({ error: 'Failed to reach Google Places API' });
     }
   });
+
+  app.get('/places/reverse-geocode', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const querySchema = z.object({
+      lat: z.coerce.number().finite().gte(-90).lte(90),
+      lng: z.coerce.number().finite().gte(-180).lte(180),
+    });
+    const parsed = querySchema.safeParse(req.query);
+    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+
+    const apiKey = await getGoogleMapsKey();
+    if (!apiKey) {
+      return reply.code(400).send({ error: 'Google Maps integration is not configured or disabled.' });
+    }
+
+    const params = new URLSearchParams({
+      latlng: `${parsed.data.lat},${parsed.data.lng}`,
+      key: apiKey,
+    });
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?${params}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+        app.log.warn({ status: data.status, error_message: data.error_message }, 'Reverse geocode error');
+        return reply.code(502).send({ error: `Google Geocoding API error: ${data.status}` });
+      }
+
+      const result = data.results?.[0];
+      reply.send({ address: result?.formatted_address || null });
+    } catch (err: any) {
+      app.log.error(err, 'Reverse geocode proxy failed');
+      reply.code(502).send({ error: 'Failed to reach Google Geocoding API' });
+    }
+  });
 }

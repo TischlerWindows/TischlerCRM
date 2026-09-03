@@ -6,6 +6,7 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService } from '@/lib/records-service'
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from '@/components/toast'
+import { apiClient } from '@/lib/api-client'
 
 interface ClockInRecord {
   id: string
@@ -15,9 +16,11 @@ interface ClockInRecord {
   clockInTime?: string
   clockInLatitude?: string | number
   clockInLongitude?: string | number
+  clockInAddress?: string
   clockOutTime?: string
   clockOutLatitude?: string | number
   clockOutLongitude?: string | number
+  clockOutAddress?: string
   durationMinutes?: string | number
 }
 
@@ -66,6 +69,14 @@ function mapLink(lat?: string | number, lng?: string | number): string | null {
   return `https://www.google.com/maps?q=${Number(lat)},${Number(lng)}`
 }
 
+function locationLabel(address?: string, lat?: string | number, lng?: string | number): string {
+  if (address) return address
+  if (lat !== undefined && lng !== undefined && lat !== '' && lng !== '') {
+    return `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
+  }
+  return 'Location unavailable'
+}
+
 export default function ClockInWidget({ record }: WidgetProps) {
   const { user } = useAuth()
   const { showToast } = useToast()
@@ -102,6 +113,14 @@ export default function ClockInWidget({ record }: WidgetProps) {
       if (loc.lat === null) {
         showToast('Could not capture your location — clocking in without it.', 'error')
       }
+      let clockInAddress: string | null = null
+      if (loc.lat !== null && loc.lng !== null) {
+        try {
+          clockInAddress = (await apiClient.reverseGeocode(loc.lat, loc.lng)).address
+        } catch {
+          clockInAddress = null
+        }
+      }
       await recordsService.createRecord('ClockIn', {
         data: {
           workOrder: recordId,
@@ -110,6 +129,7 @@ export default function ClockInWidget({ record }: WidgetProps) {
           clockInTime: new Date().toISOString(),
           clockInLatitude: loc.lat,
           clockInLongitude: loc.lng,
+          clockInAddress,
         },
       })
       await load()
@@ -131,11 +151,20 @@ export default function ClockInWidget({ record }: WidgetProps) {
       const clockOutTime = new Date()
       const clockInTime = activeEntry.clockInTime ? new Date(activeEntry.clockInTime) : clockOutTime
       const durationMinutes = Math.max(0, Math.round((clockOutTime.getTime() - clockInTime.getTime()) / 60000))
+      let clockOutAddress: string | null = null
+      if (loc.lat !== null && loc.lng !== null) {
+        try {
+          clockOutAddress = (await apiClient.reverseGeocode(loc.lat, loc.lng)).address
+        } catch {
+          clockOutAddress = null
+        }
+      }
       await recordsService.updateRecord('ClockIn', activeEntry.id, {
         data: {
           clockOutTime: clockOutTime.toISOString(),
           clockOutLatitude: loc.lat,
           clockOutLongitude: loc.lng,
+          clockOutAddress,
           durationMinutes,
         },
       })
@@ -193,45 +222,48 @@ export default function ClockInWidget({ record }: WidgetProps) {
       </div>
 
       {entries.length > 0 && (
-        <div className="border-t border-gray-100 divide-y divide-gray-100 max-h-72 overflow-y-auto">
-          {entries.map((e) => {
-            const inLink = mapLink(e.clockInLatitude, e.clockInLongitude)
-            const outLink = mapLink(e.clockOutLatitude, e.clockOutLongitude)
-            return (
-              <div key={e.id} className="px-4 py-2.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-800 truncate">{e.clockedInByName || 'Unknown'}</span>
-                  <span className="text-gray-500 shrink-0 ml-2">{fmtDuration(e.durationMinutes)}</span>
-                </div>
-                <div className="mt-1 flex items-center gap-3 text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <LogIn className="h-3 w-3" />
-                    {fmtTime(e.clockInTime)}
-                    {inLink && (
-                      <a href={inLink} target="_blank" rel="noreferrer" className="text-brand-navy hover:underline">
-                        <MapPin className="h-3 w-3 inline" />
-                      </a>
-                    )}
-                  </span>
-                  {e.clockOutTime ? (
-                    <span className="flex items-center gap-1">
-                      <LogOut className="h-3 w-3" />
-                      {fmtTime(e.clockOutTime)}
-                      {outLink && (
-                        <a href={outLink} target="_blank" rel="noreferrer" className="text-brand-navy hover:underline">
-                          <MapPin className="h-3 w-3 inline" />
-                        </a>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="text-amber-600 font-medium">In progress</span>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+        <div className="border-t border-gray-100 overflow-x-auto">
+          <table className="w-full min-w-[760px] text-xs">
+            <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-4 py-2">Employee</th>
+                <th className="px-4 py-2">Clock In Time</th>
+                <th className="px-4 py-2">Clock In Location</th>
+                <th className="px-4 py-2">Clock Out Time</th>
+                <th className="px-4 py-2">Clock Out Location</th>
+                <th className="px-4 py-2 text-right">Duration</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {entries.map((e) => {
+                const inLink = mapLink(e.clockInLatitude, e.clockInLongitude)
+                const outLink = mapLink(e.clockOutLatitude, e.clockOutLongitude)
+                return (
+                  <tr key={e.id} className="align-top text-gray-700">
+                    <td className="px-4 py-3 font-medium text-gray-900">{e.clockedInByName || 'Unknown'}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{fmtTime(e.clockInTime)}</td>
+                    <td className="px-4 py-3">
+                      <LocationCell address={locationLabel(e.clockInAddress, e.clockInLatitude, e.clockInLongitude)} href={inLink} />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {e.clockOutTime ? fmtTime(e.clockOutTime) : <span className="font-medium text-amber-600">In progress</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {e.clockOutTime ? <LocationCell address={locationLabel(e.clockOutAddress, e.clockOutLatitude, e.clockOutLongitude)} href={outLink} /> : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">{fmtDuration(e.durationMinutes)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   )
+}
+
+function LocationCell({ address, href }: { address: string; href: string | null }) {
+  const content = <span className="inline-flex items-start gap-1.5 leading-4"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" /><span>{address}</span></span>
+  return href ? <a href={href} target="_blank" rel="noreferrer" className="text-brand-navy hover:underline">{content}</a> : content
 }
