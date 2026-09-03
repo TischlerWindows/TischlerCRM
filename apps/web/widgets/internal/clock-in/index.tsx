@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Clock, MapPin, LogIn, LogOut, Loader2 } from 'lucide-react'
+import { Clock, MapPin, LogIn, LogOut, Loader2, Pencil, Trash2, Check, X } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService } from '@/lib/records-service'
 import { useAuth } from '@/lib/auth-context'
@@ -77,6 +77,14 @@ function locationLabel(address?: string, lat?: string | number, lng?: string | n
   return 'Location unavailable'
 }
 
+function toDateTimeLocal(iso?: string): string {
+  if (!iso) return ''
+  const date = new Date(iso)
+  if (isNaN(date.getTime())) return ''
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 export default function ClockInWidget({ record }: WidgetProps) {
   const { user } = useAuth()
   const { showToast } = useToast()
@@ -85,6 +93,8 @@ export default function ClockInWidget({ record }: WidgetProps) {
   const [entries, setEntries] = useState<ClockInRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
+  const [editingClockInTime, setEditingClockInTime] = useState('')
 
   const load = useCallback(async () => {
     if (!recordId) { setLoading(false); return }
@@ -176,6 +186,59 @@ export default function ClockInWidget({ record }: WidgetProps) {
     }
   }
 
+  const canManageEntry = (entry: ClockInRecord) =>
+    user?.role === 'ADMIN' || entry.clockedInByUserId === user?.id
+
+  const startEditingTime = (entry: ClockInRecord) => {
+    if (!canManageEntry(entry) || busy) return
+    setEditingEntryId(entry.id)
+    setEditingClockInTime(toDateTimeLocal(entry.clockInTime))
+  }
+
+  const cancelEditingTime = () => {
+    setEditingEntryId(null)
+    setEditingClockInTime('')
+  }
+
+  const saveEditingTime = async (entry: ClockInRecord) => {
+    if (!editingClockInTime || !canManageEntry(entry) || busy) return
+    const clockInDate = new Date(editingClockInTime)
+    if (isNaN(clockInDate.getTime())) {
+      showToast('Enter a valid clock-in time.', 'error')
+      return
+    }
+    setBusy(true)
+    try {
+      const data: Record<string, unknown> = { clockInTime: clockInDate.toISOString() }
+      if (entry.clockOutTime) {
+        const clockOutDate = new Date(entry.clockOutTime)
+        data.durationMinutes = Math.max(0, Math.round((clockOutDate.getTime() - clockInDate.getTime()) / 60000))
+      }
+      await recordsService.updateRecord('ClockIn', entry.id, { data })
+      cancelEditingTime()
+      await load()
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to update clock-in time', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDelete = async (entry: ClockInRecord) => {
+    if (!canManageEntry(entry) || busy) return
+    if (!window.confirm('Delete this clock-in entry? This cannot be undone.')) return
+    setBusy(true)
+    try {
+      await recordsService.deleteRecord('ClockIn', entry.id)
+      if (editingEntryId === entry.id) cancelEditingTime()
+      await load()
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to delete clock-in entry', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-4 animate-pulse">
@@ -234,6 +297,7 @@ export default function ClockInWidget({ record }: WidgetProps) {
                 <th className="px-4 py-2">Clock Out Time</th>
                 <th className="px-4 py-2">Clock Out Location</th>
                 <th className="px-4 py-2 text-right">Duration</th>
+                <th className="px-4 py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -243,7 +307,33 @@ export default function ClockInWidget({ record }: WidgetProps) {
                 return (
                   <tr key={e.id} className="align-top text-gray-700">
                     <td className="px-4 py-3 font-medium text-gray-900">{e.clockedInByName || 'Unknown'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{fmtTime(e.clockInTime)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {editingEntryId === e.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="datetime-local"
+                            value={editingClockInTime}
+                            onChange={(event) => setEditingClockInTime(event.target.value)}
+                            disabled={busy}
+                            className="h-8 rounded border border-gray-300 px-2 text-xs text-gray-700"
+                            aria-label="Edit clock-in time"
+                          />
+                          <button type="button" onClick={() => saveEditingTime(e)} disabled={busy || !editingClockInTime} className="rounded p-1 text-green-700 hover:bg-green-50 disabled:opacity-50" aria-label="Save clock-in time" title="Save clock-in time">
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button type="button" onClick={cancelEditingTime} disabled={busy} className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:opacity-50" aria-label="Cancel editing clock-in time" title="Cancel editing clock-in time">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : canManageEntry(e) ? (
+                        <button type="button" onClick={() => startEditingTime(e)} className="inline-flex items-center gap-1 text-left text-brand-navy hover:underline" title="Edit clock-in time">
+                          {fmtTime(e.clockInTime)}
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      ) : (
+                        fmtTime(e.clockInTime)
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <LocationCell address={locationLabel(e.clockInAddress, e.clockInLatitude, e.clockInLongitude)} href={inLink} />
                     </td>
@@ -254,6 +344,13 @@ export default function ClockInWidget({ record }: WidgetProps) {
                       {e.clockOutTime ? <LocationCell address={locationLabel(e.clockOutAddress, e.clockOutLatitude, e.clockOutLongitude)} href={outLink} /> : '—'}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">{fmtDuration(e.durationMinutes)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {canManageEntry(e) && (
+                        <button type="button" onClick={() => handleDelete(e)} disabled={busy} className="rounded p-1 text-red-600 hover:bg-red-50 disabled:opacity-50" aria-label="Delete clock-in entry" title="Delete clock-in entry">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 )
               })}
