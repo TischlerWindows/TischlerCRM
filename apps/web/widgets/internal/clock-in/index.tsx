@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useToast } from '@/components/toast'
 import { apiClient } from '@/lib/api-client'
 import { BodyEditor } from '@/app/proposal-builder/_components/body-editor'
+import { createPortal } from 'react-dom'
 
 const TASK_OPTIONS = ['Default 1', 'Default 2', 'Default 3', 'Other']
 
@@ -98,6 +99,9 @@ function TaskCell({
   const [otherResponse, setOtherResponse] = useState(entry.taskOtherResponse || '')
   const [saving, setSaving] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null)
 
   useEffect(() => {
     setSelected(parseTaskValues(entry.tasks))
@@ -107,10 +111,37 @@ function TaskCell({
   useEffect(() => {
     if (!open) return
     const handleOutside = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      if (
+        ref.current && !ref.current.contains(target) &&
+        menuRef.current && !menuRef.current.contains(target)
+      ) setOpen(false)
     }
     document.addEventListener('mousedown', handleOutside)
     return () => document.removeEventListener('mousedown', handleOutside)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const updatePosition = () => {
+      const trigger = triggerRef.current
+      if (!trigger) return
+      const rect = trigger.getBoundingClientRect()
+      const width = Math.max(220, rect.width)
+      const menuHeight = 190
+      const left = Math.min(rect.left, window.innerWidth - width - 8)
+      const top = rect.bottom + menuHeight > window.innerHeight - 8
+        ? Math.max(8, rect.top - menuHeight - 4)
+        : rect.bottom + 4
+      setMenuPosition({ top, left: Math.max(8, left), width })
+    }
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
   }, [open])
 
   const toggle = (option: string) => {
@@ -140,6 +171,7 @@ function TaskCell({
       <div className="relative w-full shrink-0 sm:w-44">
         <button
           type="button"
+          ref={triggerRef}
           onClick={() => setOpen((value) => !value)}
           className="flex min-h-9 w-full items-center justify-between gap-2 rounded border border-gray-300 bg-white px-2.5 py-2 text-left text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
           aria-label="Select tasks"
@@ -147,8 +179,13 @@ function TaskCell({
           <span className={selected.length ? 'truncate' : 'text-gray-400'}>{label}</span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
         </button>
-        {open && (
-          <div className="absolute left-0 top-full z-50 mt-1 w-full rounded border border-gray-200 bg-white p-1 shadow-lg">
+        {open && menuPosition && typeof document !== 'undefined' && createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: 'fixed', top: menuPosition.top, left: menuPosition.left, width: menuPosition.width, zIndex: 9999 }}
+            className="rounded border border-gray-200 bg-white p-1 shadow-xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
             {TASK_OPTIONS.map((option) => (
               <label key={option} className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-xs hover:bg-gray-50">
                 <input
@@ -163,7 +200,8 @@ function TaskCell({
             <button type="button" onClick={save} disabled={saving} className="mt-1 w-full rounded bg-brand-navy px-2 py-1.5 text-xs font-medium text-white disabled:opacity-60">
               {saving ? 'Saving...' : 'Save Tasks'}
             </button>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
       {selected.includes('Other') && (
