@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Clock, MapPin, LogIn, LogOut, Loader2, Pencil, Trash2, Check, X } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { Clock, MapPin, LogIn, LogOut, Loader2, Pencil, Trash2, Check, X, ChevronDown } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService } from '@/lib/records-service'
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from '@/components/toast'
 import { apiClient } from '@/lib/api-client'
+import { BodyEditor } from '@/app/proposal-builder/_components/body-editor'
+
+const TASK_OPTIONS = ['Default 1', 'Default 2', 'Default 3', 'Other']
 
 interface ClockInRecord {
   id: string
@@ -22,6 +25,8 @@ interface ClockInRecord {
   clockOutLongitude?: string | number
   clockOutAddress?: string
   durationMinutes?: string | number
+  tasks?: string
+  taskOtherResponse?: string
 }
 
 interface GeoPoint {
@@ -75,6 +80,102 @@ function locationLabel(address?: string, lat?: string | number, lng?: string | n
     return `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`
   }
   return 'Location unavailable'
+}
+
+function parseTaskValues(value?: string): string[] {
+  return (value || '').split(';').map((item) => item.trim()).filter(Boolean)
+}
+
+function TaskCell({
+  entry,
+  onSave,
+}: {
+  entry: ClockInRecord
+  onSave: (tasks: string[], otherResponse: string) => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const [selected, setSelected] = useState(() => parseTaskValues(entry.tasks))
+  const [otherResponse, setOtherResponse] = useState(entry.taskOtherResponse || '')
+  const [saving, setSaving] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setSelected(parseTaskValues(entry.tasks))
+    setOtherResponse(entry.taskOtherResponse || '')
+  }, [entry.tasks, entry.taskOtherResponse])
+
+  useEffect(() => {
+    if (!open) return
+    const handleOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [open])
+
+  const toggle = (option: string) => {
+    setSelected((current) => current.includes(option)
+      ? current.filter((value) => value !== option)
+      : [...current, option])
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await onSave(selected, otherResponse)
+      setOpen(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const label = selected.length === 0
+    ? 'Select tasks'
+    : selected.length === 1
+      ? selected[0]
+      : `${selected.length} tasks selected`
+
+  return (
+    <div ref={ref} className="flex min-w-[360px] items-start gap-2">
+      <div className="relative w-44 shrink-0">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="flex min-h-9 w-full items-center justify-between gap-2 rounded border border-gray-300 bg-white px-2.5 py-2 text-left text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+          aria-label="Select tasks"
+        >
+          <span className={selected.length ? 'truncate' : 'text-gray-400'}>{label}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+        </button>
+        {open && (
+          <div className="absolute left-0 top-full z-50 mt-1 w-full rounded border border-gray-200 bg-white p-1 shadow-lg">
+            {TASK_OPTIONS.map((option) => (
+              <label key={option} className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-xs hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(option)}
+                  onChange={() => toggle(option)}
+                  className="h-4 w-4 rounded border-gray-300 text-brand-navy"
+                />
+                {option}
+              </label>
+            ))}
+            <button type="button" onClick={save} disabled={saving} className="mt-1 w-full rounded bg-brand-navy px-2 py-1.5 text-xs font-medium text-white disabled:opacity-60">
+              {saving ? 'Saving...' : 'Save Tasks'}
+            </button>
+          </div>
+        )}
+      </div>
+      {selected.includes('Other') && (
+        <div className="min-w-[280px] flex-1">
+          <BodyEditor value={otherResponse} onChange={setOtherResponse} placeholder="Describe the task..." minHeight={90} />
+          <button type="button" onClick={save} disabled={saving} className="mt-1 rounded border border-brand-navy px-2.5 py-1 text-xs font-medium text-brand-navy hover:bg-brand-navy/5 disabled:opacity-60">
+            {saving ? 'Saving...' : 'Save Other Task'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function toDateTimeLocal(iso?: string): string {
@@ -249,6 +350,19 @@ export default function ClockInWidget({ record }: WidgetProps) {
     }
   }
 
+  const saveTasks = async (entry: ClockInRecord, tasks: string[], otherResponse: string) => {
+    if (!canManageEntry(entry)) return
+    try {
+      await recordsService.updateRecord('ClockIn', entry.id, {
+        data: { tasks: tasks.join(';'), taskOtherResponse: tasks.includes('Other') ? otherResponse : '' },
+      })
+      await load()
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to save tasks', 'error')
+      throw err
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-4 animate-pulse">
@@ -307,6 +421,7 @@ export default function ClockInWidget({ record }: WidgetProps) {
                 <th className="px-4 py-2">Clock Out Time</th>
                 <th className="px-4 py-2">Clock Out Location</th>
                 <th className="px-4 py-2 text-right">Duration</th>
+                <th className="px-4 py-2">Tasks</th>
                 <th className="px-4 py-2 text-right">Actions</th>
               </tr>
             </thead>
@@ -378,6 +493,13 @@ export default function ClockInWidget({ record }: WidgetProps) {
                       {e.clockOutTime ? <LocationCell address={locationLabel(e.clockOutAddress, e.clockOutLatitude, e.clockOutLongitude)} href={outLink} /> : '—'}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">{fmtDuration(e.durationMinutes)}</td>
+                    <td className="px-4 py-3">
+                      {canManageEntry(e) ? (
+                        <TaskCell entry={e} onSave={(tasks, otherResponse) => saveTasks(e, tasks, otherResponse)} />
+                      ) : (
+                        <span className="text-gray-600">{parseTaskValues(e.tasks).join(', ') || '—'}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       {canManageEntry(e) && (
                         <button type="button" onClick={() => handleDelete(e)} disabled={busy} className="rounded p-1 text-red-600 hover:bg-red-50 disabled:opacity-50" aria-label="Delete clock-in entry" title="Delete clock-in entry">

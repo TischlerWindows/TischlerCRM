@@ -426,6 +426,8 @@ const CORE_OBJECTS = [
       { apiName: 'clockOutLatitude', label: 'Clock Out Latitude', type: 'Number' },
       { apiName: 'clockOutLongitude', label: 'Clock Out Longitude', type: 'Number' },
       { apiName: 'durationMinutes', label: 'Duration (Minutes)', type: 'Number' },
+      { apiName: 'tasks', label: 'Tasks', type: 'MultiPicklist', picklistValues: ['Default 1', 'Default 2', 'Default 3', 'Other'] },
+      { apiName: 'taskOtherResponse', label: 'Other Task Details', type: 'RichTextArea' },
     ],
   },
 ];
