@@ -125,6 +125,8 @@ function getWidgetLabel(config: WidgetConfig | undefined | null): string {
       return 'Project List'
     case 'ProjectListVertical':
       return 'Project List Vertical Page'
+    case 'ClockIn':
+      return 'Clock In'
     default:
       return 'Widget'
   }

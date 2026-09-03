@@ -526,10 +526,15 @@ class ApiClient {
   }
 
   // Records
-  async getRecords(objectApiName: string, options?: { limit?: number; offset?: number }) {
+  async getRecords(objectApiName: string, options?: { limit?: number; offset?: number; filter?: Record<string, string> }) {
     const params = new URLSearchParams();
     if (options?.limit) params.append('limit', String(options.limit));
     if (options?.offset) params.append('offset', String(options.offset));
+    if (options?.filter) {
+      for (const [field, value] of Object.entries(options.filter)) {
+        params.append(`filter[${field}]`, value);
+      }
+    }
     const queryString = params.toString();
     return this.request<any[]>(`/objects/${objectApiName}/records${queryString ? `?${queryString}` : ''}`);
   }

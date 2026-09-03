@@ -34,6 +34,7 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   DropboxFiles: { type: 'DropboxFiles' },
   ProjectList: { type: 'ProjectList' },
   ProjectListVertical: { type: 'ProjectListVertical' },
+  ClockIn: { type: 'ClockIn' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────

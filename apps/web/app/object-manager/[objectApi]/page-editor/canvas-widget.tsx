@@ -24,6 +24,7 @@ import {
   UserCheck,
   GitBranch,
   Table2,
+  Clock,
 } from 'lucide-react';
 
 interface CanvasWidgetCardProps {
@@ -45,6 +46,7 @@ const WIDGET_ICONS: Partial<Record<LayoutWidget['widgetType'], React.ElementType
   InstallationCostGrid: Table2,
   ProjectList: Table2,
   ProjectListVertical: LayoutList,
+  ClockIn: Clock,
 };
 
 const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
@@ -61,6 +63,7 @@ const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   InstallationCostGrid: 'Installation Cost Grid',
   ProjectList: 'Project List',
   ProjectListVertical: 'Project List Vertical Page',
+  ClockIn: 'Clock In',
 };
 
 function summarizeWidget(widget: LayoutWidget): string {
@@ -111,6 +114,8 @@ function summarizeWidget(widget: LayoutWidget): string {
       return 'Shop drawings, loading list, and completion sign-off for this Project';
     case 'ProjectListVertical':
       return 'Same fields as Project List, as a fill-out page';
+    case 'ClockIn':
+      return 'Clock in/out button with geo- and time-stamped log';
     default:
       return '';
   }

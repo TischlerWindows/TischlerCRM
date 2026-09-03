@@ -23,6 +23,7 @@ export const INTERNAL_WIDGET_IDS = [
   'dropbox-files',
   'project-list',
   'project-list-vertical',
+  'clock-in',
 ] as const
 export type InternalWidgetId = (typeof INTERNAL_WIDGET_IDS)[number]
 

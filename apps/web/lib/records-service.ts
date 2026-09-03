@@ -33,7 +33,7 @@ class RecordsService {
   /**
    * Get all records for an object
    */
-  async getRecords(objectApiName: string, options?: { limit?: number; offset?: number }): Promise<RecordData[]> {
+  async getRecords(objectApiName: string, options?: { limit?: number; offset?: number; filter?: Record<string, string> }): Promise<RecordData[]> {
     try {
       const records = await apiClient.getRecords(objectApiName, options);
       return records;

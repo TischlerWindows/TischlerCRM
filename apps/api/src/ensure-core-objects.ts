@@ -410,6 +410,24 @@ const CORE_OBJECTS = [
       { apiName: 'relatedRecordId', label: 'Related Record', type: 'Text' },
     ],
   },
+  {
+    apiName: 'ClockIn',
+    label: 'Clock In',
+    pluralLabel: 'Clock Ins',
+    description: 'Time-tracking clock-in/out records with geolocation, linked to a Work Order',
+    fields: [
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup' },
+      { apiName: 'clockedInByUserId', label: 'Clocked In By', type: 'Lookup' },
+      { apiName: 'clockedInByName', label: 'Clocked In By (Name)', type: 'Text' },
+      { apiName: 'clockInTime', label: 'Clock In Time', type: 'DateTime', required: true },
+      { apiName: 'clockInLatitude', label: 'Clock In Latitude', type: 'Number' },
+      { apiName: 'clockInLongitude', label: 'Clock In Longitude', type: 'Number' },
+      { apiName: 'clockOutTime', label: 'Clock Out Time', type: 'DateTime' },
+      { apiName: 'clockOutLatitude', label: 'Clock Out Latitude', type: 'Number' },
+      { apiName: 'clockOutLongitude', label: 'Clock Out Longitude', type: 'Number' },
+      { apiName: 'durationMinutes', label: 'Duration (Minutes)', type: 'Number' },
+    ],
+  },
 ];
 
 /**

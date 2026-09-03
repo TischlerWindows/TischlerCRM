@@ -9,6 +9,7 @@ import { externalWidgets } from '@/widgets/external/registry';
 import {
   Activity,
   Cloud,
+  Clock,
   Component,
   FolderOpen,
   LayoutGrid,
@@ -26,6 +27,7 @@ import type { ElementType } from 'react';
 const LUCIDE_ICON_MAP: Record<string, ElementType> = {
   Activity,
   Cloud,
+  Clock,
   Component,
   FolderOpen,
   LayoutGrid,
@@ -63,6 +65,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'dropbox-files': 'DropboxFiles',
   'project-list': 'ProjectList',
   'project-list-vertical': 'ProjectListVertical',
+  'clock-in': 'ClockIn',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {
