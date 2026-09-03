@@ -202,7 +202,7 @@ export default function ClockInWidget({ record }: WidgetProps) {
               type="button"
               onClick={handleClockOut}
               disabled={busy}
-              style={{ height: 150, minHeight: 150 }}
+              style={{ height: 100, minHeight: 100 }}
               className="mx-auto flex w-full items-center justify-center gap-3 rounded-xl bg-red-600 px-6 text-lg font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
             >
               {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
@@ -214,7 +214,7 @@ export default function ClockInWidget({ record }: WidgetProps) {
             type="button"
             onClick={handleClockIn}
             disabled={busy || !recordId}
-            style={{ height: 150, minHeight: 150 }}
+            style={{ height: 100, minHeight: 100 }}
             className="mx-auto flex w-full items-center justify-center gap-3 rounded-xl bg-red-600 px-6 text-lg font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
           >
             {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
