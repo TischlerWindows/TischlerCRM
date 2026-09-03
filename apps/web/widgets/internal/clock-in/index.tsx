@@ -202,9 +202,9 @@ export default function ClockInWidget({ record }: WidgetProps) {
               type="button"
               onClick={handleClockOut}
               disabled={busy}
-              className="mx-auto flex h-14 w-56 items-center justify-center gap-2 rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
+              className="mx-auto flex h-[72px] w-80 items-center justify-center gap-3 rounded-md bg-red-600 px-6 text-lg font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
             >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+              {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
               Clock Out
             </button>
           </div>
@@ -213,9 +213,9 @@ export default function ClockInWidget({ record }: WidgetProps) {
             type="button"
             onClick={handleClockIn}
             disabled={busy || !recordId}
-            className="mx-auto flex h-14 w-56 items-center justify-center gap-2 rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
+            className="mx-auto flex h-[72px] w-80 items-center justify-center gap-3 rounded-md bg-red-600 px-6 text-lg font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition-colors"
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
+            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
             Clock In
           </button>
         )}
