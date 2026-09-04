@@ -44,6 +44,7 @@ import { notificationRoutes } from './routes/notifications.js';
 import { initNotificationListener } from './lib/notifications/listen-manager.js';
 import { supportTicketConfigRoutes } from './routes/support-ticket-config.js';
 import { productLogRoutes } from './routes/product-log.js';
+import { summaryRoutes } from './routes/summaries.js';
 import { quoteTemplateRoutes } from './routes/quote-templates.js';
 import { specPresetRoutes } from './routes/spec-presets.js';
 import { specVariantRoutes } from './routes/spec-variants.js';
@@ -534,6 +535,7 @@ export function buildApp() {
   app.register(supportTicketConfigRoutes);
   app.register(automationRoutes);
   app.register(productLogRoutes);
+  app.register(summaryRoutes);
   app.register(quoteTemplateRoutes);
   app.register(specPresetRoutes);
   app.register(specVariantRoutes);
