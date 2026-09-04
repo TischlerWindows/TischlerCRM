@@ -232,6 +232,12 @@ export default function CustomObjectRecordsPage() {
       return resolveLookupDisplayName(value, 'User');
     }
 
+    // MultiLookupUser — semicolon-joined user ids → resolved names
+    if (fieldDef && fieldDef.type === 'MultiLookupUser' && typeof value === 'string') {
+      const ids = value.split(';').map(s => s.trim()).filter(Boolean);
+      return ids.length > 0 ? ids.map(id => resolveLookupDisplayName(id, 'User')).join(', ') : 'N/A';
+    }
+
     // Check if this is a PicklistLookup (composite: { picklist, lookup })
     if (fieldDef && fieldDef.type === 'PicklistLookup' && typeof value === 'object' && value !== null) {
       const picklistPart = value.picklist || '';

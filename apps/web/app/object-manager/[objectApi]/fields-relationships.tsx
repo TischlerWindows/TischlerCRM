@@ -69,6 +69,7 @@ const FIELD_TYPES: FieldTypeOption[] = [
   { value: 'Lookup', label: 'Lookup Relationship', description: 'Creates a relationship that links this object to another object. The relationship field allows users to click on a lookup icon to select a value from a popup list. The other object is the source of the values in the list.', category: 'Relationship', icon: LinkIcon },
   { value: 'ExternalLookup', label: 'External Lookup Relationship', description: 'Creates a relationship that links this object to an external object whose data is stored outside the Salesforce org.', category: 'Relationship', icon: ExternalLink },
   { value: 'LookupUser', label: 'Lookup User', description: 'Creates a field that looks up and references a user in the system. Users can search for and select a user from the user list.', category: 'Relationship', icon: User },
+  { value: 'MultiLookupUser', label: 'Lookup User (Multi-Select)', description: 'Creates a field that looks up and references multiple users in the system. Users can search for and select any number of users from the user list.', category: 'Relationship', icon: User },
   { value: 'PicklistLookup', label: 'Picklist with Lookup', description: 'A side-by-side combination of a picklist dropdown and a lookup search field. Choose which side displays the dropdown.', category: 'Relationship', icon: List },
   { value: 'LookupFields', label: 'Lookup Fields Display', description: 'A read-only display field that shows selected fields from a related record. The related record is determined by a Lookup field you specify in the page layout editor.', category: 'Relationship', icon: LinkIcon },
   
@@ -174,7 +175,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       type,
       subFields: type === 'CompositeText' ? formData.subFields : [],
       picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' || type === 'PicklistLookup' || type === 'DropdownWithCustom' ? formData.picklistValues : [],
-      lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup' || type === 'LookupFields') ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
+      lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup' || type === 'LookupFields') ? formData.lookupObject : ((type === 'LookupUser' || type === 'MultiLookupUser') ? 'User' : ''),
       lookupField: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.lookupField : '',
       relationshipName: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.relationshipName : '',
       formulaExpr: type === 'Formula' ? formData.formulaExpr : '',
@@ -442,7 +443,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       newField.lookupObject = formData.lookupObject;
       if (formData.lookupField) newField.lookupField = formData.lookupField;
     }
-    if (t === 'LookupUser') {
+    if (t === 'LookupUser' || t === 'MultiLookupUser') {
       newField.lookupObject = 'User';
     }
     if (t === 'URL' && formData.staticUrl) {
@@ -998,7 +999,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                             {schema?.objects
                               .find(o => o.apiName === formData.lookupObject)
                               ?.fields
-                              .filter(f => f.type !== 'Lookup' && f.type !== 'ExternalLookup' && f.type !== 'LookupUser' && f.type !== 'PicklistLookup')
+                              .filter(f => f.type !== 'Lookup' && f.type !== 'ExternalLookup' && f.type !== 'LookupUser' && f.type !== 'MultiLookupUser' && f.type !== 'PicklistLookup')
                               .sort((a, b) => a.label.localeCompare(b.label))
                               .map(f => (
                                 <option key={f.apiName} value={f.apiName}>{f.label} ({f.type})</option>
@@ -1216,7 +1217,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                             {schema?.objects
                               .find(o => o.apiName === formData.lookupObject)
                               ?.fields
-                              .filter(f => f.type !== 'Lookup' && f.type !== 'ExternalLookup' && f.type !== 'LookupUser' && f.type !== 'PicklistLookup')
+                              .filter(f => f.type !== 'Lookup' && f.type !== 'ExternalLookup' && f.type !== 'LookupUser' && f.type !== 'MultiLookupUser' && f.type !== 'PicklistLookup')
                               .sort((a, b) => a.label.localeCompare(b.label))
                               .map(f => (
                                 <option key={f.apiName} value={f.apiName}>{f.label} ({f.type})</option>

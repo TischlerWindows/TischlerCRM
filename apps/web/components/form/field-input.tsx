@@ -52,6 +52,7 @@ import {
 import {
   LookupSearch,
   LookupUserSearch,
+  MultiLookupUserSearch,
   getRecordLabel,
   getLookupTargetApi,
 } from './lookup-search';
@@ -779,6 +780,27 @@ export function FieldInput({
           />
         );
       }
+      break;
+    }
+
+    // ── MultiLookupUser ──────────────────────────────────────
+    case 'MultiLookupUser': {
+      const userRecords = lookupRecordsCache['__users__'] || [];
+      inputElement = (
+        <MultiLookupUserSearch
+          fieldDef={fieldDef}
+          value={value}
+          onChange={(val) => onFieldChange(fieldDef.apiName, val)}
+          disabled={isReadOnly}
+          error={error}
+          userRecords={userRecords}
+          lookupQuery={lookupQueries[fieldDef.apiName] ?? ''}
+          isActive={activeLookupField === fieldDef.apiName}
+          onQueryChange={(q) => onLookupQueryChange(fieldDef.apiName, q)}
+          onFocus={() => onLookupFocus(fieldDef.apiName)}
+          onBlur={() => onLookupBlur(fieldDef.apiName)}
+        />
+      );
       break;
     }
 

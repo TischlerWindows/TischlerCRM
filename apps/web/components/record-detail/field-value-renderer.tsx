@@ -202,6 +202,32 @@ export function renderValue(
 
   if (value === null || value === undefined || value === '') return '-';
 
+  // MultiLookupUser → comma-separated clickable links, one per selected user
+  if (fieldType === 'MultiLookupUser') {
+    const ids = typeof value === 'string'
+      ? value.split(';').map((v) => v.trim()).filter(Boolean)
+      : Array.isArray(value) ? value.map(String) : [];
+    if (ids.length === 0) return '-';
+    const route = LOOKUP_ROUTE_MAP.User;
+    return (
+      <span className="space-x-1">
+        {ids.map((id, idx) => {
+          const label = resolveLookupDisplayName(id, 'User');
+          return (
+            <span key={id}>
+              {route ? (
+                <Link href={`/${route}/${id}`} className="text-brand-navy hover:underline underline-offset-2">
+                  {label}
+                </Link>
+              ) : label}
+              {idx < ids.length - 1 ? ',' : ''}
+            </span>
+          );
+        })}
+      </span>
+    );
+  }
+
   // Lookup → clickable link showing resolved label (not raw UUID)
   if ((fieldType === 'Lookup' || fieldType === 'LookupUser') && (fieldDef?.lookupObject || fieldType === 'LookupUser')) {
     const lookupTarget = fieldDef?.lookupObject || 'User';

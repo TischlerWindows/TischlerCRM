@@ -15,7 +15,7 @@ import {
   PicklistTextDropdown,
   filterPicklistValues,
 } from '../form/picklist-fields';
-import { LookupSearch, LookupUserSearch, getLookupTargetApi, getRecordLabel } from '../form/lookup-search';
+import { LookupSearch, LookupUserSearch, MultiLookupUserSearch, getLookupTargetApi, getRecordLabel } from '../form/lookup-search';
 import type { VisibilityContext } from '@/lib/field-visibility';
 
 /**
@@ -32,7 +32,7 @@ const INLINE_EDITABLE_TYPES = new Set<string>([
   'Date', 'DateTime', 'Time',
   'Checkbox',
   'Picklist', 'MultiPicklist', 'MultiSelectPicklist', 'PicklistText', 'DropdownWithCustom',
-  'Lookup', 'ExternalLookup', 'LookupUser', 'PicklistLookup',
+  'Lookup', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup',
   'Address', 'CompositeText',
 ]);
 
@@ -79,7 +79,7 @@ export function InlineEditableField({ fieldDef, value, children, formData }: Inl
     const handleKeyDown = (e: React.KeyboardEvent) => {
       const isMultilineOrComplex = [
         'TextArea', 'LongTextArea', 'RichTextArea', 'Address', 'CompositeText',
-        'Lookup', 'ExternalLookup', 'LookupUser', 'PicklistLookup',
+        'Lookup', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup',
       ].includes(fieldDef.type);
       if (e.key === 'Enter' && !isMultilineOrComplex) {
         e.preventDefault();
@@ -198,6 +198,8 @@ function FieldEditor({
       return <InlineLookupEditor fieldDef={fieldDef} value={draft} onChange={setDraft} />;
     case 'LookupUser':
       return <InlineLookupUserEditor fieldDef={fieldDef} value={draft} onChange={setDraft} />;
+    case 'MultiLookupUser':
+      return <InlineMultiLookupUserEditor fieldDef={fieldDef} value={draft} onChange={setDraft} />;
     case 'PicklistLookup':
       return <InlinePicklistLookupEditor fieldDef={fieldDef} value={draft} onChange={setDraft} />;
 
@@ -416,6 +418,34 @@ function InlineLookupUserEditor({
 
   return (
     <LookupUserSearch
+      fieldDef={fieldDef}
+      value={value}
+      onChange={onChange}
+      userRecords={userRecords}
+      lookupQuery={query}
+      isActive={isActive}
+      onQueryChange={setQuery}
+      onFocus={() => setIsActive(true)}
+      onBlur={() => setTimeout(() => setIsActive(false), 150)}
+    />
+  );
+}
+
+function InlineMultiLookupUserEditor({
+  fieldDef,
+  value,
+  onChange,
+}: {
+  fieldDef: FieldDef;
+  value: any;
+  onChange: (val: any) => void;
+}) {
+  const userRecords = useLookupUserCandidates();
+  const [query, setQuery] = useState('');
+  const [isActive, setIsActive] = useState(false);
+
+  return (
+    <MultiLookupUserSearch
       fieldDef={fieldDef}
       value={value}
       onChange={onChange}

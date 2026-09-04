@@ -469,6 +469,13 @@ export function formatFieldValue(rawValue: any, fieldType?: string, lookupObject
     return value.split(';').map(s => s.trim()).filter(Boolean).join(', ') || '-';
   }
 
+  // MultiLookupUser — semicolon-joined user ids → resolved names
+  if (fieldType === 'MultiLookupUser' && typeof value === 'string') {
+    const ids = value.split(';').map(s => s.trim()).filter(Boolean);
+    if (ids.length === 0) return '-';
+    return ids.map(id => resolveLookupDisplayName(id, 'User')).join(', ') || '-';
+  }
+
   // Currency — US dollar format (e.g. $1,234.56)
   if (fieldType === 'Currency') {
     const n = typeof value === 'number' ? value : Number(value);

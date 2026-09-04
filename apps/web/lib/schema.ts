@@ -7,7 +7,7 @@ export type FieldType =
   | "Geolocation" | "Number" | "Percent" | "Phone"
   | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText" | "PicklistLookup"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
-  | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser" | "LookupUser"
+  | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser" | "LookupUser" | "MultiLookupUser"
   | "LocationSearch"
   | "DropboxFiles"
   | "DropdownWithCustom";
@@ -50,6 +50,7 @@ export function normalizeFieldType(raw: string): FieldType {
     compositetext: 'CompositeText',
     autouser: 'AutoUser',
     lookupuser: 'LookupUser',
+    multilookupuser: 'MultiLookupUser',
     locationsearch: 'LocationSearch',
     location_search: 'LocationSearch',
     dropboxfiles: 'DropboxFiles',
@@ -949,6 +950,7 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'URL', value: 'URL', type: 'URL' },
   { label: 'Address', value: 'Address', type: 'Address' },
   { label: 'Lookup User', value: 'LookupUser', type: 'LookupUser' },
+  { label: 'Lookup User (Multi-Select)', value: 'MultiLookupUser', type: 'MultiLookupUser' },
   { label: 'Dropbox Files', value: 'DropboxFiles', type: 'DropboxFiles' },
   { label: 'Picklist with Custom', value: 'DropdownWithCustom', type: 'DropdownWithCustom' }
 ];
@@ -956,7 +958,7 @@ export const FIELD_TYPES: FieldOption[] = [
 // Helper to get field type categories
 export const getFieldTypeCategory = (type: FieldType): string => {
   if (["AutoNumber", "Formula", "RollupSummary"].includes(type)) return "Advanced";
-  if (["Lookup", "ExternalLookup", "LookupFields", "LookupUser", "PicklistLookup"].includes(type)) return "Relationship";
+  if (["Lookup", "ExternalLookup", "LookupFields", "LookupUser", "MultiLookupUser", "PicklistLookup"].includes(type)) return "Relationship";
   if (["Text", "TextArea", "LongTextArea", "RichTextArea", "EncryptedText"].includes(type)) return "Text";
   if (["Number", "Currency", "Percent"].includes(type)) return "Number";
   if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";
@@ -975,6 +977,7 @@ export const getFieldTypeIcon = (type: FieldType): string => {
     ExternalLookup: "external-link",
     LookupFields: "link-2",
     LookupUser: "user",
+    MultiLookupUser: "users",
     Checkbox: "check-square",
     Currency: "dollar-sign",
     Date: "calendar",

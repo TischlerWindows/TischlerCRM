@@ -36,13 +36,13 @@ export function useLookupPreloader(
     for (const field of objectDef.fields) {
       const t = field.type;
       if (
-        (t === 'Lookup' || t === 'ExternalLookup' || t === 'LookupUser' || t === 'PicklistLookup') &&
+        (t === 'Lookup' || t === 'ExternalLookup' || t === 'LookupUser' || t === 'MultiLookupUser' || t === 'PicklistLookup') &&
         field.lookupObject &&
         knownObjects.has(field.lookupObject)
       ) {
         targets.add(field.lookupObject);
       }
-      if (t === 'LookupUser') {
+      if (t === 'LookupUser' || t === 'MultiLookupUser') {
         targets.add('User');
       }
     }

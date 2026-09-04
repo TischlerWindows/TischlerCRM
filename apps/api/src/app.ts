@@ -1,4 +1,4 @@
-// TischlerCRM API Ã¢â‚¬â€ v2026.04.20
+// TischlerCRM API — v2026.04.20
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -24,7 +24,6 @@ import { reportRoutes } from './routes/reports.js';
 import { dashboardRoutes } from './routes/dashboards.js';
 import { backupRoutes } from './routes/backup.js';
 import { settingRoutes } from './routes/settings.js';
-import { summaryRoutes } from './routes/summaries.js';
 import { preferenceRoutes } from './routes/preferences.js';
 import { departmentRoutes } from './routes/departments.js';
 import { usersAdminRoutes } from './routes/users-admin.js';
@@ -50,14 +49,12 @@ import { specPresetRoutes } from './routes/spec-presets.js';
 import { specVariantRoutes } from './routes/spec-variants.js';
 import { tokenMappingRoutes } from './routes/token-mappings.js';
 import { proposalPdfRoutes } from './routes/proposal-pdf.js';
-import { projectListPdfRoutes } from './routes/project-list-pdf.js';
-import { companyResourceRoutes } from './routes/company-resources.js';
 import { seedCategoriesIfMissing } from './lib/support-tickets/categories.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Ã¢â€â‚¬Ã¢â€â‚¬ Simple in-memory rate limiter (resets on restart) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ── Simple in-memory rate limiter (resets on restart) ─────────────────────
 // TODO (M-1): replace with @fastify/rate-limit + Redis before horizontal scaling
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
@@ -86,7 +83,7 @@ function buildInviteUrl(inviteToken: string): string {
 }
 
 export function buildApp() {
-  // H-1: bodyLimit Ã¢â‚¬â€ the settings endpoint stores the full OrgSchema as a single
+  // H-1: bodyLimit — the settings endpoint stores the full OrgSchema as a single
   // JSON blob which can easily reach several MB with many objects/layouts.
   const app = Fastify({
     logger: true,
@@ -94,16 +91,10 @@ export function buildApp() {
     querystringParser: (str) => qs.parse(str),
   });
 
-  // H-2: security headers Ã¢â‚¬â€ must be registered before CORS
-  // crossOriginResourcePolicy: cross-origin because this is an API consumed by
-  // the frontend on a sibling domain; logos and fonts must be loadable by
-  // <img> and @font-face from cross-origin pages.
-  app.register(helmet, {
-    contentSecurityPolicy: false,
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-  });
+  // H-2: security headers — must be registered before CORS
+  app.register(helmet, { contentSecurityPolicy: false });
 
-  // H-3: explicit CORS origin whitelist Ã¢â‚¬â€ never reflect arbitrary origins
+  // H-3: explicit CORS origin whitelist — never reflect arbitrary origins
   const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
     .split(',')
     .map(s => s.trim())
@@ -135,30 +126,6 @@ export function buildApp() {
     done(null, body);
   });
 
-  // Global safety net for errors that escape a route's own try/catch â€”
-  // persists into the same ErrorLog table the client-side reporter uses
-  // (source: 'server'), visible at Settings > Error Log alongside client errors.
-  app.setErrorHandler(async (error, req, reply) => {
-    req.log.error(error);
-    try {
-      await prisma.errorLog.create({
-        data: {
-          id: generateId('ErrorLog'),
-          message: error.message.slice(0, 2000),
-          stack: error.stack?.slice(0, 8000),
-          source: 'server',
-          url: req.url?.slice(0, 2000),
-          userId: (req as any).user?.sub ?? null,
-          metadata: { method: req.method, statusCode: error.statusCode ?? 500 },
-        },
-      });
-    } catch {
-      // Never let error-logging itself break the error response
-    }
-    const statusCode = error.statusCode && error.statusCode < 500 ? error.statusCode : 500;
-    reply.code(statusCode).send({ error: statusCode < 500 ? error.message : 'Internal server error' });
-  });
-
   // Serve Next.js static files (if built)
   const nextStaticPath = path.join(__dirname, '../../web/.next/static');
   if (fs.existsSync(nextStaticPath)) {
@@ -168,10 +135,10 @@ export function buildApp() {
     });
   }
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Health check Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Health check ──────────────────────────────────────────────────────────
   app.get('/health', async () => ({ ok: true, version: '2026-03-24-v4' }));
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Auth: login Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Auth: login ───────────────────────────────────────────────────────────
   app.post('/auth/login', async (req, reply) => {
     // C-3: rate-limit login attempts per IP
     const ip = extractIp(req);
@@ -242,7 +209,7 @@ export function buildApp() {
     return reply.send(response);
   });
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Auth: accept invite Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Auth: accept invite ───────────────────────────────────────────────────
   app.post('/auth/accept-invite', async (req, reply) => {
     const ip = extractIp(req);
     if (!checkRateLimit(`accept-invite:${ip}`, 10, 15 * 60 * 1000)) {
@@ -282,7 +249,7 @@ export function buildApp() {
     return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, profileId: user.profileId ?? null } });
   });
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Auth: forgot password Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Auth: forgot password ─────────────────────────────────────────────────
   app.post('/auth/forgot-password', async (req, reply) => {
     const ip = extractIp(req);
     if (!checkRateLimit(`forgot-password:${ip}`, 5, 15 * 60 * 1000)) {
@@ -312,7 +279,7 @@ export function buildApp() {
     })().catch(err => app.log.error(err));
   });
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Auth: reset password Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Auth: reset password ──────────────────────────────────────────────────
   app.post('/auth/reset-password', async (req, reply) => {
     const ip = extractIp(req);
     if (!checkRateLimit(`reset-password:${ip}`, 10, 15 * 60 * 1000)) {
@@ -349,7 +316,7 @@ export function buildApp() {
     return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, profileId: user.profileId ?? null } });
   });
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Auth: change password (requires valid JWT) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Auth: change password (requires valid JWT) ────────────────────────────
   app.post('/auth/change-password', async (req, reply) => {
     const ip = extractIp(req);
     if (!checkRateLimit(`change-password:${ip}`, 10, 15 * 60 * 1000)) {
@@ -404,7 +371,7 @@ export function buildApp() {
     return reply.send({ success: true });
   });
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Security: login history (admin-only) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Security: login history (admin-only) ──────────────────────────────────
   app.get('/security/login-events', async (req, reply) => {
     if (!req.user || req.user.role !== 'ADMIN') {
       return reply.code(403).send({ error: 'Insufficient permissions' });
@@ -429,7 +396,7 @@ export function buildApp() {
     return reply.send(events);
   });
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Auth guard hook Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Auth guard hook ───────────────────────────────────────────────────────
   app.addHook('onRequest', async (req, reply) => {
     const routeUrl = req.routeOptions?.url;
     // <img src=".../places/static-map?..."> has no Authorization header; the handler
@@ -445,11 +412,6 @@ export function buildApp() {
     if (routeUrl === '/health') return;
     if (routeUrl === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
     if (routeUrl === '/dropbox/callback') return;
-    // Brand-asset binary endpoints are served unauthenticated so <img src> tags
-    // and @font-face declarations can load them (neither can attach a Bearer
-    // token). The UUIDs are non-enumerable and these assets ultimately ship
-    // inside customer-facing PDFs, so they're not sensitive.
-    if (/^\/company-resources\/(logos|fonts)\/[^/]+\/bytes$/.test(pathOnly)) return;
 
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
@@ -476,7 +438,7 @@ export function buildApp() {
     req.user = payload as any;
   });
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Current user's effective permissions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Current user's effective permissions ─────────────────────────────────
   app.get('/me/permissions', async (req, reply) => {
     const userId = req.user!.sub;
     const user = await prisma.user.findUnique({
@@ -520,7 +482,7 @@ export function buildApp() {
       });
     }
 
-    // Normalise stored permissions: translate storage keys Ã¢â€ â€™ canonical API names.
+    // Normalise stored permissions: translate storage keys → canonical API names.
     const stored = (user.profile?.permissions ?? {}) as Record<string, unknown>;
     const rawObjs = (stored.objectPermissions ?? stored.objects ?? {}) as Record<string, unknown>;
     const objectPermissions: Record<string, unknown> = {};
@@ -534,40 +496,19 @@ export function buildApp() {
     });
   });
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Admin route guard Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Admin route guard ─────────────────────────────────────────────────────
   app.addHook('onRequest', async (req, reply) => {
     if (!req.routeOptions?.url?.startsWith('/admin')) return;
     if (req.routeOptions?.url === '/admin/backup/scheduled' && req.headers['x-cron-secret']) {
       const env = loadEnv();
       if (env.BACKUP_CRON_SECRET && req.headers['x-cron-secret'] === env.BACKUP_CRON_SECRET) return;
     }
-    if (!req.user) return reply.code(403).send({ error: 'Insufficient permissions.' });
-    if (req.user.role === 'ADMIN') return; // admins pass everything
-
-    // Non-admins may access specific read-only admin routes via app permissions.
-    const path = req.routeOptions?.url ?? '';
-    const method = req.method?.toUpperCase() ?? '';
-    const isRead = method === 'GET';
-    if (isRead) {
-      const permPath =
-        path.startsWith('/admin/users') ? 'manageUsers,viewAllUsers' :
-        path.startsWith('/admin/profiles') ? 'manageProfiles,viewAllProfiles' :
-        null;
-      if (permPath) {
-        const user = await prisma.user.findUnique({
-          where: { id: req.user.sub },
-          select: { profile: { select: { permissions: true } } },
-        });
-        const app = (user?.profile?.permissions as any)?.app ?? {};
-        const allowed = permPath.split(',').some((k) => !!app[k]);
-        if (allowed) return;
-      }
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
     }
-
-    return reply.code(403).send({ error: 'Insufficient permissions.' });
   });
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Register API routes Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Register API routes ───────────────────────────────────────────────────
   app.register(objectRoutes);
   app.register(fieldRoutes);
   app.register(layoutRoutes);
@@ -576,7 +517,6 @@ export function buildApp() {
   app.register(dashboardRoutes);
   app.register(backupRoutes);
   app.register(settingRoutes);
-  app.register(summaryRoutes);
   app.register(preferenceRoutes);
   app.register(departmentRoutes);
   app.register(usersAdminRoutes);
@@ -599,8 +539,6 @@ export function buildApp() {
   app.register(specVariantRoutes);
   app.register(tokenMappingRoutes);
   app.register(proposalPdfRoutes);
-  app.register(projectListPdfRoutes);
-  app.register(companyResourceRoutes);
 
   // Start the Postgres LISTEN connection so notify() events broadcast
   // from any process reach SSE subscribers on this process.
