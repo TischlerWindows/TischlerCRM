@@ -2345,8 +2345,8 @@ export default function SummaryPage() {
         }
       }
       return [
-        [...qtRow('Euro Windows', ewQ, ewF, ewS, ewN, locQt?.euroWindows), ...qtCalcCols(ewN, pv(locQt?.euroWindows?.full), pv(locQt?.euroWindows?.pct), pv(locQt?.euroWindows?.final), pv(locQt?.euroWindows?.finalAdj))],
-        [...qtRow('Euro Doors',   dQ,  dF,  dS,  dN,  locQt?.euroDoors),   ...qtCalcCols(dN,  pv(locQt?.euroDoors?.full),   pv(locQt?.euroDoors?.pct),   pv(locQt?.euroDoors?.final),   pv(locQt?.euroDoors?.finalAdj))],
+        [...qtRow('Windows', ewQ, ewF, ewS, ewN, locQt?.euroWindows), ...qtCalcCols(ewN, pv(locQt?.euroWindows?.full), pv(locQt?.euroWindows?.pct), pv(locQt?.euroWindows?.final), pv(locQt?.euroWindows?.finalAdj))],
+        [...qtRow('Doors',   dQ,  dF,  dS,  dN,  locQt?.euroDoors),   ...qtCalcCols(dN,  pv(locQt?.euroDoors?.full),   pv(locQt?.euroDoors?.pct),   pv(locQt?.euroDoors?.final),   pv(locQt?.euroDoors?.finalAdj))],
       ];
     };
 
@@ -2396,8 +2396,8 @@ export default function SummaryPage() {
       function gtQtSum(f: string) { return pv((gtQt.euroWindows as any)?.[f]) + pv((gtQt.doubleHung as any)?.[f]) + pv((gtQt.euroDoors as any)?.[f]); }
       const gta = s.grandTotalAdjustment;
       const grandRows = [
-        [...qtRow('Euro Windows', grandEwQty, grandEwFields, grandEwSqFt, grandEwNet, gtQt.euroWindows), ...qtCalcCols(grandEwNet, pv((gtQt.euroWindows as any)?.full), pv((gtQt.euroWindows as any)?.pct), pv((gtQt.euroWindows as any)?.final), pv((gtQt.euroWindows as any)?.finalAdj))],
-        [...qtRow('Euro Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet,  gtQt.euroDoors),   ...qtCalcCols(grandDNet,  pv((gtQt.euroDoors as any)?.full),   pv((gtQt.euroDoors as any)?.pct),   pv((gtQt.euroDoors as any)?.final),   pv((gtQt.euroDoors as any)?.finalAdj))],
+        [...qtRow('Windows', grandEwQty, grandEwFields, grandEwSqFt, grandEwNet, gtQt.euroWindows), ...qtCalcCols(grandEwNet, pv((gtQt.euroWindows as any)?.full), pv((gtQt.euroWindows as any)?.pct), pv((gtQt.euroWindows as any)?.final), pv((gtQt.euroWindows as any)?.finalAdj))],
+        [...qtRow('Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet,  gtQt.euroDoors),   ...qtCalcCols(grandDNet,  pv((gtQt.euroDoors as any)?.full),   pv((gtQt.euroDoors as any)?.pct),   pv((gtQt.euroDoors as any)?.final),   pv((gtQt.euroDoors as any)?.finalAdj))],
         [...qtRow('Total', tQty, tFields, tSqFt, tNet, {
           full: String(gtQtSum('full')),
           pct:  String(gtQtSum('pct')),
@@ -5068,7 +5068,7 @@ export default function SummaryPage() {
                       finalAdj: gtNet ? (p(aggQt?.euroWindows?.finalAdj) + p(aggQt?.doubleHung?.finalAdj) + p(aggQt?.euroDoors?.finalAdj)) / gtNet : 0,
                     };
 
-                    // Grand Total table cell for a category (Euro Windows / Double Hung / Euro Doors) x field (Full/%/Final/+Adj).
+                    // Grand Total table cell for a category (Windows / Double Hung / Doors) x field (Full/%/Final/+Adj).
                     // Multi-location jobs: read-only, auto-summed from the per-location tables (aggQt).
                     // Single-location jobs: editable input bound to the top-level quoteTotals (unchanged behavior).
                     const catCell = (cat: 'euroWindows' | 'doubleHung' | 'euroDoors', f: 'full' | 'pct' | 'final' | 'finalAdj') => {
@@ -5166,7 +5166,7 @@ export default function SummaryPage() {
                               </thead>
                               <tbody className="divide-y divide-gray-100">
                                 <tr className="hover:bg-gray-50">
-                                  <td className="px-3 py-3 font-medium text-gray-900 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Euro Windows</td>
+                                  <td className="px-3 py-3 font-medium text-gray-900 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Windows</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewF)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewSq)}</td>
@@ -5178,7 +5178,7 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-purple-600 bg-purple-50/30">{lEwCalc.finalAdj ? fmt(lEwCalc.finalAdj) : '—'}</td>
                                 </tr>
                                 <tr className="hover:bg-gray-50">
-                                  <td className="px-3 py-3 font-medium text-gray-900 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Euro Doors</td>
+                                  <td className="px-3 py-3 font-medium text-gray-900 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Doors</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dF)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dSq)}</td>
@@ -5249,11 +5249,11 @@ export default function SummaryPage() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                              {/* Euro Windows */}
+                              {/* Windows */}
                               <tr className="hover:bg-gray-50">
                                 <td className="px-2 py-3 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6]">
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-medium text-gray-900 whitespace-nowrap">Euro Windows</span>
+                                    <span className="font-medium text-gray-900 whitespace-nowrap">Windows</span>
                                     <button onClick={() => setExpandedQtRows(p => ({ ...p, euroWindows: !p['euroWindows'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['euroWindows'] ? <><span>▾</span><span className="hidden sm:inline"> Hide</span></> : <><span>▸</span><span className="hidden sm:inline"> Breakdown</span></>}</button>
                                   </div>
                                 </td>
@@ -5303,11 +5303,11 @@ export default function SummaryPage() {
                                 </>);
                               })()}
                               {/* Double Hung — hidden: none of the current product type options are double hungs */}
-                              {/* Euro Doors */}
+                              {/* Doors */}
                               <tr className="hover:bg-gray-50">
                                 <td className="px-2 py-3 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6]">
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-medium text-gray-900 whitespace-nowrap">Euro Doors</span>
+                                    <span className="font-medium text-gray-900 whitespace-nowrap">Doors</span>
                                     <button onClick={() => setExpandedQtRows(p => ({ ...p, euroDoors: !p['euroDoors'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['euroDoors'] ? <><span>▾</span><span className="hidden sm:inline"> Hide</span></> : <><span>▸</span><span className="hidden sm:inline"> Breakdown</span></>}</button>
                                   </div>
                                 </td>
