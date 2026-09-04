@@ -2346,7 +2346,6 @@ export default function SummaryPage() {
       }
       return [
         [...qtRow('Euro Windows', ewQ, ewF, ewS, ewN, locQt?.euroWindows), ...qtCalcCols(ewN, pv(locQt?.euroWindows?.full), pv(locQt?.euroWindows?.pct), pv(locQt?.euroWindows?.final), pv(locQt?.euroWindows?.finalAdj))],
-        [...qtRow('Double Hung',  dhQ, dhF, dhS, dhN, locQt?.doubleHung),  ...qtCalcCols(dhN, pv(locQt?.doubleHung?.full),  pv(locQt?.doubleHung?.pct),  pv(locQt?.doubleHung?.final),  pv(locQt?.doubleHung?.finalAdj))],
         [...qtRow('Euro Doors',   dQ,  dF,  dS,  dN,  locQt?.euroDoors),   ...qtCalcCols(dN,  pv(locQt?.euroDoors?.full),   pv(locQt?.euroDoors?.pct),   pv(locQt?.euroDoors?.final),   pv(locQt?.euroDoors?.finalAdj))],
       ];
     };
@@ -2398,7 +2397,6 @@ export default function SummaryPage() {
       const gta = s.grandTotalAdjustment;
       const grandRows = [
         [...qtRow('Euro Windows', grandEwQty, grandEwFields, grandEwSqFt, grandEwNet, gtQt.euroWindows), ...qtCalcCols(grandEwNet, pv((gtQt.euroWindows as any)?.full), pv((gtQt.euroWindows as any)?.pct), pv((gtQt.euroWindows as any)?.final), pv((gtQt.euroWindows as any)?.finalAdj))],
-        [...qtRow('Double Hung',  grandDhQty, grandDhFields, grandDhSqFt, grandDhNet, gtQt.doubleHung),  ...qtCalcCols(grandDhNet, pv((gtQt.doubleHung as any)?.full),  pv((gtQt.doubleHung as any)?.pct),  pv((gtQt.doubleHung as any)?.final),  pv((gtQt.doubleHung as any)?.finalAdj))],
         [...qtRow('Euro Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet,  gtQt.euroDoors),   ...qtCalcCols(grandDNet,  pv((gtQt.euroDoors as any)?.full),   pv((gtQt.euroDoors as any)?.pct),   pv((gtQt.euroDoors as any)?.final),   pv((gtQt.euroDoors as any)?.finalAdj))],
         [...qtRow('Total', tQty, tFields, tSqFt, tNet, {
           full: String(gtQtSum('full')),
@@ -4675,7 +4673,9 @@ export default function SummaryPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Additional Glass Types for Proposal</label>
                         {(() => {
                           const options = ARCADIA_GLASS_TYPE_OPTIONS;
+                          const knownOptions = options.slice(0, -1); // all but 'Custom Please Specify'
                           const selected = editingSummary.additionalGlassTypes || [];
+                          const customSelected = selected.find(v => !knownOptions.includes(v));
                           return (
                             <details className="relative">
                               <summary className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white cursor-pointer flex items-center justify-between select-none list-none focus:outline-none focus:ring-1 focus:ring-brand-navy/40">
@@ -4685,24 +4685,55 @@ export default function SummaryPage() {
                                 <span className="ml-2 text-gray-400">▾</span>
                               </summary>
                               <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto py-1">
-                                {options.map(v => (
-                                  <label key={v} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                                {options.map(v => {
+                                  const isCustomOption = v === 'Custom Please Specify';
+                                  return (
+                                    <label key={v} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={isCustomOption ? customSelected !== undefined : selected.includes(v)}
+                                        onChange={(e) => {
+                                          if (isCustomOption) {
+                                            // Toggle: add/remove an empty custom-text slot instead of the literal label
+                                            setEditingSummary({
+                                              ...editingSummary,
+                                              additionalGlassTypes: e.target.checked
+                                                ? [...selected, '']
+                                                : selected.filter(x => knownOptions.includes(x)),
+                                            });
+                                          } else {
+                                            setEditingSummary({
+                                              ...editingSummary,
+                                              additionalGlassTypes: e.target.checked
+                                                ? [...selected, v]
+                                                : selected.filter(x => x !== v),
+                                            });
+                                          }
+                                        }}
+                                        className="w-3.5 h-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy/20"
+                                      />
+                                      <span className="text-sm text-gray-700">{v}</span>
+                                    </label>
+                                  );
+                                })}
+                                {/* Inline text input when Custom Please Specify is checked */}
+                                {customSelected !== undefined && (
+                                  <div className="px-3 py-1.5">
                                     <input
-                                      type="checkbox"
-                                      checked={selected.includes(v)}
+                                      type="text"
+                                      value={customSelected ?? ''}
                                       onChange={(e) => {
+                                        const nonCustom = selected.filter(v => knownOptions.includes(v));
                                         setEditingSummary({
                                           ...editingSummary,
-                                          additionalGlassTypes: e.target.checked
-                                            ? [...selected, v]
-                                            : selected.filter(x => x !== v),
+                                          additionalGlassTypes: [...nonCustom, e.target.value],
                                         });
                                       }}
-                                      className="w-3.5 h-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy/20"
+                                      placeholder="Enter custom glass type…"
+                                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy/40"
                                     />
-                                    <span className="text-sm text-gray-700">{v}</span>
-                                  </label>
-                                ))}
+                                  </div>
+                                )}
                               </div>
                             </details>
                           );
@@ -5147,18 +5178,6 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-purple-600 bg-purple-50/30">{lEwCalc.finalAdj ? fmt(lEwCalc.finalAdj) : '—'}</td>
                                 </tr>
                                 <tr className="hover:bg-gray-50">
-                                  <td className="px-3 py-3 font-medium text-gray-900 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Double Hung</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhQ)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhF)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhSq)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{dhN ? `$${fmtInt(dhN)}` : '—'}</td>
-                                  {inputCell('doubleHung','full')}{inputCell('doubleHung','pct')}{inputCell('doubleHung','final')}{inputCell('doubleHung','finalAdj')}
-                                  <td className="px-4 py-3 text-right text-blue-400 border-l-4 border-blue-300 bg-blue-50/30">{lDhCalc.full ? fmt(lDhCalc.full) : '—'}</td>
-                                  <td className="px-4 py-3 text-right text-blue-400 bg-blue-50/30">{lDhCalc.disc ? fmt(lDhCalc.disc) : '—'}</td>
-                                  <td className="px-4 py-3 text-right text-green-400 bg-green-50/30">{lDhCalc.final ? fmt(lDhCalc.final) : '—'}</td>
-                                  <td className="px-4 py-3 text-right text-purple-400 bg-purple-50/30">{lDhCalc.finalAdj ? fmt(lDhCalc.finalAdj) : '—'}</td>
-                                </tr>
-                                <tr className="hover:bg-gray-50">
                                   <td className="px-3 py-3 font-medium text-gray-900 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Euro Doors</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dF)}</td>
@@ -5283,59 +5302,7 @@ export default function SummaryPage() {
                                   ))}
                                 </>);
                               })()}
-                              {/* Double Hung */}
-                              <tr className="hover:bg-gray-50">
-                                <td className="px-2 py-3 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6]">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="font-medium text-gray-900 whitespace-nowrap">Double Hung</span>
-                                    <button onClick={() => setExpandedQtRows(p => ({ ...p, doubleHung: !p['doubleHung'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['doubleHung'] ? <><span>▾</span><span className="hidden sm:inline"> Hide</span></> : <><span>▸</span><span className="hidden sm:inline"> Breakdown</span></>}</button>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungQty)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungFields)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `$${fmtInt(doubleHungNet)}` : '—'}</td>
-                                {(['full','pct','final','finalAdj'] as const).map(f => catCell('doubleHung', f))}
-                                <td className="px-4 py-3 text-right text-blue-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? fmt(dhCalc.full) : '—'}</td>
-                                <td className="px-4 py-3 text-right text-blue-400 bg-blue-50/30">{dhCalc.disc ? fmt(dhCalc.disc) : '—'}</td>
-                                <td className="px-4 py-3 text-right text-green-400 bg-green-50/30">{dhCalc.final ? fmt(dhCalc.final) : '—'}</td>
-                                <td className="px-4 py-3 text-right text-purple-400 bg-purple-50/30">{dhCalc.finalAdj ? fmt(dhCalc.finalAdj) : '—'}</td>
-                              </tr>
-                              {expandedQtRows['doubleHung'] && (() => {
-                                const grouped = Object.entries(
-                                  hungRows.reduce((acc: Record<string, {qty:number,fields:number,sqFt:number,net:number}>, row) => {
-                                    const parts = [(row as any).type, (row as any).type2, (row as any).type3, (row as any).type4].filter(Boolean);
-                                    const t = parts.length ? parts.join(' w/ ') : '—';
-                                    if (!acc[t]) acc[t] = {qty:0,fields:0,sqFt:0,net:0};
-                                    acc[t].qty += parseFloat((row as any).qty) || 0;
-                                    acc[t].fields += parseFloat((row as any).fieldsTotal) || 0;
-                                    acc[t].sqFt += parseFloat((row as any).sqFeetTotal) || 0;
-                                    acc[t].net += parseFloat((row as any).netEuroTotal) || 0;
-                                    return acc;
-                                  }, {})
-                                );
-                                if (!grouped.length) return null;
-                                return (<>
-                                  <tr className="bg-indigo-50/60 border-y border-indigo-200">
-                                    <td className="pl-8 pr-2 py-1.5 text-xs font-semibold text-indigo-700 uppercase tracking-wide">↳ Type</td>
-                                    <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Qty</td>
-                                    <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Fields</td>
-                                    <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">Sq Ft</td>
-                                    <td className="px-4 py-1.5 text-xs font-semibold text-gray-500 text-right">NET $</td>
-                                    <td colSpan={8}></td>
-                                  </tr>
-                                  {grouped.map(([type, vals]) => (
-                                    <tr key={type} className="bg-indigo-50/20 border-b border-indigo-100">
-                                      <td className="pl-8 pr-2 py-1.5 text-xs text-gray-700">{type}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.qty)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.fields)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.sqFt)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `$${fmtInt(vals.net)}` : '—'}</td>
-                                      <td colSpan={8}></td>
-                                    </tr>
-                                  ))}
-                                </>);
-                              })()}
+                              {/* Double Hung — hidden: none of the current product type options are double hungs */}
                               {/* Euro Doors */}
                               <tr className="hover:bg-gray-50">
                                 <td className="px-2 py-3 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6]">

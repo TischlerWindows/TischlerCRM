@@ -4709,7 +4709,7 @@ export default function SummaryPage() {
                                   <label key={v} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
                                     <input
                                       type="checkbox"
-                                      checked={v === 'Custom' ? !!customSelected : selected.includes(v)}
+                                      checked={v === 'Custom' ? customSelected !== undefined : selected.includes(v)}
                                       onChange={(e) => {
                                         if (v === 'Custom') {
                                           // toggle: add/remove the custom text entry slot
