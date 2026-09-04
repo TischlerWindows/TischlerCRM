@@ -96,13 +96,6 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
     id: `region-swap-${region.id}`,
     data: { type: 'region', regionId: region.id },
   });
-  // Only treat the swap zone as "active" while another region (not a panel/
-  // widget/field) is being dragged, so the highlight accurately reflects a
-  // valid drop — matches the guard in dispatchDragEnd.
-  const { active: dndActiveDrag } = useDndContext();
-  const isDraggingRegion =
-    (dndActiveDrag?.data.current as { type?: unknown } | undefined)?.type === 'region';
-  const showRegionSwapHighlight = isDraggingRegion && isRegionSwapOver && !isDragging;
   const {
     attributes: dragAttributes,
     listeners: dragListeners,
@@ -113,6 +106,13 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
     data: { type: 'region', regionId: region.id },
     disabled: dragSpan !== null,
   });
+  // Only treat the swap zone as "active" while another region (not a panel/
+  // widget/field) is being dragged, so the highlight accurately reflects a
+  // valid drop — matches the guard in dispatchDragEnd.
+  const { active: dndActiveDrag } = useDndContext();
+  const isDraggingRegion =
+    (dndActiveDrag?.data.current as { type?: unknown } | undefined)?.type === 'region';
+  const showRegionSwapHighlight = isDraggingRegion && isRegionSwapOver && !isDragging;
   const resizeSessionRef = useRef<{
     pointerId: number;
     startX: number;
