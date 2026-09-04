@@ -4693,9 +4693,13 @@ export default function SummaryPage() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Additional Glass Types for Proposal</label>
                         {(() => {
-                          const options = [...getOppPicklistFiltered('Opportunity__glassType'), 'Custom'];
+                          const knownGlassTypes = getOppPicklistFiltered('Opportunity__glassType');
+                          const options = [...knownGlassTypes, 'Custom'];
                           const selected = editingSummary.additionalGlassTypes || [];
-                          const customSelected = selected.find(v => !options.slice(0, -1).includes(v) && v !== 'Custom');
+                          // A blank string is always the not-yet-typed custom slot, even if the
+                          // underlying picklist happens to contain a stray blank value itself.
+                          const isCustomValue = (v: string) => v === '' || !knownGlassTypes.includes(v);
+                          const customSelected = selected.find(v => v !== 'Custom' && isCustomValue(v));
                           return (
                             <details className="relative">
                               <summary className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white cursor-pointer flex items-center justify-between select-none list-none focus:outline-none focus:ring-1 focus:ring-brand-navy/40">
@@ -4717,7 +4721,7 @@ export default function SummaryPage() {
                                             ...editingSummary,
                                             additionalGlassTypes: e.target.checked
                                               ? [...selected, '']
-                                              : selected.filter(x => options.slice(0, -1).includes(x)),
+                                              : selected.filter(x => knownGlassTypes.includes(x)),
                                           });
                                         } else {
                                           setEditingSummary({
@@ -4734,13 +4738,13 @@ export default function SummaryPage() {
                                   </label>
                                 ))}
                                 {/* Inline text input when Custom is checked */}
-                                {(selected.some(v => !getOppPicklistFiltered('Opportunity__glassType').includes(v))) && (
+                                {customSelected !== undefined && (
                                   <div className="px-3 py-1.5">
                                     <input
                                       type="text"
                                       value={customSelected ?? ''}
                                       onChange={(e) => {
-                                        const nonCustom = selected.filter(v => getOppPicklistFiltered('Opportunity__glassType').includes(v));
+                                        const nonCustom = selected.filter(v => knownGlassTypes.includes(v));
                                         setEditingSummary({
                                           ...editingSummary,
                                           additionalGlassTypes: [...nonCustom, e.target.value],
