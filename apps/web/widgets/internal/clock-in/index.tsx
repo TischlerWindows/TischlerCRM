@@ -167,13 +167,13 @@ function TaskCell({
       : `${selected.length} tasks selected`
 
   return (
-    <div ref={ref} className="flex min-w-0 flex-col items-stretch gap-2 sm:flex-row sm:items-start">
-      <div className="relative w-full shrink-0 sm:w-44">
+    <div ref={ref} className="flex min-w-0 items-start gap-2">
+      <div className="relative w-32 shrink-0 sm:w-44">
         <button
           type="button"
           ref={triggerRef}
           onClick={() => setOpen((value) => !value)}
-          className="flex min-h-9 w-full items-center justify-between gap-2 rounded border border-gray-300 bg-white px-2.5 py-2 text-left text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+          className="flex min-h-8 w-full items-center justify-between gap-1 rounded border border-gray-300 bg-white px-2 py-1.5 text-left text-[11px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-navy/20 sm:min-h-9 sm:px-2.5 sm:py-2 sm:text-xs"
           aria-label="Select tasks"
         >
           <span className={selected.length ? 'truncate' : 'text-gray-400'}>{label}</span>
@@ -205,9 +205,9 @@ function TaskCell({
         )}
       </div>
       {selected.includes('Other') && (
-        <div className="w-full min-w-0 flex-1 sm:min-w-[280px]">
-          <BodyEditor value={otherResponse} onChange={setOtherResponse} placeholder="Describe the task..." minHeight={90} />
-          <button type="button" onClick={save} disabled={saving} className="mt-1 rounded border border-brand-navy px-2.5 py-1 text-xs font-medium text-brand-navy hover:bg-brand-navy/5 disabled:opacity-60">
+        <div className="w-56 min-w-0 flex-1 sm:min-w-[280px]">
+          <BodyEditor value={otherResponse} onChange={setOtherResponse} placeholder="Describe the task..." minHeight={70} />
+          <button type="button" onClick={save} disabled={saving} className="mt-1 whitespace-nowrap rounded border border-brand-navy px-2 py-1 text-[11px] font-medium text-brand-navy hover:bg-brand-navy/5 disabled:opacity-60 sm:px-2.5 sm:text-xs">
             {saving ? 'Saving...' : 'Save Other Task'}
           </button>
         </div>
@@ -449,18 +449,18 @@ export default function ClockInWidget({ record }: WidgetProps) {
       </div>
 
       {entries.length > 0 && (
-        <div className="border-t border-gray-100 overflow-x-auto">
-          <table className="w-full table-fixed text-xs sm:table-auto sm:min-w-[760px]">
-            <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        <div className="-mx-px overflow-x-auto border-t border-gray-100">
+          <table className="w-full min-w-[880px] table-auto text-[11px] sm:text-xs">
+            <thead className="whitespace-nowrap bg-gray-50 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-[11px]">
               <tr>
-                <th className="w-[22%] px-2 py-2 sm:w-auto sm:px-4">Employee</th>
-                <th className="w-[21%] px-2 py-2 sm:w-auto sm:px-4">Clock In Time</th>
-                <th className="hidden px-4 py-2 md:table-cell">Clock In Location</th>
-                <th className="w-[21%] px-2 py-2 sm:w-auto sm:px-4">Clock Out Time</th>
-                <th className="hidden px-4 py-2 md:table-cell">Clock Out Location</th>
-                <th className="w-[10%] px-2 py-2 text-right sm:w-auto sm:px-4">Duration</th>
-                <th className="w-[22%] px-2 py-2 sm:w-auto sm:px-4">Tasks</th>
-                <th className="w-[8%] px-2 py-2 text-right sm:w-auto sm:px-4">Actions</th>
+                <th className="px-2 py-2 sm:px-4">Employee</th>
+                <th className="px-2 py-2 sm:px-4">Clock In Time</th>
+                <th className="px-2 py-2 sm:px-4">Clock In Location</th>
+                <th className="px-2 py-2 sm:px-4">Clock Out Time</th>
+                <th className="px-2 py-2 sm:px-4">Clock Out Location</th>
+                <th className="px-2 py-2 text-right sm:px-4">Duration</th>
+                <th className="px-2 py-2 sm:px-4">Tasks</th>
+                <th className="px-2 py-2 text-right sm:px-4">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -469,8 +469,8 @@ export default function ClockInWidget({ record }: WidgetProps) {
                 const outLink = mapLink(e.clockOutLatitude, e.clockOutLongitude)
                 return (
                   <tr key={e.id} className="align-top text-gray-700">
-                    <td className="truncate px-2 py-3 font-medium text-gray-900 sm:px-4">{e.clockedInByName || 'Unknown'}</td>
-                    <td className="px-2 py-3 whitespace-nowrap sm:px-4">
+                    <td className="truncate px-2 py-2 font-medium text-gray-900 sm:px-4 sm:py-3">{e.clockedInByName || 'Unknown'}</td>
+                    <td className="px-2 py-2 whitespace-nowrap sm:px-4 sm:py-3">
                       {editingEntryId === e.id && editingTimeField === 'clockIn' ? (
                         <div className="flex items-center gap-1">
                           <input
@@ -499,10 +499,10 @@ export default function ClockInWidget({ record }: WidgetProps) {
                         fmtTime(e.clockInTime)
                       )}
                     </td>
-                    <td className="hidden px-4 py-3 md:table-cell">
+                    <td className="px-2 py-2 sm:px-4 sm:py-3">
                       <LocationCell address={locationLabel(e.clockInAddress, e.clockInLatitude, e.clockInLongitude)} href={inLink} />
                     </td>
-                    <td className="px-2 py-3 whitespace-nowrap sm:px-4">
+                    <td className="px-2 py-2 whitespace-nowrap sm:px-4 sm:py-3">
                       {editingEntryId === e.id && editingTimeField === 'clockOut' ? (
                         <div className="flex items-center gap-1">
                           <input
@@ -527,18 +527,18 @@ export default function ClockInWidget({ record }: WidgetProps) {
                         </button>
                       ) : fmtTime(e.clockOutTime) : <span className="font-medium text-amber-600">In progress</span>}
                     </td>
-                    <td className="hidden px-4 py-3 md:table-cell">
+                    <td className="px-2 py-2 sm:px-4 sm:py-3">
                       {e.clockOutTime ? <LocationCell address={locationLabel(e.clockOutAddress, e.clockOutLatitude, e.clockOutLongitude)} href={outLink} /> : '—'}
                     </td>
-                    <td className="px-2 py-3 text-right whitespace-nowrap sm:px-4">{fmtDuration(e.durationMinutes)}</td>
-                    <td className="px-2 py-3 sm:px-4">
+                    <td className="px-2 py-2 text-right whitespace-nowrap sm:px-4 sm:py-3">{fmtDuration(e.durationMinutes)}</td>
+                    <td className="px-2 py-2 sm:px-4 sm:py-3">
                       {canManageEntry(e) ? (
                         <TaskCell entry={e} onSave={(tasks, otherResponse) => saveTasks(e, tasks, otherResponse)} />
                       ) : (
                         <span className="text-gray-600">{parseTaskValues(e.tasks).join(', ') || '—'}</span>
                       )}
                     </td>
-                    <td className="px-2 py-3 text-right sm:px-4">
+                    <td className="px-2 py-2 text-right sm:px-4 sm:py-3">
                       {canManageEntry(e) && (
                         <button type="button" onClick={() => handleDelete(e)} disabled={busy} className="rounded p-1 text-red-600 hover:bg-red-50 disabled:opacity-50" aria-label="Delete clock-in entry" title="Delete clock-in entry">
                           <Trash2 className="h-4 w-4" />
