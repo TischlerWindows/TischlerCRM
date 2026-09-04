@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Eye, GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { LayoutPanel, LayoutSection } from './types';
 import { useEditorStore } from './editor-store';
 import type { PreviewMode } from './store/selection-slice';
@@ -40,8 +40,31 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   const addPanel = useEditorStore((s) => s.addPanel);
   const removeSection = useEditorStore((s) => s.removeSection);
   const resizeSection = useEditorStore((s) => s.resizeSection);
+  const swapSections = useEditorStore((s) => s.swapSections);
+  const layout = useEditorStore((s) => s.layout);
   const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? EMPTY_RULES);
   const previewMode = useEditorStore((s) => s.previewMode);
+
+  // Reading-order (top-to-bottom, left-to-right) sibling list, used by the
+  // move up/down arrows as a reliable alternative to precise drag-and-drop.
+  const orderedRegionIds = useMemo(() => {
+    const tab = layout.tabs.find((t) => t.id === tabId);
+    if (!tab) return [];
+    return [...tab.regions]
+      .sort((a, b) => a.gridRow - b.gridRow || a.gridColumn - b.gridColumn)
+      .map((r) => r.id);
+  }, [layout, tabId]);
+  const regionOrderIndex = orderedRegionIds.indexOf(region.id);
+  const canMoveUp = regionOrderIndex > 0;
+  const canMoveDown = regionOrderIndex >= 0 && regionOrderIndex < orderedRegionIds.length - 1;
+  const moveRegionUp = () => {
+    if (!canMoveUp) return;
+    swapSections(region.id, orderedRegionIds[regionOrderIndex - 1]);
+  };
+  const moveRegionDown = () => {
+    if (!canMoveDown) return;
+    swapSections(region.id, orderedRegionIds[regionOrderIndex + 1]);
+  };
 
   const isHiddenInPreviewMode =
     (previewMode === 'new' && region.hideOnNew) ||
@@ -69,10 +92,17 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
     id: `region-drop-${region.id}`,
     data: { type: 'region-drop', regionId: region.id },
   });
-  const { setNodeRef: setRegionDropRef } = useDroppable({
+  const { setNodeRef: setRegionDropRef, isOver: isRegionSwapOver } = useDroppable({
     id: `region-swap-${region.id}`,
     data: { type: 'region', regionId: region.id },
   });
+  // Only treat the swap zone as "active" while another region (not a panel/
+  // widget/field) is being dragged, so the highlight accurately reflects a
+  // valid drop — matches the guard in dispatchDragEnd.
+  const { active: dndActiveDrag } = useDndContext();
+  const isDraggingRegion =
+    (dndActiveDrag?.data.current as { type?: unknown } | undefined)?.type === 'region';
+  const showRegionSwapHighlight = isDraggingRegion && isRegionSwapOver && !isDragging;
   const {
     attributes: dragAttributes,
     listeners: dragListeners,
@@ -276,6 +306,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
             className={cn(
               'absolute inset-x-0 top-0 flex items-center justify-between gap-2 rounded-t-xl px-3 py-1.5 transition-opacity',
               showChrome ? 'opacity-100' : 'opacity-0',
+              showRegionSwapHighlight && 'bg-brand-navy/10 ring-2 ring-inset ring-brand-navy',
             )}
           >
             <div className="flex min-w-0 items-center gap-1.5">
@@ -335,17 +366,45 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
                 </span>
               )}
             </div>
-            <button
-              type="button"
-              className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeSection(region.id);
-              }}
-              aria-label="Delete section"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  moveRegionUp();
+                }}
+                disabled={!canMoveUp}
+                aria-label="Move section up"
+                title="Move section up"
+              >
+                <ChevronUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  moveRegionDown();
+                }}
+                disabled={!canMoveDown}
+                aria-label="Move section down"
+                title="Move section down"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeSection(region.id);
+                }}
+                aria-label="Delete section"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
 
           {/* Central drop prompt */}
@@ -394,7 +453,10 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
       {/* Section header */}
       <div
         ref={setRegionDropRef}
-        className="flex items-center justify-between gap-2 border-b border-brand-navy/15 bg-brand-navy/10 px-3 py-2 cursor-pointer"
+        className={cn(
+          'flex items-center justify-between gap-2 border-b border-brand-navy/15 bg-brand-navy/10 px-3 py-2 cursor-pointer',
+          showRegionSwapHighlight && 'bg-brand-navy/25 ring-2 ring-inset ring-brand-navy',
+        )}
         onClick={selectRegion}
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -457,6 +519,32 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
         </div>
 
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="rounded p-1.5 text-brand-navy/60 hover:bg-white/60 hover:text-brand-navy disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+            onClick={(e) => {
+              e.stopPropagation();
+              moveRegionUp();
+            }}
+            disabled={!canMoveUp}
+            aria-label="Move section up"
+            title="Move section up"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="rounded p-1.5 text-brand-navy/60 hover:bg-white/60 hover:text-brand-navy disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+            onClick={(e) => {
+              e.stopPropagation();
+              moveRegionDown();
+            }}
+            disabled={!canMoveDown}
+            aria-label="Move section down"
+            title="Move section down"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
           <button
             type="button"
             className="rounded p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"

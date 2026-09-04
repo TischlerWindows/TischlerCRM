@@ -278,12 +278,24 @@ export function dispatchDragEnd(
     return;
   }
 
+  // Panel (column section OR component section) dropped onto another panel's
+  // position — supports both reordering within the same region AND moving
+  // the panel into a different region, inserted at that exact position.
   if (active.kind === 'panel' && target.kind === 'panel-item') {
-    const activeRegionId =
-      active.regionId ?? findPanel(layout, active.panelId)?.region.id;
-    if (!activeRegionId || activeRegionId !== target.regionId) return;
     if (active.panelId === target.panelId) return;
     movePanel(active.panelId, target.regionId, target.index);
+    return;
+  }
+
+  // Panel dropped onto a region's general drop zone (empty region, or the
+  // widget area below the panel list of a different region) -> append it to
+  // the end of that region's panel list.
+  if (active.kind === 'panel' && target.kind === 'region-drop') {
+    const sourceEntry = findPanel(layout, active.panelId);
+    const targetRegion = findRegion(layout, target.regionId);
+    if (!sourceEntry || !targetRegion) return;
+    if (sourceEntry.region.id === target.regionId) return;
+    movePanel(active.panelId, target.regionId, targetRegion.panels.length);
     return;
   }
 
