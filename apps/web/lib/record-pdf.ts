@@ -25,6 +25,7 @@ interface GenerateRecordPdfOptions {
 interface PdfField {
   label: string;
   value: string;
+  populated: boolean;
   labelStyle: LabelStyle;
   valueStyle: ValueStyle;
 }
@@ -66,7 +67,14 @@ function getFontStyle(style: { bold?: boolean; italic?: boolean }): 'normal' | '
 }
 
 function getLabelFontStyle(style: LabelStyle): 'normal' | 'bold' | 'italic' | 'bolditalic' {
-  return style.italic ? 'bolditalic' : 'bold';
+  return getFontStyle({ ...style, bold: style.bold !== false });
+}
+
+function hasFieldValue(value: unknown): boolean {
+  if (value === null || value === undefined || value === '' || value === 'N/A') return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.values(value).some(hasFieldValue);
+  return true;
 }
 
 function readRecordValue(
@@ -106,9 +114,11 @@ function getVisibleFields(
       if (placement.visibleIf?.length && !evaluateVisibility(placement.visibleIf, record)) return [];
       if (getFormattingEffectsForField(pageLayout, field.apiName, record)?.hidden) return [];
 
+      const rawValue = readRecordValue(field, record);
       return [{
         label: placement.labelOverride || field.label,
-        value: formatPdfValue(readRecordValue(field, record), field),
+        value: formatPdfValue(rawValue, field),
+        populated: hasFieldValue(rawValue),
         labelStyle: placement.labelStyle ?? {},
         valueStyle: placement.valueStyle ?? {},
       }];
@@ -154,6 +164,7 @@ export async function generateRecordPdf({
   };
 
   const drawSectionHeading = (label: string, level: 'tab' | 'panel') => {
+    const heading = label.toUpperCase();
     const height = level === 'tab' ? 10 : 8;
     ensureSpace(height + 4);
     if (level === 'tab') {
@@ -163,7 +174,7 @@ export async function generateRecordPdf({
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
-      doc.text(label, PAGE_MARGIN + 3, cursorY + 6.5);
+      doc.text(heading, PAGE_MARGIN + 3, cursorY + 6.5);
     } else {
       doc.setFillColor(242, 244, 247);
       doc.setDrawColor(...LINE);
@@ -171,7 +182,7 @@ export async function generateRecordPdf({
       doc.setTextColor(...TEXT);
       doc.setFontSize(9.5);
       doc.setFont('helvetica', 'bold');
-      doc.text(label, PAGE_MARGIN + 3, cursorY + 5.5);
+      doc.text(heading, PAGE_MARGIN + 3, cursorY + 5.5);
     }
     cursorY += height + 2;
   };
@@ -216,10 +227,6 @@ export async function generateRecordPdf({
         doc.setFont('helvetica', getLabelFontStyle(cell.labelStyle));
         doc.setFontSize(cell.labelFontSize);
         doc.text(label, x, labelY);
-        // Standard Helvetica-Bold can look close to regular text in browser
-        // PDF viewers. A very small second pass gives labels a clearly heavier
-        // weight without changing their configured size or layout.
-        doc.text(label, x + 0.08, labelY);
         doc.setTextColor(...valueColor);
         doc.setFont('helvetica', getFontStyle(cell.valueStyle));
         doc.setFontSize(cell.valueFontSize);
@@ -277,7 +284,7 @@ export async function generateRecordPdf({
           panel,
           fields: getVisibleFields(panel.fields ?? [], objectDef, pageLayout, record),
         })))
-      .filter(({ fields }) => fields.length > 0);
+      .filter(({ fields }) => fields.some((field) => field.populated));
 
     if (visiblePanels.length === 0) continue;
     drawSectionHeading(tab.label || 'Details', 'tab');
