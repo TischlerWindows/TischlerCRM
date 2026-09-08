@@ -245,7 +245,8 @@ export default function RecordDetailPage({
   const isLookupLoaded = useLookupPreloader(objectDef);
 
   // ── Build a display title from the record ────────────────────────────
-  // Every object mirrors the Opportunity format: "NUM (Descriptive Name)".
+  // Every object mirrors the Opportunity format: "NUM (Descriptive Name)",
+  // except Work Order, which just reads "NUM".
   const getRecordTitle = (): string => {
     if (!record) return '';
 
@@ -258,9 +259,13 @@ export default function RecordDetailPage({
       numberValue = numberValue.replace(/\s*-\s*Requote\s+\d+$/i, '');
     }
 
+    if (objectApiName === 'WorkOrder') {
+      return numberValue || `Untitled ${objectDef?.label ?? 'Record'}`;
+    }
+
     // Descriptive name candidates, in priority order:
     // 1. <object>Name field (opportunityName, projectName, accountName, serviceName, quoteName, installationName, ...)
-    // 2. 'title' (Work Order)
+    // 2. 'title'
     // 3. 'name' (Account's generic name field)
     // 4. The subtitle resolver (composite name, first/last name, email — covers Contact/Lead)
     const lowerFirst = objectApiName.charAt(0).toLowerCase() + objectApiName.slice(1);
