@@ -146,75 +146,73 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
   const record = records.find((r: any) => String(r.id) === stringValue);
   
   if (record) {
-    // Return appropriate display field based on object type
-    if (objectType === 'Contact') {
-      // Check both unprefixed and prefixed name fields
-      const nameObj = record.name || record.Contact__name;
-      if (nameObj && typeof nameObj === 'object') {
-        const resolved = resolveCompositeTextValue(nameObj);
-        if (resolved) return resolved;
+    // Descriptive name — object types whose naming doesn't follow the generic
+    // `<object>Name` convention get their own resolver; everything else falls
+    // through to the generic candidates below.
+    const getDescriptiveName = (): string => {
+      if (objectType === 'Contact') {
+        const nameObj = record.name || record.Contact__name;
+        if (nameObj && typeof nameObj === 'object') {
+          const resolved = resolveCompositeTextValue(nameObj);
+          if (resolved) return resolved;
+        }
+        const fn = record.firstName || record.Contact__firstName;
+        const ln = record.lastName || record.Contact__lastName;
+        if (fn || ln) return `${fn || ''} ${ln || ''}`.trim();
+        return record.email || record.Contact__email || '';
       }
-      const fn = record.firstName || record.Contact__firstName;
-      const ln = record.lastName || record.Contact__lastName;
-      if (fn || ln) {
-        return `${fn || ''} ${ln || ''}`.trim();
+      if (objectType === 'Lead') {
+        const contactName = record.contactName || record.Lead__contactName;
+        const fn = record.firstName || record.Lead__firstName || '';
+        const ln = record.lastName || record.Lead__lastName || '';
+        const rawLn = ln && ln !== 'N/A' ? ln : '';
+        return contactName || `${fn} ${rawLn}`.trim();
       }
-      return record.contactNumber || record.Contact__contactNumber || record.email || record.Contact__email || stringValue;
-    }
-    if (objectType === 'Account') {
-      return record.accountName || record.Account__accountName || record.accountNumber || stringValue;
-    }
-    if (objectType === 'User') {
-      return record.name || record.email || stringValue;
-    }
-    if (objectType === 'Property') {
-      return record.propertyNumber || record.Property__propertyNumber || record.name || stringValue;
-    }
-    if (objectType === 'Lead') {
-      const leadNum = record.leadNumber || record.Lead__leadNumber;
-      const contactName = record.contactName || record.Lead__contactName;
-      const leadFn = record.firstName || record.Lead__firstName || '';
-      const leadLn = record.lastName || record.Lead__lastName || '';
-      const rawLn = leadLn && leadLn !== 'N/A' ? leadLn : '';
-      const leadName = contactName || `${leadFn} ${rawLn}`.trim();
-      if (leadNum && leadName) return `${leadNum} - ${leadName}`;
-      return leadNum || leadName || record.name || stringValue;
-    }
-    if (objectType === 'Opportunity') {
-      const oppNum = record.opportunityNumber || record.Opportunity__opportunityNumber;
-      const oppName = record.opportunityName || record.Opportunity__opportunityName;
-      if (oppNum && oppName) return `${oppNum} - ${oppName}`;
-      return oppNum || oppName || record.name || stringValue;
-    }
-    if (objectType === 'Product') {
-      return record.productName || record.name || stringValue;
-    }
-    if (objectType === 'Quote') {
-      return record.quoteNumber || record.quoteName || record.name || stringValue;
-    }
-    if (objectType === 'Project') {
-      return record.projectNumber || record.projectName || record.name || stringValue;
-    }
-    if (objectType === 'Service') {
-      return record.serviceNumber || record.name || stringValue;
-    }
-    if (objectType === 'Installation') {
-      return record.installationNumber || record.installationName || record.name || stringValue;
-    }
-    // Generic fallback - look for any name or number field
-    const keys = Object.keys(record);
-    const anyNameField = keys.find(k => k.toLowerCase().includes('name') && record[k]);
-    if (anyNameField) {
-      const nameVal = record[anyNameField];
-      if (typeof nameVal === 'object' && nameVal !== null) {
-        const resolved = resolveCompositeTextValue(nameVal);
-        if (resolved) return resolved;
+      if (objectType === 'User') {
+        return record.name || record.email || '';
       }
-      return String(nameVal);
+      const lower = objectType.charAt(0).toLowerCase() + objectType.slice(1);
+      const candidates = [`${objectType}__${lower}Name`, `${lower}Name`, 'title', 'name'];
+      for (const key of candidates) {
+        const val = record[key];
+        if (typeof val === 'string' && val.trim()) return val.trim();
+      }
+      const keys = Object.keys(record);
+      const anyNameField = keys.find(
+        (k) => k.toLowerCase().includes('name') && record[k] && typeof record[k] !== 'object',
+      );
+      return anyNameField ? String(record[anyNameField]) : '';
+    };
+
+    // Record number — Contact/Property use their own field names; everything
+    // else follows the generic `<object>Number` convention.
+    const getNumberValue = (): string => {
+      if (objectType === 'Contact') return record.contactNumber || record.Contact__contactNumber || '';
+      if (objectType === 'Property') return record.propertyNumber || record.Property__propertyNumber || '';
+      const lower = objectType.charAt(0).toLowerCase() + objectType.slice(1);
+      const candidates = [`${objectType}__${lower}Number`, `${lower}Number`];
+      for (const key of candidates) {
+        if (typeof record[key] === 'string' && record[key]) return record[key];
+      }
+      const keys = Object.keys(record);
+      const anyNumberField = keys.find((k) => k.toLowerCase().includes('number') && record[k]);
+      return anyNumberField ? String(record[anyNumberField]) : '';
+    };
+
+    const numberValue = getNumberValue();
+    const descriptiveName = getDescriptiveName();
+
+    // Work Order records mirror their own detail-page title: number only, no name.
+    if (objectType === 'WorkOrder') {
+      return numberValue || descriptiveName || stringValue;
     }
-    const anyNumberField = keys.find(k => k.toLowerCase().includes('number') && record[k]);
-    if (anyNumberField) return String(record[anyNumberField]);
-    
+
+    if (numberValue && descriptiveName && descriptiveName !== numberValue) {
+      return `${numberValue} (${descriptiveName})`;
+    }
+    if (numberValue) return numberValue;
+    if (descriptiveName) return descriptiveName;
+
     const fallbackName = record.name || record.label || record.title;
     if (fallbackName && typeof fallbackName === 'object') {
       const resolved = resolveCompositeTextValue(fallbackName);
