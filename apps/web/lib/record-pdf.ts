@@ -66,7 +66,7 @@ function getFontStyle(style: { bold?: boolean; italic?: boolean }): 'normal' | '
 }
 
 function getLabelFontStyle(style: LabelStyle): 'normal' | 'bold' | 'italic' | 'bolditalic' {
-  return getFontStyle({ ...style, bold: style.bold !== false });
+  return style.italic ? 'bolditalic' : 'bold';
 }
 
 function readRecordValue(
@@ -216,6 +216,10 @@ export async function generateRecordPdf({
         doc.setFont('helvetica', getLabelFontStyle(cell.labelStyle));
         doc.setFontSize(cell.labelFontSize);
         doc.text(label, x, labelY);
+        // Standard Helvetica-Bold can look close to regular text in browser
+        // PDF viewers. A very small second pass gives labels a clearly heavier
+        // weight without changing their configured size or layout.
+        doc.text(label, x + 0.08, labelY);
         doc.setTextColor(...valueColor);
         doc.setFont('helvetica', getFontStyle(cell.valueStyle));
         doc.setFontSize(cell.valueFontSize);
