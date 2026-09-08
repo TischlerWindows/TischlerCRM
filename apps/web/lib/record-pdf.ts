@@ -193,7 +193,7 @@ export async function generateRecordPdf({
     for (let index = 0; index < fields.length; index += 2) {
       const pair = fields.slice(index, index + 2);
       const cells = pair.map((field) => {
-        const labelFontSize = toPdfFontSize(field.labelStyle.fontSize, 9);
+        const labelFontSize = toPdfFontSize(field.labelStyle.fontSize, 11);
         const valueFontSize = toPdfFontSize(field.valueStyle.fontSize, 10.5);
         doc.setFont('helvetica', getFontStyle(field.valueStyle));
         doc.setFontSize(valueFontSize);
