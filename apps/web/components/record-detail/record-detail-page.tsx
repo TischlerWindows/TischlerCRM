@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -162,6 +163,36 @@ export default function RecordDetailPage({
       return next;
     });
   }, []);
+
+  // ── Print mode ────────────────────────────────────────────────────────
+  // window.print() (and Ctrl/Cmd+P) triggers the 'print' media query without
+  // any callback we control, so we listen for it directly: while printing,
+  // every tab renders at once (stacked, with headings) instead of just the
+  // active one, and every panel/widget renders expanded regardless of its
+  // interactive collapsed state — a print/PDF should show the whole record.
+  const [isPrintMode, setIsPrintMode] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia('print');
+    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => setIsPrintMode(e.matches);
+    handleChange(mql);
+    mql.addEventListener?.('change', handleChange);
+    // flushSync: React 18 batches state updates from native event listeners,
+    // which could otherwise leave the DOM in its pre-print state by the time
+    // the browser captures the page for the print/PDF preview.
+    const handleBeforePrint = () => flushSync(() => setIsPrintMode(true));
+    const handleAfterPrint = () => flushSync(() => setIsPrintMode(false));
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      mql.removeEventListener?.('change', handleChange);
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, []);
+  const noopToggle = useCallback(() => {}, []);
+  const noopSetSectionToggles = useCallback(() => {}, []);
+  const emptySet = useMemo(() => new Set<string>(), []);
+  const emptyObject = useMemo(() => ({}), []);
   const objectDef: ObjectDef | undefined = schema?.objects.find(
     (o) => o.apiName.toLowerCase() === objectApiName.toLowerCase(),
   );
@@ -553,7 +584,41 @@ export default function RecordDetailPage({
               );
             })()}
             {/* Render tabs */}
-            {pageLayout.tabs.length > 1
+            {isPrintMode
+              ? [...pageLayout.tabs]
+                  .filter((tab: any) => {
+                    if (tab.hideOnView || tab.hideOnExisting) return false;
+                    const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
+                    if (tabFx?.hidden) return false;
+                    return true;
+                  })
+                  .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
+                  .map((tab: any, idx: number) => (
+                    <div key={tab.id ?? idx} className="break-inside-avoid">
+                      {pageLayout.tabs.length > 1 && (
+                        <h2 className="mb-2 border-b border-gray-300 pb-1 text-base font-bold text-gray-900">
+                          {tab.label || `Tab ${idx + 1}`}
+                        </h2>
+                      )}
+                      <RecordTabRenderer
+                        tab={tab}
+                        tabIndex={idx}
+                        pageLayout={pageLayout}
+                        record={record}
+                        objectDef={objectDef}
+                        formulaValues={formulaValues}
+                        isLookupLoaded={isLookupLoaded}
+                        sectionToggles={emptyObject}
+                        setSectionToggles={noopSetSectionToggles}
+                        collapsedPanelIds={emptySet}
+                        togglePanelCollapse={noopToggle}
+                        manualPanelIds={emptySet}
+                        collapsedWidgetIds={emptySet}
+                        toggleWidgetCollapse={noopToggle}
+                      />
+                    </div>
+                  ))
+              : pageLayout.tabs.length > 1
               ? (() => {
                   const sortedTabsForRender = [...pageLayout.tabs]
                     .filter((tab: any) => {
