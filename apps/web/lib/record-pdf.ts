@@ -5,7 +5,14 @@ import {
   getFormattingEffectsForRegion,
   getFormattingEffectsForTab,
 } from './layout-formatting';
-import type { FieldDef, ObjectDef, PageLayout, PanelField } from './schema';
+import type {
+  FieldDef,
+  LabelStyle,
+  ObjectDef,
+  PageLayout,
+  PanelField,
+  ValueStyle,
+} from './schema';
 import { formatFieldValue } from './utils';
 
 interface GenerateRecordPdfOptions {
@@ -18,6 +25,8 @@ interface GenerateRecordPdfOptions {
 interface PdfField {
   label: string;
   value: string;
+  labelStyle: LabelStyle;
+  valueStyle: ValueStyle;
 }
 
 const NAVY = [30, 58, 95] as const;
@@ -28,6 +37,37 @@ const LINE = [209, 213, 219] as const;
 const PAGE_MARGIN = 16;
 const PAGE_TOP = 18;
 const PAGE_BOTTOM = 17;
+
+type PdfColor = readonly [number, number, number];
+
+function parseHexColor(color: string | undefined, fallback: PdfColor): PdfColor {
+  if (!color) return fallback;
+  const match = /^#?([\da-f]{3}|[\da-f]{6})$/i.exec(color.trim());
+  if (!match) return fallback;
+  const hex = match[1].length === 3
+    ? match[1].split('').map((character) => character + character).join('')
+    : match[1];
+  return [
+    Number.parseInt(hex.slice(0, 2), 16),
+    Number.parseInt(hex.slice(2, 4), 16),
+    Number.parseInt(hex.slice(4, 6), 16),
+  ];
+}
+
+function toPdfFontSize(pixelSize: number | undefined, fallback: number): number {
+  return pixelSize ? Math.max(6, pixelSize * 0.75) : fallback;
+}
+
+function getFontStyle(style: { bold?: boolean; italic?: boolean }): 'normal' | 'bold' | 'italic' | 'bolditalic' {
+  if (style.bold && style.italic) return 'bolditalic';
+  if (style.bold) return 'bold';
+  if (style.italic) return 'italic';
+  return 'normal';
+}
+
+function getLabelFontStyle(style: LabelStyle): 'normal' | 'bold' | 'italic' | 'bolditalic' {
+  return getFontStyle({ ...style, bold: style.bold !== false });
+}
 
 function readRecordValue(
   field: FieldDef,
@@ -69,6 +109,8 @@ function getVisibleFields(
       return [{
         label: placement.labelOverride || field.label,
         value: formatPdfValue(readRecordValue(field, record), field),
+        labelStyle: placement.labelStyle ?? {},
+        valueStyle: placement.valueStyle ?? {},
       }];
     });
 }
@@ -140,26 +182,44 @@ export async function generateRecordPdf({
     for (let index = 0; index < fields.length; index += 2) {
       const pair = fields.slice(index, index + 2);
       const cells = pair.map((field) => {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9.5);
+        const labelFontSize = toPdfFontSize(field.labelStyle.fontSize, 9);
+        const valueFontSize = toPdfFontSize(field.valueStyle.fontSize, 10.5);
+        doc.setFont('helvetica', getFontStyle(field.valueStyle));
+        doc.setFontSize(valueFontSize);
         return {
           ...field,
+          labelFontSize,
+          valueFontSize,
           lines: doc.splitTextToSize(field.value, columnWidth - 4) as string[],
         };
       });
-      const rowHeight = Math.max(14, ...cells.map((cell) => 8 + cell.lines.length * 4));
+      const rowHeight = Math.max(
+        14,
+        ...cells.map((cell) => 4 + cell.labelFontSize * 0.4 + cell.lines.length * cell.valueFontSize * 0.42),
+      );
       ensureSpace(rowHeight + 1);
 
       cells.forEach((cell, columnIndex) => {
         const x = PAGE_MARGIN + columnIndex * (columnWidth + gap);
-        doc.setTextColor(...MUTED);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7.5);
-        doc.text(cell.label.toUpperCase(), x, cursorY + 3);
-        doc.setTextColor(...TEXT);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9.5);
-        doc.text(cell.lines, x, cursorY + 8);
+        const label = cell.labelStyle.uppercase ? cell.label.toUpperCase() : cell.label;
+        const labelY = cursorY + 3.5;
+        const valueY = labelY + cell.labelFontSize * 0.42 + 2;
+        const labelColor = parseHexColor(cell.labelStyle.color, MUTED);
+        const valueColor = parseHexColor(cell.valueStyle.color, TEXT);
+
+        if (cell.valueStyle.background) {
+          doc.setFillColor(...parseHexColor(cell.valueStyle.background, [255, 255, 255]));
+          doc.roundedRect(x - 1, valueY - 3.5, columnWidth - 2, rowHeight - (valueY - cursorY), 1, 1, 'F');
+        }
+
+        doc.setTextColor(...labelColor);
+        doc.setFont('helvetica', getLabelFontStyle(cell.labelStyle));
+        doc.setFontSize(cell.labelFontSize);
+        doc.text(label, x, labelY);
+        doc.setTextColor(...valueColor);
+        doc.setFont('helvetica', getFontStyle(cell.valueStyle));
+        doc.setFontSize(cell.valueFontSize);
+        doc.text(cell.lines, x, valueY);
       });
 
       doc.setDrawColor(232, 234, 238);
