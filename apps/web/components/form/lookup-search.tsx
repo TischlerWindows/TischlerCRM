@@ -23,25 +23,37 @@ export function getRecordLabel(record: any): string {
     if (nameParts.length > 0) return nameParts.join(' ');
   }
 
-  // Handle simple name string
-  if (record.name && typeof record.name === 'string') return record.name;
+  // Combine "NUM (Name)" the same way the record detail page title does —
+  // matches the format used everywhere else a record is referenced.
+  const combine = (num: unknown, name: unknown): string | null => {
+    if (typeof num !== 'string' || !num) return null;
+    if (typeof name === 'string' && name && name !== num) return `${num} (${name})`;
+    return num;
+  };
 
-  if (record.title) return record.title;
+  const accountNum = record.accountNumber || record.Account__accountNumber;
+  const accountName = record.accountName || record.Account__accountName;
+  if (accountNum) {
+    const combined = combine(accountNum, accountName);
+    if (combined) return combined;
+  }
+  if (accountName) return accountName;
 
-  // Account name - check multiple variations
-  if (record.accountName) return record.accountName;
-  if (record.Account__accountName) return record.Account__accountName;
-
-  // Property number
+  // Property number (no separate name field — address goes in subtext)
   if (record.propertyNumber) return record.propertyNumber;
   if (record.Property__propertyNumber) return record.Property__propertyNumber;
 
-  // Account number as fallback for accounts
-  if (record.accountNumber) return record.accountNumber;
-
-  // Lead: show just lead number as label (contactName goes in subtext)
+  // Lead
   const leadNum = record.leadNumber || record.Lead__leadNumber;
-  if (leadNum) return leadNum;
+  if (leadNum) {
+    const leadContactName = record.contactName || record.Lead__contactName;
+    const leadFn = record.firstName || record.Lead__firstName || '';
+    const leadLn = record.lastName || record.Lead__lastName || '';
+    const rawLeadLn = leadLn && leadLn !== 'N/A' ? leadLn : '';
+    const leadName = leadContactName || `${leadFn} ${rawLeadLn}`.trim();
+    const combined = combine(leadNum, leadName);
+    if (combined) return combined;
+  }
 
   // Contact names
   if (record.firstName || record.lastName) {
@@ -49,13 +61,34 @@ export function getRecordLabel(record: any): string {
   }
   if (record.email) return record.email;
 
-  // Opportunity: show just opportunity number as label (name goes in subtext)
+  // Handle simple name string (after Contact/Lead — some non-number objects use it)
+  if (record.name && typeof record.name === 'string') return record.name;
+  if (record.title) return record.title;
+
+  // Opportunity
   const oppNum = record.opportunityNumber || record.Opportunity__opportunityNumber;
-  if (oppNum) return oppNum;
-  if (record.projectNumber) return record.projectNumber;
-  if (record.quoteNumber) return record.quoteNumber;
-  if (record.serviceNumber) return record.serviceNumber;
-  if (record.installationNumber) return record.installationNumber;
+  if (oppNum) {
+    const oppName = record.opportunityName || record.Opportunity__opportunityName;
+    const combined = combine(oppNum, oppName);
+    if (combined) return combined;
+  }
+  // Project / Quote / Service / Installation — all follow <object>Number + <object>Name
+  if (record.projectNumber) {
+    const combined = combine(record.projectNumber, record.projectName);
+    if (combined) return combined;
+  }
+  if (record.quoteNumber) {
+    const combined = combine(record.quoteNumber, record.quoteName);
+    if (combined) return combined;
+  }
+  if (record.serviceNumber) {
+    const combined = combine(record.serviceNumber, record.serviceName);
+    if (combined) return combined;
+  }
+  if (record.installationNumber) {
+    const combined = combine(record.installationNumber, record.installationName);
+    if (combined) return combined;
+  }
   if (record.productName) return record.productName;
 
   // Handle address - could be string or object
@@ -120,10 +153,17 @@ export function getRecordLabel(record: any): string {
   );
   if (emailKey && record[emailKey]) return record[emailKey];
 
-  // Final fallback - use any "name" or "number" field
-  const anyNameField = keys.find(
-    (key) => key.toLowerCase().includes('name') && record[key],
+  // Final fallback - use any "name" or "number" field, combined if both exist
+  const anyNumberField = keys.find(
+    (key) => key.toLowerCase().includes('number') && record[key],
   );
+  const anyNameField = keys.find(
+    (key) => key.toLowerCase().includes('name') && record[key] && typeof record[key] !== 'object',
+  );
+  if (anyNumberField && record[anyNumberField]) {
+    const combined = combine(record[anyNumberField], anyNameField ? record[anyNameField] : undefined);
+    if (combined) return combined;
+  }
   if (anyNameField && record[anyNameField]) {
     const val = record[anyNameField];
     if (typeof val === 'object' && val !== null) {
@@ -145,11 +185,6 @@ export function getRecordLabel(record: any): string {
     }
     return String(val);
   }
-  const anyNumberField = keys.find(
-    (key) => key.toLowerCase().includes('number') && record[key],
-  );
-  if (anyNumberField && record[anyNumberField])
-    return String(record[anyNumberField]);
 
   return String(record.id || 'Record');
 }
@@ -196,24 +231,6 @@ export function getRecordSubtext(record: any): string {
   // Contact: show email as subtext
   const email = record.email || record.Contact__email;
   if (email && typeof email === 'string') return email;
-
-  // Lead: show contactName as subtext
-  const leadContactName = record.contactName || record.Lead__contactName;
-  if (leadContactName) return leadContactName;
-  const leadFn = record.firstName || record.Lead__firstName || '';
-  const leadLn = record.lastName || record.Lead__lastName || '';
-  const rawLeadLn = leadLn && leadLn !== 'N/A' ? leadLn : '';
-  const leadFullName = `${leadFn} ${rawLeadLn}`.trim();
-  if (leadFullName) return leadFullName;
-
-  // Opportunity: show opportunity name as subtext
-  const oppName = record.opportunityName || record.Opportunity__opportunityName;
-  if (oppName) return oppName;
-
-  // Account: show account number as subtext
-  if (record.accountNumber || record.Account__accountNumber) {
-    return record.accountNumber || record.Account__accountNumber;
-  }
 
   return '';
 }
