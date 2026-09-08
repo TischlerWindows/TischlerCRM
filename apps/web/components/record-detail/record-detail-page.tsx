@@ -245,29 +245,46 @@ export default function RecordDetailPage({
   const isLookupLoaded = useLookupPreloader(objectDef);
 
   // ── Build a display title from the record ────────────────────────────
+  // Every object mirrors the Opportunity format: "NUM (Descriptive Name)".
   const getRecordTitle = (): string => {
     if (!record) return '';
-
-    // Opportunity records: show as "OPP#### (Opp Name)"
-    if (objectApiName === 'Opportunity') {
-      const rawOppNum = record.Opportunity__opportunityNumber || record.opportunityNumber || '';
-      // Strip "- Requote N" suffix from the number — the name already carries that info
-      const oppNum = rawOppNum.replace(/\s*-\s*Requote\s+\d+$/i, '');
-      const oppName = record.Opportunity__opportunityName || record.opportunityName || '';
-      if (oppNum && oppName) return `${oppNum} (${oppName})`;
-      if (oppNum) return oppNum;
-    }
 
     const numberKey = Object.keys(record).find(
       (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k],
     );
-    if (numberKey) return record[numberKey];
-    if (record.name && typeof record.name === 'string') return record.name;
-    // CompositeText name (e.g. Contact's Salutation/First/Last) — the subtitle
-    // resolver already handles this; reuse its output as the title when the
-    // record has no number.
-    const subtitle = getRecordSubtitle();
-    if (subtitle) return subtitle;
+    let numberValue: string = numberKey ? record[numberKey] : '';
+    // Opportunity: strip "- Requote N" suffix — the name already carries that info
+    if (objectApiName === 'Opportunity' && numberValue) {
+      numberValue = numberValue.replace(/\s*-\s*Requote\s+\d+$/i, '');
+    }
+
+    // Descriptive name candidates, in priority order:
+    // 1. <object>Name field (opportunityName, projectName, accountName, serviceName, quoteName, installationName, ...)
+    // 2. 'title' (Work Order)
+    // 3. 'name' (Account's generic name field)
+    // 4. The subtitle resolver (composite name, first/last name, email — covers Contact/Lead)
+    const lowerFirst = objectApiName.charAt(0).toLowerCase() + objectApiName.slice(1);
+    const nameCandidateKeys = [
+      `${objectApiName}__${lowerFirst}Name`,
+      `${lowerFirst}Name`,
+      'title',
+      'name',
+    ];
+    let descriptiveName = '';
+    for (const key of nameCandidateKeys) {
+      const val = record[key];
+      if (typeof val === 'string' && val.trim()) {
+        descriptiveName = val.trim();
+        break;
+      }
+    }
+    if (!descriptiveName) descriptiveName = getRecordSubtitle();
+
+    if (numberValue && descriptiveName && descriptiveName !== numberValue) {
+      return `${numberValue} (${descriptiveName})`;
+    }
+    if (numberValue) return numberValue;
+    if (descriptiveName) return descriptiveName;
     return `Untitled ${objectDef?.label ?? 'Record'}`;
   };
 
@@ -435,7 +452,7 @@ export default function RecordDetailPage({
                       {objectDef?.label ?? 'Record'}
                     </div>
                     <h1 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight truncate">{title}</h1>
-                    {subtitle && subtitle !== title && (
+                    {subtitle && subtitle !== title && !title.includes(subtitle) && (
                       <p className="text-sm text-gray-500 truncate">{subtitle}</p>
                     )}
                     {objectApiName === 'Opportunity' && params?.id && (
