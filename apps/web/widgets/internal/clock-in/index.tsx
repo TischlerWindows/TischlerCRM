@@ -101,12 +101,25 @@ function TaskCell({
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const otherEditorRef = useRef<HTMLDivElement>(null)
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null)
 
   useEffect(() => {
     setSelected(parseTaskValues(entry.tasks))
     setOtherResponse(entry.taskOtherResponse || '')
   }, [entry.tasks, entry.taskOtherResponse])
+
+  // On narrow screens the table scrolls horizontally, so the Other editor
+  // (which sits to the right of the dropdown, further right than the visible
+  // viewport) can appear "cut off" until the user manually scrolls the table.
+  // Bring it into view automatically the moment it appears.
+  useEffect(() => {
+    if (!selected.includes('Other')) return
+    const id = window.setTimeout(() => {
+      otherEditorRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'end', block: 'nearest' })
+    }, 50)
+    return () => window.clearTimeout(id)
+  }, [selected.includes('Other')])
 
   useEffect(() => {
     if (!open) return
@@ -205,7 +218,7 @@ function TaskCell({
         )}
       </div>
       {selected.includes('Other') && (
-        <div className="w-48 shrink-0 sm:w-72">
+        <div ref={otherEditorRef} className="w-48 shrink-0 sm:w-72">
           <BodyEditor value={otherResponse} onChange={setOtherResponse} placeholder="Describe the task..." minHeight={70} />
           <button type="button" onClick={save} disabled={saving} className="mt-1 whitespace-nowrap rounded border border-brand-navy px-2 py-1 text-[11px] font-medium text-brand-navy hover:bg-brand-navy/5 disabled:opacity-60 sm:px-2.5 sm:text-xs">
             {saving ? 'Saving...' : 'Save Other Task'}
