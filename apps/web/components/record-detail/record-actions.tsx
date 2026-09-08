@@ -30,6 +30,8 @@ export interface RecordActionsProps {
   visibleActions: Array<'edit' | 'delete' | 'clone' | 'print' | 'requote' | 'proposal'>;
   /** Called after a successful edit to update parent state */
   onRecordUpdated: (raw: RecordData, flat: Record<string, any>) => void;
+  /** Optional extra classes for the button-row wrapper (e.g. 'print:hidden') */
+  className?: string;
 }
 
 /**
@@ -51,6 +53,7 @@ export function RecordActions({
   canCustomize,
   visibleActions,
   onRecordUpdated,
+  className,
 }: RecordActionsProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -340,7 +343,7 @@ export function RecordActions({
   return (
     <>
       {/* Action buttons */}
-      <div className="flex flex-wrap items-center gap-2 shrink-0">
+      <div className={`flex flex-wrap items-center gap-2 shrink-0${className ? ` ${className}` : ''}`}>
         {showEdit && canEdit && (
           <button
             onClick={handleEdit}

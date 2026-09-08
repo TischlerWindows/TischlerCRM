@@ -208,7 +208,7 @@ export function InlineEditToolbar() {
   if (!ctx || !ctx.editingAll) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-brand-navy/20 bg-white px-6 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+    <div className="print:hidden fixed inset-x-0 bottom-0 z-50 border-t border-brand-navy/20 bg-white px-6 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
       <div className="relative flex items-center justify-center">
         <span className="absolute left-0 text-base font-medium text-brand-navy">Editing fields&hellip;</span>
         <div className="flex items-center gap-4">

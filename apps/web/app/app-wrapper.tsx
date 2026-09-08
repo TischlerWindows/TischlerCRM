@@ -296,7 +296,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     <div className="h-dvh flex flex-col bg-brand-light overflow-hidden">
       {/* Impersonation banner */}
       {isImpersonating && (
-        <div className="bg-amber-500 text-white text-xs font-semibold px-4 py-1.5 flex items-center justify-between z-[60]">
+        <div className="print:hidden bg-amber-500 text-white text-xs font-semibold px-4 py-1.5 flex items-center justify-between z-[60]">
           <span>You are logged in as <strong>{user?.name ?? user?.email}</strong></span>
           <button
             onClick={() => { returnToAdmin(); window.location.href = '/settings/users'; }}
@@ -307,7 +307,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
         </div>
       )}
       {/* Global Header — Salesforce-style navy bar */}
-      <header className="bg-brand-navy px-4 py-0 flex items-center justify-between sticky top-0 z-50 h-[48px] shadow-md">
+      <header className="print:hidden bg-brand-navy px-4 py-0 flex items-center justify-between sticky top-0 z-50 h-[48px] shadow-md">
         {/* Left: Logo + App Name */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <Link href="/" className="flex items-center gap-2.5 group" title="Home">
@@ -514,7 +514,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
 
       {/* Tab Navigation Row — Salesforce-style app launcher tabs (hidden on settings pages) */}
       {isLoaded && !pathname?.startsWith('/settings') && (
-        <nav className="bg-white border-b border-gray-200 px-4 flex items-center justify-between sticky top-[48px] z-40 h-[40px]">
+        <nav className="print:hidden bg-white border-b border-gray-200 px-4 flex items-center justify-between sticky top-[48px] z-40 h-[40px]">
           <div className="flex items-center gap-0 overflow-x-auto flex-1 h-full scrollbar-hide">
             {filteredTabs.map((item) => {
               const isActive = pathname === item.href || 

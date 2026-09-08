@@ -60,7 +60,7 @@ function RequoteVersionSelector({ objectApiName, recordId }: { objectApiName: st
   const current = versions.find((v) => v.isCurrent);
 
   return (
-    <div className="relative mt-1">
+    <div className="print:hidden relative mt-1">
       <button
         onClick={() => setOpen(!open)}
         className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
@@ -438,7 +438,7 @@ export default function RecordDetailPage({
         <div className="mb-8">
           <Link
             href={effectiveBackRoute}
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
+            className="print:hidden inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
             {effectiveBackLabel}
@@ -478,6 +478,7 @@ export default function RecordDetailPage({
                   canCustomize={canCustomize}
                   visibleActions={visibleActions}
                   onRecordUpdated={handleRecordUpdated}
+                  className="print:hidden"
                 />
               </div>
 
@@ -533,7 +534,7 @@ export default function RecordDetailPage({
                   (a.order ?? 0) - (b.order ?? 0),
                 );
               return (
-                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                <div className="print:hidden flex items-center gap-2 overflow-x-auto pb-1">
                   {sortedTabsForNav.map((tab: any, idx: number) => (
                     <button
                       key={tab.id ?? idx}

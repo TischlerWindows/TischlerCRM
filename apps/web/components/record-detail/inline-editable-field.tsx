@@ -109,7 +109,7 @@ export function InlineEditableField({ fieldDef, value, children, formData }: Inl
         type="button"
         onClick={(e) => startEditAll(e.currentTarget.parentElement as HTMLElement)}
         aria-label={`Edit ${fieldDef.label}`}
-        className="shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-brand-navy"
+        className="print:hidden shrink-0 rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-brand-navy"
       >
         <Pencil className="h-3 w-3" />
       </button>

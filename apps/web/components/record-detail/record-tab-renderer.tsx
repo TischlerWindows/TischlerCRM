@@ -387,8 +387,8 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                 >
                   <span className="text-sm font-semibold text-gray-700" style={headerStyle}>{panel.label}</span>
                   {isPanelCollapsed
-                    ? <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
-                    : <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+                    ? <ChevronRight className="print:hidden h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+                    : <ChevronDown className="print:hidden h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
                   }
                 </button>
                 {!isPanelCollapsed && (
@@ -472,8 +472,8 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
               >
                 <span className="text-sm font-semibold text-gray-700" style={headerStyle}>{panel.label}</span>
                 {isPanelCollapsed
-                  ? <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
-                  : <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+                  ? <ChevronRight className="print:hidden h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+                  : <ChevronDown className="print:hidden h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
                 }
               </button>
               {!isPanelCollapsed && (
@@ -824,9 +824,9 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
             ) : null}
           </div>
           {isCollapsed ? (
-            <ChevronRight className="h-4 w-4 text-gray-500" aria-hidden="true" />
+            <ChevronRight className="print:hidden h-4 w-4 text-gray-500" aria-hidden="true" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-gray-500" aria-hidden="true" />
+            <ChevronDown className="print:hidden h-4 w-4 text-gray-500" aria-hidden="true" />
           )}
         </button>
 

@@ -278,6 +278,46 @@ body {
   }
 }
 
+/* ====================================================================
+   PRINT — turns "Print" into a clean, formattable document instead of
+   a screenshot of the app chrome. Individual interactive controls
+   (nav bars, buttons, pencils, chevrons) are hidden via print:hidden
+   in the relevant components; this block handles page-level polish
+   that can't be expressed with a Tailwind utility class alone.
+   ==================================================================== */
+@media print {
+  html, body {
+    background: #fff !important;
+  }
+
+  /* Un-stick any fixed/sticky chrome so it can't repeat on every page
+     or overlap content — belt-and-braces alongside print:hidden. */
+  header, nav, .fixed, .sticky {
+    position: static !important;
+  }
+
+  /* Flatten card chrome into plain document sections */
+  .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
+    box-shadow: none !important;
+  }
+
+  /* Avoid splitting a panel/section awkwardly across a page break */
+  .rounded-lg.border, .rounded-xl.border {
+    break-inside: avoid;
+  }
+
+  /* Links: print as plain text, not underlined/colored hyperlinks */
+  a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  /* Reclaim the full page width — no need for the app's max-width gutters */
+  .min-h-screen {
+    min-height: 0 !important;
+  }
+}
+
 /* Hide number input spinners globally */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
