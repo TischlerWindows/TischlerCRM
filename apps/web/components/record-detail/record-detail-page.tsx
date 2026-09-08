@@ -501,6 +501,7 @@ export default function RecordDetailPage({
                   backRoute={effectiveBackRoute}
                   record={record}
                   rawRecord={rawRecord}
+                  pdfRecord={{ ...record, ...formulaValues }}
                   pageLayout={pageLayout}
                   objectDef={objectDef}
                   title={title}

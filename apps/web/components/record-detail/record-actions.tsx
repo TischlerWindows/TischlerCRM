@@ -3,13 +3,14 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Edit, Trash2, Database, ChevronDown, Settings, ExternalLink, Copy, Printer, RefreshCw, FileText } from 'lucide-react';
+import { Edit, Trash2, Database, ChevronDown, Settings, ExternalLink, Copy, RefreshCw, FileText } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/toast';
 import { PageLayout, type ObjectDef } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
+import { generateRecordPdf } from '@/lib/record-pdf';
 import { assembleProposal } from '@crm/proposal-assembly';
 import { findSummaryForOpportunity, getSavedSummaries } from '@/lib/proposal-summary-resolver';
 
@@ -20,6 +21,8 @@ export interface RecordActionsProps {
   backRoute: string;
   record: Record<string, any> | null;
   rawRecord: RecordData | null;
+  /** Record data augmented with computed formula values for PDF rendering. */
+  pdfRecord?: Record<string, unknown>;
   pageLayout: PageLayout | null;
   objectDef: ObjectDef | undefined;
   title: string;
@@ -45,6 +48,7 @@ export function RecordActions({
   backRoute,
   record,
   rawRecord,
+  pdfRecord,
   pageLayout,
   objectDef,
   title,
@@ -64,6 +68,7 @@ export function RecordActions({
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [isRequoting, setIsRequoting] = useState(false);
+  const [isGeneratingRecordPdf, setIsGeneratingRecordPdf] = useState(false);
   const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
   const [showRequotePrompt, setShowRequotePrompt] = useState(false);
   const [requoteName, setRequoteName] = useState('');
@@ -200,8 +205,38 @@ export function RecordActions({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!record || !objectDef || !pageLayout) {
+      showToast('No page layout found for this record.', 'error');
+      return;
+    }
+
+    const previewWindow = window.open('', '_blank');
+    setIsGeneratingRecordPdf(true);
+    try {
+      const { blob, filename } = await generateRecordPdf({
+        objectDef,
+        pageLayout,
+        record: pdfRecord ?? record,
+        title,
+      });
+      const url = URL.createObjectURL(blob);
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url;
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      previewWindow?.close();
+      const message = error instanceof Error ? error.message : 'Failed to generate PDF preview.';
+      showToast(message, 'error');
+    } finally {
+      setIsGeneratingRecordPdf(false);
+    }
   };
 
   const readLookupId = (value: unknown): string => {
@@ -385,11 +420,14 @@ export function RecordActions({
         )}
         {showPrint && (
           <button
-            onClick={handlePrint}
-            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            onClick={() => void handlePrint()}
+            disabled={isGeneratingRecordPdf}
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Printer className="w-3.5 h-3.5 sm:mr-1" />
-            <span className="hidden sm:inline">Print</span>
+            <FileText className="w-3.5 h-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">
+              {isGeneratingRecordPdf ? 'Preparing...' : 'Preview PDF'}
+            </span>
           </button>
         )}
         {showDelete && canDelete && (
