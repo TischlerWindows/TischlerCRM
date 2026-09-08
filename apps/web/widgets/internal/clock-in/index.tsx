@@ -450,7 +450,7 @@ export default function ClockInWidget({ record }: WidgetProps) {
 
       {entries.length > 0 && (
         <div className="-mx-px overflow-x-auto border-t border-gray-100">
-          <table className="w-full min-w-[1140px] table-auto text-[11px] sm:text-xs">
+          <table className="w-full min-w-[1140px] table-auto text-[11px] sm:min-w-[1520px] sm:text-xs">
             <thead className="whitespace-nowrap bg-gray-50 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-[11px]">
               <tr>
                 <th className="px-2 py-2 sm:px-4">Employee</th>
