@@ -205,7 +205,7 @@ function TaskCell({
         )}
       </div>
       {selected.includes('Other') && (
-        <div className="w-40 shrink-0 sm:w-72">
+        <div className="w-48 shrink-0 sm:w-72">
           <BodyEditor value={otherResponse} onChange={setOtherResponse} placeholder="Describe the task..." minHeight={70} />
           <button type="button" onClick={save} disabled={saving} className="mt-1 whitespace-nowrap rounded border border-brand-navy px-2 py-1 text-[11px] font-medium text-brand-navy hover:bg-brand-navy/5 disabled:opacity-60 sm:px-2.5 sm:text-xs">
             {saving ? 'Saving...' : 'Save Other Task'}
@@ -450,7 +450,7 @@ export default function ClockInWidget({ record }: WidgetProps) {
 
       {entries.length > 0 && (
         <div className="-mx-px overflow-x-auto border-t border-gray-100">
-          <table className="w-full min-w-[1100px] table-auto text-[11px] sm:text-xs">
+          <table className="w-full min-w-[1140px] table-auto text-[11px] sm:text-xs">
             <thead className="whitespace-nowrap bg-gray-50 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-[11px]">
               <tr>
                 <th className="px-2 py-2 sm:px-4">Employee</th>
@@ -459,7 +459,7 @@ export default function ClockInWidget({ record }: WidgetProps) {
                 <th className="px-2 py-2 sm:px-4">Clock Out Time</th>
                 <th className="px-2 py-2 sm:px-4">Clock Out Location</th>
                 <th className="px-2 py-2 text-right sm:px-4">Duration</th>
-                <th className="w-[320px] px-2 py-2 sm:w-[520px] sm:px-4">Tasks</th>
+                <th className="w-[360px] px-2 py-2 sm:w-[520px] sm:px-4">Tasks</th>
                 <th className="px-2 py-2 text-right sm:px-4">Actions</th>
               </tr>
             </thead>

@@ -164,7 +164,7 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
         className="border border-gray-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-brand-navy/20 focus-within:border-brand-navy/40"
         onFocus={onFocus}
       >
-      <div className="flex items-center gap-0.5 px-1.5 py-1 border-b border-gray-200 bg-gray-50">
+      <div className="flex flex-wrap items-center gap-0.5 px-1.5 py-1 border-b border-gray-200 bg-gray-50">
         <ToolbarBtn
           active={editor.isActive('bold')}
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -221,7 +221,7 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
           ))}
         </select>
         {placeholder && (
-          <span className="ml-auto text-[10px] text-gray-400 pr-1">{placeholder}</span>
+          <span className="ml-auto hidden text-[10px] text-gray-400 pr-1 sm:inline">{placeholder}</span>
         )}
       </div>
       <div
