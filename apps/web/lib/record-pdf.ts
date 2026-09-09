@@ -165,7 +165,7 @@ export async function generateRecordPdf({
 
   const drawSectionHeading = (label: string, level: 'tab' | 'panel') => {
     const heading = label.toUpperCase();
-    const height = level === 'tab' ? 10 : 8;
+    const height = level === 'tab' ? 10 : 11;
     ensureSpace(height + 4);
     if (level === 'tab') {
       cursorY += 3;
@@ -180,9 +180,9 @@ export async function generateRecordPdf({
       doc.setDrawColor(...LINE);
       doc.rect(PAGE_MARGIN, cursorY, contentWidth, height, 'FD');
       doc.setTextColor(...TEXT);
-      doc.setFontSize(11);
+      doc.setFontSize(13);
       doc.setFont('helvetica', 'bold');
-      doc.text(heading, PAGE_MARGIN + 3, cursorY + 5.5);
+      doc.text(heading, PAGE_MARGIN + 3, cursorY + 7);
     }
     cursorY += height + 2;
   };
@@ -291,7 +291,7 @@ export async function generateRecordPdf({
     for (const { panel, fields } of visiblePanels) {
       drawSectionHeading(panel.label || 'Information', 'panel');
       drawFieldRows(fields);
-      cursorY += 2;
+      cursorY += 6;
     }
   }
 
