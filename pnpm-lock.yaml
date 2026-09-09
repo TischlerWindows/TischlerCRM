@@ -190,6 +190,9 @@ importers:
       html-react-parser:
         specifier: ^5.1.18
         version: 5.2.17(@types/react@18.2.21)(react@18.2.0)
+      html2canvas:
+        specifier: ^1.4.1
+        version: 1.4.1
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.2
@@ -6595,8 +6598,7 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
-  base64-arraybuffer@1.0.2:
-    optional: true
+  base64-arraybuffer@1.0.2: {}
 
   base64-js@0.0.8: {}
 
@@ -6779,7 +6781,6 @@ snapshots:
   css-line-break@2.1.0:
     dependencies:
       utrie: 1.0.2
-    optional: true
 
   css-select@5.2.2:
     dependencies:
@@ -7669,7 +7670,6 @@ snapshots:
     dependencies:
       css-line-break: 2.1.0
       text-segmentation: 1.0.3
-    optional: true
 
   htmlparser2@10.1.0:
     dependencies:
@@ -9483,7 +9483,6 @@ snapshots:
   text-segmentation@1.0.3:
     dependencies:
       utrie: 1.0.2
-    optional: true
 
   text-table@0.2.0: {}
 
@@ -9695,7 +9694,6 @@ snapshots:
   utrie@1.0.2:
     dependencies:
       base64-arraybuffer: 1.0.2
-    optional: true
 
   v8-to-istanbul@9.3.0:
     dependencies:

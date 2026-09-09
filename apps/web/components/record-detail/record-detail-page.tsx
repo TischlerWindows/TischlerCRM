@@ -183,10 +183,21 @@ export default function RecordDetailPage({
     const handleAfterPrint = () => flushSync(() => setIsPrintMode(false));
     window.addEventListener('beforeprint', handleBeforePrint);
     window.addEventListener('afterprint', handleAfterPrint);
+    // The "Print View"/"Print Page" PDF actions (record-actions.tsx) generate
+    // a PDF from raw data rather than calling window.print(), but still need
+    // every tab's widgets fully rendered (and expanded) so they can be
+    // rasterized into the PDF — dispatched instead of a prop since RecordActions
+    // and RecordDetailPage don't otherwise share this piece of state.
+    const handlePdfModeChange = (e: Event) => {
+      const active = !!(e as CustomEvent<{ active: boolean }>).detail?.active;
+      flushSync(() => setIsPrintMode(active));
+    };
+    window.addEventListener('crm:record-pdf-mode', handlePdfModeChange);
     return () => {
       mql.removeEventListener?.('change', handleChange);
       window.removeEventListener('beforeprint', handleBeforePrint);
       window.removeEventListener('afterprint', handleAfterPrint);
+      window.removeEventListener('crm:record-pdf-mode', handlePdfModeChange);
     };
   }, []);
   const noopToggle = useCallback(() => {}, []);
