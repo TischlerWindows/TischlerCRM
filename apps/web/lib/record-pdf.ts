@@ -61,15 +61,11 @@ function toPdfFontSize(pixelSize: number | undefined, fallback: number): number 
   return pixelSize ? Math.max(6, pixelSize * 0.75) : fallback;
 }
 
-function getFontStyle(style: { bold?: boolean; italic?: boolean }): 'normal' | 'bold' | 'italic' | 'bolditalic' {
-  if (style.bold && style.italic) return 'bolditalic';
-  if (style.bold) return 'bold';
-  if (style.italic) return 'italic';
-  return 'normal';
-}
-
-function getLabelFontStyle(style: LabelStyle): 'normal' | 'bold' | 'italic' | 'bolditalic' {
-  return getFontStyle({ ...style, bold: style.bold !== false });
+// Labels always bold in print — some page layouts set labelStyle.bold to
+// false for on-screen de-emphasis, which printed inconsistently
+// field-to-field. Print keeps every field heading bold for consistency.
+function getLabelFontStyle(style: LabelStyle): 'bold' | 'bolditalic' {
+  return style.italic ? 'bolditalic' : 'bold';
 }
 
 // Values intentionally never bold — some page layouts set valueStyle.bold
