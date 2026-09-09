@@ -1,5 +1,5 @@
 'use client'
-import { Plus, Minus, Users, RefreshCw, Save, Loader2 } from 'lucide-react'
+import { Plus, Minus, Users, RefreshCw, Save, Loader2, FileText } from 'lucide-react'
 
 interface ToolbarProps {
   startDate: string | null
@@ -7,16 +7,18 @@ interface ToolbarProps {
   weekCount: number
   isDirty: boolean
   saving: boolean
+  generatingPdf?: boolean
   onAddWeek: () => void
   onRemoveWeek: () => void
   onManageTechnicians: () => void
   onRecalculate: () => void
   onSave: () => void
+  onPreviewPdf: () => void
 }
 
 export function Toolbar({
-  startDate, endDate, weekCount, isDirty, saving,
-  onAddWeek, onRemoveWeek, onManageTechnicians, onRecalculate, onSave,
+  startDate, endDate, weekCount, isDirty, saving, generatingPdf,
+  onAddWeek, onRemoveWeek, onManageTechnicians, onRecalculate, onSave, onPreviewPdf,
 }: ToolbarProps) {
   const formatDate = (d: string | null) => {
     if (!d) return '—'
@@ -46,6 +48,10 @@ export function Toolbar({
       </button>
       <button onClick={onRecalculate} className="text-xs px-2 py-1 bg-[#f0f1f9] text-brand-navy border border-blue-200 rounded hover:bg-blue-50 transition-colors flex items-center gap-1">
         <RefreshCw className="w-3 h-3" /> Recalculate
+      </button>
+      <button onClick={onPreviewPdf} disabled={generatingPdf} className="text-xs px-2 py-1 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex items-center gap-1 text-gray-700 disabled:opacity-50">
+        {generatingPdf ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+        Preview PDF
       </button>
       <button onClick={onSave} disabled={!isDirty && !saving} className="text-xs px-3 py-1 bg-brand-navy text-white rounded hover:bg-brand-navy/90 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed font-semibold relative">
         {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}

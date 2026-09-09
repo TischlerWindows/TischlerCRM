@@ -16,6 +16,7 @@ import { VarianceReportTab } from './components/variance-report-tab'
 import { ExecutiveSummaryTab } from './components/executive-summary-tab'
 import { TechnicianModal } from './components/technician-modal'
 import { num } from './utils/calculations'
+import { generateInstallationReportPdf } from './utils/pdf'
 
 type Tab = 'costs' | 'technicians' | 'variance' | 'executive'
 
@@ -30,6 +31,7 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
 
   const [activeTab, setActiveTab] = useState<Tab>('costs')
   const [techModalOpen, setTechModalOpen] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -71,6 +73,32 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
     { id: 'executive', label: 'Executive Summary' },
   ]
 
+  const handlePreviewPdf = async () => {
+    const previewWindow = window.open('', '_blank')
+    setGeneratingPdf(true)
+    try {
+      const { blob } = await generateInstallationReportPdf({
+        installationData: instData,
+        costs: data.costs,
+        techExpenses: data.techExpenses,
+      })
+      const url = URL.createObjectURL(blob)
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url
+      } else {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'Installation_Report.pdf'
+        link.click()
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch {
+      previewWindow?.close()
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Installation Header */}
@@ -97,11 +125,13 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
         weekCount={data.weekCount}
         isDirty={isDirty}
         saving={saving}
+        generatingPdf={generatingPdf}
         onAddWeek={addWeek}
         onRemoveWeek={removeWeek}
         onManageTechnicians={() => setTechModalOpen(true)}
         onRecalculate={recalculate}
         onSave={save}
+        onPreviewPdf={() => void handlePreviewPdf()}
       />
 
       <div className="flex gap-0 border-b-2 border-gray-200">

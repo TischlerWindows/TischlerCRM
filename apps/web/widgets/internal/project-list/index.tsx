@@ -19,9 +19,10 @@
  * multiple top-level table columns.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { Loader2, AlertCircle, Save, Table2 } from 'lucide-react'
+import { Loader2, AlertCircle, Save, Table2, FileText } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService } from '@/lib/records-service'
+import { generateProjectListPdf } from './pdf'
 
 type FieldType = 'text' | 'textarea' | 'date' | 'number' | 'checkbox' | 'select'
 
@@ -217,11 +218,13 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
   const [values, setValues] = useState<Record<string, any>>({})
   const [initialValues, setInitialValues] = useState<Record<string, any>>({})
   const [projectName, setProjectName] = useState('')
+  const [projectNumber, setProjectNumber] = useState('')
   // Read-only values derived from related records (see FieldDef.computed).
   const [computedValues, setComputedValues] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const load = useCallback(async () => {
     if (!recordId) return
@@ -237,6 +240,7 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       const next: Record<string, any> = {}
       for (const key of ALL_KEYS) next[key] = flat[key] ?? ''
       setProjectName(flat.projectName || '')
+      setProjectNumber(flat.projectNumber || '')
 
       // Auto-fill Salesman/Location from the Project's related Opportunity/Property,
       // but only when the Project doesn't already have its own saved value — users can
@@ -324,6 +328,35 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
       setSaving(false)
     }
   }, [recordId, isDirty, values, initialValues])
+
+  const handlePreviewPdf = async () => {
+    const previewWindow = window.open('', '_blank')
+    setGeneratingPdf(true)
+    try {
+      const { blob } = await generateProjectListPdf({
+        title: 'Project List',
+        projectName,
+        projectNumber,
+        groups: GROUPS,
+        values,
+      })
+      const url = URL.createObjectURL(blob)
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url
+      } else {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'Project_List.pdf'
+        link.click()
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      previewWindow?.close()
+      setError(err instanceof Error ? err.message : 'Failed to generate PDF preview')
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
 
   if (object?.apiName && object.apiName !== 'Project') {
     return (
@@ -444,14 +477,24 @@ export default function ProjectListWidget({ record, object }: WidgetProps) {
             <p className="text-xs text-gray-500">Customer: {projectName || '—'}</p>
           </div>
         </div>
-        <button
-          onClick={save}
-          disabled={!isDirty || saving}
-          className="text-xs px-4 py-1.5 bg-brand-navy text-white rounded hover:bg-brand-navy/90 transition-colors flex items-center gap-1.5 font-semibold disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          {isDirty ? 'Save Changes' : 'Saved'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void handlePreviewPdf()}
+            disabled={generatingPdf}
+            className="text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex items-center gap-1.5 font-semibold text-gray-700 disabled:opacity-50"
+          >
+            {generatingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+            Preview PDF
+          </button>
+          <button
+            onClick={save}
+            disabled={!isDirty || saving}
+            className="text-xs px-4 py-1.5 bg-brand-navy text-white rounded hover:bg-brand-navy/90 transition-colors flex items-center gap-1.5 font-semibold disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {isDirty ? 'Save Changes' : 'Saved'}
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto border border-gray-200 rounded-lg" role="table">
