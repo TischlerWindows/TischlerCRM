@@ -8,9 +8,10 @@ import { apiClient } from '@/lib/api-client';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/toast';
-import { PageLayout, type ObjectDef } from '@/lib/schema';
+import { PageLayout, type LayoutTab, type ObjectDef } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { generateRecordPdf } from '@/lib/record-pdf';
+import { getFormattingEffectsForTab } from '@/lib/layout-formatting';
 import { assembleProposal } from '@crm/proposal-assembly';
 import { findSummaryForOpportunity, getSavedSummaries } from '@/lib/proposal-summary-resolver';
 
@@ -72,6 +73,17 @@ export function RecordActions({
   const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
   const [showRequotePrompt, setShowRequotePrompt] = useState(false);
   const [requoteName, setRequoteName] = useState('');
+  const [showPrintPageMenu, setShowPrintPageMenu] = useState(false);
+
+  // Tabs a user can print individually — same visibility rules as the record
+  // detail page's tab nav (hideOnView + formatting-rule hidden effects).
+  const printableTabs = (pageLayout?.tabs ?? [])
+    .filter((tab: LayoutTab) => {
+      if (tab.hideOnView || tab.hideOnExisting) return false;
+      const data = (record ?? {}) as Record<string, unknown>;
+      return !getFormattingEffectsForTab(pageLayout, tab.id, data)?.hidden;
+    })
+    .sort((a: LayoutTab, b: LayoutTab) => (a.order ?? 0) - (b.order ?? 0));
 
   // Auto-open edit form when navigated with ?edit=true (e.g. after requote)
   useEffect(() => {
@@ -205,12 +217,13 @@ export function RecordActions({
     }
   };
 
-  const handlePrint = async () => {
+  const handlePrint = async (tab?: { id: string; label: string }) => {
     if (!record || !objectDef || !pageLayout) {
       showToast('No page layout found for this record.', 'error');
       return;
     }
 
+    setShowPrintPageMenu(false);
     const previewWindow = window.open('', '_blank');
     setIsGeneratingRecordPdf(true);
     try {
@@ -218,7 +231,8 @@ export function RecordActions({
         objectDef,
         pageLayout,
         record: pdfRecord ?? record,
-        title,
+        title: tab ? `${title} - ${tab.label}` : title,
+        onlyTabId: tab?.id,
       });
       const url = URL.createObjectURL(blob);
       if (previewWindow && !previewWindow.closed) {
@@ -429,6 +443,35 @@ export function RecordActions({
               {isGeneratingRecordPdf ? 'Preparing...' : 'Print View'}
             </span>
           </button>
+        )}
+        {showPrint && printableTabs.length > 1 && (
+          <div className="relative">
+            <button
+              onClick={() => setShowPrintPageMenu((prev) => !prev)}
+              disabled={isGeneratingRecordPdf}
+              className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <FileText className="w-3.5 h-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Print Page</span>
+              <ChevronDown className="w-3.5 h-3.5 ml-1" />
+            </button>
+            {showPrintPageMenu && (
+              <>
+                <div className="fixed inset-0 z-overlay" onClick={() => setShowPrintPageMenu(false)} />
+                <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-modal max-h-72 overflow-y-auto">
+                  {printableTabs.map((tab: LayoutTab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => void handlePrint({ id: tab.id, label: tab.label || 'Tab' })}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      {tab.label || 'Tab'}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         )}
         {showDelete && canDelete && (
           <button

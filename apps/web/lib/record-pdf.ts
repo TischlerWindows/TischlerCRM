@@ -20,6 +20,8 @@ interface GenerateRecordPdfOptions {
   pageLayout: PageLayout;
   record: Record<string, unknown>;
   title: string;
+  /** When set, only this tab (by id) is rendered instead of the whole record. */
+  onlyTabId?: string;
 }
 
 interface PdfField {
@@ -135,6 +137,7 @@ export async function generateRecordPdf({
   pageLayout,
   record,
   title,
+  onlyTabId,
 }: GenerateRecordPdfOptions): Promise<{ blob: Blob; filename: string }> {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
@@ -257,6 +260,7 @@ export async function generateRecordPdf({
   cursorY += 7;
 
   const tabs = [...pageLayout.tabs]
+    .filter((tab) => !onlyTabId || tab.id === onlyTabId)
     .filter((tab) => {
       if (tab.hideOnView || tab.hideOnExisting) return false;
       return !getFormattingEffectsForTab(pageLayout, tab.id, record)?.hidden;
