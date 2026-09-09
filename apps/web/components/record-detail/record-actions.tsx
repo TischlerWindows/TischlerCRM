@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/toast';
 import { PageLayout, type LayoutTab, type ObjectDef } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
-import { generateRecordPdf } from '@/lib/record-pdf';
+import { generateRecordPdf, pageLayoutHasWidgets } from '@/lib/record-pdf';
 import { getFormattingEffectsForTab } from '@/lib/layout-formatting';
 import { assembleProposal } from '@crm/proposal-assembly';
 import { findSummaryForOpportunity, getSavedSummaries } from '@/lib/proposal-summary-resolver';
@@ -229,9 +229,12 @@ export function RecordActions({
     // Switch RecordDetailPage into print mode so every tab/panel/widget is
     // mounted, expanded, and rendered with real data before we rasterize
     // widget content off the live DOM (see captureElementCanvas in record-pdf.ts).
+    const needsWidgetSettle = pageLayoutHasWidgets(pageLayout, tab?.id);
     window.dispatchEvent(new CustomEvent('crm:record-pdf-mode', { detail: { active: true } }));
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 800));
+      if (needsWidgetSettle) {
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+      }
       const { blob, filename } = await generateRecordPdf({
         objectDef,
         pageLayout,
