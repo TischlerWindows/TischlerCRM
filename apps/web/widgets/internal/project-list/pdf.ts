@@ -78,7 +78,7 @@ export async function generateProjectListPdf(params: {
   };
 
   const drawGroupHeading = (label: string) => {
-    ensureSpace(14);
+    ensureSpace(16);
     cursorY += 3;
     doc.setFillColor(...NAVY);
     doc.rect(PAGE_MARGIN, cursorY, contentWidth, 10, 'F');
@@ -86,21 +86,21 @@ export async function generateProjectListPdf(params: {
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text(label.toUpperCase(), PAGE_MARGIN + 3, cursorY + 6.5);
-    cursorY += 12;
+    // Clearance below the bar generous enough for a field label's ascenders
+    // to never visually collide with the bar's bottom edge.
+    cursorY += 15;
   };
 
-  const drawColumn = (column: ProjectListPdfColumn) => {
-    ensureSpace(8);
-    doc.setTextColor(...TEXT);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text(column.title, PAGE_MARGIN, cursorY);
-    cursorY += 5.5;
-
+  // Column titles duplicate each field's own label for the common
+  // single-field case (e.g. column "TUS Order #" -> field "TUS Order #"),
+  // and compound columns already bake their context into each field's own
+  // label (e.g. "Change Order — Row 1") — so columns are flattened into one
+  // field list per group instead of a separate title + fields.
+  const drawFieldRows = (fields: ProjectListPdfField[]) => {
     const gap = 5;
     const columnWidth = (contentWidth - gap) / 2;
-    for (let index = 0; index < column.fields.length; index += 2) {
-      const pair = column.fields.slice(index, index + 2);
+    for (let index = 0; index < fields.length; index += 2) {
+      const pair = fields.slice(index, index + 2);
       const cells = pair.map((field) => {
         const value = formatValue(field, values[field.key]);
         doc.setFont('helvetica', 'normal');
@@ -127,7 +127,6 @@ export async function generateProjectListPdf(params: {
       doc.line(PAGE_MARGIN, cursorY + rowHeight, pageWidth - PAGE_MARGIN, cursorY + rowHeight);
       cursorY += rowHeight + 1;
     }
-    cursorY += 3;
   };
 
   drawPageHeader();
@@ -148,15 +147,15 @@ export async function generateProjectListPdf(params: {
   cursorY += 7;
 
   for (const group of groups) {
-    const hasAnyValue = group.columns.some((column) =>
-      column.fields.some((field) => {
-        const raw = values[field.key];
-        return raw !== undefined && raw !== null && raw !== '' && raw !== false;
-      }),
-    );
+    const fields = group.columns.flatMap((column) => column.fields);
+    const hasAnyValue = fields.some((field) => {
+      const raw = values[field.key];
+      return raw !== undefined && raw !== null && raw !== '' && raw !== false;
+    });
     if (!hasAnyValue) continue;
     drawGroupHeading(group.title);
-    for (const column of group.columns) drawColumn(column);
+    drawFieldRows(fields);
+    cursorY += 3;
   }
 
   const pageCount = doc.getNumberOfPages();
