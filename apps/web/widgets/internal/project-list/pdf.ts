@@ -77,56 +77,65 @@ export async function generateProjectListPdf(params: {
     if (cursorY + height > pageHeight - PAGE_BOTTOM) addPage();
   };
 
-  const drawGroupHeading = (label: string) => {
-    ensureSpace(16);
-    cursorY += 3;
-    doc.setFillColor(...NAVY);
-    doc.rect(PAGE_MARGIN, cursorY, contentWidth, 10, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text(label.toUpperCase(), PAGE_MARGIN + 3, cursorY + 6.5);
-    // Clearance below the bar generous enough for a field label's ascenders
-    // to never visually collide with the bar's bottom edge.
-    cursorY += 15;
-  };
+  const CARD_GAP = 5;
+  const CARD_WIDTH = (contentWidth - CARD_GAP) / 2;
+  const CARD_HEADER_HEIGHT = 8;
 
   // Column titles duplicate each field's own label for the common
   // single-field case (e.g. column "TUS Order #" -> field "TUS Order #"),
   // and compound columns already bake their context into each field's own
-  // label (e.g. "Change Order — Row 1") — so columns are flattened into one
-  // field list per group instead of a separate title + fields.
-  const drawFieldRows = (fields: ProjectListPdfField[]) => {
-    const gap = 5;
-    const columnWidth = (contentWidth - gap) / 2;
-    for (let index = 0; index < fields.length; index += 2) {
-      const pair = fields.slice(index, index + 2);
-      const cells = pair.map((field) => {
-        const value = formatValue(field, values[field.key]);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9.5);
-        return { field, value, lines: doc.splitTextToSize(value, columnWidth - 4) as string[] };
-      });
-      const rowHeight = Math.max(11, ...cells.map((cell) => 6 + cell.lines.length * 4.2));
-      ensureSpace(rowHeight + 1);
+  // label (e.g. "Change Order — Row 1") — so a group's fields are flattened
+  // into one single-column list per card, matching the widget's own
+  // one-field-per-row layout inside each "Order Info"/"Product Type" panel.
+  const measureFieldHeight = (field: ProjectListPdfField, width: number): number => {
+    const value = formatValue(field, values[field.key]);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    const lines = doc.splitTextToSize(value, width - 6) as string[];
+    return Math.max(11, 6 + lines.length * 4.2);
+  };
 
-      cells.forEach((cell, columnIndex) => {
-        const x = PAGE_MARGIN + columnIndex * (columnWidth + gap);
-        doc.setTextColor(...MUTED);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.text(cell.field.label.toUpperCase(), x, cursorY + 3);
-        doc.setTextColor(...TEXT);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9.5);
-        doc.text(cell.lines, x, cursorY + 8);
-      });
+  const measureCardHeight = (fields: ProjectListPdfField[], width: number): number => {
+    let height = CARD_HEADER_HEIGHT;
+    for (const field of fields) height += measureFieldHeight(field, width);
+    return height;
+  };
 
-      doc.setDrawColor(...LINE);
-      doc.setLineWidth(0.2);
-      doc.line(PAGE_MARGIN, cursorY + rowHeight, pageWidth - PAGE_MARGIN, cursorY + rowHeight);
-      cursorY += rowHeight + 1;
-    }
+  const drawCard = (x: number, y: number, width: number, label: string, fields: ProjectListPdfField[]) => {
+    const height = measureCardHeight(fields, width);
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.2);
+    doc.rect(x, y, width, height);
+
+    doc.setFillColor(242, 244, 247);
+    doc.rect(x, y, width, CARD_HEADER_HEIGHT, 'F');
+    doc.setTextColor(...TEXT);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(label.toUpperCase(), x + 3, y + 5.5);
+
+    let rowY = y + CARD_HEADER_HEIGHT;
+    fields.forEach((field, index) => {
+      const rowHeight = measureFieldHeight(field, width);
+      const value = formatValue(field, values[field.key]);
+      const lines = doc.splitTextToSize(value, width - 6) as string[];
+
+      doc.setTextColor(...MUTED);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.text(field.label.toUpperCase(), x + 3, rowY + 3.5);
+      doc.setTextColor(...TEXT);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.text(lines, x + 3, rowY + 8.5);
+
+      if (index < fields.length - 1) {
+        doc.setDrawColor(...LINE);
+        doc.setLineWidth(0.2);
+        doc.line(x, rowY + rowHeight, x + width, rowY + rowHeight);
+      }
+      rowY += rowHeight;
+    });
   };
 
   drawPageHeader();
@@ -146,16 +155,27 @@ export async function generateProjectListPdf(params: {
   doc.text(`Generated ${new Date().toLocaleString()}`, PAGE_MARGIN, cursorY);
   cursorY += 7;
 
-  for (const group of groups) {
-    const fields = group.columns.flatMap((column) => column.fields);
-    const hasAnyValue = fields.some((field) => {
+  // Only groups with at least one populated field are shown, then paired
+  // left/right exactly like the widget's own `grid-cols-2` layout (which
+  // fills left-to-right, top-to-bottom in declaration order).
+  const populatedGroups = groups
+    .map((group) => ({ label: group.title, fields: group.columns.flatMap((column) => column.fields) }))
+    .filter((group) => group.fields.some((field) => {
       const raw = values[field.key];
       return raw !== undefined && raw !== null && raw !== '' && raw !== false;
-    });
-    if (!hasAnyValue) continue;
-    drawGroupHeading(group.title);
-    drawFieldRows(fields);
-    cursorY += 3;
+    }));
+
+  for (let index = 0; index < populatedGroups.length; index += 2) {
+    const left = populatedGroups[index]!;
+    const right = populatedGroups[index + 1];
+    const leftHeight = measureCardHeight(left.fields, CARD_WIDTH);
+    const rightHeight = right ? measureCardHeight(right.fields, CARD_WIDTH) : 0;
+    ensureSpace(Math.max(leftHeight, rightHeight));
+
+    drawCard(PAGE_MARGIN, cursorY, CARD_WIDTH, left.label, left.fields);
+    if (right) drawCard(PAGE_MARGIN + CARD_WIDTH + CARD_GAP, cursorY, CARD_WIDTH, right.label, right.fields);
+
+    cursorY += Math.max(leftHeight, rightHeight) + CARD_GAP;
   }
 
   const pageCount = doc.getNumberOfPages();
