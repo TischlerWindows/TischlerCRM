@@ -72,6 +72,13 @@ function getLabelFontStyle(style: LabelStyle): 'normal' | 'bold' | 'italic' | 'b
   return getFontStyle({ ...style, bold: style.bold !== false });
 }
 
+// Values intentionally never bold — some page layouts set valueStyle.bold
+// for on-screen emphasis, which printed inconsistently field-to-field and
+// read as a rendering glitch. Print keeps bold reserved for headings only.
+function getValueFontStyle(style: ValueStyle): 'normal' | 'italic' {
+  return style.italic ? 'italic' : 'normal';
+}
+
 function hasFieldValue(value: unknown): boolean {
   if (value === null || value === undefined || value === '' || value === 'N/A') return false;
   if (Array.isArray(value)) return value.length > 0;
@@ -198,7 +205,7 @@ export async function generateRecordPdf({
       const cells = pair.map((field) => {
         const labelFontSize = toPdfFontSize(field.labelStyle.fontSize, 11);
         const valueFontSize = toPdfFontSize(field.valueStyle.fontSize, 10.5);
-        doc.setFont('helvetica', getFontStyle(field.valueStyle));
+        doc.setFont('helvetica', getValueFontStyle(field.valueStyle));
         doc.setFontSize(valueFontSize);
         return {
           ...field,
@@ -231,7 +238,7 @@ export async function generateRecordPdf({
         doc.setFontSize(cell.labelFontSize);
         doc.text(label, x, labelY);
         doc.setTextColor(...valueColor);
-        doc.setFont('helvetica', getFontStyle(cell.valueStyle));
+        doc.setFont('helvetica', getValueFontStyle(cell.valueStyle));
         doc.setFontSize(cell.valueFontSize);
         doc.text(cell.lines, x, valueY);
       });
