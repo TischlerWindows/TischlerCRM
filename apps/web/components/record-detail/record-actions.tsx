@@ -426,7 +426,7 @@ export function RecordActions({
           >
             <FileText className="w-3.5 h-3.5 sm:mr-1" />
             <span className="hidden sm:inline">
-              {isGeneratingRecordPdf ? 'Preparing...' : 'Preview PDF'}
+              {isGeneratingRecordPdf ? 'Preparing...' : 'Print View'}
             </span>
           </button>
         )}

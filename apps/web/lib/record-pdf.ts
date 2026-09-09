@@ -180,7 +180,7 @@ export async function generateRecordPdf({
       doc.setDrawColor(...LINE);
       doc.rect(PAGE_MARGIN, cursorY, contentWidth, height, 'FD');
       doc.setTextColor(...TEXT);
-      doc.setFontSize(9.5);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
       doc.text(heading, PAGE_MARGIN + 3, cursorY + 5.5);
     }
