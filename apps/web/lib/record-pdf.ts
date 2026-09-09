@@ -61,11 +61,11 @@ function toPdfFontSize(pixelSize: number | undefined, fallback: number): number 
   return pixelSize ? Math.max(6, pixelSize * 0.75) : fallback;
 }
 
-// Labels always bold in print — some page layouts set labelStyle.bold to
-// false for on-screen de-emphasis, which printed inconsistently
-// field-to-field. Print keeps every field heading bold for consistency.
-function getLabelFontStyle(style: LabelStyle): 'bold' | 'bolditalic' {
-  return style.italic ? 'bolditalic' : 'bold';
+// Labels never bold in print — matches field values so per-field
+// labelStyle.bold configured for on-screen emphasis doesn't print
+// inconsistently field-to-field. Section/panel headings stay bold.
+function getLabelFontStyle(style: LabelStyle): 'normal' | 'italic' {
+  return style.italic ? 'italic' : 'normal';
 }
 
 // Values intentionally never bold — some page layouts set valueStyle.bold
