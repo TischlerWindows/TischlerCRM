@@ -13,7 +13,7 @@ import type {
   PanelField,
   ValueStyle,
 } from './schema';
-import { formatFieldValue } from './utils';
+import { formatFieldValue, resolveLookupDisplayName } from './utils';
 
 interface GenerateRecordPdfOptions {
   objectDef: ObjectDef;
@@ -95,6 +95,13 @@ function readRecordValue(
 
 function formatPdfValue(value: unknown, field: FieldDef): string {
   if (field.type === 'EncryptedText' && value) return '********';
+  if (value && (field.type === 'Lookup' || field.type === 'ExternalLookup' || field.type === 'LookupUser')) {
+    const lookupObject = field.lookupObject || (field.type === 'LookupUser' ? 'User' : undefined);
+    if (lookupObject) {
+      const resolved = resolveLookupDisplayName(value, lookupObject);
+      if (resolved && resolved !== '-') return resolved;
+    }
+  }
   const formatted = formatFieldValue(value, field.type, field.lookupObject);
   return formatted || '-';
 }
