@@ -50,6 +50,7 @@ import { specPresetRoutes } from './routes/spec-presets.js';
 import { specVariantRoutes } from './routes/spec-variants.js';
 import { tokenMappingRoutes } from './routes/token-mappings.js';
 import { proposalPdfRoutes } from './routes/proposal-pdf.js';
+import { projectListPdfRoutes } from './routes/project-list-pdf.js';
 import { seedCategoriesIfMissing } from './lib/support-tickets/categories.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -541,6 +542,7 @@ export function buildApp() {
   app.register(specVariantRoutes);
   app.register(tokenMappingRoutes);
   app.register(proposalPdfRoutes);
+  app.register(projectListPdfRoutes);
 
   // Start the Postgres LISTEN connection so notify() events broadcast
   // from any process reach SSE subscribers on this process.
