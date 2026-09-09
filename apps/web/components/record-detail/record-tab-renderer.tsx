@@ -376,7 +376,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
             };
 
             return (
-              <div key={panel.id} data-print-panel-id={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm">
+              <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm">
                 <button
                   type="button"
                   onClick={() => togglePanelCollapse(panel.id)}
@@ -619,16 +619,14 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
 
         {/* Widgets */}
         {sortedWidgets.length > 0 && (
-          <div data-print-region-widgets={region.id}>
-            <LayoutWidgetsInline
-              widgets={sortedWidgets as any}
-              enabledIds={enabledWidgetIds}
-              record={record ?? undefined}
-              objectDef={buildObjectDefPayload(objectDef)}
-              collapsedWidgetIds={collapsedWidgetIds}
-              toggleWidgetCollapse={toggleWidgetCollapse}
-            />
-          </div>
+          <LayoutWidgetsInline
+            widgets={sortedWidgets as any}
+            enabledIds={enabledWidgetIds}
+            record={record ?? undefined}
+            objectDef={buildObjectDefPayload(objectDef)}
+            collapsedWidgetIds={collapsedWidgetIds}
+            toggleWidgetCollapse={toggleWidgetCollapse}
+          />
         )}
       </div>
     );

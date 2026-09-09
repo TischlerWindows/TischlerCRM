@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/toast';
 import { PageLayout, type LayoutTab, type ObjectDef } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
-import { generateRecordPdf, pageLayoutHasWidgets } from '@/lib/record-pdf';
+import { generateRecordPdf } from '@/lib/record-pdf';
 import { getFormattingEffectsForTab } from '@/lib/layout-formatting';
 import { assembleProposal } from '@crm/proposal-assembly';
 import { findSummaryForOpportunity, getSavedSummaries } from '@/lib/proposal-summary-resolver';
@@ -226,15 +226,7 @@ export function RecordActions({
     setShowPrintPageMenu(false);
     const previewWindow = window.open('', '_blank');
     setIsGeneratingRecordPdf(true);
-    // Switch RecordDetailPage into print mode so every tab/panel/widget is
-    // mounted, expanded, and rendered with real data before we rasterize
-    // widget content off the live DOM (see captureElementCanvas in record-pdf.ts).
-    const needsWidgetSettle = pageLayoutHasWidgets(pageLayout, tab?.id);
-    window.dispatchEvent(new CustomEvent('crm:record-pdf-mode', { detail: { active: true } }));
     try {
-      if (needsWidgetSettle) {
-        await new Promise((resolve) => window.setTimeout(resolve, 500));
-      }
       const { blob, filename } = await generateRecordPdf({
         objectDef,
         pageLayout,
@@ -257,7 +249,6 @@ export function RecordActions({
       const message = error instanceof Error ? error.message : 'Failed to generate PDF preview.';
       showToast(message, 'error');
     } finally {
-      window.dispatchEvent(new CustomEvent('crm:record-pdf-mode', { detail: { active: false } }));
       setIsGeneratingRecordPdf(false);
     }
   };

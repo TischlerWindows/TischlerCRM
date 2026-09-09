@@ -142,64 +142,6 @@ function safeFilename(value: string): string {
   return safe || 'Record';
 }
 
-// Widgets (RelatedList, ProjectList, InstallationCostGrid, maps, etc.) are
-// arbitrary React UI that can't be reconstructed from raw record data, so
-// they're rasterized from their live, already-rendered DOM node instead —
-// record-tab-renderer.tsx tags each one with a matching data attribute.
-//
-// Widgets render on-screen at full desktop width; screenshotting them as-is
-// and squeezing that into a page-width PDF image shrinks their text far
-// below the rest of the document. Instead, the element is temporarily
-// resized to the PDF's actual print width first — a "preset render view"
-// that lets the widget reflow (narrower internal columns, larger relative
-// text) exactly like it will appear on the page — then captured at that size.
-const PRINT_DPI = 96;
-
-async function captureElementCanvas(selector: string, targetWidthMM: number): Promise<HTMLCanvasElement | null> {
-  if (typeof document === 'undefined') return null;
-  const el = document.querySelector<HTMLElement>(selector);
-  if (!el || el.getClientRects().length === 0) return null;
-
-  const targetWidthPx = Math.round((targetWidthMM / 25.4) * PRINT_DPI);
-  const prevWidth = el.style.width;
-  const prevMaxWidth = el.style.maxWidth;
-  el.style.width = `${targetWidthPx}px`;
-  el.style.maxWidth = `${targetWidthPx}px`;
-  try {
-    // Let layout settle into the new width before snapshotting. Uses
-    // setTimeout, not requestAnimationFrame — rAF is suspended in
-    // background tabs, and the print preview window we just opened via
-    // window.open() backgrounds this tab, which would hang forever.
-    await new Promise((resolve) => window.setTimeout(resolve, 50));
-    const html2canvas = (await import('html2canvas')).default;
-    const canvas = await html2canvas(el, { scale: 1.5, backgroundColor: '#ffffff', useCORS: true, logging: false });
-    return canvas.width > 0 && canvas.height > 0 ? canvas : null;
-  } catch {
-    return null;
-  } finally {
-    el.style.width = prevWidth;
-    el.style.maxWidth = prevMaxWidth;
-  }
-}
-
-/**
- * Structural check (no formatting-rule evaluation, no record data needed) —
- * used by the print button to skip the widget-settle delay entirely for
- * records with no widget content, since that's the common case.
- */
-export function pageLayoutHasWidgets(pageLayout: PageLayout, onlyTabId?: string): boolean {
-  const tabs = pageLayout.tabs.filter((tab) => !onlyTabId || tab.id === onlyTabId);
-  for (const tab of tabs) {
-    for (const region of tab.regions ?? []) {
-      if ((region.widgets ?? []).some((w) => w.widgetType !== 'HeaderHighlights')) return true;
-      for (const panel of region.panels ?? []) {
-        if (panel.panelType === 'components' && (panel.widgets ?? []).length > 0) return true;
-      }
-    }
-  }
-  return false;
-}
-
 export async function generateRecordPdf({
   objectDef,
   pageLayout,
@@ -311,37 +253,6 @@ export async function generateRecordPdf({
     }
   };
 
-  // Draws a rasterized widget, sliced across page breaks as needed since a
-  // single doc.addImage() call can't span multiple pages on its own.
-  const drawCanvasBlock = (canvas: HTMLCanvasElement) => {
-    const pxPerMM = canvas.width / contentWidth;
-    let offsetPx = 0;
-    let remainingPx = canvas.height;
-    while (remainingPx > 0) {
-      const availableMM = pageHeight - PAGE_BOTTOM - cursorY;
-      if (availableMM < 15) {
-        addPage();
-        continue;
-      }
-      const slicePx = Math.min(remainingPx, Math.floor(availableMM * pxPerMM));
-      if (slicePx <= 0) {
-        addPage();
-        continue;
-      }
-      const sliceCanvas = document.createElement('canvas');
-      sliceCanvas.width = canvas.width;
-      sliceCanvas.height = slicePx;
-      const ctx = sliceCanvas.getContext('2d');
-      ctx?.drawImage(canvas, 0, offsetPx, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
-      const sliceHeightMM = slicePx / pxPerMM;
-      doc.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', PAGE_MARGIN, cursorY, contentWidth, sliceHeightMM);
-      cursorY += sliceHeightMM + 2;
-      offsetPx += slicePx;
-      remainingPx -= slicePx;
-      if (remainingPx > 0) addPage();
-    }
-  };
-
   drawPageHeader();
   doc.setTextColor(...MUTED);
   doc.setFont('helvetica', 'bold');
@@ -367,76 +278,34 @@ export async function generateRecordPdf({
     .sort((left, right) => left.order - right.order);
 
   for (const tab of tabs) {
-    const regions = [...(tab.regions ?? [])]
+    const visiblePanels = [...(tab.regions ?? [])]
       .filter((region) => {
         if (region.hidden || region.hideOnView || region.hideOnExisting) return false;
         if (region.visibleIf?.length && !evaluateVisibility(region.visibleIf, record)) return false;
         return !getFormattingEffectsForRegion(pageLayout, region.id, record)?.hidden;
       })
-      .sort((left, right) => left.gridRow - right.gridRow || left.gridColumn - right.gridColumn);
-
-    // Field panels and widget (component) panels/regions are interleaved in
-    // on-screen order — widgets are captured from their live DOM node
-    // (data-print-panel-id / data-print-region-widgets, set by
-    // record-tab-renderer.tsx) since their content can't be derived from
-    // raw record data alone.
-    type PdfBlock =
-      | { kind: 'fields'; label: string; fields: PdfField[] }
-      | { kind: 'widget'; label: string; selector: string };
-    const blocks: PdfBlock[] = [];
-
-    for (const region of regions) {
-      const panels = [...(region.panels ?? [])]
+      .sort((left, right) => left.gridRow - right.gridRow || left.gridColumn - right.gridColumn)
+      .flatMap((region) => [...(region.panels ?? [])]
         .filter((panel) => {
-          if (panel.hidden || panel.hideOnView || panel.hideOnExisting) return false;
+          if (panel.panelType === 'components' || panel.hidden || panel.hideOnView || panel.hideOnExisting) {
+            return false;
+          }
           if (panel.visibleIf?.length && !evaluateVisibility(panel.visibleIf, record)) return false;
           return !getFormattingEffectsForPanel(pageLayout, panel.id, record)?.hidden;
         })
-        .sort((left, right) => left.order - right.order);
+        .sort((left, right) => left.order - right.order)
+        .map((panel) => ({
+          panel,
+          fields: getVisibleFields(panel.fields ?? [], objectDef, pageLayout, record),
+        })))
+      .filter(({ fields }) => fields.some((field) => field.populated));
 
-      for (const panel of panels) {
-        if (panel.panelType === 'components') {
-          if ((panel.widgets ?? []).length > 0) {
-            blocks.push({
-              kind: 'widget',
-              label: panel.label || 'Widgets',
-              selector: `[data-print-panel-id="${panel.id}"]`,
-            });
-          }
-          continue;
-        }
-        const fields = getVisibleFields(panel.fields ?? [], objectDef, pageLayout, record);
-        if (fields.some((field) => field.populated)) {
-          blocks.push({ kind: 'fields', label: panel.label || 'Information', fields });
-        }
-      }
-
-      const regionWidgets = (region.widgets ?? []).filter(
-        (widget) => !widget.hideOnView && !widget.hideOnExisting && widget.widgetType !== 'HeaderHighlights',
-      );
-      if (regionWidgets.length > 0) {
-        blocks.push({
-          kind: 'widget',
-          label: region.label || 'Widgets',
-          selector: `[data-print-region-widgets="${region.id}"]`,
-        });
-      }
-    }
-
-    if (blocks.length === 0) continue;
+    if (visiblePanels.length === 0) continue;
     drawSectionHeading(tab.label || 'Details', 'tab');
-    for (const block of blocks) {
-      if (block.kind === 'fields') {
-        drawSectionHeading(block.label, 'panel');
-        drawFieldRows(block.fields);
-        cursorY += 6;
-      } else {
-        const canvas = await captureElementCanvas(block.selector, contentWidth);
-        if (!canvas) continue;
-        drawSectionHeading(block.label, 'panel');
-        drawCanvasBlock(canvas);
-        cursorY += 6;
-      }
+    for (const { panel, fields } of visiblePanels) {
+      drawSectionHeading(panel.label || 'Information', 'panel');
+      drawFieldRows(fields);
+      cursorY += 6;
     }
   }
 
