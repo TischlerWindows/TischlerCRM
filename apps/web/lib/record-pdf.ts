@@ -166,8 +166,11 @@ async function captureElementCanvas(selector: string, targetWidthMM: number): Pr
   el.style.width = `${targetWidthPx}px`;
   el.style.maxWidth = `${targetWidthPx}px`;
   try {
-    // Let layout settle into the new width before snapshotting.
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    // Let layout settle into the new width before snapshotting. Uses
+    // setTimeout, not requestAnimationFrame — rAF is suspended in
+    // background tabs, and the print preview window we just opened via
+    // window.open() backgrounds this tab, which would hang forever.
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
     const html2canvas = (await import('html2canvas')).default;
     const canvas = await html2canvas(el, { scale: 1.5, backgroundColor: '#ffffff', useCORS: true, logging: false });
     return canvas.width > 0 && canvas.height > 0 ? canvas : null;
