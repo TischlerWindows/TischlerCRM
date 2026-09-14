@@ -191,7 +191,7 @@ function EditableCell({
       type="button"
       onClick={startEdit}
       disabled={saving}
-      className="w-full text-left rounded px-1 py-0.5 -mx-1 hover:bg-brand-navy/5 disabled:opacity-50 truncate"
+      className="w-full text-left rounded px-1 py-0.5 -mx-1 hover:bg-brand-navy/5 disabled:opacity-50 whitespace-normal break-words"
       title={type === 'textarea' ? display : undefined}
     >
       {display}
@@ -528,7 +528,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
               {rows.map((row, i) => (
                 <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   {ALL_FIELDS.map((f) => (
-                    <td key={f.key} className="px-1.5 py-1 border-b border-gray-100 align-top min-w-[5rem]">
+                    <td key={f.key} className="px-1.5 py-1 border-b border-gray-100 align-top min-w-[5rem] max-w-[18rem] whitespace-normal break-words">
                       <EditableCell
                         value={row.data?.[f.key]}
                         type={f.type}
