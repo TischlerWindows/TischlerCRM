@@ -69,7 +69,20 @@ const NEW_INFO_RIGHT_FIELDS: FieldDef[] = [
   INFO_FIELDS[6]!,
 ]
 
-const ALL_FIELDS = [...INFO_FIELDS, ...COMMENT_FIELDS]
+const ALL_FIELDS = [
+  INFO_FIELDS[0]!,
+  INFO_FIELDS[1]!,
+  INFO_FIELDS[2]!,
+  INFO_FIELDS[3]!,
+  INFO_FIELDS[4]!,
+  INFO_FIELDS[5]!,
+  INFO_FIELDS[7]!,
+  INFO_FIELDS[8]!,
+  INFO_FIELDS[9]!,
+  INFO_FIELDS[10]!,
+  INFO_FIELDS[6]!,
+  ...COMMENT_FIELDS,
+]
 
 function toDateInputValue(v: unknown): string {
   if (!v) return ''
