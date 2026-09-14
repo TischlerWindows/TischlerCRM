@@ -6,7 +6,7 @@ import type { WidgetManifest } from '@/lib/widgets/types'
 export const config: WidgetManifest = {
   id: 'punch-list',
   name: 'Punch List',
-  description: 'Punch list items for this Project — inline-editable grid with a New Punch List form',
+  description: 'Punch list items for this Work Order — inline-editable grid with a New Punch List form',
   icon: 'ListChecks',
   category: 'internal',
   integration: null,

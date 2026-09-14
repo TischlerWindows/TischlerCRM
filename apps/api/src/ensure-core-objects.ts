@@ -282,7 +282,7 @@ const CORE_OBJECTS = [
     apiName: 'PunchList',
     label: 'Punch List',
     pluralLabel: 'Punch Lists',
-    description: 'Punch list items tracked against a Project',
+    description: 'Punch list items tracked against a Work Order',
     fields: [
       { apiName: 'punchListName', label: 'Punch List Name', type: 'Text', required: true },
       { apiName: 'itemNumber', label: 'Item#', type: 'Text' },
@@ -301,7 +301,7 @@ const CORE_OBJECTS = [
       { apiName: 'materialInWH', label: 'Material in WH', type: 'LongTextArea' },
       { apiName: 'materialToOrder', label: 'Material to Order', type: 'LongTextArea' },
       { apiName: 'specialEquipmentNeeded', label: 'Special Equipment Needed/Comments', type: 'LongTextArea' },
-      { apiName: 'project', label: 'Project', type: 'Lookup', required: true },
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
     ],
   },
   {
@@ -522,6 +522,9 @@ export async function ensureCoreObjects(): Promise<void> {
 
     if (existing) {
       existed++;
+      if (objDef.apiName === 'PunchList') {
+        await migratePunchListProjectField(existing.id);
+      }
       // Ensure fields exist even if the object already exists
       await ensureFields(existing.id, objDef.fields, systemUser.id);
       continue;
@@ -1110,6 +1113,42 @@ interface FieldDef {
   max?: number;
   minLength?: number;
   maxLength?: number;
+}
+
+async function migratePunchListProjectField(objectId: string): Promise<void> {
+  const legacyField = await prisma.customField.findFirst({
+    where: { objectId, apiName: 'project' },
+  });
+  if (legacyField) {
+    const currentField = await prisma.customField.findFirst({
+      where: { objectId, apiName: 'workOrder' },
+    });
+    if (!currentField) {
+      await prisma.customField.update({
+        where: { id: legacyField.id },
+        data: { apiName: 'workOrder', label: 'Work Order' },
+      });
+    }
+  }
+
+  const records = await prisma.record.findMany({
+    where: { objectId, deletedAt: null },
+    select: { id: true, data: true },
+  });
+  for (const record of records) {
+    const data = (record.data ?? {}) as Record<string, unknown>;
+    const legacyValue = data.project ?? data.PunchList__project;
+    if (legacyValue === undefined || data.workOrder !== undefined || data.PunchList__workOrder !== undefined) {
+      continue;
+    }
+    const nextData: Record<string, Prisma.InputJsonValue> = {
+      ...(data as Record<string, Prisma.InputJsonValue>),
+      workOrder: legacyValue as Prisma.InputJsonValue,
+    };
+    delete nextData.project;
+    delete nextData.PunchList__project;
+    await prisma.record.update({ where: { id: record.id }, data: { data: nextData } });
+  }
 }
 
 async function ensureFields(objectId: string, fields: FieldDef[], userId: string): Promise<void> {

@@ -1,8 +1,8 @@
 'use client'
 
 /**
- * Punch List widget — shows every PunchList record linked (via its `project`
- * Lookup) to the Project this widget is placed on, as an inline-editable
+ * Punch List widget — shows every PunchList record linked (via its `workOrder`
+ * Lookup) to the Work Order this widget is placed on, as an inline-editable
  * grid, plus a "+ New Punch List" form matching the field groups below.
  *
  * Field/group layout mirrors the requested "New Punch List" form:
@@ -185,12 +185,12 @@ const inputClass = 'w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-
 
 /** "+ New Punch List" modal — grouped exactly like the requested form. */
 function NewPunchListModal({
-  projectName,
+  workOrderName,
   saving,
   onCancel,
   onSubmit,
 }: {
-  projectName: string
+  workOrderName: string
   saving: boolean
   onCancel: () => void
   onSubmit: (values: Record<string, unknown>) => void
@@ -281,8 +281,8 @@ function NewPunchListModal({
                   {renderField(f)}
                 </FormField>
               ))}
-              <FormField label="Project">
-                <div className={`${inputClass} bg-gray-50 text-gray-500`}>{projectName || '—'}</div>
+              <FormField label="Work Order">
+                <div className={`${inputClass} bg-gray-50 text-gray-500`}>{workOrderName || '—'}</div>
               </FormField>
             </div>
           </section>
@@ -323,7 +323,7 @@ function NewPunchListModal({
 
 export default function PunchListWidget({ record, object }: WidgetProps) {
   const recordId = record?.id ? String(record.id) : undefined
-  const projectName = String(record?.projectName ?? '')
+  const workOrderName = String(record?.name ?? record?.title ?? record?.workOrderNumber ?? '')
   const [rows, setRows] = useState<RecordData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -336,7 +336,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     setLoading(true)
     setError(null)
     try {
-      const records = await recordsService.getRecords('PunchList', { filter: { project: recordId } })
+      const records = await recordsService.getRecords('PunchList', { filter: { workOrder: recordId } })
       setRows(records)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load punch list items')
@@ -347,10 +347,10 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
 
   useEffect(() => { load() }, [load])
 
-  if (object?.apiName && object.apiName !== 'Project') {
+  if (object?.apiName && object.apiName !== 'WorkOrder') {
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-        The Punch List widget can only be placed on the Project object&rsquo;s layout.
+        The Punch List widget can only be placed on the Work Order object&rsquo;s layout.
       </div>
     )
   }
@@ -379,7 +379,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     setCreating(true)
     setError(null)
     try {
-      const data = { ...values, totalEstimateOfHours: computeTotalHours(values), project: recordId }
+      const data = { ...values, totalEstimateOfHours: computeTotalHours(values), workOrder: recordId }
       const created = await recordsService.createRecord('PunchList', { data })
       if (created) {
         setRows((prev) => [...prev, created])
@@ -458,7 +458,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
 
       {showNewModal && (
         <NewPunchListModal
-          projectName={projectName}
+          workOrderName={workOrderName}
           saving={creating}
           onCancel={() => setShowNewModal(false)}
           onSubmit={handleCreate}
