@@ -52,6 +52,23 @@ const COMMENT_FIELDS: FieldDef[] = [
   { key: 'specialEquipmentNeeded', label: 'Special Equipment Needed/Comments', type: 'textarea' },
 ]
 
+const NEW_INFO_LEFT_FIELDS: FieldDef[] = [
+  INFO_FIELDS[0]!,
+  INFO_FIELDS[1]!,
+  INFO_FIELDS[2]!,
+  INFO_FIELDS[3]!,
+  INFO_FIELDS[4]!,
+  INFO_FIELDS[5]!,
+]
+
+const NEW_INFO_RIGHT_FIELDS: FieldDef[] = [
+  INFO_FIELDS[7]!,
+  INFO_FIELDS[8]!,
+  INFO_FIELDS[9]!,
+  INFO_FIELDS[10]!,
+  INFO_FIELDS[6]!,
+]
+
 const ALL_FIELDS = [...INFO_FIELDS, ...COMMENT_FIELDS]
 
 function toDateInputValue(v: unknown): string {
@@ -267,12 +284,21 @@ function NewPunchListModal({
         <div className="overflow-y-auto px-6 py-4 space-y-6">
           <section className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500">Information</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {INFO_FIELDS.map((f) => (
-                <FormField key={f.key} label={f.label} required={f.key === 'punchListName'}>
-                  {renderField(f)}
-                </FormField>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+              <div className="space-y-4">
+                {NEW_INFO_LEFT_FIELDS.map((f) => (
+                  <FormField key={f.key} label={f.label} required={f.key === 'punchListName'}>
+                    {renderField(f)}
+                  </FormField>
+                ))}
+              </div>
+              <div className="space-y-4">
+                {NEW_INFO_RIGHT_FIELDS.map((f) => (
+                  <FormField key={f.key} label={f.label}>
+                    {renderField(f)}
+                  </FormField>
+                ))}
+              </div>
             </div>
           </section>
 
