@@ -286,7 +286,7 @@ const CORE_OBJECTS = [
     fields: [
       { apiName: 'punchListName', label: 'Punch List Name', type: 'Text', required: true },
       { apiName: 'itemNumber', label: 'Item#', type: 'Text' },
-      { apiName: 'chosen', label: 'Chosen', type: 'Checkbox' },
+      { apiName: 'techName', label: 'Tech Name', type: 'Text' },
       { apiName: 'elevationPageNumber', label: 'Elevation Page #', type: 'Text' },
       { apiName: 'location', label: 'Location', type: 'Text' },
       { apiName: 'unit', label: 'Unit', type: 'Text' },

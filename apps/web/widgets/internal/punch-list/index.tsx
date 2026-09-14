@@ -19,6 +19,7 @@ import type { ReactNode } from 'react'
 import { Loader2, AlertCircle, ListChecks, Plus, X } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
+import { useAuth } from '@/lib/auth-context'
 
 type FieldType = 'text' | 'textarea' | 'checkbox' | 'number' | 'date'
 
@@ -33,7 +34,7 @@ interface FieldDef {
 const INFO_FIELDS: FieldDef[] = [
   { key: 'punchListName', label: 'Punch List Name', type: 'text' },
   { key: 'itemNumber', label: 'Item#', type: 'text' },
-  { key: 'chosen', label: 'Chosen', type: 'checkbox' },
+  { key: 'techName', label: 'Tech Name', type: 'text' },
   { key: 'elevationPageNumber', label: 'Elevation Page #', type: 'text' },
   { key: 'location', label: 'Location', type: 'text' },
   { key: 'unit', label: 'Unit', type: 'text' },
@@ -186,16 +187,18 @@ const inputClass = 'w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-
 /** "+ New Punch List" modal — grouped exactly like the requested form. */
 function NewPunchListModal({
   workOrderName,
+  creatorName,
   saving,
   onCancel,
   onSubmit,
 }: {
   workOrderName: string
+  creatorName: string
   saving: boolean
   onCancel: () => void
   onSubmit: (values: Record<string, unknown>) => void
 }) {
-  const [values, setValues] = useState<Record<string, unknown>>({})
+  const [values, setValues] = useState<Record<string, unknown>>({ techName: creatorName })
   const setField = (key: string, value: unknown) => setValues((prev) => ({ ...prev, [key]: value }))
   const totalHours = computeTotalHours(values)
 
@@ -322,8 +325,10 @@ function NewPunchListModal({
 }
 
 export default function PunchListWidget({ record, object }: WidgetProps) {
+  const { user } = useAuth()
   const recordId = record?.id ? String(record.id) : undefined
   const workOrderName = String(record?.name ?? record?.title ?? record?.workOrderNumber ?? '')
+  const creatorName = user?.name ?? ''
   const [rows, setRows] = useState<RecordData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -459,6 +464,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
       {showNewModal && (
         <NewPunchListModal
           workOrderName={workOrderName}
+          creatorName={creatorName}
           saving={creating}
           onCancel={() => setShowNewModal(false)}
           onSubmit={handleCreate}
