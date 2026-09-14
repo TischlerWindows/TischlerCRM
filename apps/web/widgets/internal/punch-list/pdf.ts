@@ -10,21 +10,18 @@ const PAGE_MARGIN = 10
 const HEADER_HEIGHT = 12
 
 const COLUMNS = [
-  { key: 'punchListName', label: 'Punch List Name', width: 30 },
-  { key: 'itemNumber', label: 'Item#', width: 14 },
-  { key: 'techName', label: 'Tech Name', width: 24 },
-  { key: 'elevationPageNumber', label: 'Elevation Page #', width: 22 },
-  { key: 'location', label: 'Location', width: 19 },
-  { key: 'unit', label: 'Unit', width: 14 },
-  { key: 'clientApproved', label: 'Client Approved', width: 20 },
-  { key: 'serviceDate', label: 'Service Date', width: 20 },
-  { key: 'estimateOfMen', label: 'Estimate of Men', width: 19 },
-  { key: 'estimateOfIndividualHours', label: 'Individual Hours', width: 21 },
-  { key: 'totalEstimateOfHours', label: 'Total Hours', width: 17 },
-  { key: 'descriptionOfWork', label: 'Description of Work', width: 36 },
-  { key: 'materialInWH', label: 'Material in WH', width: 28 },
-  { key: 'materialToOrder', label: 'Material to Order', width: 28 },
-  { key: 'specialEquipmentNeeded', label: 'Special Equipment / Comments', width: 38 },
+  { key: 'itemNumber', label: '#', width: 10 },
+  { key: 'techName', label: 'Tech\nName', width: 22 },
+  { key: 'location', label: 'Location', width: 23 },
+  { key: 'unit', label: 'Unit', width: 16 },
+  { key: 'elevationPageNumber', label: 'EP#', width: 13 },
+  { key: 'descriptionOfWork', label: 'Description', width: 68 },
+  { key: 'specialEquipmentNeeded', label: 'Special Equipment', width: 36 },
+  { key: 'materialInWH', label: 'Material in\nWH', width: 22 },
+  { key: 'materialToOrder', label: 'Material to\nOrder', width: 25 },
+  { key: 'estimateOfIndividualHours', label: 'Hours', width: 14 },
+  { key: 'estimateOfMen', label: 'Men', width: 13 },
+  { key: 'totalEstimateOfHours', label: 'Total', width: 14 },
 ] as const
 
 function formatValue(key: string, raw: unknown): string {
@@ -102,7 +99,7 @@ export async function generatePunchListPdf({
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(6.3)
     for (const column of scaledColumns) {
-      doc.text(column.label, x + 1.5, cursorY + 7.5, { maxWidth: column.width - 3 })
+      doc.text(column.label, x + 1.5, cursorY + 4.5, { maxWidth: column.width - 3 })
       x += column.width
     }
     cursorY += HEADER_HEIGHT
