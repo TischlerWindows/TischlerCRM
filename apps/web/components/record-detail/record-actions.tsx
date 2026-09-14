@@ -339,61 +339,25 @@ export function RecordActions({
         }
       }
 
-      // Server-side render via PDFKit (Phase 3). The render route re-assembles
-      // the proposal — passing only the IDs avoids serializing the full
-      // assembled doc over the wire and keeps the server as the source of
-      // truth for what ends up in the PDF.
+      // Server-side render via PDFKit (Phase 3). Direct GET navigation (no
+      // fetch+blob) so the response's Content-Disposition filename is what
+      // the browser's PDF viewer shows as the tab title / "Save as"
+      // suggestion — a client-built blob: URL carries no filename at all,
+      // which showed as the blob's raw id.
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
       const token = apiClient.getToken();
-      const response = await fetch(`${apiBase}/proposal-pdf/render`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          summaryId: (match.summary as { id: string }).id,
-          templateId: template.id,
-        }),
+      const params = new URLSearchParams({
+        summaryId: (match.summary as { id: string }).id,
+        templateId: template.id,
+        ...(token ? { token } : {}),
       });
-      if (!response.ok) {
-        const detail = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error(detail.error || `Failed to render proposal PDF (${response.status})`);
-      }
-      const blob = await response.blob();
-      // Wrapping in a File (which carries a .name) rather than a bare Blob —
-      // browsers commonly use that name for both the PDF viewer's tab title
-      // and its "Save as" suggestion; a blob: URL alone carries neither.
-      const previewTitle = (match.summary as { name?: string })?.name
-        ? `${(match.summary as { name?: string }).name} - Summary`
-        : 'Proposal Preview';
-      const filename = `${previewTitle.replace(/[^A-Za-z0-9_() -]+/g, '_')}.pdf`;
-      const file = new File([blob], filename, { type: 'application/pdf' });
-      const url = URL.createObjectURL(file);
+      const url = `${apiBase}/proposal-pdf/render?${params.toString()}`;
 
       if (previewWindow && !previewWindow.closed) {
         previewWindow.location.href = url;
-        // Belt-and-suspenders alongside the File name above and the PDF's
-        // own embedded title (set server-side) — the built-in PDF viewer
-        // sets its own tab title asynchronously, after 'load', once it
-        // finishes parsing the PDF, so a single post-load assignment gets
-        // clobbered. Re-assert for a few seconds to reliably win that race.
-        previewWindow.addEventListener('load', () => {
-          let ticks = 0;
-          const forceTitle = () => {
-            try { previewWindow.document.title = previewTitle; } catch { /* cross-origin — ignore */ }
-            if (++ticks < 20) setTimeout(forceTitle, 200);
-          };
-          forceTitle();
-        });
       } else {
-        // Popup blocker killed the synchronous open — fall back to a download.
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.click();
+        window.open(url, '_blank');
       }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
 
       if (assembled.warnings.length > 0) {
         showToast(`Proposal preview generated with ${assembled.warnings.length} warning(s).`, 'success');

@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { prisma } from '@crm/db/client';
 import { assembleProposal, type TokenMappingRow } from '@crm/proposal-assembly';
 import { pageLogosSchema, type PageLogoRule } from '@crm/types';
+import { verifyJwt } from '../auth.js';
+import { loadEnv } from '../config.js';
 import {
   renderProposalPDF,
   type BrandResources,
@@ -23,6 +25,125 @@ const renderSchema = z.object({
   bodyOverrides: z.record(z.string()).optional(),
 });
 
+/**
+ * Shared rendering core for both the POST (JSON body, used by Hard Edit
+ * which can carry large bodyOverrides) and GET (query string, used for
+ * plain-preview navigation so the browser's own Content-Disposition
+ * filename handling applies — no blob: URL, no lost filename) routes.
+ */
+async function buildProposalPdf(
+  app: FastifyInstance,
+  { summaryId, templateId, bodyOverrides }: z.infer<typeof renderSchema>,
+): Promise<{ buffer: Buffer; filename: string } | { error: string; status: number }> {
+  // ── Fetch template + presets + token mappings + brand wiring ────
+  // The template includes 5 distinct font roles per the brand guide
+  // (title, subtitle, heading, body, signature). Each is nullable — the
+  // renderer falls back to Helvetica variants where unset.
+  const fontSelect = { id: true, family: true, data: true } as const;
+  const template = await prisma.quoteTemplate.findUnique({
+    where: { id: templateId },
+    include: {
+      presets: { include: { conditions: true, variants: true } },
+      tokenMappings: true,
+      signatureFont:  { select: fontSelect },
+      titleFont:      { select: fontSelect },
+      subtitleFont:   { select: fontSelect },
+      headingFont:    { select: fontSelect },
+      bodyFont:       { select: fontSelect },
+    },
+  });
+  if (!template) return { error: 'Template not found', status: 404 };
+
+  const fontRes = (f: typeof template.titleFont) =>
+    f ? { bytes: Buffer.from(f.data), family: f.family } : undefined;
+
+  // ── Resolve per-page logo rules to image bytes ────────────────
+  // pageLogos is a JSON column — validate the shape and silently drop
+  // rules that don't parse rather than 500'ing the whole PDF. Logos are
+  // referenced by id only (no Prisma FK) so a deleted logo just gets
+  // dropped from the list with a log line.
+  const pageLogos = await resolvePageLogos(app, template.pageLogos);
+
+  const brand: BrandResources = {
+    accentColor: template.accentColorHex ?? undefined,
+    emphasisColor: template.emphasisColorHex ?? undefined,
+    pageLogos,
+    signatureFont: fontRes(template.signatureFont),
+    titleFont:     fontRes(template.titleFont),
+    subtitleFont:  fontRes(template.subtitleFont),
+    headingFont:   fontRes(template.headingFont),
+    bodyFont:      fontRes(template.bodyFont),
+  };
+
+  // ── Load the summary from the Setting blob (matches client) ────
+  const summariesSetting = await prisma.setting.findUnique({ where: { key: 'summaries' } });
+  const summaries = (summariesSetting?.value as unknown as Array<{ id: string }>) ?? [];
+  const summary = Array.isArray(summaries) ? summaries.find((s) => s.id === summaryId) : null;
+  if (!summary) return { error: 'Summary not found', status: 404 };
+
+  // ── Optional: linked Opportunity + Project records for custom token
+  // resolution (Phase 2 functionality — runs lazily, never blocks). ──
+  const linkedOpportunityId = (summary as { linkedOpportunityId?: string }).linkedOpportunityId;
+  const opportunity = await fetchLinkedRecord(prisma, 'Opportunity', linkedOpportunityId).catch(() => null);
+  const project = await fetchProjectForOpportunity(prisma, linkedOpportunityId).catch(() => null);
+
+  // ── Assemble ─────────────────────────────────────────────────
+  const result = assembleProposal({
+    summary: summary as Parameters<typeof assembleProposal>[0]['summary'],
+    template: {
+      id: template.id,
+      name: template.name,
+      presets: template.presets as Parameters<typeof assembleProposal>[0]['template']['presets'],
+    },
+    tokenMappings: template.tokenMappings as unknown as TokenMappingRow[],
+    opportunity: opportunity ?? undefined,
+    project: project ?? undefined,
+  });
+
+  // ── Apply Hard Edit body overrides ────────────────────────────
+  // Each key is an ordered-block index; the value is the edited HTML body.
+  // Mutating preset.body here means the PDFKit renderer draws the user's
+  // edits with the identical layout/fonts/logo as a normal preview.
+  if (bodyOverrides) {
+    for (const [key, body] of Object.entries(bodyOverrides)) {
+      const idx = Number(key);
+      if (Number.isInteger(idx) && idx >= 0 && idx < result.orderedBlocks.length) {
+        result.orderedBlocks[idx].preset.body = body;
+      }
+    }
+  }
+
+  // ── Render ────────────────────────────────────────────────────
+  let pdfBuffer: Buffer;
+  try {
+    pdfBuffer = await renderProposalPDF(result, brand);
+  } catch (err) {
+    app.log.error({ err }, 'PDF render failed');
+    return { error: 'Failed to render proposal PDF', status: 500 };
+  }
+
+  // ── Append glass type data sheets ─────────────────────────────
+  const glassKeys = collectGlassTypeKeys(summary as Record<string, unknown>);
+  if (glassKeys.length > 0) {
+    try {
+      pdfBuffer = await appendGlassSheets(pdfBuffer, glassKeys);
+    } catch (err) {
+      app.log.warn({ err }, 'Glass sheet append failed — returning proposal without sheets');
+    }
+  }
+
+  // ── Append the Impact Resistant Products sheet for Dade County jobs ──
+  try {
+    pdfBuffer = await appendDadeImpactSheet(pdfBuffer, (summary as Record<string, unknown>).jobType as string | undefined);
+  } catch (err) {
+    app.log.warn({ err }, 'Dade impact sheet append failed — returning proposal without it');
+  }
+
+  const safeName = (result.pdfData.projectName || 'Proposal').replace(/[^A-Za-z0-9_-]+/g, '_');
+  const filename = `${safeName}_Quote.pdf`;
+  return { buffer: pdfBuffer, filename };
+}
+
 export async function proposalPdfRoutes(app: FastifyInstance) {
   /**
    * POST /proposal-pdf/render
@@ -39,120 +160,51 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
     }
-    const { summaryId, templateId, bodyOverrides } = parsed.data;
 
-    // ── Fetch template + presets + token mappings + brand wiring ────
-    // The template includes 5 distinct font roles per the brand guide
-    // (title, subtitle, heading, body, signature). Each is nullable — the
-    // renderer falls back to Helvetica variants where unset.
-    const fontSelect = { id: true, family: true, data: true } as const;
-    const template = await prisma.quoteTemplate.findUnique({
-      where: { id: templateId },
-      include: {
-        presets: { include: { conditions: true, variants: true } },
-        tokenMappings: true,
-        signatureFont:  { select: fontSelect },
-        titleFont:      { select: fontSelect },
-        subtitleFont:   { select: fontSelect },
-        headingFont:    { select: fontSelect },
-        bodyFont:       { select: fontSelect },
-      },
-    });
-    if (!template) return reply.code(404).send({ error: 'Template not found' });
-
-    const fontRes = (f: typeof template.titleFont) =>
-      f ? { bytes: Buffer.from(f.data), family: f.family } : undefined;
-
-    // ── Resolve per-page logo rules to image bytes ────────────────
-    // pageLogos is a JSON column — validate the shape and silently drop
-    // rules that don't parse rather than 500'ing the whole PDF. Logos are
-    // referenced by id only (no Prisma FK) so a deleted logo just gets
-    // dropped from the list with a log line.
-    const pageLogos = await resolvePageLogos(app, template.pageLogos);
-
-    const brand: BrandResources = {
-      accentColor: template.accentColorHex ?? undefined,
-      emphasisColor: template.emphasisColorHex ?? undefined,
-      pageLogos,
-      signatureFont: fontRes(template.signatureFont),
-      titleFont:     fontRes(template.titleFont),
-      subtitleFont:  fontRes(template.subtitleFont),
-      headingFont:   fontRes(template.headingFont),
-      bodyFont:      fontRes(template.bodyFont),
-    };
-
-    // ── Load the summary from the Setting blob (matches client) ────
-    const summariesSetting = await prisma.setting.findUnique({ where: { key: 'summaries' } });
-    const summaries = (summariesSetting?.value as unknown as Array<{ id: string }>) ?? [];
-    const summary = Array.isArray(summaries) ? summaries.find((s) => s.id === summaryId) : null;
-    if (!summary) return reply.code(404).send({ error: 'Summary not found' });
-
-    // ── Optional: linked Opportunity + Project records for custom token
-    // resolution (Phase 2 functionality — runs lazily, never blocks). ──
-    const linkedOpportunityId = (summary as { linkedOpportunityId?: string }).linkedOpportunityId;
-    const opportunity = await fetchLinkedRecord(prisma, 'Opportunity', linkedOpportunityId).catch(() => null);
-    const project = await fetchProjectForOpportunity(prisma, linkedOpportunityId).catch(() => null);
-
-    // ── Assemble ─────────────────────────────────────────────────
-    const result = assembleProposal({
-      summary: summary as Parameters<typeof assembleProposal>[0]['summary'],
-      template: {
-        id: template.id,
-        name: template.name,
-        presets: template.presets as Parameters<typeof assembleProposal>[0]['template']['presets'],
-      },
-      tokenMappings: template.tokenMappings as unknown as TokenMappingRow[],
-      opportunity: opportunity ?? undefined,
-      project: project ?? undefined,
-    });
-
-    // ── Apply Hard Edit body overrides ────────────────────────────
-    // Each key is an ordered-block index; the value is the edited HTML body.
-    // Mutating preset.body here means the PDFKit renderer draws the user's
-    // edits with the identical layout/fonts/logo as a normal preview.
-    if (bodyOverrides) {
-      for (const [key, body] of Object.entries(bodyOverrides)) {
-        const idx = Number(key);
-        if (Number.isInteger(idx) && idx >= 0 && idx < result.orderedBlocks.length) {
-          result.orderedBlocks[idx].preset.body = body;
-        }
-      }
-    }
-
-    // ── Render ────────────────────────────────────────────────────
-    let pdfBuffer: Buffer;
-    try {
-      pdfBuffer = await renderProposalPDF(result, brand);
-    } catch (err) {
-      app.log.error({ err }, 'PDF render failed');
-      return reply.code(500).send({ error: 'Failed to render proposal PDF' });
-    }
-
-    // ── Append glass type data sheets ─────────────────────────────
-    const glassKeys = collectGlassTypeKeys(summary as Record<string, unknown>);
-    if (glassKeys.length > 0) {
-      try {
-        pdfBuffer = await appendGlassSheets(pdfBuffer, glassKeys);
-      } catch (err) {
-        app.log.warn({ err }, 'Glass sheet append failed — returning proposal without sheets');
-      }
-    }
-
-    // ── Append the Impact Resistant Products sheet for Dade County jobs ──
-    try {
-      pdfBuffer = await appendDadeImpactSheet(pdfBuffer, (summary as Record<string, unknown>).jobType as string | undefined);
-    } catch (err) {
-      app.log.warn({ err }, 'Dade impact sheet append failed — returning proposal without it');
-    }
-
-    const safeName = (result.pdfData.projectName || 'Proposal').replace(/[^A-Za-z0-9_-]+/g, '_');
-    const filename = `${safeName}_Quote.pdf`;
+    const result = await buildProposalPdf(app, parsed.data);
+    if ('error' in result) return reply.code(result.status).send({ error: result.error });
 
     reply
       .header('Content-Type', 'application/pdf')
-      .header('Content-Disposition', `inline; filename="${filename}"`)
-      .header('Content-Length', String(pdfBuffer.length))
-      .send(pdfBuffer);
+      .header('Content-Disposition', `inline; filename="${result.filename}"`)
+      .header('Content-Length', String(result.buffer.length))
+      .send(result.buffer);
+  });
+
+  /**
+   * GET /proposal-pdf/render?templateId=...&summaryId=...&token=...
+   *
+   * Same render as the POST route, but meant for direct browser navigation
+   * (window.open/location.href) rather than fetch+blob — that way the
+   * response's Content-Disposition filename is what the browser's native
+   * PDF viewer shows as the tab title and "Save as" suggestion, instead of
+   * a client-generated blob: URL's raw id. Auth token travels via query
+   * param (same pattern as /places/static-map) since a plain navigation
+   * can't set an Authorization header. Doesn't support bodyOverrides
+   * (Hard Edit) — those stay on the POST+blob path.
+   */
+  app.get('/proposal-pdf/render', async (req, reply) => {
+    const query = req.query as Record<string, string>;
+    let user = req.user;
+    if (!user && query.token) {
+      const env = loadEnv();
+      user = verifyJwt(query.token, env.JWT_SECRET) as any;
+    }
+    if (!user) return reply.code(401).send({ error: 'Authentication required.' });
+
+    const parsed = renderSchema.pick({ summaryId: true, templateId: true }).safeParse(query);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
+    }
+
+    const result = await buildProposalPdf(app, parsed.data);
+    if ('error' in result) return reply.code(result.status).send({ error: result.error });
+
+    reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="${result.filename}"`)
+      .header('Content-Length', String(result.buffer.length))
+      .send(result.buffer);
   });
 }
 

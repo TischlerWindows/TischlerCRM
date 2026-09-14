@@ -899,50 +899,23 @@ export default function QuoteBuilderPage() {
     setIsPreviewingPDF(true);
     setError(null);
     try {
+      // Direct GET navigation (no fetch+blob) so the response's
+      // Content-Disposition filename is what the browser's PDF viewer shows
+      // as the tab title / "Save as" suggestion — a client-built blob: URL
+      // carries no filename at all, which showed as the blob's raw id.
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
       const token = apiClient.getToken();
-      const response = await fetch(`${apiBase}/proposal-pdf/render`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ templateId: selectedTemplateId, summaryId: selectedSummaryId }),
+      const params = new URLSearchParams({
+        templateId: selectedTemplateId,
+        summaryId: selectedSummaryId,
+        ...(token ? { token } : {}),
       });
-      if (!response.ok) {
-        const detail = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error(detail.error || `Failed to render PDF (${response.status})`);
-      }
-      const blob = await response.blob();
-      // Wrapping in a File (which carries a .name) rather than a bare Blob —
-      // browsers commonly use that name for both the PDF viewer's tab title
-      // and its "Save as" suggestion; a blob: URL alone carries neither.
-      const previewTitle = selectedSummary?.name ? `${selectedSummary.name} - Summary` : 'Proposal Preview';
-      const filename = `${previewTitle.replace(/[^A-Za-z0-9_() -]+/g, '_')}.pdf`;
-      const file = new File([blob], filename, { type: 'application/pdf' });
-      const url = URL.createObjectURL(file);
+      const url = `${apiBase}/proposal-pdf/render?${params.toString()}`;
       if (previewWindow && !previewWindow.closed) {
         previewWindow.location.href = url;
-        // Belt-and-suspenders alongside the File name above and the PDF's
-        // own embedded title (set server-side) — the built-in PDF viewer
-        // sets its own tab title asynchronously, after 'load', once it
-        // finishes parsing the PDF, so a single post-load assignment gets
-        // clobbered. Re-assert for a few seconds to reliably win that race.
-        previewWindow.addEventListener('load', () => {
-          let ticks = 0;
-          const forceTitle = () => {
-            try { previewWindow.document.title = previewTitle; } catch { /* cross-origin — ignore */ }
-            if (++ticks < 20) setTimeout(forceTitle, 200);
-          };
-          forceTitle();
-        });
       } else {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'proposal.pdf';
-        link.click();
+        window.open(url, '_blank');
       }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err: unknown) {
       previewWindow?.close();
       const message = err instanceof Error ? err.message : 'Failed to generate proposal PDF';

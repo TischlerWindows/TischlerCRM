@@ -409,6 +409,10 @@ export function buildApp() {
     // SSE notification stream accepts auth via query-param token (EventSource
     // cannot set Authorization). The route handler verifies it itself.
     if (pathOnly === '/me/notifications/stream' || routeUrl === '/me/notifications/stream') return;
+    // Direct browser navigation (window.open/location.href) can't set an
+    // Authorization header either — the GET proposal PDF route verifies its
+    // own query-param token, same pattern as static-map above.
+    if (req.method === 'GET' && (pathOnly === '/proposal-pdf/render' || routeUrl === '/proposal-pdf/render')) return;
 
     if (routeUrl?.startsWith('/auth')) return;
     if (routeUrl === '/health') return;
