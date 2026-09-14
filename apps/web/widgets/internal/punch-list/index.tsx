@@ -14,7 +14,7 @@
  *   System Information: created by / last modified by (built-in record
  *     audit fields — not custom fields, read-only).
  */
-import { Fragment, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
@@ -53,30 +53,6 @@ const COMMENT_FIELDS: FieldDef[] = [
 ]
 
 const ALL_FIELDS = [...INFO_FIELDS, ...COMMENT_FIELDS]
-
-const TOP_LEFT_FIELDS: FieldDef[] = [
-  INFO_FIELDS[0]!,
-  INFO_FIELDS[1]!,
-  INFO_FIELDS[3]!,
-  INFO_FIELDS[4]!,
-  INFO_FIELDS[5]!,
-]
-
-const TOP_RIGHT_FIELDS: FieldDef[] = [
-  INFO_FIELDS[7]!,
-  INFO_FIELDS[8]!,
-  INFO_FIELDS[9]!,
-  INFO_FIELDS[10]!,
-  INFO_FIELDS[6]!,
-]
-
-const TOP_TABLE_FIELDS = TOP_LEFT_FIELDS.flatMap((left, index) => [
-  left,
-  TOP_RIGHT_FIELDS[index],
-].filter((field): field is FieldDef => Boolean(field)))
-
-const TOP_FIELD_KEYS = new Set([...TOP_LEFT_FIELDS, ...TOP_RIGHT_FIELDS].map((field) => field.key))
-const LOWER_FIELDS = ALL_FIELDS.filter((field) => !TOP_FIELD_KEYS.has(field.key))
 
 function toDateInputValue(v: unknown): string {
   if (!v) return ''
@@ -437,65 +413,6 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     }
   }
 
-  const renderFieldTable = (fields: FieldDef[]) => (
-    <table className="min-w-full text-[11px] border-collapse">
-      <thead className="bg-gray-100">
-        <tr>
-          <th className="px-1.5 py-1 text-left font-semibold text-gray-600 whitespace-nowrap border-b border-gray-200">Field</th>
-          <th className="px-1.5 py-1 text-left font-semibold text-gray-600 whitespace-nowrap border-b border-gray-200">Value</th>
-          <th className="px-1.5 py-1 text-left font-semibold text-gray-600 whitespace-nowrap border-b border-gray-200">Field</th>
-          <th className="px-1.5 py-1 text-left font-semibold text-gray-600 whitespace-nowrap border-b border-gray-200">Value</th>
-          <th className="w-8 px-1 py-1 border-b border-gray-200" aria-label="Actions" />
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, rowIndex) => (
-          <tr key={row.id} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-            {Array.from({ length: Math.ceil(fields.length / 2) }, (_, pairIndex) => {
-              const left = fields[pairIndex * 2]
-              const right = fields[pairIndex * 2 + 1]
-              return (
-                <Fragment key={left?.key ?? pairIndex}>
-                  {[left, right].map((field, fieldIndex) => field ? (
-                    <Fragment key={field.key}>
-                      <td className="px-1.5 py-1 border-b border-gray-100 align-top font-medium text-gray-600 whitespace-nowrap">
-                        {field.label}
-                      </td>
-                      <td className="px-1.5 py-1 border-b border-gray-100 align-top min-w-[5rem]">
-                        <EditableCell
-                          value={row.data?.[field.key]}
-                          type={field.type}
-                          saving={savingRowId === row.id || field.computed === true}
-                          onCommit={(value) => handleCellCommit(row.id, field.key, value)}
-                        />
-                      </td>
-                    </Fragment>
-                  ) : (
-                    <Fragment key={`empty-${fieldIndex}`}><td /><td /></Fragment>
-                  ))}
-                </Fragment>
-              )
-            })}
-            <td className="w-8 px-1 py-1 border-b border-gray-100 align-top">
-              <button
-                type="button"
-                onClick={() => void handleDelete(row)}
-                disabled={deletingRowId === row.id || savingRowId === row.id}
-                aria-label={`Delete ${String(row.data?.punchListName || 'punch list item')}`}
-                title="Delete punch list item"
-                className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-              >
-                {deletingRowId === row.id
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <Trash2 className="h-3.5 w-3.5" />}
-              </button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between border-b border-gray-200 pb-3">
@@ -529,15 +446,49 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
       ) : rows.length === 0 ? (
         <div className="py-8 text-center text-sm text-gray-400">No punch list items yet.</div>
       ) : (
-        <div className="space-y-2">
-          <div className="overflow-x-auto border border-gray-200 rounded-lg">
-            {renderFieldTable(TOP_TABLE_FIELDS)}
-          </div>
-          {LOWER_FIELDS.length > 0 && (
-            <div className="overflow-x-auto border border-gray-200 rounded-lg">
-              {renderFieldTable(LOWER_FIELDS)}
-            </div>
-          )}
+        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          <table className="min-w-full text-[11px] border-collapse">
+            <thead className="bg-gray-100">
+              <tr>
+                {ALL_FIELDS.map((f) => (
+                  <th key={f.key} className="px-1.5 py-1 text-left font-semibold text-gray-600 whitespace-nowrap border-b border-gray-200">
+                    {f.label}
+                  </th>
+                ))}
+                <th className="w-8 px-1 py-1 border-b border-gray-200" aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  {ALL_FIELDS.map((f) => (
+                    <td key={f.key} className="px-1.5 py-1 border-b border-gray-100 align-top min-w-[5rem]">
+                      <EditableCell
+                        value={row.data?.[f.key]}
+                        type={f.type}
+                        saving={savingRowId === row.id || f.computed === true}
+                        onCommit={(value) => handleCellCommit(row.id, f.key, value)}
+                      />
+                    </td>
+                  ))}
+                  <td className="w-8 px-1 py-1 border-b border-gray-100 align-top">
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(row)}
+                      disabled={deletingRowId === row.id || savingRowId === row.id}
+                      aria-label={`Delete ${String(row.data?.punchListName || 'punch list item')}`}
+                      title="Delete punch list item"
+                      className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                    >
+                      {deletingRowId === row.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Trash2 className="h-3.5 w-3.5" />}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
