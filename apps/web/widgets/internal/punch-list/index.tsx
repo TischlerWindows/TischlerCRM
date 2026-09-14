@@ -33,7 +33,6 @@ interface FieldDef {
 }
 
 const INFO_FIELDS: FieldDef[] = [
-  { key: 'punchListName', label: 'Punch List Name', type: 'text' },
   { key: 'itemNumber', label: 'Item#', type: 'text' },
   { key: 'techName', label: 'Tech Name', type: 'text' },
   { key: 'elevationPageNumber', label: 'Elevation Page #', type: 'text' },
@@ -59,15 +58,14 @@ const NEW_INFO_LEFT_FIELDS: FieldDef[] = [
   INFO_FIELDS[2]!,
   INFO_FIELDS[3]!,
   INFO_FIELDS[4]!,
-  INFO_FIELDS[5]!,
 ]
 
 const NEW_INFO_RIGHT_FIELDS: FieldDef[] = [
+  INFO_FIELDS[6]!,
   INFO_FIELDS[7]!,
   INFO_FIELDS[8]!,
   INFO_FIELDS[9]!,
-  INFO_FIELDS[10]!,
-  INFO_FIELDS[6]!,
+  INFO_FIELDS[5]!,
 ]
 
 const ALL_FIELDS = [
@@ -76,12 +74,11 @@ const ALL_FIELDS = [
   INFO_FIELDS[2]!,
   INFO_FIELDS[3]!,
   INFO_FIELDS[4]!,
-  INFO_FIELDS[5]!,
+  INFO_FIELDS[6]!,
   INFO_FIELDS[7]!,
   INFO_FIELDS[8]!,
   INFO_FIELDS[9]!,
-  INFO_FIELDS[10]!,
-  INFO_FIELDS[6]!,
+  INFO_FIELDS[5]!,
   ...COMMENT_FIELDS,
 ]
 
@@ -282,7 +279,7 @@ function NewPunchListModal({
     )
   }
 
-  const canSave = !!String(values.punchListName ?? '').trim() && !saving
+  const canSave = !saving
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="new-punch-list-title">
@@ -301,7 +298,7 @@ function NewPunchListModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
               <div className="space-y-4">
                 {NEW_INFO_LEFT_FIELDS.map((f) => (
-                  <FormField key={f.key} label={f.label} required={f.key === 'punchListName'}>
+                  <FormField key={f.key} label={f.label}>
                     {renderField(f)}
                   </FormField>
                 ))}
@@ -440,8 +437,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
   }
 
   const handleDelete = async (row: RecordData) => {
-    const name = String(row.data?.punchListName || 'this punch list item')
-    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return
+    if (!window.confirm('Delete this punch list item? This cannot be undone.')) return
     setDeletingRowId(row.id)
     setError(null)
     try {
@@ -546,7 +542,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
                       type="button"
                       onClick={() => void handleDelete(row)}
                       disabled={deletingRowId === row.id || savingRowId === row.id}
-                      aria-label={`Delete ${String(row.data?.punchListName || 'punch list item')}`}
+                      aria-label="Delete punch list item"
                       title="Delete punch list item"
                       className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
                     >

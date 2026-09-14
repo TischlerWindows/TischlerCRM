@@ -284,7 +284,6 @@ const CORE_OBJECTS = [
     pluralLabel: 'Punch Lists',
     description: 'Punch list items tracked against a Work Order',
     fields: [
-      { apiName: 'punchListName', label: 'Punch List Name', type: 'Text', required: true },
       { apiName: 'itemNumber', label: 'Item#', type: 'Text' },
       { apiName: 'techName', label: 'Tech Name', type: 'Text' },
       { apiName: 'elevationPageNumber', label: 'Elevation Page #', type: 'Text' },
@@ -1116,6 +1115,13 @@ interface FieldDef {
 }
 
 async function migratePunchListProjectField(objectId: string): Promise<void> {
+  const obsoleteNameField = await prisma.customField.findFirst({
+    where: { objectId, apiName: 'punchListName' },
+  });
+  if (obsoleteNameField) {
+    await prisma.customField.delete({ where: { id: obsoleteNameField.id } });
+  }
+
   const legacyField = await prisma.customField.findFirst({
     where: { objectId, apiName: 'project' },
   });
@@ -1138,15 +1144,20 @@ async function migratePunchListProjectField(objectId: string): Promise<void> {
   for (const record of records) {
     const data = (record.data ?? {}) as Record<string, unknown>;
     const legacyValue = data.project ?? data.PunchList__project;
-    if (legacyValue === undefined || data.workOrder !== undefined || data.PunchList__workOrder !== undefined) {
+    const hasObsoleteName = data.punchListName !== undefined || data.PunchList__punchListName !== undefined;
+    if ((legacyValue === undefined || data.workOrder !== undefined || data.PunchList__workOrder !== undefined) && !hasObsoleteName) {
       continue;
     }
     const nextData: Record<string, Prisma.InputJsonValue> = {
       ...(data as Record<string, Prisma.InputJsonValue>),
-      workOrder: legacyValue as Prisma.InputJsonValue,
     };
-    delete nextData.project;
-    delete nextData.PunchList__project;
+    if (legacyValue !== undefined && data.workOrder === undefined && data.PunchList__workOrder === undefined) {
+      nextData.workOrder = legacyValue as Prisma.InputJsonValue;
+      delete nextData.project;
+      delete nextData.PunchList__project;
+    }
+    delete nextData.punchListName;
+    delete nextData.PunchList__punchListName;
     await prisma.record.update({ where: { id: record.id }, data: { data: nextData } });
   }
 }
