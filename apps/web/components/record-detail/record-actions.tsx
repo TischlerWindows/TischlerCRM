@@ -361,24 +361,36 @@ export function RecordActions({
         throw new Error(detail.error || `Failed to render proposal PDF (${response.status})`);
       }
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      // Wrapping in a File (which carries a .name) rather than a bare Blob —
+      // browsers commonly use that name for both the PDF viewer's tab title
+      // and its "Save as" suggestion; a blob: URL alone carries neither.
+      const previewTitle = (match.summary as { name?: string })?.name
+        ? `${(match.summary as { name?: string }).name} - Summary`
+        : 'Proposal Preview';
+      const filename = `${previewTitle.replace(/[^A-Za-z0-9_() -]+/g, '_')}.pdf`;
+      const file = new File([blob], filename, { type: 'application/pdf' });
+      const url = URL.createObjectURL(file);
 
       if (previewWindow && !previewWindow.closed) {
         previewWindow.location.href = url;
-        // Belt-and-suspenders alongside the PDF's own embedded title (set
-        // server-side) — some PDF viewers show the blob: URL's raw id
-        // instead of the document's Title metadata as the tab title.
-        const previewTitle = (match.summary as { name?: string })?.name
-          ? `${(match.summary as { name?: string }).name} - Summary`
-          : 'Proposal Preview';
+        // Belt-and-suspenders alongside the File name above and the PDF's
+        // own embedded title (set server-side) — the built-in PDF viewer
+        // sets its own tab title asynchronously, after 'load', once it
+        // finishes parsing the PDF, so a single post-load assignment gets
+        // clobbered. Re-assert for a few seconds to reliably win that race.
         previewWindow.addEventListener('load', () => {
-          try { previewWindow.document.title = previewTitle; } catch { /* cross-origin — ignore */ }
+          let ticks = 0;
+          const forceTitle = () => {
+            try { previewWindow.document.title = previewTitle; } catch { /* cross-origin — ignore */ }
+            if (++ticks < 20) setTimeout(forceTitle, 200);
+          };
+          forceTitle();
         });
       } else {
         // Popup blocker killed the synchronous open — fall back to a download.
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'proposal.pdf';
+        link.download = filename;
         link.click();
       }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
