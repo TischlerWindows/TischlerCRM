@@ -51,6 +51,7 @@ import { specVariantRoutes } from './routes/spec-variants.js';
 import { tokenMappingRoutes } from './routes/token-mappings.js';
 import { proposalPdfRoutes } from './routes/proposal-pdf.js';
 import { projectListPdfRoutes } from './routes/project-list-pdf.js';
+import { pdfEchoRoutes } from './routes/pdf-echo.js';
 import { seedCategoriesIfMissing } from './lib/support-tickets/categories.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -413,6 +414,9 @@ export function buildApp() {
     // Authorization header either — the GET proposal PDF route verifies its
     // own query-param token, same pattern as static-map above.
     if (req.method === 'GET' && (pathOnly === '/proposal-pdf/render' || routeUrl === '/proposal-pdf/render')) return;
+    // One-time PDF handoff links — the random id itself is the capability,
+    // no separate token needed (see routes/pdf-echo.ts).
+    if (req.method === 'GET' && pathOnly.startsWith('/pdf-echo/')) return;
 
     if (routeUrl?.startsWith('/auth')) return;
     if (routeUrl === '/health') return;
@@ -547,6 +551,7 @@ export function buildApp() {
   app.register(tokenMappingRoutes);
   app.register(proposalPdfRoutes);
   app.register(projectListPdfRoutes);
+  app.register(pdfEchoRoutes);
 
   // Start the Postgres LISTEN connection so notify() events broadcast
   // from any process reach SSE subscribers on this process.

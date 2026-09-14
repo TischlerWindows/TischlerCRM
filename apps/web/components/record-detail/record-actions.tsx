@@ -11,6 +11,7 @@ import { useToast } from '@/components/toast';
 import { PageLayout, type LayoutTab, type ObjectDef } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { generateRecordPdf } from '@/lib/record-pdf';
+import { openPdfPreview } from '@/lib/pdf-preview';
 import { getFormattingEffectsForTab } from '@/lib/layout-formatting';
 import { assembleProposal } from '@crm/proposal-assembly';
 import { findSummaryForOpportunity, getSavedSummaries } from '@/lib/proposal-summary-resolver';
@@ -234,16 +235,7 @@ export function RecordActions({
         title: tab ? `${title} - ${tab.label}` : title,
         onlyTabId: tab?.id,
       });
-      const url = URL.createObjectURL(blob);
-      if (previewWindow && !previewWindow.closed) {
-        previewWindow.location.href = url;
-      } else {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.click();
-      }
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      await openPdfPreview(previewWindow, blob, filename);
     } catch (error) {
       previewWindow?.close();
       const message = error instanceof Error ? error.message : 'Failed to generate PDF preview.';
