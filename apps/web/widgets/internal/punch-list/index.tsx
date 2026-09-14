@@ -16,10 +16,11 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2 } from 'lucide-react'
+import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2, FileText } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { useAuth } from '@/lib/auth-context'
+import { generatePunchListPdf } from './pdf'
 
 type FieldType = 'text' | 'textarea' | 'checkbox' | 'number' | 'date'
 
@@ -375,6 +376,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
   const [creating, setCreating] = useState(false)
   const [savingRowId, setSavingRowId] = useState<string | null>(null)
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const load = useCallback(async () => {
     if (!recordId) return
@@ -452,6 +454,25 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     }
   }
 
+  const handlePreviewPdf = async () => {
+    const previewWindow = window.open('', '_blank')
+    setGeneratingPdf(true)
+    setError(null)
+    try {
+      await generatePunchListPdf({
+        rows,
+        workOrderName,
+        workOrderNumber: String(record?.workOrderNumber ?? ''),
+        previewWindow,
+      })
+    } catch (err: unknown) {
+      previewWindow?.close()
+      setError(err instanceof Error ? err.message : 'Failed to generate Punch List PDF')
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between border-b border-gray-200 pb-3">
@@ -462,13 +483,23 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
             <p className="text-xs text-gray-500">{rows.length} item{rows.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
-        <button
-          onClick={() => setShowNewModal(true)}
-          className="text-xs px-3 py-1.5 bg-brand-navy text-white rounded hover:bg-brand-navy/90 transition-colors flex items-center gap-1.5 font-semibold"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          New Punch List
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void handlePreviewPdf()}
+            disabled={generatingPdf}
+            className="text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex items-center gap-1.5 font-semibold text-gray-700 disabled:opacity-50"
+          >
+            {generatingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+            Preview PDF
+          </button>
+          <button
+            onClick={() => setShowNewModal(true)}
+            className="text-xs px-3 py-1.5 bg-brand-navy text-white rounded hover:bg-brand-navy/90 transition-colors flex items-center gap-1.5 font-semibold"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            New Punch List
+          </button>
+        </div>
       </div>
 
       {error && (
