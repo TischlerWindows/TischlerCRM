@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Loader2, AlertCircle, ListChecks, Plus, X } from 'lucide-react'
+import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { useAuth } from '@/lib/auth-context'
@@ -127,7 +127,7 @@ function EditableCell({
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => commit(draft)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(draft) } else if (e.key === 'Escape') setEditing(false) }}
-          className="w-full min-w-[9rem] border border-brand-navy/40 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          className="w-full min-w-[7rem] border border-brand-navy/40 rounded px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }
@@ -140,7 +140,7 @@ function EditableCell({
           onBlur={() => commit(draft)}
           onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false) }}
           rows={2}
-          className="w-full min-w-[12rem] border border-brand-navy/40 rounded px-1.5 py-1 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          className="w-full min-w-[9rem] border border-brand-navy/40 rounded px-1 py-1 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }
@@ -152,7 +152,7 @@ function EditableCell({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => commit(draft)}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(draft) } else if (e.key === 'Escape') setEditing(false) }}
-        className="w-full min-w-[6rem] border border-brand-navy/40 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
+        className="w-full min-w-[4.5rem] border border-brand-navy/40 rounded px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
       />
     )
   }
@@ -335,6 +335,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
   const [showNewModal, setShowNewModal] = useState(false)
   const [creating, setCreating] = useState(false)
   const [savingRowId, setSavingRowId] = useState<string | null>(null)
+  const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!recordId) return
@@ -397,6 +398,21 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     }
   }
 
+  const handleDelete = async (row: RecordData) => {
+    const name = String(row.data?.punchListName || 'this punch list item')
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return
+    setDeletingRowId(row.id)
+    setError(null)
+    try {
+      await recordsService.deleteRecord('PunchList', row.id)
+      setRows((prev) => prev.filter((item) => item.id !== row.id))
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete punch list item')
+    } finally {
+      setDeletingRowId(null)
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between border-b border-gray-200 pb-3">
@@ -431,21 +447,22 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
         <div className="py-8 text-center text-sm text-gray-400">No punch list items yet.</div>
       ) : (
         <div className="overflow-x-auto border border-gray-200 rounded-lg">
-          <table className="min-w-full text-xs border-collapse">
+          <table className="min-w-full text-[11px] border-collapse">
             <thead className="bg-gray-100">
               <tr>
                 {ALL_FIELDS.map((f) => (
-                  <th key={f.key} className="px-2 py-1.5 text-left font-semibold text-gray-600 whitespace-nowrap border-b border-gray-200">
+                  <th key={f.key} className="px-1.5 py-1 text-left font-semibold text-gray-600 whitespace-nowrap border-b border-gray-200">
                     {f.label}
                   </th>
                 ))}
+                <th className="w-8 px-1 py-1 border-b border-gray-200" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
               {rows.map((row, i) => (
                 <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   {ALL_FIELDS.map((f) => (
-                    <td key={f.key} className="px-2 py-1.5 border-b border-gray-100 align-top min-w-[7rem]">
+                    <td key={f.key} className="px-1.5 py-1 border-b border-gray-100 align-top min-w-[5rem]">
                       <EditableCell
                         value={row.data?.[f.key]}
                         type={f.type}
@@ -454,6 +471,20 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
                       />
                     </td>
                   ))}
+                  <td className="w-8 px-1 py-1 border-b border-gray-100 align-top">
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(row)}
+                      disabled={deletingRowId === row.id || savingRowId === row.id}
+                      aria-label={`Delete ${String(row.data?.punchListName || 'punch list item')}`}
+                      title="Delete punch list item"
+                      className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                    >
+                      {deletingRowId === row.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Trash2 className="h-3.5 w-3.5" />}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
