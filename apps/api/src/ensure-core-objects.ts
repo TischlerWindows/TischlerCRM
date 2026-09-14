@@ -279,6 +279,32 @@ const CORE_OBJECTS = [
     ],
   },
   {
+    apiName: 'PunchList',
+    label: 'Punch List',
+    pluralLabel: 'Punch Lists',
+    description: 'Punch list items tracked against a Project',
+    fields: [
+      { apiName: 'punchListName', label: 'Punch List Name', type: 'Text', required: true },
+      { apiName: 'itemNumber', label: 'Item#', type: 'Text' },
+      { apiName: 'chosen', label: 'Chosen', type: 'Checkbox' },
+      { apiName: 'elevationPageNumber', label: 'Elevation Page #', type: 'Text' },
+      { apiName: 'location', label: 'Location', type: 'Text' },
+      { apiName: 'unit', label: 'Unit', type: 'Text' },
+      // Calculated on save (estimateOfMen × estimateOfIndividualHours) — see
+      // the PunchList widget's save handler, not a live Formula field.
+      { apiName: 'totalEstimateOfHours', label: 'Total Estimate of Hours', type: 'Number' },
+      { apiName: 'clientApproved', label: 'Client Approved', type: 'Checkbox' },
+      { apiName: 'serviceDate', label: 'Service Date', type: 'Date' },
+      { apiName: 'estimateOfMen', label: 'Estimate of Men', type: 'Number' },
+      { apiName: 'estimateOfIndividualHours', label: 'Estimate of Individual Hours', type: 'Number' },
+      { apiName: 'descriptionOfWork', label: 'Description of Work', type: 'LongTextArea' },
+      { apiName: 'materialInWH', label: 'Material in WH', type: 'LongTextArea' },
+      { apiName: 'materialToOrder', label: 'Material to Order', type: 'LongTextArea' },
+      { apiName: 'specialEquipmentNeeded', label: 'Special Equipment Needed/Comments', type: 'LongTextArea' },
+      { apiName: 'project', label: 'Project', type: 'Lookup', required: true },
+    ],
+  },
+  {
     apiName: 'WorkOrder',
     label: 'Work Order',
     pluralLabel: 'Work Orders',

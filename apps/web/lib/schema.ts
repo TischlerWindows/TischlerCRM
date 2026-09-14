@@ -227,7 +227,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -398,6 +398,10 @@ export interface ClockInConfig {
   type: 'ClockIn';
 }
 
+export interface PunchListConfig {
+  type: 'PunchList';
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -415,7 +419,8 @@ export type WidgetConfig =
   | DropboxFilesConfig
   | ProjectListConfig
   | ProjectListVerticalConfig
-  | ClockInConfig;
+  | ClockInConfig
+  | PunchListConfig;
 
 export interface PageWidget {
   id: string;

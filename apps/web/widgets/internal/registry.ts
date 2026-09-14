@@ -19,6 +19,7 @@ import { config as dropboxFilesManifest } from './dropbox-files/widget.config'
 import { config as projectListManifest } from './project-list/widget.config'
 import { config as projectListVerticalManifest } from './project-list-vertical/widget.config'
 import { config as clockInManifest } from './clock-in/widget.config'
+import { config as punchListManifest } from './punch-list/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
 import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
@@ -111,6 +112,11 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     manifest: clockInManifest,
     widgetConfigType: 'ClockIn',
     Component: dynamic(() => import('./clock-in/index')),
+  },
+  {
+    manifest: punchListManifest,
+    widgetConfigType: 'PunchList',
+    Component: dynamic(() => import('./punch-list/index')),
   },
 ]
 

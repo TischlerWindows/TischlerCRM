@@ -24,6 +24,7 @@ export const INTERNAL_WIDGET_IDS = [
   'project-list',
   'project-list-vertical',
   'clock-in',
+  'punch-list',
 ] as const
 export type InternalWidgetId = (typeof INTERNAL_WIDGET_IDS)[number]
 
