@@ -155,7 +155,7 @@ function EditableCell({
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => commit(draft)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(draft) } else if (e.key === 'Escape') setEditing(false) }}
-          className="w-full min-w-[7rem] border border-brand-navy/40 rounded px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          className="w-full min-w-[7rem] border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }
@@ -168,7 +168,7 @@ function EditableCell({
           onBlur={() => commit(draft)}
           onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false) }}
           rows={2}
-          className="w-full min-w-[9rem] border border-brand-navy/40 rounded px-1 py-1 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          className="w-full min-w-[9rem] border border-brand-navy/40 rounded px-1 py-1 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }
@@ -180,7 +180,7 @@ function EditableCell({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => commit(draft)}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(draft) } else if (e.key === 'Escape') setEditing(false) }}
-        className="w-full min-w-[4.5rem] border border-brand-navy/40 rounded px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
+        className="w-full min-w-[4.5rem] border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
       />
     )
   }
@@ -513,7 +513,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
         <div className="py-8 text-center text-sm text-gray-400">No punch list items yet.</div>
       ) : (
         <div className="overflow-x-auto border border-gray-200 rounded-lg">
-          <table className="min-w-full text-[11px] border-collapse">
+          <table className="min-w-full text-sm border-collapse">
             <thead className="bg-gray-100">
               <tr>
                 {ALL_FIELDS.map((f) => (
