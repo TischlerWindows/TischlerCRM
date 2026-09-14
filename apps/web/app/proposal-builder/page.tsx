@@ -917,6 +917,13 @@ export default function QuoteBuilderPage() {
       const url = URL.createObjectURL(blob);
       if (previewWindow && !previewWindow.closed) {
         previewWindow.location.href = url;
+        // Belt-and-suspenders alongside the PDF's own embedded title (set
+        // server-side) — some PDF viewers show the blob: URL's raw id
+        // instead of the document's Title metadata as the tab title.
+        const previewTitle = selectedSummary?.name ? `${selectedSummary.name} - Summary` : 'Proposal Preview';
+        previewWindow.addEventListener('load', () => {
+          try { previewWindow.document.title = previewTitle; } catch { /* cross-origin — ignore */ }
+        });
       } else {
         const link = document.createElement('a');
         link.href = url;

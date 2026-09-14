@@ -365,6 +365,15 @@ export function RecordActions({
 
       if (previewWindow && !previewWindow.closed) {
         previewWindow.location.href = url;
+        // Belt-and-suspenders alongside the PDF's own embedded title (set
+        // server-side) — some PDF viewers show the blob: URL's raw id
+        // instead of the document's Title metadata as the tab title.
+        const previewTitle = (match.summary as { name?: string })?.name
+          ? `${(match.summary as { name?: string }).name} - Summary`
+          : 'Proposal Preview';
+        previewWindow.addEventListener('load', () => {
+          try { previewWindow.document.title = previewTitle; } catch { /* cross-origin — ignore */ }
+        });
       } else {
         // Popup blocker killed the synchronous open — fall back to a download.
         const link = document.createElement('a');

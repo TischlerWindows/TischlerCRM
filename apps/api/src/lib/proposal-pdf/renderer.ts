@@ -141,7 +141,7 @@ export async function renderProposalPDF(
     // Required so drawFooter() can iterate all pages via bufferedPageRange()/switchToPage().
     bufferPages: true,
     info: {
-      Title: result.pdfData.projectName ? `${result.pdfData.projectName} — Proposal` : 'Tischler Proposal',
+      Title: result.pdfData.projectName ? `${result.pdfData.projectName} - Summary` : 'Tischler Proposal',
       Author: 'Tischler und Sohn',
     },
   });
