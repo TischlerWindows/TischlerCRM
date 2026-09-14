@@ -147,6 +147,9 @@ export async function generateProjectListPdf(params: {
   doc.setTextColor(...TEXT);
   doc.setFontSize(18);
   const heading = projectNumber ? `${projectNumber} (${projectName || 'Untitled'})` : (projectName || 'Untitled');
+  // Shown as the tab title for blob: URLs in PDF viewers, which otherwise
+  // fall back to the blob's raw UUID.
+  doc.setProperties({ title: `${heading} - ${title}` });
   doc.text(doc.splitTextToSize(`${heading} - ${title}`, contentWidth), PAGE_MARGIN, cursorY);
   cursorY += 11;
   doc.setTextColor(...MUTED);

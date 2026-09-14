@@ -84,6 +84,9 @@ export async function generateInstallationReportPdf({
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
   const projectName = installationData.installationName || '—';
+  // Shown as the tab title for blob: URLs in PDF viewers, which otherwise
+  // fall back to the blob's raw UUID.
+  doc.setProperties({ title: `Installation Report - ${projectName}` });
   doc.text(`Project: ${projectName}`, 20, y); y += 5;
   doc.text(`Start Date: ${startDate}`, 20, y);
   doc.text(`End Date: ${endDate}`, w / 2, y); y += 8;

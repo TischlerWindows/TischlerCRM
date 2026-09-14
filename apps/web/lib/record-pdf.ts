@@ -151,6 +151,9 @@ export async function generateRecordPdf({
 }: GenerateRecordPdfOptions): Promise<{ blob: Blob; filename: string }> {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+  // PDF viewers (e.g. Chrome's) show this as the tab title for blob: URLs,
+  // which otherwise fall back to the blob's raw UUID.
+  doc.setProperties({ title });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const contentWidth = pageWidth - PAGE_MARGIN * 2;
