@@ -84,6 +84,7 @@ function UserLookupField({
       onQueryChange={setQuery}
       onFocus={() => setActive(true)}
       onBlur={() => setTimeout(() => setActive(false), 150)}
+      portalDropdown
     />
   )
 }

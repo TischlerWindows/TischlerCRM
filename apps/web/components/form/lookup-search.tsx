@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Input } from '@/components/ui/input';
 import { FieldDef, ObjectDef } from '@/lib/schema';
 import { cn, resolveLookupDisplayName, upsertLookupCacheRecord } from '@/lib/utils';
@@ -524,6 +525,7 @@ export interface LookupUserSearchProps {
   onQueryChange: (query: string) => void;
   onFocus: () => void;
   onBlur: () => void;
+  portalDropdown?: boolean;
 }
 
 export function LookupUserSearch({
@@ -538,7 +540,10 @@ export function LookupUserSearch({
   onQueryChange,
   onFocus,
   onBlur,
+  portalDropdown = false,
 }: LookupUserSearchProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const selectedUser = value
     ? userRecords.find((u) => String(u.id) === String(value))
     : null;
@@ -558,10 +563,64 @@ export function LookupUserSearch({
     );
   });
 
+  useEffect(() => {
+    if (!isActive || !portalDropdown || !inputRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    setDropdownPosition({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  }, [isActive, portalDropdown]);
+
+  const dropdown = (
+    <div
+      className={`${portalDropdown ? 'fixed' : 'absolute'} z-[100] mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg`}
+      style={portalDropdown && dropdownPosition ? { top: dropdownPosition.top, left: dropdownPosition.left, width: dropdownPosition.width } : undefined}
+    >
+      <button
+        type="button"
+        onClick={() => {
+          onChange('');
+          onQueryChange('');
+        }}
+        className={cn(
+          'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
+          !value && 'bg-blue-50',
+        )}
+      >
+        -- None --
+      </button>
+      {filteredUsers.length > 0 ? (
+        filteredUsers.slice(0, 20).map((user) => (
+          <button
+            key={user.id}
+            type="button"
+            onClick={() => {
+              upsertLookupCacheRecord('User', user);
+              onChange(user.id);
+              onQueryChange(user.name || user.email);
+            }}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+          >
+            <div className="font-medium text-gray-900 truncate">
+              {user.name || user.email}
+            </div>
+            <div className="text-xs text-gray-500">
+              {user.email}
+              {user.title ? ` \u00b7 ${user.title}` : ''}
+            </div>
+          </button>
+        ))
+      ) : lookupQuery ? (
+        <div className="px-3 py-2 text-xs text-gray-500">
+          No users found.
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
     <div className="relative">
       <Input
         id={fieldDef.apiName}
+        ref={inputRef}
         value={userDisplayValue}
         placeholder="Search users..."
         onChange={(e) => onQueryChange(e.target.value)}
@@ -570,56 +629,7 @@ export function LookupUserSearch({
         disabled={disabled}
         className={cn(error && 'border-red-500')}
       />
-      {isActive && (
-        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-          <button
-            type="button"
-            onClick={() => {
-              onChange('');
-              onQueryChange('');
-            }}
-            className={cn(
-              'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
-              !value && 'bg-blue-50',
-            )}
-          >
-            -- None --
-          </button>
-          {filteredUsers.length > 0 ? (
-            filteredUsers.slice(0, 20).map((user) => (
-              <button
-                key={user.id}
-                type="button"
-                onClick={() => {
-                  // Seed the global lookup cache with the picked user so
-                  // resolveLookupDisplayName finds it on the very next
-                  // render — mirrors the equivalent seed in LookupSearch's
-                  // selection handler. Without this, the raw user id shows
-                  // until an unrelated background fetch of /admin/users
-                  // happens to complete (or the page is refreshed and the
-                  // preloader awaits it before the initial paint).
-                  upsertLookupCacheRecord('User', user);
-                  onChange(user.id);
-                  onQueryChange(user.name || user.email);
-                }}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-              >
-                <div className="font-medium text-gray-900 truncate">
-                  {user.name || user.email}
-                </div>
-                <div className="text-xs text-gray-500">
-                  {user.email}
-                  {user.title ? ` \u00b7 ${user.title}` : ''}
-                </div>
-              </button>
-            ))
-          ) : lookupQuery ? (
-            <div className="px-3 py-2 text-xs text-gray-500">
-              No users found.
-            </div>
-          ) : null}
-        </div>
-      )}
+      {isActive && (!portalDropdown || dropdownPosition) && (portalDropdown && typeof document !== 'undefined' ? createPortal(dropdown, document.body) : dropdown)}
     </div>
   );
 }
