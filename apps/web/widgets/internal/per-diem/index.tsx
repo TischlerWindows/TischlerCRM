@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, CalendarDays, Loader2, Plus, Trash2, WalletCards, X } from 'lucide-react'
+import { AlertCircle, CalendarDays, FileText, Loader2, Plus, Trash2, WalletCards, X } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
+import { generatePerDiemPdf } from './pdf'
 
 type FieldType = 'text' | 'textarea' | 'currency' | 'date'
 
@@ -172,6 +173,8 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
   const [saving, setSaving] = useState(false)
   const [savingRowId, setSavingRowId] = useState<string | null>(null)
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
+  const workOrderName = String(record?.name ?? record?.title ?? record?.workOrderNumber ?? '')
 
   const load = useCallback(async () => {
     if (!recordId) return
@@ -236,6 +239,25 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     }
   }
 
+  const handlePreviewPdf = async () => {
+    const previewWindow = window.open('', '_blank')
+    setGeneratingPdf(true)
+    setError(null)
+    try {
+      await generatePerDiemPdf({
+        rows,
+        workOrderName,
+        workOrderNumber: String(record?.workOrderNumber ?? ''),
+        previewWindow,
+      })
+    } catch (err: unknown) {
+      previewWindow?.close()
+      setError(err instanceof Error ? err.message : 'Failed to generate Per Diem PDF')
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="hidden items-center justify-between border-b border-gray-200 pb-3 md:flex">
@@ -246,10 +268,16 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
             <p className="text-xs text-gray-500">{rows.length} record{rows.length === 1 ? '' : 's'}</p>
           </div>
         </div>
-        <button type="button" onClick={() => setShowNewModal(true)} className="inline-flex items-center gap-1.5 rounded bg-brand-navy px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-navy/90">
-          <Plus className="h-3.5 w-3.5" />
-          New Per Diem
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => void handlePreviewPdf()} disabled={generatingPdf} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+            Preview PDF
+          </button>
+          <button type="button" onClick={() => setShowNewModal(true)} className="inline-flex items-center gap-1.5 rounded bg-brand-navy px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-navy/90">
+            <Plus className="h-3.5 w-3.5" />
+            New Per Diem
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-3 md:hidden">
@@ -260,10 +288,15 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
             <p className="text-xs text-gray-500">{rows.length} record{rows.length === 1 ? '' : 's'}</p>
           </div>
         </div>
-        <button type="button" onClick={() => setShowNewModal(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded bg-brand-navy px-3 py-2 text-xs font-semibold text-white">
-          <Plus className="h-3.5 w-3.5" />
-          New Per Diem
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button type="button" onClick={() => void handlePreviewPdf()} disabled={generatingPdf} aria-label="Preview Per Diem PDF" title="Preview Per Diem PDF" className="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 disabled:opacity-50">
+            {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+          </button>
+          <button type="button" onClick={() => setShowNewModal(true)} className="inline-flex items-center gap-1.5 rounded bg-brand-navy px-3 py-2 text-xs font-semibold text-white">
+            <Plus className="h-3.5 w-3.5" />
+            New Per Diem
+          </button>
+        </div>
       </div>
 
       {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"><AlertCircle className="h-4 w-4 shrink-0 text-red-500" />{error}</div>}

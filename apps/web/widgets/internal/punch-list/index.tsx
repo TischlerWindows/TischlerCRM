@@ -466,6 +466,25 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     }
   }
 
+  const handleAddBlankRow = async () => {
+    if (!recordId) return
+    setCreating(true)
+    setError(null)
+    try {
+      const data = {
+        workOrder: recordId,
+        serviceDate: serviceDate || undefined,
+        totalEstimateOfHours: 0,
+      }
+      const created = await recordsService.createRecord('PunchList', { data })
+      if (created) setRows((prev) => [...prev, created])
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to add punch list row')
+    } finally {
+      setCreating(false)
+    }
+  }
+
   const handleDelete = async (row: RecordData) => {
     if (!window.confirm('Delete this punch list item? This cannot be undone.')) return
     setDeletingRowId(row.id)
@@ -535,6 +554,16 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
             <Plus className="w-3.5 h-3.5" />
             New Punch List
           </button>
+          <button
+            type="button"
+            onClick={() => void handleAddBlankRow()}
+            disabled={creating}
+            aria-label="Add blank punch list row"
+            title="Add blank punch list row"
+            className="inline-flex h-8 w-8 items-center justify-center rounded border border-brand-navy text-brand-navy hover:bg-brand-navy/5 disabled:opacity-50"
+          >
+            {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-4 w-4" />}
+          </button>
         </div>
       </div>
 
@@ -575,6 +604,15 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
           >
             {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
             Preview PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleAddBlankRow()}
+            disabled={creating}
+            className="inline-flex items-center justify-center gap-1.5 rounded border border-brand-navy px-2 py-2 text-xs font-semibold text-brand-navy disabled:opacity-50"
+          >
+            {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+            Add blank row
           </button>
           <div className="flex items-center justify-end rounded border border-gray-200 bg-gray-50 px-2 py-2 text-[11px] text-gray-500">
             Tap a value below to edit
