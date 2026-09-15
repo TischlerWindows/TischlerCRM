@@ -18,11 +18,11 @@ interface FieldDef {
 }
 
 const FIELDS: FieldDef[] = [
-  { key: 'perDiemStartDate', label: 'Per Diem Start Date', type: 'date' },
-  { key: 'perDiemEndDate', label: 'Per Diem End Date', type: 'date' },
   { key: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'user' },
   { key: 'perDiemAmount', label: 'Per Diem Amount', type: 'currency' },
   { key: 'perDiemNotes', label: 'Per Diem Notes', type: 'textarea' },
+  { key: 'perDiemStartDate', label: 'Per Diem Start Date', type: 'date' },
+  { key: 'perDiemEndDate', label: 'Per Diem End Date', type: 'date' },
 ]
 
 function dateValue(value: unknown): string {

@@ -10,11 +10,11 @@ const PAGE_MARGIN = 10
 const HEADER_HEIGHT = 12
 
 const COLUMNS = [
-  { key: 'perDiemStartDate', label: 'Start Date', width: 28 },
-  { key: 'perDiemEndDate', label: 'End Date', width: 28 },
   { key: 'serviceTechPerDiem', label: 'Service Tech Per Diem', width: 45 },
   { key: 'perDiemAmount', label: 'Per Diem Amount', width: 32 },
   { key: 'perDiemNotes', label: 'Notes', width: 120 },
+  { key: 'perDiemStartDate', label: 'Start Date', width: 28 },
+  { key: 'perDiemEndDate', label: 'End Date', width: 28 },
 ] as const
 
 function formatValue(key: string, raw: unknown): string {
