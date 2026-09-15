@@ -62,7 +62,6 @@ const NEW_INFO_LEFT_FIELDS: FieldDef[] = [
 
 const NEW_INFO_RIGHT_FIELDS: FieldDef[] = [
   INFO_FIELDS[6]!,
-  INFO_FIELDS[7]!,
   INFO_FIELDS[8]!,
   INFO_FIELDS[9]!,
   INFO_FIELDS[5]!,
@@ -75,7 +74,6 @@ const ALL_FIELDS = [
   INFO_FIELDS[3]!,
   INFO_FIELDS[4]!,
   INFO_FIELDS[6]!,
-  INFO_FIELDS[7]!,
   INFO_FIELDS[8]!,
   INFO_FIELDS[9]!,
   INFO_FIELDS[5]!,
@@ -92,8 +90,8 @@ const WRAPPED_HEADER_KEYS = new Set([
 ])
 
 function getCellWidthClass(key: string): string {
+  if (key === 'itemNumber' || key === 'elevationPageNumber') return 'min-w-[3rem] max-w-[5rem]'
   if (key === 'descriptionOfWork') return 'min-w-[5rem] max-w-[34rem]'
-  if (key === 'serviceDate') return 'min-w-[9rem] max-w-[12rem]'
   if (WRAPPED_HEADER_KEYS.has(key)) return 'min-w-[5rem] max-w-[9rem]'
   return 'min-w-[5rem] max-w-[18rem]'
 }
@@ -390,6 +388,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
   const [savingRowId, setSavingRowId] = useState<string | null>(null)
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [serviceDate, setServiceDate] = useState('')
 
   const load = useCallback(async () => {
     if (!recordId) return
@@ -439,7 +438,12 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     setCreating(true)
     setError(null)
     try {
-      const data = { ...values, totalEstimateOfHours: computeTotalHours(values), workOrder: recordId }
+      const data = {
+        ...values,
+        serviceDate: serviceDate || undefined,
+        totalEstimateOfHours: computeTotalHours(values),
+        workOrder: recordId,
+      }
       const created = await recordsService.createRecord('PunchList', { data })
       if (created) {
         setRows((prev) => [...prev, created])
@@ -496,6 +500,16 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+            Service Date
+            <input
+              type="date"
+              value={serviceDate}
+              onChange={(e) => setServiceDate(e.target.value)}
+              className="border border-gray-300 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
+              aria-label="Service Date for new punch list items"
+            />
+          </label>
           <button
             onClick={() => void handlePreviewPdf()}
             disabled={generatingPdf}
