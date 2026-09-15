@@ -367,7 +367,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
       ) : rows.length === 0 ? (
         <div className="py-8 text-center text-sm text-gray-400"><CalendarDays className="mx-auto mb-2 h-8 w-8 text-gray-300" />No per diem records yet.</div>
       ) : (
-        <div className="hidden overflow-x-auto rounded-lg border border-gray-200 md:block">
+        <div className="hidden overflow-visible rounded-lg border border-gray-200 md:block">
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-gray-100">
               <tr>
