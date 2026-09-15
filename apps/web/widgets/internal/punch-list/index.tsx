@@ -93,6 +93,7 @@ const WRAPPED_HEADER_KEYS = new Set([
 
 function getCellWidthClass(key: string): string {
   if (key === 'descriptionOfWork') return 'min-w-[5rem] max-w-[34rem]'
+  if (key === 'serviceDate') return 'min-w-[9rem] max-w-[12rem]'
   if (WRAPPED_HEADER_KEYS.has(key)) return 'min-w-[5rem] max-w-[9rem]'
   return 'min-w-[5rem] max-w-[18rem]'
 }
