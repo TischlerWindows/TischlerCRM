@@ -97,6 +97,15 @@ function getCellWidthClass(key: string): string {
   return 'min-w-[5rem] max-w-[18rem]'
 }
 
+function getMobileRowWidthClass(field: FieldDef): string {
+  if (field.key === 'itemNumber') return 'w-12'
+  if (field.key === 'elevationPageNumber') return 'w-20'
+  if (field.key === 'descriptionOfWork') return 'w-64'
+  if (field.type === 'textarea') return 'w-40'
+  if (field.type === 'checkbox') return 'w-24'
+  return 'w-24'
+}
+
 function toDateInputValue(v: unknown): string {
   if (!v) return ''
   const s = String(v)
@@ -637,38 +646,29 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
       )}
 
       {!loading && rows.length > 0 && (
-        <div className="space-y-3 md:hidden">
+        <div className="overflow-x-auto rounded-lg border border-gray-200 md:hidden">
           {rows.map((row, index) => (
-            <article key={row.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="flex items-start justify-between gap-3 border-b border-gray-100 bg-gray-50 px-3 py-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Item {String(row.data?.itemNumber ?? index + 1)}</p>
-                  <p className="mt-0.5 truncate text-sm font-semibold text-brand-navy">{String(row.data?.descriptionOfWork || row.data?.location || 'Punch list item')}</p>
-                  <p className="mt-1 text-xs text-gray-500">{String(row.data?.techName || 'No tech assigned')} · {String(row.data?.location || 'No location')}</p>
+            <article key={row.id} className={`flex min-w-[72rem] items-center gap-2 border-b border-gray-100 px-2 py-2 last:border-b-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+              {ALL_FIELDS.map((field) => (
+                <div key={field.key} className={`${getMobileRowWidthClass(field)} shrink-0`}>
+                  <p className="truncate text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
+                  <EditableCell
+                    value={row.data?.[field.key] ?? (field.key === 'itemNumber' ? index + 1 : undefined)}
+                    type={field.type}
+                    saving={savingRowId === row.id || field.computed === true}
+                    onCommit={(value) => handleCellCommit(row.id, field.key, value)}
+                  />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(row)}
-                  disabled={deletingRowId === row.id || savingRowId === row.id}
-                  aria-label="Delete punch list item"
-                  className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-                >
-                  {deletingRowId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-3 px-3 py-3">
-                {[...INFO_FIELDS.filter((field) => field.key !== 'serviceDate'), ...COMMENT_FIELDS].map((field) => (
-                  <div key={field.key} className={field.type === 'textarea' ? 'col-span-2' : ''}>
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">{field.label}</p>
-                    <EditableCell
-                      value={row.data?.[field.key]}
-                      type={field.type}
-                      saving={savingRowId === row.id || field.computed === true}
-                      onCommit={(value) => handleCellCommit(row.id, field.key, value)}
-                    />
-                  </div>
-                ))}
-              </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => void handleDelete(row)}
+                disabled={deletingRowId === row.id || savingRowId === row.id}
+                aria-label="Delete punch list item"
+                className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+              >
+                {deletingRowId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              </button>
             </article>
           ))}
         </div>
