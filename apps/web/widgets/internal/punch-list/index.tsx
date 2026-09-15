@@ -492,7 +492,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+      <div className="hidden items-center justify-between border-b border-gray-200 pb-3 md:flex">
         <div className="flex items-center gap-2">
           <ListChecks className="w-5 h-5 text-brand-navy" />
           <div>
@@ -529,6 +529,50 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
         </div>
       </div>
 
+      <div className="flex flex-col gap-3 border-b border-gray-200 pb-3 md:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <ListChecks className="h-5 w-5 shrink-0 text-brand-navy" />
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-brand-navy">Punch List</h3>
+              <p className="text-xs text-gray-500">{rows.length} item{rows.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowNewModal(true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded bg-brand-navy px-3 py-2 text-xs font-semibold text-white"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New Item
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="col-span-2 flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600">
+            Service Date
+            <input
+              type="date"
+              value={serviceDate}
+              onChange={(e) => setServiceDate(e.target.value)}
+              className="min-w-0 rounded border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
+              aria-label="Service Date for new punch list items"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => void handlePreviewPdf()}
+            disabled={generatingPdf}
+            className="inline-flex items-center justify-center gap-1.5 rounded border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 disabled:opacity-50"
+          >
+            {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+            Preview PDF
+          </button>
+          <div className="flex items-center justify-end rounded border border-gray-200 bg-gray-50 px-2 py-2 text-[11px] text-gray-500">
+            Tap a value below to edit
+          </div>
+        </div>
+      </div>
+
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
@@ -543,7 +587,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
       ) : rows.length === 0 ? (
         <div className="py-8 text-center text-sm text-gray-400">No punch list items yet.</div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+        <div className="hidden overflow-x-auto rounded-lg border border-gray-200 md:block">
           <table className="min-w-full text-sm border-collapse">
             <thead className="bg-gray-100">
               <tr>
@@ -589,6 +633,44 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!loading && rows.length > 0 && (
+        <div className="space-y-3 md:hidden">
+          {rows.map((row, index) => (
+            <article key={row.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="flex items-start justify-between gap-3 border-b border-gray-100 bg-gray-50 px-3 py-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Item {String(row.data?.itemNumber ?? index + 1)}</p>
+                  <p className="mt-0.5 truncate text-sm font-semibold text-brand-navy">{String(row.data?.descriptionOfWork || row.data?.location || 'Punch list item')}</p>
+                  <p className="mt-1 text-xs text-gray-500">{String(row.data?.techName || 'No tech assigned')} · {String(row.data?.location || 'No location')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(row)}
+                  disabled={deletingRowId === row.id || savingRowId === row.id}
+                  aria-label="Delete punch list item"
+                  className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                >
+                  {deletingRowId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-3 px-3 py-3">
+                {[...INFO_FIELDS.filter((field) => field.key !== 'serviceDate'), ...COMMENT_FIELDS].map((field) => (
+                  <div key={field.key} className={field.type === 'textarea' ? 'col-span-2' : ''}>
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">{field.label}</p>
+                    <EditableCell
+                      value={row.data?.[field.key]}
+                      type={field.type}
+                      saving={savingRowId === row.id || field.computed === true}
+                      onCommit={(value) => handleCellCommit(row.id, field.key, value)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
         </div>
       )}
 

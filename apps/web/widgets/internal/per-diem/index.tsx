@@ -238,7 +238,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+      <div className="hidden items-center justify-between border-b border-gray-200 pb-3 md:flex">
         <div className="flex items-center gap-2">
           <WalletCards className="h-5 w-5 text-brand-navy" />
           <div>
@@ -252,13 +252,27 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
         </button>
       </div>
 
+      <div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-3 md:hidden">
+        <div className="flex min-w-0 items-center gap-2">
+          <WalletCards className="h-5 w-5 shrink-0 text-brand-navy" />
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-brand-navy">Per Diem</h3>
+            <p className="text-xs text-gray-500">{rows.length} record{rows.length === 1 ? '' : 's'}</p>
+          </div>
+        </div>
+        <button type="button" onClick={() => setShowNewModal(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded bg-brand-navy px-3 py-2 text-xs font-semibold text-white">
+          <Plus className="h-3.5 w-3.5" />
+          New Per Diem
+        </button>
+      </div>
+
       {error && <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"><AlertCircle className="h-4 w-4 shrink-0 text-red-500" />{error}</div>}
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-brand-navy" /></div>
       ) : rows.length === 0 ? (
         <div className="py-8 text-center text-sm text-gray-400"><CalendarDays className="mx-auto mb-2 h-8 w-8 text-gray-300" />No per diem records yet.</div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <div className="hidden overflow-x-auto rounded-lg border border-gray-200 md:block">
           <table className="min-w-full border-collapse text-sm">
             <thead className="bg-gray-100">
               <tr>
@@ -275,6 +289,40 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!loading && rows.length > 0 && (
+        <div className="space-y-3 md:hidden">
+          {rows.map((row) => (
+            <article key={row.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="flex items-start justify-between gap-3 border-b border-gray-100 bg-gray-50 px-3 py-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Service Tech Per Diem</p>
+                  <EditableCell value={row.data?.serviceTechPerDiem} type="text" saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, 'serviceTechPerDiem', value)} />
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    <EditableCell value={row.data?.perDiemStartDate} type="date" saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, 'perDiemStartDate', value)} />
+                    <span aria-hidden="true">-</span>
+                    <EditableCell value={row.data?.perDiemEndDate} type="date" saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, 'perDiemEndDate', value)} />
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-start gap-1">
+                  <div className="rounded-lg bg-brand-navy px-2.5 py-1.5 text-right text-white">
+                    <p className="text-[10px] uppercase tracking-wide text-white/70">Amount</p>
+                    <EditableCell value={row.data?.perDiemAmount} type="currency" saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, 'perDiemAmount', value)} />
+                  </div>
+                  <button type="button" onClick={() => void handleDelete(row)} disabled={deletingRowId === row.id || savingRowId === row.id} aria-label="Delete per diem record" className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">
+                    {deletingRowId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <div className="px-3 py-3">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Per Diem Notes</p>
+                <EditableCell value={row.data?.perDiemNotes} type="textarea" saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, 'perDiemNotes', value)} />
+              </div>
+            </article>
+          ))}
         </div>
       )}
 
