@@ -688,6 +688,10 @@ export function MultiLookupUserSearch({
     onChange(next.join(';'));
     onFocus();
     requestAnimationFrame(() => inputRef.current?.focus());
+    window.setTimeout(() => {
+      onFocus();
+      inputRef.current?.focus();
+    }, 200);
   };
 
   const removeUser = (userId: string) => {
