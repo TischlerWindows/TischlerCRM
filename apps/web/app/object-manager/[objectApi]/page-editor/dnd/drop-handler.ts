@@ -36,6 +36,7 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   ProjectListVertical: { type: 'ProjectListVertical' },
   ClockIn: { type: 'ClockIn' },
   PunchList: { type: 'PunchList' },
+  PerDiem: { type: 'PerDiem' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────

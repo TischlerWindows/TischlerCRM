@@ -67,6 +67,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'project-list-vertical': 'ProjectListVertical',
   'clock-in': 'ClockIn',
   'punch-list': 'PunchList',
+  'per-diem': 'PerDiem',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {
