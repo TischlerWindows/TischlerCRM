@@ -58,9 +58,11 @@ interface UserRecord {
 function UserLookupField({
   value,
   onChange,
+  onClose,
 }: {
   value: unknown
   onChange: (value: unknown) => void
+  onClose?: () => void
 }) {
   const [users, setUsers] = useState<UserRecord[]>([])
   const [query, setQuery] = useState('')
@@ -86,7 +88,10 @@ function UserLookupField({
       isActive={active}
       onQueryChange={setQuery}
       onFocus={() => setActive(true)}
-      onBlur={() => setTimeout(() => setActive(false), 150)}
+      onBlur={() => {
+        setTimeout(() => setActive(false), 150)
+        onClose?.()
+      }}
       portalDropdown
     />
   )
@@ -122,6 +127,7 @@ function EditableCell({
       return (
         <UserLookupField
           value={draft}
+          onClose={() => setEditing(false)}
           onChange={(nextValue) => {
             setDraft(nextValue)
             if (nextValue !== value) onCommit(nextValue)
