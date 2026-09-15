@@ -286,7 +286,7 @@ const CORE_OBJECTS = [
     fields: [
       { apiName: 'perDiemStartDate', label: 'Per Diem Start Date', type: 'Date' },
       { apiName: 'perDiemEndDate', label: 'Per Diem End Date', type: 'Date' },
-      { apiName: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'Text' },
+      { apiName: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'LookupUser' },
       { apiName: 'perDiemAmount', label: 'Per Diem Amount', type: 'Currency' },
       { apiName: 'perDiemNotes', label: 'Per Diem Notes', type: 'LongTextArea' },
       { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
@@ -537,6 +537,9 @@ export async function ensureCoreObjects(): Promise<void> {
       existed++;
       if (objDef.apiName === 'PunchList') {
         await migratePunchListProjectField(existing.id);
+      }
+      if (objDef.apiName === 'PerDiem') {
+        await migratePerDiemServiceTechField(existing.id);
       }
       // Ensure fields exist even if the object already exists
       await ensureFields(existing.id, objDef.fields, systemUser.id);
@@ -1174,6 +1177,13 @@ async function migratePunchListProjectField(objectId: string): Promise<void> {
     delete nextData.PunchList__punchListName;
     await prisma.record.update({ where: { id: record.id }, data: { data: nextData } });
   }
+}
+
+async function migratePerDiemServiceTechField(objectId: string): Promise<void> {
+  await prisma.customField.updateMany({
+    where: { objectId, apiName: 'serviceTechPerDiem', type: 'Text' },
+    data: { type: 'LookupUser' },
+  });
 }
 
 async function ensureFields(objectId: string, fields: FieldDef[], userId: string): Promise<void> {

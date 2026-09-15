@@ -4,9 +4,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { AlertCircle, CalendarDays, FileText, Loader2, Plus, Trash2, WalletCards, X } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
+import { apiClient } from '@/lib/api-client'
+import { resolveLookupDisplayName } from '@/lib/utils'
+import { LookupUserSearch } from '@/components/form/lookup-search'
 import { generatePerDiemPdf } from './pdf'
 
-type FieldType = 'text' | 'textarea' | 'currency' | 'date'
+type FieldType = 'text' | 'textarea' | 'currency' | 'date' | 'user'
 
 interface FieldDef {
   key: string
@@ -17,7 +20,7 @@ interface FieldDef {
 const FIELDS: FieldDef[] = [
   { key: 'perDiemStartDate', label: 'Per Diem Start Date', type: 'date' },
   { key: 'perDiemEndDate', label: 'Per Diem End Date', type: 'date' },
-  { key: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'text' },
+  { key: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'user' },
   { key: 'perDiemAmount', label: 'Per Diem Amount', type: 'currency' },
   { key: 'perDiemNotes', label: 'Per Diem Notes', type: 'textarea' },
 ]
@@ -38,7 +41,51 @@ function displayValue(value: unknown, type: FieldType): string {
   if (value === undefined || value === null || value === '') return '-'
   if (type === 'date') return dateDisplay(value)
   if (type === 'currency') return `$${Number(value).toFixed(2)}`
+  if (type === 'user') return resolveLookupDisplayName(String(value), 'User')
   return String(value)
+}
+
+interface UserRecord {
+  id: string
+  name?: string
+  email?: string
+  title?: string
+}
+
+function UserLookupField({
+  value,
+  onChange,
+}: {
+  value: unknown
+  onChange: (value: unknown) => void
+}) {
+  const [users, setUsers] = useState<UserRecord[]>([])
+  const [query, setQuery] = useState('')
+  const [active, setActive] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    apiClient.get<UserRecord[]>('/admin/users').then((result) => {
+      if (!cancelled) setUsers(Array.isArray(result) ? result : [])
+    }).catch(() => {
+      if (!cancelled) setUsers([])
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  return (
+    <LookupUserSearch
+      fieldDef={{ id: 'serviceTechPerDiem', apiName: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'LookupUser' }}
+      value={value}
+      onChange={onChange}
+      userRecords={users}
+      lookupQuery={query}
+      isActive={active}
+      onQueryChange={setQuery}
+      onFocus={() => setActive(true)}
+      onBlur={() => setTimeout(() => setActive(false), 150)}
+    />
+  )
 }
 
 function EditableCell({
@@ -67,6 +114,18 @@ function EditableCell({
   }
 
   if (editing) {
+    if (type === 'user') {
+      return (
+        <UserLookupField
+          value={draft}
+          onChange={(nextValue) => {
+            setDraft(nextValue)
+            setEditing(false)
+            if (nextValue !== value) onCommit(nextValue)
+          }}
+        />
+      )
+    }
     if (type === 'textarea') {
       return (
         <textarea
@@ -123,6 +182,9 @@ function NewPerDiemModal({
   const setField = (key: string, value: unknown) => setValues((current) => ({ ...current, [key]: value }))
 
   const renderField = (field: FieldDef) => {
+    if (field.type === 'user') {
+      return <UserLookupField value={values[field.key]} onChange={(value) => setField(field.key, value)} />
+    }
     if (field.type === 'textarea') {
       return <textarea rows={3} value={String(values[field.key] ?? '')} onChange={(event) => setField(field.key, event.target.value)} className="w-full rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy" />
     }
