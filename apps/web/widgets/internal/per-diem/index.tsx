@@ -6,7 +6,7 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
 import { resolveLookupDisplayName } from '@/lib/utils'
-import { LookupUserSearch } from '@/components/form/lookup-search'
+import { MultiLookupUserSearch } from '@/components/form/lookup-search'
 import { generatePerDiemPdf } from './pdf'
 
 type FieldType = 'text' | 'textarea' | 'currency' | 'date' | 'user'
@@ -41,7 +41,10 @@ function displayValue(value: unknown, type: FieldType): string {
   if (value === undefined || value === null || value === '') return '-'
   if (type === 'date') return dateDisplay(value)
   if (type === 'currency') return `$${Number(value).toFixed(2)}`
-  if (type === 'user') return resolveLookupDisplayName(String(value), 'User')
+  if (type === 'user') {
+    const ids = String(value).split(';').map((id) => id.trim()).filter(Boolean)
+    return ids.length > 0 ? ids.map((id) => resolveLookupDisplayName(id, 'User')).join(', ') : '-'
+  }
   return String(value)
 }
 
@@ -74,8 +77,8 @@ function UserLookupField({
   }, [])
 
   return (
-    <LookupUserSearch
-      fieldDef={{ id: 'serviceTechPerDiem', apiName: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'LookupUser' }}
+    <MultiLookupUserSearch
+      fieldDef={{ id: 'serviceTechPerDiem', apiName: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'MultiLookupUser' }}
       value={value}
       onChange={onChange}
       userRecords={users}

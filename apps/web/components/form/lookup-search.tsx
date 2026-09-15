@@ -651,6 +651,7 @@ export interface MultiLookupUserSearchProps {
   onQueryChange: (query: string) => void;
   onFocus: () => void;
   onBlur: () => void;
+  portalDropdown?: boolean;
 }
 
 export function MultiLookupUserSearch({
@@ -665,7 +666,10 @@ export function MultiLookupUserSearch({
   onQueryChange,
   onFocus,
   onBlur,
+  portalDropdown = false,
 }: MultiLookupUserSearchProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const selectedIds: string[] = typeof value === 'string'
     ? value.split(';').map((v) => v.trim()).filter(Boolean)
     : Array.isArray(value)
@@ -699,6 +703,47 @@ export function MultiLookupUserSearch({
     );
   });
 
+  useEffect(() => {
+    if (!isActive || !portalDropdown || !inputRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    setDropdownPosition({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  }, [isActive, portalDropdown]);
+
+  const dropdown = (
+    <div
+      className={`${portalDropdown ? 'fixed' : 'absolute'} z-[100] mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg`}
+      style={portalDropdown && dropdownPosition ? { top: dropdownPosition.top, left: dropdownPosition.left, width: dropdownPosition.width } : undefined}
+    >
+      {filteredUsers.length > 0 ? (
+        filteredUsers.slice(0, 20).map((user) => {
+          const checked = selectedIds.includes(String(user.id));
+          return (
+            <button
+              key={user.id}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                toggleUser(String(user.id), user);
+              }}
+              className={cn(
+                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50',
+                checked && 'bg-blue-50',
+              )}
+            >
+              <input type="checkbox" checked={checked} onChange={() => {}} className="h-4 w-4 rounded border-gray-300 text-brand-navy" />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-gray-900 truncate">{user.name || user.email}</div>
+                <div className="text-xs text-gray-500">{user.email}{user.title ? ` \u00b7 ${user.title}` : ''}</div>
+              </div>
+            </button>
+          );
+        })
+      ) : (
+        <div className="px-3 py-2 text-xs text-gray-500">No users found.</div>
+      )}
+    </div>
+  );
+
   return (
     <div className="relative">
       {selectedUsers.length > 0 && (
@@ -724,6 +769,7 @@ export function MultiLookupUserSearch({
       )}
       <Input
         id={fieldDef.apiName}
+        ref={inputRef}
         value={isActive ? lookupQuery : ''}
         placeholder={selectedUsers.length > 0 ? 'Add another user...' : 'Search users...'}
         onChange={(e) => onQueryChange(e.target.value)}
@@ -732,50 +778,7 @@ export function MultiLookupUserSearch({
         disabled={disabled}
         className={cn(error && 'border-red-500')}
       />
-      {isActive && (
-        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-          {filteredUsers.length > 0 ? (
-            filteredUsers.slice(0, 20).map((user) => {
-              const checked = selectedIds.includes(String(user.id));
-              return (
-                <button
-                  key={user.id}
-                  type="button"
-                  // mousedown (not click) so this fires before the input's onBlur closes the dropdown
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    toggleUser(String(user.id), user);
-                  }}
-                  className={cn(
-                    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50',
-                    checked && 'bg-blue-50',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => {}}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-navy"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-gray-900 truncate">
-                      {user.name || user.email}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {user.email}
-                      {user.title ? ` \u00b7 ${user.title}` : ''}
-                    </div>
-                  </div>
-                </button>
-              );
-            })
-          ) : (
-            <div className="px-3 py-2 text-xs text-gray-500">
-              No users found.
-            </div>
-          )}
-        </div>
-      )}
+      {isActive && (!portalDropdown || dropdownPosition) && (portalDropdown && typeof document !== 'undefined' ? createPortal(dropdown, document.body) : dropdown)}
     </div>
   );
 }

@@ -284,7 +284,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Per Diems',
     description: 'Per diem expenses tracked against a Work Order',
     fields: [
-      { apiName: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'LookupUser' },
+      { apiName: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'MultiLookupUser' },
       { apiName: 'perDiemAmount', label: 'Per Diem Amount', type: 'Currency' },
       { apiName: 'perDiemNotes', label: 'Per Diem Notes', type: 'LongTextArea' },
       { apiName: 'perDiemStartDate', label: 'Per Diem Start Date', type: 'Date' },
@@ -1181,8 +1181,8 @@ async function migratePunchListProjectField(objectId: string): Promise<void> {
 
 async function migratePerDiemServiceTechField(objectId: string): Promise<void> {
   await prisma.customField.updateMany({
-    where: { objectId, apiName: 'serviceTechPerDiem', type: 'Text' },
-    data: { type: 'LookupUser' },
+    where: { objectId, apiName: 'serviceTechPerDiem', type: { in: ['Text', 'LookupUser'] } },
+    data: { type: 'MultiLookupUser' },
   });
 }
 
