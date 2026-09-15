@@ -686,6 +686,8 @@ export function MultiLookupUserSearch({
       ? selectedIds.filter((id) => id !== userId)
       : [...selectedIds, userId];
     onChange(next.join(';'));
+    onFocus();
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const removeUser = (userId: string) => {
@@ -713,6 +715,7 @@ export function MultiLookupUserSearch({
     <div
       className={`${portalDropdown ? 'fixed' : 'absolute'} z-[100] mt-1 max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg`}
       style={portalDropdown && dropdownPosition ? { top: dropdownPosition.top, left: dropdownPosition.left, width: dropdownPosition.width } : undefined}
+      onMouseDown={(event) => event.preventDefault()}
     >
       {filteredUsers.length > 0 ? (
         filteredUsers.slice(0, 20).map((user) => {
