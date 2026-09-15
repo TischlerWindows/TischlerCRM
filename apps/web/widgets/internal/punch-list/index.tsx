@@ -82,6 +82,21 @@ const ALL_FIELDS = [
   ...COMMENT_FIELDS,
 ]
 
+/** Long numeric-estimate headers wrap onto two lines at a fixed width
+ * instead of forcing the whole table wider — keeps more room for the
+ * free-text columns (Description of Work, etc.) that need it more. */
+const WRAPPED_HEADER_KEYS = new Set([
+  'estimateOfMen',
+  'estimateOfIndividualHours',
+  'totalEstimateOfHours',
+])
+
+function getCellWidthClass(key: string): string {
+  if (key === 'descriptionOfWork') return 'min-w-[5rem] max-w-[34rem]'
+  if (WRAPPED_HEADER_KEYS.has(key)) return 'min-w-[5rem] max-w-[9rem]'
+  return 'min-w-[5rem] max-w-[18rem]'
+}
+
 function toDateInputValue(v: unknown): string {
   if (!v) return ''
   const s = String(v)
@@ -517,7 +532,10 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
             <thead className="bg-gray-100">
               <tr>
                 {ALL_FIELDS.map((f) => (
-                  <th key={f.key} className="px-1.5 py-1 text-left font-semibold text-gray-600 whitespace-nowrap border-b border-gray-200">
+                  <th
+                    key={f.key}
+                    className={`px-1.5 py-1 text-left font-semibold text-gray-600 border-b border-gray-200 ${getCellWidthClass(f.key)} ${WRAPPED_HEADER_KEYS.has(f.key) ? 'whitespace-normal break-words' : 'whitespace-nowrap'}`}
+                  >
                     {f.label}
                   </th>
                 ))}
@@ -528,7 +546,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
               {rows.map((row, i) => (
                 <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   {ALL_FIELDS.map((f) => (
-                    <td key={f.key} className="px-1.5 py-1 border-b border-gray-100 align-top min-w-[5rem] max-w-[18rem] whitespace-normal break-words">
+                    <td key={f.key} className={`px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${getCellWidthClass(f.key)}`}>
                       <EditableCell
                         value={row.data?.[f.key]}
                         type={f.type}
