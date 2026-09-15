@@ -55,13 +55,13 @@ const FALLBACK_ITALIC = 'Helvetica-Oblique';
 const FALLBACK_BOLD_ITALIC = 'Helvetica-BoldOblique';
 
 const PAGE_MARGIN = 56; // ≈ 0.78"
-const BODY_FONT_SIZE = 10;
+const BODY_FONT_SIZE = 8;
 
 // NUMBER_COL matches w-7 (1.75 rem = 28 px → 21 pt) in the web preview — used
 // for spec item number prefix and free-text body indent.
 const NUMBER_COL = 21;
-const SECTION_HEADING_SIZE = 12;
-const FOOTER_SIZE = 7;
+const SECTION_HEADING_SIZE = 10;
+const FOOTER_SIZE = 6;
 
 // ── Brand resources, supplied per-render by the proposal-pdf route ──
 //
@@ -453,7 +453,7 @@ function drawHungDiagram(
   doc.circle(winX, wDimY, DOT_R).fill();
   doc.circle(winX + WIN_W, wDimY, DOT_R).fill();
   doc.restore();
-  doc.font(ctx.fonts.regular).fontSize(8).fillColor(ctx.text);
+  doc.font(ctx.fonts.regular).fontSize(7).fillColor(ctx.text);
   doc.text(row.widthFtIn, winX - 10, wDimY + DOT_R + 5, { width: WIN_W + 20, align: 'center', lineBreak: false });
   doc.text(`[${row.widthMM} mm]`, winX - 10, wDimY + DOT_R + 16, { width: WIN_W + 20, align: 'center', lineBreak: false });
 
@@ -471,7 +471,7 @@ function drawHungDiagram(
   doc.save();
   doc.translate(hDimX + 6, hMidY);
   doc.rotate(90);
-  doc.font(ctx.fonts.regular).fontSize(8).fillColor(ctx.text);
+  doc.font(ctx.fonts.regular).fontSize(7).fillColor(ctx.text);
   doc.text(row.heightFtIn, -28, -11, { width: 56, align: 'center', lineBreak: false });
   doc.text(`[${row.heightMM} mm]`, -28, 1, { width: 56, align: 'center', lineBreak: false });
   doc.restore();
@@ -508,8 +508,8 @@ function drawLetterheadBlock(
     const reservePt = firstLogoRule.maxHeightPt + 8;
     doc.moveDown(Math.max(1, reservePt / lineH));
   } else {
-    doc.fillColor(ctx.navy).font(ctx.fonts.title).fontSize(20).text(wordmark, { lineGap: 2 });
-    doc.fillColor(ctx.muted).font(ctx.fonts.subtitle).fontSize(8).text(tagline);
+    doc.fillColor(ctx.navy).font(ctx.fonts.title).fontSize(16).text(wordmark, { lineGap: 2 });
+    doc.fillColor(ctx.muted).font(ctx.fonts.subtitle).fontSize(7).text(tagline);
   }
 
   if (showRule) {
@@ -910,7 +910,7 @@ function drawClosingSignatureBlock(
 
   if (useSignatureFont && ctx.fonts.signature && salesman) {
     const info = getSalespersonInfo(salesman);
-    doc.moveDown(0.6).fillColor(ctx.navy).font(ctx.fonts.signature).fontSize(24).text(info.fullName);
+    doc.moveDown(0.6).fillColor(ctx.navy).font(ctx.fonts.signature).fontSize(18).text(info.fullName);
     doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(info.fullName);
     if (info.title) {
       doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(info.title);
