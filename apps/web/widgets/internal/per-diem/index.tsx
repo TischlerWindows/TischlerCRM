@@ -124,7 +124,6 @@ function EditableCell({
           value={draft}
           onChange={(nextValue) => {
             setDraft(nextValue)
-            setEditing(false)
             if (nextValue !== value) onCommit(nextValue)
           }}
         />
