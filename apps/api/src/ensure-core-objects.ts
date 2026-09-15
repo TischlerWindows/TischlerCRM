@@ -279,6 +279,20 @@ const CORE_OBJECTS = [
     ],
   },
   {
+    apiName: 'PerDiem',
+    label: 'Per Diem',
+    pluralLabel: 'Per Diems',
+    description: 'Per diem expenses tracked against a Work Order',
+    fields: [
+      { apiName: 'perDiemStartDate', label: 'Per Diem Start Date', type: 'Date' },
+      { apiName: 'perDiemEndDate', label: 'Per Diem End Date', type: 'Date' },
+      { apiName: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'Text' },
+      { apiName: 'perDiemAmount', label: 'Per Diem Amount', type: 'Currency' },
+      { apiName: 'perDiemNotes', label: 'Per Diem Notes', type: 'LongTextArea' },
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
+    ],
+  },
+  {
     apiName: 'PunchList',
     label: 'Punch List',
     pluralLabel: 'Punch Lists',

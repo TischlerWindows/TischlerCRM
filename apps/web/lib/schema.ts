@@ -227,7 +227,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -402,6 +402,10 @@ export interface PunchListConfig {
   type: 'PunchList';
 }
 
+export interface PerDiemConfig {
+  type: 'PerDiem';
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -420,7 +424,8 @@ export type WidgetConfig =
   | ProjectListConfig
   | ProjectListVerticalConfig
   | ClockInConfig
-  | PunchListConfig;
+  | PunchListConfig
+  | PerDiemConfig;
 
 export interface PageWidget {
   id: string;
