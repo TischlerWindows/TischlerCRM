@@ -296,6 +296,20 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     }
   }
 
+  const handleAddBlankRow = async () => {
+    if (!recordId) return
+    setSaving(true)
+    setError(null)
+    try {
+      const created = await recordsService.createRecord('PerDiem', { data: { workOrder: recordId } })
+      if (created) setRows((current) => [...current, created])
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to add per diem row')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleDelete = async (row: RecordData) => {
     if (!window.confirm('Delete this per diem record? This cannot be undone.')) return
     setDeletingRowId(row.id)
@@ -348,6 +362,9 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
             <Plus className="h-3.5 w-3.5" />
             New Per Diem
           </button>
+          <button type="button" onClick={() => void handleAddBlankRow()} disabled={saving} aria-label="Add blank Per Diem row" title="Add blank Per Diem row" className="inline-flex h-8 w-8 items-center justify-center rounded border border-brand-navy text-brand-navy hover:bg-brand-navy/5 disabled:opacity-50">
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-4 w-4" />}
+          </button>
         </div>
       </div>
 
@@ -366,6 +383,9 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
           <button type="button" onClick={() => setShowNewModal(true)} className="inline-flex items-center gap-1.5 rounded bg-brand-navy px-3 py-2 text-xs font-semibold text-white">
             <Plus className="h-3.5 w-3.5" />
             New Per Diem
+          </button>
+          <button type="button" onClick={() => void handleAddBlankRow()} disabled={saving} aria-label="Add blank Per Diem row" title="Add blank Per Diem row" className="inline-flex h-8 w-8 items-center justify-center rounded border border-brand-navy text-brand-navy disabled:opacity-50">
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-4 w-4" />}
           </button>
         </div>
       </div>
