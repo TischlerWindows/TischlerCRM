@@ -84,6 +84,7 @@ const ALL_FIELDS = [
  * instead of forcing the whole table wider — keeps more room for the
  * free-text columns (Description of Work, etc.) that need it more. */
 const WRAPPED_HEADER_KEYS = new Set([
+  'elevationPageNumber',
   'estimateOfMen',
   'estimateOfIndividualHours',
   'totalEstimateOfHours',
