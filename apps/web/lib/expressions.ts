@@ -22,16 +22,24 @@ const OPERATORS = {
   '<=': (a: number, b: number) => a <= b,
   '&&': (a: boolean, b: boolean) => a && b,
   '||': (a: boolean, b: boolean) => a || b,
-  '+': (a: number, b: number) => a + b,
-  '-': (a: number, b: number) => a - b,
-  '*': (a: number, b: number) => a * b,
-  '/': (a: number, b: number) => a / b,
-  '%': (a: number, b: number) => a % b,
+  '+': (a: any, b: any) => toFormulaNumber(a) + toFormulaNumber(b),
+  '-': (a: any, b: any) => toFormulaNumber(a) - toFormulaNumber(b),
+  '*': (a: any, b: any) => toFormulaNumber(a) * toFormulaNumber(b),
+  '/': (a: any, b: any) => toFormulaNumber(a) / toFormulaNumber(b),
+  '%': (a: any, b: any) => toFormulaNumber(a) % toFormulaNumber(b),
   'IN': (a: any, b: any[]) => Array.isArray(b) && b.includes(a),
   'INCLUDES': (a: any[], b: any) => Array.isArray(a) && a.includes(b),
   'CONTAINS': (a: string, b: string) => typeof a === 'string' && typeof b === 'string' && a.includes(b),
   'STARTS_WITH': (a: string, b: string) => typeof a === 'string' && typeof b === 'string' && a.startsWith(b)
 };
+
+function toFormulaNumber(value: unknown): number {
+  if (value === undefined || value === null || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const normalized = String(value).replace(/[$,]/g, '').trim();
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 // Supported functions
 const FUNCTIONS = {
@@ -436,7 +444,11 @@ class ExpressionParser {
           }
           return current as ExpressionValue;
         }
-        return context[expr.value];
+        if (expr.value in context) return context[expr.value];
+        const matchingKey = Object.keys(context).find(
+          (key) => key.toLowerCase() === String(expr.value).toLowerCase(),
+        );
+        return matchingKey ? context[matchingKey] : undefined;
 
       case 'operator':
         if (!expr.left || !expr.right) {
