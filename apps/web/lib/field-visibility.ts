@@ -58,6 +58,13 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
         : rawLeft.split(/\s*;\s*/).filter(Boolean))
     : null;
   const leftValue = rawLeft;
+  const rightIsNumeric = typeof condition.right === 'number' ||
+    (typeof condition.right === 'string' && condition.right.trim() !== '' && !Number.isNaN(Number(condition.right)));
+  const normalizedLeftValue = rightIsNumeric && (leftValue === undefined || leftValue === null || leftValue === '')
+    ? 0
+    : leftValue;
+  const numericEquals = (left: unknown, right: unknown): boolean =>
+    rightIsNumeric && left !== undefined && left !== null && left !== '' && Number(left) === Number(right);
 
   switch (condition.op) {
     case '==':
@@ -71,7 +78,7 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
       if (Array.isArray(condition.right)) {
         return condition.right.includes(leftValue);
       }
-      return leftValue === condition.right;
+      return numericEquals(normalizedLeftValue, condition.right) || leftValue === condition.right;
     
     case '!=':
       if (leftParts) {
@@ -84,7 +91,7 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
       if (Array.isArray(condition.right)) {
         return !condition.right.includes(leftValue);
       }
-      return leftValue !== condition.right;
+      return !(numericEquals(normalizedLeftValue, condition.right) || leftValue === condition.right);
     
     case '>':
       return Number(leftValue) > Number(condition.right);
