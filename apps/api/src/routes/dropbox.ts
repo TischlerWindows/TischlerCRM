@@ -111,6 +111,23 @@ const OPPORTUNITY_AUTOCAD_SUBFOLDERS = [
   'Shops & Drawings',
 ];
 
+async function createDropboxFolderBatch(accessToken: string, paths: string[]): Promise<void> {
+  const result = await dropboxApi(accessToken, '/files/create_folder_batch', {
+    paths: paths.map((path) => ({ path, autorename: false })),
+    force_async: false,
+  });
+
+  let jobId = result.async_job_id as string | undefined;
+  while (jobId) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    const status = await dropboxApi(accessToken, '/files/create_folder_batch/check', {
+      async_job_id: jobId,
+    });
+    if (status['.tag'] === 'complete') return;
+    jobId = status['.tag'] === 'in_progress' ? jobId : undefined;
+  }
+}
+
 /**
  * Create the full Opportunity subfolder structure (the 9 numbered folders,
  * the '5. AutoCad' subfolder set, the '9. Photos' Site/Finished pair, and
@@ -124,18 +141,19 @@ async function createOpportunityFolderStructure(
   childPath: string,
   safeName: string,
 ): Promise<void> {
-  const createFolder = async (path: string): Promise<void> => {
-    try {
-      await dropboxApi(accessToken, '/files/create_folder_v2', { path, autorename: false });
-    } catch { /* already exists — ignore */ }
-  };
-
-  await Promise.all(OPPORTUNITY_SUBFOLDERS.map((subfolder) => createFolder(`${childPath}/${subfolder}`)));
-  await Promise.all([
-    ...OPPORTUNITY_PHOTOS_SUBFOLDERS.map((subfolder) => createFolder(`${childPath}/9. Photos/${subfolder}`)),
-    ...OPPORTUNITY_AUTOCAD_SUBFOLDERS.map((subfolder) => createFolder(`${childPath}/5. AutoCad/${subfolder}`)),
-  ]);
-  await createFolder(`${childPath}/1. Estimation/${safeName}`);
+  try {
+    await createDropboxFolderBatch(
+      accessToken,
+      OPPORTUNITY_SUBFOLDERS.map((subfolder) => `${childPath}/${subfolder}`),
+    );
+    await createDropboxFolderBatch(accessToken, [
+      ...OPPORTUNITY_PHOTOS_SUBFOLDERS.map((subfolder) => `${childPath}/9. Photos/${subfolder}`),
+      ...OPPORTUNITY_AUTOCAD_SUBFOLDERS.map((subfolder) => `${childPath}/5. AutoCad/${subfolder}`),
+      `${childPath}/1. Estimation/${safeName}`,
+    ]);
+  } catch (err: any) {
+    console.error('[dropbox] Opportunity folder structure creation failed:', err.message);
+  }
 }
 
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
