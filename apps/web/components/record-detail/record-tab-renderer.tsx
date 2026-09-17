@@ -419,20 +419,23 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
           const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
           const visibleFields = sortedFields.filter((f: any) => {
             if (f.behavior === 'hidden') return false;
-            if (f.hideOnView || f.hideOnExisting) return false;
+            if (f.hideOnView) return false;
             // Synthetic TeamMemberSlot fields don't have a FieldDef on the parent object;
             // they pass through here so the renderer below can dispatch on kind.
             if (f.kind === 'teamMemberSlot' && f.slotConfig) {
+              if (f.hideOnExisting) return false;
               const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
               if (fFx?.hidden) return false;
               return true;
             }
             // lookupFields: virtual display tile, no fieldDef on parent object
             if (f.kind === 'lookupFields' && f.lookupFieldsConfig) {
+              if (f.hideOnExisting) return false;
               return true;
             }
             const fd = getFieldDef(f.fieldApiName, objectDef);
             if (!fd) return false;
+            if (f.hideOnExisting && fd.type !== 'DropboxFiles') return false;
             // LookupFields field type: always pass through
             if (fd.type === 'LookupFields') return true;
             if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
