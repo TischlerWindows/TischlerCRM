@@ -398,7 +398,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
   const [savingRowId, setSavingRowId] = useState<string | null>(null)
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
-  const [serviceDate, setServiceDate] = useState('')
+  const [serviceDate, setServiceDate] = useState(() => toDateInputValue(record?.serviceDate))
   const [punchListCreated, setPunchListCreated] = useState(!!record?.punchListCreated)
   const [punchListPrinted, setPunchListPrinted] = useState(!!record?.punchListPrinted)
   const [savingFlagKey, setSavingFlagKey] = useState<string | null>(null)
@@ -518,6 +518,22 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     }
   }
 
+  const handleServiceDateChange = async (value: string) => {
+    const previous = serviceDate
+    setServiceDate(value)
+    if (!recordId) return
+    setSavingFlagKey('serviceDate')
+    setError(null)
+    try {
+      await recordsService.updateRecord('WorkOrder', recordId, { data: { serviceDate: value || null } })
+    } catch (err: unknown) {
+      setServiceDate(previous)
+      setError(err instanceof Error ? err.message : 'Failed to save change')
+    } finally {
+      setSavingFlagKey(null)
+    }
+  }
+
   const handlePreviewPdf = async () => {
     const previewWindow = window.open('', '_blank')
     setGeneratingPdf(true)
@@ -575,7 +591,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
             <input
               type="date"
               value={serviceDate}
-              onChange={(e) => setServiceDate(e.target.value)}
+              onChange={(e) => void handleServiceDateChange(e.target.value)}
               className="border border-gray-300 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
               aria-label="Service Date for new punch list items"
             />
@@ -652,7 +668,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
             <input
               type="date"
               value={serviceDate}
-              onChange={(e) => setServiceDate(e.target.value)}
+              onChange={(e) => void handleServiceDateChange(e.target.value)}
               className="min-w-0 rounded border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
               aria-label="Service Date for new punch list items"
             />

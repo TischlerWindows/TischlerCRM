@@ -192,6 +192,7 @@ class LocalStorageSchemaService implements SchemaService {
         migratedSchema = this.ensureOpportunityTemplateLayout(migratedSchema);
         migratedSchema = this.ensureInstallationCostObjects(migratedSchema);
         migratedSchema = this.ensureProjectListReportFields(migratedSchema);
+        migratedSchema = this.ensureWorkOrderPunchListFields(migratedSchema);
 
         // Universal: ensure every object has at least one layout with populated fields
         migratedSchema = this.ensureAllObjectsHavePopulatedLayout(migratedSchema);
@@ -3817,6 +3818,34 @@ class LocalStorageSchemaService implements SchemaService {
     if (newFields.length === 0) return schema;
 
     objects[projectIdx] = { ...project, fields: [...project.fields, ...newFields], updatedAt: now };
+    return { ...schema, objects, updatedAt: now };
+  }
+
+  /** Registers the Punch List widget's per-WorkOrder header state (the
+   * Punch List Created?/Printed checkboxes and the Service Date used when
+   * creating new punch list items) as real WorkOrder CustomFields, so they
+   * can be added to the WorkOrder page layout. Read-only — the Punch List
+   * widget is the only place that writes these values; the layout fields
+   * just reflect them. Apis are intentionally bare (no `WorkOrder__` prefix)
+   * to match the keys the widget already reads/writes on Record.data. */
+  private ensureWorkOrderPunchListFields(schema: OrgSchema): OrgSchema {
+    const objects = [...schema.objects];
+    const now = new Date().toISOString();
+    const woIdx = objects.findIndex(o => o.apiName === 'WorkOrder');
+    if (woIdx < 0) return schema;
+
+    const workOrder = objects[woIdx]!;
+    const existingApiNames = new Set(workOrder.fields.map((f: FieldDef) => f.apiName));
+
+    const newFields: FieldDef[] = [
+      { id: generateId(), apiName: 'punchListCreated', label: 'Punch List Created?', type: 'Checkbox', readOnly: true, custom: true } as FieldDef,
+      { id: generateId(), apiName: 'punchListPrinted', label: 'Punch List Printed', type: 'Checkbox', readOnly: true, custom: true } as FieldDef,
+      { id: generateId(), apiName: 'serviceDate', label: 'Service Date', type: 'Date', readOnly: true, custom: true } as FieldDef,
+    ].filter(f => !existingApiNames.has(f.apiName));
+
+    if (newFields.length === 0) return schema;
+
+    objects[woIdx] = { ...workOrder, fields: [...workOrder.fields, ...newFields], updatedAt: now };
     return { ...schema, objects, updatedAt: now };
   }
 }
