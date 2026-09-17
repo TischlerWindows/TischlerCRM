@@ -103,12 +103,21 @@ const OPPORTUNITY_SUBFOLDERS = [
 /** Sub-subfolders created inside the Opportunity's '9. Photos' folder. */
 const OPPORTUNITY_PHOTOS_SUBFOLDERS = ['Site', 'Finished'];
 
+/** Sub-subfolders created inside the Opportunity's '5. AutoCad' folder. */
+const OPPORTUNITY_AUTOCAD_SUBFOLDERS = [
+  'Files from Architect',
+  'Presentations',
+  'Files from Factory',
+  'Shops & Drawings',
+];
+
 /**
  * Create the full Opportunity subfolder structure (the 9 numbered folders,
- * the '9. Photos' Site/Finished pair, and the OPP#### working folder inside
- * '1. Estimation'). Idempotent — pre-existing folders (409) are ignored.
- * Used both when an Opportunity is linked to a Property and when it stands
- * alone (no Property attached) so both cases get the identical 9-folder set.
+ * the '5. AutoCad' subfolder set, the '9. Photos' Site/Finished pair, and
+ * the OPP#### working folder inside '1. Estimation'). Idempotent —
+ * pre-existing folders (409) are ignored. Used both when an Opportunity is
+ * linked to a Property and when it stands alone (no Property attached) so
+ * both cases get the identical folder set.
  */
 async function createOpportunityFolderStructure(
   accessToken: string,
@@ -123,6 +132,11 @@ async function createOpportunityFolderStructure(
   for (const sub of OPPORTUNITY_PHOTOS_SUBFOLDERS) {
     try {
       await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/9. Photos/${sub}`, autorename: false });
+    } catch { /* already exists — ignore */ }
+  }
+  for (const sub of OPPORTUNITY_AUTOCAD_SUBFOLDERS) {
+    try {
+      await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/5. AutoCad/${sub}`, autorename: false });
     } catch { /* already exists — ignore */ }
   }
   try {
