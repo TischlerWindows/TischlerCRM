@@ -111,20 +111,56 @@ const OPPORTUNITY_AUTOCAD_SUBFOLDERS = [
   'Shops & Drawings',
 ];
 
+/**
+ * Create many folders in one Dropbox batch call (much less prone to
+ * per-request rate-limiting than firing individual create_folder_v2 calls).
+ * `paths` is a flat array of full Dropbox paths — NOT {path, autorename}
+ * objects, which is a different (invalid) shape for this endpoint.
+ */
 async function createDropboxFolderBatch(accessToken: string, paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
   const result = await dropboxApi(accessToken, '/files/create_folder_batch', {
-    paths: paths.map((path) => ({ path, autorename: false })),
+    paths,
+    autorename: false,
     force_async: false,
   });
 
-  let jobId = result.async_job_id as string | undefined;
+  let jobId = result['.tag'] === 'async_job_id' ? (result.async_job_id as string) : undefined;
   while (jobId) {
-    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    await new Promise<void>((resolve) => setTimeout(resolve, 300));
     const status = await dropboxApi(accessToken, '/files/create_folder_batch/check', {
       async_job_id: jobId,
     });
-    if (status['.tag'] === 'complete') return;
-    jobId = status['.tag'] === 'in_progress' ? jobId : undefined;
+    if (status['.tag'] !== 'in_progress') {
+      if (status['.tag'] === 'failed') {
+        throw new Error(`Dropbox batch folder creation failed: ${JSON.stringify(status)}`);
+      }
+      return;
+    }
+  }
+}
+
+/** Create folders one at a time, ignoring per-folder conflicts (409). */
+async function createDropboxFoldersSequentially(accessToken: string, paths: string[]): Promise<void> {
+  for (const path of paths) {
+    try {
+      await dropboxApi(accessToken, '/files/create_folder_v2', { path, autorename: false });
+    } catch { /* already exists — ignore */ }
+  }
+}
+
+/**
+ * Create many folders, preferring the fast batch endpoint but always
+ * falling back to reliable one-at-a-time creation if the batch call fails
+ * for any reason (e.g. malformed request, transient API error) so a batch
+ * hiccup never results in zero folders being created.
+ */
+async function ensureDropboxFolders(accessToken: string, paths: string[]): Promise<void> {
+  try {
+    await createDropboxFolderBatch(accessToken, paths);
+  } catch (err: any) {
+    console.error('[dropbox] Batch folder creation failed, falling back to sequential creation:', err.message);
+    await createDropboxFoldersSequentially(accessToken, paths);
   }
 }
 
@@ -141,19 +177,15 @@ async function createOpportunityFolderStructure(
   childPath: string,
   safeName: string,
 ): Promise<void> {
-  try {
-    await createDropboxFolderBatch(
-      accessToken,
-      OPPORTUNITY_SUBFOLDERS.map((subfolder) => `${childPath}/${subfolder}`),
-    );
-    await createDropboxFolderBatch(accessToken, [
-      ...OPPORTUNITY_PHOTOS_SUBFOLDERS.map((subfolder) => `${childPath}/9. Photos/${subfolder}`),
-      ...OPPORTUNITY_AUTOCAD_SUBFOLDERS.map((subfolder) => `${childPath}/5. AutoCad/${subfolder}`),
-      `${childPath}/1. Estimation/${safeName}`,
-    ]);
-  } catch (err: any) {
-    console.error('[dropbox] Opportunity folder structure creation failed:', err.message);
-  }
+  await ensureDropboxFolders(
+    accessToken,
+    OPPORTUNITY_SUBFOLDERS.map((subfolder) => `${childPath}/${subfolder}`),
+  );
+  await ensureDropboxFolders(accessToken, [
+    ...OPPORTUNITY_PHOTOS_SUBFOLDERS.map((subfolder) => `${childPath}/9. Photos/${subfolder}`),
+    ...OPPORTUNITY_AUTOCAD_SUBFOLDERS.map((subfolder) => `${childPath}/5. AutoCad/${subfolder}`),
+    `${childPath}/1. Estimation/${safeName}`,
+  ]);
 }
 
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
