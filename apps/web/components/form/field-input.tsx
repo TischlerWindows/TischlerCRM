@@ -554,6 +554,10 @@ export function FieldInput({
         if (computed !== null && computed !== undefined)
           formulaDisplay = computed;
       }
+      if (fieldDef.formulaReturnType === 'Currency' && formulaDisplay !== null && formulaDisplay !== undefined && formulaDisplay !== '') {
+        const amount = Number(String(formulaDisplay).replace(/[$,]/g, ''));
+        if (!Number.isNaN(amount)) formulaDisplay = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+      }
       inputElement = (
         <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">
           {formulaDisplay != null && formulaDisplay !== ''

@@ -83,6 +83,7 @@ export interface FieldDef {
   visibleIf?: ConditionExpr[]; // conditional visibility rules
   picklistDependencies?: PicklistDependencyRule[]; // conditional visibility for picklist values
   formulaExpr?: string;        // for formula fields
+  formulaReturnType?: 'Text' | 'Number' | 'Currency' | 'Percent' | 'Date' | 'DateTime';
   lookupObject?: string;       // target object for lookup fields
   lookupField?: string;        // which field on the target object to display
   relationshipName?: string;   // name to display for relationship

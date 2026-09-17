@@ -113,6 +113,13 @@ export function renderValue(
   }
   const fieldType = fieldDef?.type;
 
+  if (fieldType === 'Formula' && fieldDef?.formulaReturnType === 'Currency' && value !== null && value !== undefined && value !== '') {
+    const amount = Number(String(value).replace(/[$,]/g, ''));
+    if (!Number.isNaN(amount)) {
+      value = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    }
+  }
+
   // DropboxFiles — render Dropbox browser panel on record pages
   if (fieldType === 'DropboxFiles' && record) {
     const recordId = String(record.id ?? record.Id ?? '');

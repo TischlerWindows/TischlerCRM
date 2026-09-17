@@ -128,6 +128,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     scale: 2,
     displayFormat: '',
     formulaExpr: '',
+    formulaReturnType: 'Text' as FieldDef['formulaReturnType'],
     picklistValues: [] as string[],
     picklistColors: {} as Record<string, string>,
     picklistPosition: 'left' as 'left' | 'right',
@@ -264,6 +265,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       scale: 2,
       displayFormat: '',
       formulaExpr: '',
+      formulaReturnType: 'Text' as FieldDef['formulaReturnType'],
       picklistValues: [],
       picklistColors: {},
       picklistPosition: 'left' as 'left' | 'right',
@@ -300,6 +302,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       scale: cloned.scale || 2,
       displayFormat: cloned.autoNumber?.displayFormat || '',
       formulaExpr: cloned.formulaExpr || '',
+      formulaReturnType: cloned.formulaReturnType || 'Text',
       picklistValues: cloned.picklistValues ? [...cloned.picklistValues] : [],
       picklistColors: (cloned as any).picklistColors ? { ...(cloned as any).picklistColors } : {},
       picklistPosition: (cloned as any).picklistPosition || 'left',
@@ -339,6 +342,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       scale: field.scale || 2,
       displayFormat: field.autoNumber?.displayFormat || '',
       formulaExpr: field.formulaExpr || '',
+      formulaReturnType: field.formulaReturnType || 'Text',
       picklistValues: field.picklistValues ? [...field.picklistValues] : [],
       picklistColors: (field as any).picklistColors ? { ...(field as any).picklistColors } : {},
       picklistPosition: (field as any).picklistPosition || 'left',
@@ -424,6 +428,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     }
     if (t === 'Formula') {
       newField.formulaExpr = formData.formulaExpr;
+      newField.formulaReturnType = formData.formulaReturnType || 'Text';
     }
     if (t === 'Picklist' || t === 'MultiPicklist' || t === 'PicklistText' || t === 'PicklistLookup' || t === 'DropdownWithCustom') {
       newField.picklistValues = [...formData.picklistValues];
@@ -944,6 +949,25 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         <p>Use field API names to reference values on this record. Supports math operators (+, -, *, /), functions (IF, CONCAT, UPPER, LOWER, etc.), and comparisons.</p>
                         <p><strong>Cross-object formulas:</strong> Pull values from related records using dot notation — <code className="bg-gray-100 px-1 rounded">LookupFieldName.TargetFieldName</code></p>
                         <p className="text-gray-400">Examples: <code className="bg-gray-100 px-1 rounded">primaryContact.phone</code>, <code className="bg-gray-100 px-1 rounded">CONCAT(accountLookup.accountName, " — ", stage)</code></p>
+                      </div>
+                      <div className="mt-4">
+                        <Label htmlFor="formulaReturnType">Formula Return Type</Label>
+                        <select
+                          id="formulaReturnType"
+                          value={formData.formulaReturnType || 'Text'}
+                          onChange={(e) => setFormData({ ...formData, formulaReturnType: e.target.value as FieldDef['formulaReturnType'] })}
+                          className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-brand-navy/40"
+                        >
+                          <option value="Text">Text</option>
+                          <option value="Number">Number</option>
+                          <option value="Currency">Currency</option>
+                          <option value="Percent">Percent</option>
+                          <option value="Date">Date</option>
+                          <option value="DateTime">Date/Time</option>
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Choose Currency to display this formula with a dollar sign and currency decimals.
+                        </p>
                       </div>
                     </div>
                   )}
