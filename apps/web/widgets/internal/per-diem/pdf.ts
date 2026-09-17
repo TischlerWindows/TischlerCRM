@@ -1,5 +1,6 @@
 import { openPdfPreview } from '@/lib/pdf-preview'
 import type { RecordData } from '@/lib/records-service'
+import { resolveLookupDisplayName } from '@/lib/utils'
 
 const NAVY = [30, 58, 95] as const
 const RED = [218, 41, 28] as const
@@ -19,6 +20,12 @@ const COLUMNS = [
 
 function formatValue(key: string, raw: unknown): string {
   if (raw === undefined || raw === null || raw === '') return '-'
+  if (key === 'serviceTechPerDiem') {
+    const userIds = String(raw).split(';').map((id) => id.trim()).filter(Boolean)
+    return userIds.length > 0
+      ? userIds.map((id) => resolveLookupDisplayName(id, 'User')).join(', ')
+      : '-'
+  }
   if (key === 'perDiemStartDate' || key === 'perDiemEndDate') {
     const match = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/)
     if (match) return `${match[2]}/${match[3]}/${match[1]}`
