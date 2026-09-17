@@ -399,6 +399,9 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [serviceDate, setServiceDate] = useState('')
+  const [punchListCreated, setPunchListCreated] = useState(!!record?.punchListCreated)
+  const [punchListPrinted, setPunchListPrinted] = useState(!!record?.punchListPrinted)
+  const [savingFlagKey, setSavingFlagKey] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!recordId) return
@@ -499,6 +502,22 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     }
   }
 
+  const handleToggleWorkOrderFlag = async (key: 'punchListCreated' | 'punchListPrinted', value: boolean) => {
+    if (!recordId) return
+    const setFlag = key === 'punchListCreated' ? setPunchListCreated : setPunchListPrinted
+    setFlag(value)
+    setSavingFlagKey(key)
+    setError(null)
+    try {
+      await recordsService.updateRecord('WorkOrder', recordId, { data: { [key]: value } })
+    } catch (err: unknown) {
+      setFlag(!value)
+      setError(err instanceof Error ? err.message : 'Failed to save change')
+    } finally {
+      setSavingFlagKey(null)
+    }
+  }
+
   const handlePreviewPdf = async () => {
     const previewWindow = window.open('', '_blank')
     setGeneratingPdf(true)
@@ -527,6 +546,28 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
             <h3 className="text-sm font-bold text-brand-navy">Punch List</h3>
             <p className="text-xs text-gray-500">{rows.length} item{rows.length !== 1 ? 's' : ''}</p>
           </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+            <input
+              type="checkbox"
+              checked={punchListCreated}
+              disabled={savingFlagKey === 'punchListCreated'}
+              onChange={(e) => void handleToggleWorkOrderFlag('punchListCreated', e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
+            />
+            Punch List Created?
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+            <input
+              type="checkbox"
+              checked={punchListPrinted}
+              disabled={savingFlagKey === 'punchListPrinted'}
+              onChange={(e) => void handleToggleWorkOrderFlag('punchListPrinted', e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
+            />
+            Punch List Printed
+          </label>
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
@@ -586,6 +627,26 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
           </button>
         </div>
         <div className="grid grid-cols-2 gap-2">
+          <label className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600">
+            <input
+              type="checkbox"
+              checked={punchListCreated}
+              disabled={savingFlagKey === 'punchListCreated'}
+              onChange={(e) => void handleToggleWorkOrderFlag('punchListCreated', e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
+            />
+            Punch List Created?
+          </label>
+          <label className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600">
+            <input
+              type="checkbox"
+              checked={punchListPrinted}
+              disabled={savingFlagKey === 'punchListPrinted'}
+              onChange={(e) => void handleToggleWorkOrderFlag('punchListPrinted', e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
+            />
+            Punch List Printed
+          </label>
           <label className="col-span-2 flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600">
             Service Date
             <input
