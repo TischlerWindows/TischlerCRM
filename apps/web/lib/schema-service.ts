@@ -3822,7 +3822,7 @@ class LocalStorageSchemaService implements SchemaService {
   }
 
   /** Registers the Punch List widget's per-WorkOrder header state (the
-   * Punch List Created?/Printed checkboxes and the Service Date used when
+   * Punch List Created?/Completed checkboxes and the Service Date used when
    * creating new punch list items) as real WorkOrder CustomFields, so they
    * can be added to the WorkOrder page layout. Read-only — the Punch List
    * widget is the only place that writes these values; the layout fields
@@ -3834,16 +3834,28 @@ class LocalStorageSchemaService implements SchemaService {
     const woIdx = objects.findIndex(o => o.apiName === 'WorkOrder');
     if (woIdx < 0) return schema;
 
-    const workOrder = objects[woIdx]!;
+    let workOrder = objects[woIdx]!;
+    let renamed = false;
+
+    // Rename the field in place if an earlier deploy already created it
+    // under its former name ("Punch List Printed") before this was renamed.
+    const legacyIdx = workOrder.fields.findIndex((f: FieldDef) => f.apiName === 'punchListPrinted');
+    if (legacyIdx >= 0 && !workOrder.fields.some((f: FieldDef) => f.apiName === 'punchListCompleted')) {
+      const fields = [...workOrder.fields];
+      fields[legacyIdx] = { ...fields[legacyIdx]!, apiName: 'punchListCompleted', label: 'Punch List Completed' };
+      workOrder = { ...workOrder, fields };
+      renamed = true;
+    }
+
     const existingApiNames = new Set(workOrder.fields.map((f: FieldDef) => f.apiName));
 
     const newFields: FieldDef[] = [
       { id: generateId(), apiName: 'punchListCreated', label: 'Punch List Created?', type: 'Checkbox', readOnly: true, custom: true } as FieldDef,
-      { id: generateId(), apiName: 'punchListPrinted', label: 'Punch List Printed', type: 'Checkbox', readOnly: true, custom: true } as FieldDef,
+      { id: generateId(), apiName: 'punchListCompleted', label: 'Punch List Completed', type: 'Checkbox', readOnly: true, custom: true } as FieldDef,
       { id: generateId(), apiName: 'serviceDate', label: 'Service Date', type: 'Date', readOnly: true, custom: true } as FieldDef,
     ].filter(f => !existingApiNames.has(f.apiName));
 
-    if (newFields.length === 0) return schema;
+    if (newFields.length === 0 && !renamed) return schema;
 
     objects[woIdx] = { ...workOrder, fields: [...workOrder.fields, ...newFields], updatedAt: now };
     return { ...schema, objects, updatedAt: now };

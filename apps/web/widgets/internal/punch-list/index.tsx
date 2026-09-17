@@ -400,7 +400,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [serviceDate, setServiceDate] = useState(() => toDateInputValue(record?.serviceDate))
   const [punchListCreated, setPunchListCreated] = useState(!!record?.punchListCreated)
-  const [punchListPrinted, setPunchListPrinted] = useState(!!record?.punchListPrinted)
+  const [punchListCompleted, setPunchListCompleted] = useState(!!(record?.punchListCompleted ?? record?.punchListPrinted))
   const [savingFlagKey, setSavingFlagKey] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -502,9 +502,9 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     }
   }
 
-  const handleToggleWorkOrderFlag = async (key: 'punchListCreated' | 'punchListPrinted', value: boolean) => {
+  const handleToggleWorkOrderFlag = async (key: 'punchListCreated' | 'punchListCompleted', value: boolean) => {
     if (!recordId) return
-    const setFlag = key === 'punchListCreated' ? setPunchListCreated : setPunchListPrinted
+    const setFlag = key === 'punchListCreated' ? setPunchListCreated : setPunchListCompleted
     setFlag(value)
     setSavingFlagKey(key)
     setError(null)
@@ -577,12 +577,12 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
           <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
             <input
               type="checkbox"
-              checked={punchListPrinted}
-              disabled={savingFlagKey === 'punchListPrinted'}
-              onChange={(e) => void handleToggleWorkOrderFlag('punchListPrinted', e.target.checked)}
+              checked={punchListCompleted}
+              disabled={savingFlagKey === 'punchListCompleted'}
+              onChange={(e) => void handleToggleWorkOrderFlag('punchListCompleted', e.target.checked)}
               className="h-3.5 w-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
             />
-            Punch List Printed
+            Punch List Completed
           </label>
         </div>
         <div className="flex items-center gap-2">
@@ -656,12 +656,12 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
           <label className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600">
             <input
               type="checkbox"
-              checked={punchListPrinted}
-              disabled={savingFlagKey === 'punchListPrinted'}
-              onChange={(e) => void handleToggleWorkOrderFlag('punchListPrinted', e.target.checked)}
+              checked={punchListCompleted}
+              disabled={savingFlagKey === 'punchListCompleted'}
+              onChange={(e) => void handleToggleWorkOrderFlag('punchListCompleted', e.target.checked)}
               className="h-3.5 w-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
             />
-            Punch List Printed
+            Punch List Completed
           </label>
           <label className="col-span-2 flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600">
             Service Date
