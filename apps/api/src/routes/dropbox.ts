@@ -124,24 +124,18 @@ async function createOpportunityFolderStructure(
   childPath: string,
   safeName: string,
 ): Promise<void> {
-  for (const sf of OPPORTUNITY_SUBFOLDERS) {
+  const createFolder = async (path: string): Promise<void> => {
     try {
-      await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/${sf}`, autorename: false });
+      await dropboxApi(accessToken, '/files/create_folder_v2', { path, autorename: false });
     } catch { /* already exists — ignore */ }
-  }
-  for (const sub of OPPORTUNITY_PHOTOS_SUBFOLDERS) {
-    try {
-      await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/9. Photos/${sub}`, autorename: false });
-    } catch { /* already exists — ignore */ }
-  }
-  for (const sub of OPPORTUNITY_AUTOCAD_SUBFOLDERS) {
-    try {
-      await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/5. AutoCad/${sub}`, autorename: false });
-    } catch { /* already exists — ignore */ }
-  }
-  try {
-    await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/1. Estimation/${safeName}`, autorename: false });
-  } catch { /* already exists — ignore */ }
+  };
+
+  await Promise.all(OPPORTUNITY_SUBFOLDERS.map((subfolder) => createFolder(`${childPath}/${subfolder}`)));
+  await Promise.all([
+    ...OPPORTUNITY_PHOTOS_SUBFOLDERS.map((subfolder) => createFolder(`${childPath}/9. Photos/${subfolder}`)),
+    ...OPPORTUNITY_AUTOCAD_SUBFOLDERS.map((subfolder) => createFolder(`${childPath}/5. AutoCad/${subfolder}`)),
+  ]);
+  await createFolder(`${childPath}/1. Estimation/${safeName}`);
 }
 
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
