@@ -21,7 +21,7 @@ import { useFormulaFields } from '@/lib/use-formula-fields';
 import { useRecordSetupContext } from '@/lib/record-setup-context';
 import { collectDefaultCollapsedWidgetIds } from '@/lib/widget-collapse-defaults';
 import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
-import { RecordTabRenderer } from './record-tab-renderer';
+import { containsDropboxContent, RecordTabRenderer } from './record-tab-renderer';
 import { InlineEditProvider, InlineEditToolbar, InlineEditBottomSpacer } from './inline-edit-context';
 import { RecordActions } from './record-actions';
 
@@ -556,7 +556,7 @@ export default function RecordDetailPage({
               const sortedTabsForNav = [...pageLayout.tabs]
                 .filter((tab: any) => {
                   // Detail page is "view" mode — check hideOnView (with legacy hideOnExisting fallback)
-                  if (tab.hideOnView || tab.hideOnExisting) return false;
+                  if (tab.hideOnView || (tab.hideOnExisting && !containsDropboxContent(tab, objectDef))) return false;
                   // Hide tabs via formatting rules
                   const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
                   if (tabFx?.hidden) return false;
@@ -588,7 +588,7 @@ export default function RecordDetailPage({
             {isPrintMode
               ? [...pageLayout.tabs]
                   .filter((tab: any) => {
-                    if (tab.hideOnView || tab.hideOnExisting) return false;
+                    if (tab.hideOnView || (tab.hideOnExisting && !containsDropboxContent(tab, objectDef))) return false;
                     const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
                     if (tabFx?.hidden) return false;
                     return true;
@@ -623,7 +623,7 @@ export default function RecordDetailPage({
               ? (() => {
                   const sortedTabsForRender = [...pageLayout.tabs]
                     .filter((tab: any) => {
-                      if (tab.hideOnView || tab.hideOnExisting) return false;
+                      if (tab.hideOnView || (tab.hideOnExisting && !containsDropboxContent(tab, objectDef))) return false;
                       const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
                       if (tabFx?.hidden) return false;
                       return true;
@@ -653,7 +653,7 @@ export default function RecordDetailPage({
                 })()
               : pageLayout.tabs
                   .filter((tab: any) => {
-                    if (tab.hideOnView || tab.hideOnExisting) return false;
+                    if (tab.hideOnView || (tab.hideOnExisting && !containsDropboxContent(tab, objectDef))) return false;
                     const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
                     if (tabFx?.hidden) return false;
                     return true;

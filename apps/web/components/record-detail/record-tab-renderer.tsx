@@ -35,6 +35,27 @@ import { cn } from '@/lib/utils';
 
 // ── LookupFieldsCell ──────────────────────────────────────────────────
 
+export function containsDropboxContent(node: any, objectDef?: ObjectDef): boolean {
+  if (!node) return false;
+  if (node.widgetType === 'DropboxFiles' || node.config?.type === 'DropboxFiles' || node.type === 'DropboxFiles') {
+    return true;
+  }
+
+  const fields = node.fields ?? [];
+  if (fields.some((field: any) => {
+    const apiName = field.fieldApiName ?? field.apiName;
+    return field.type === 'DropboxFiles' || objectDef?.fields.some(
+      (fieldDef) => fieldDef.apiName === apiName && fieldDef.type === 'DropboxFiles',
+    );
+  })) {
+    return true;
+  }
+
+  return ['widgets', 'panels', 'regions', 'sections'].some((key) =>
+    (node[key] ?? []).some((child: any) => containsDropboxContent(child, objectDef)),
+  );
+}
+
 function LookupFieldsCell({
   config,
   record,
@@ -293,7 +314,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
   const visibleRegions = regions.filter((region) => {
     if (region.hidden) return false;
     // Detail page is "view" mode — check hideOnView with legacy hideOnExisting fallback
-    if ((region as any).hideOnView || (region as any).hideOnExisting) return false;
+    if ((region as any).hideOnView || ((region as any).hideOnExisting && !containsDropboxContent(region, objectDef))) return false;
     if ((region as any).visibleIf?.length > 0 && !evaluateVisibility((region as any).visibleIf, layoutVisibilityData)) return false;
     const regionFx = getFormattingEffectsForRegion(pageLayout, region.id, layoutVisibilityData);
     return !regionFx?.hidden;
@@ -359,7 +380,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
         {/* Panels */}
           {sortedPanels.map((panel: any) => {
             if (panel.hidden) return null;
-            if (panel.hideOnView || panel.hideOnExisting) return null;
+            if (panel.hideOnView || (panel.hideOnExisting && !containsDropboxContent(panel, objectDef))) return null;
             if (panel.visibleIf?.length > 0 && !evaluateVisibility(panel.visibleIf, layoutVisibilityData)) return null;
             const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
           if (panelFx?.hidden) return null;
