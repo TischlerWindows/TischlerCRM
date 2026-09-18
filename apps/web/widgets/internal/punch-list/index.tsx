@@ -14,7 +14,7 @@
  *   System Information: created by / last modified by (built-in record
  *     audit fields — not custom fields, read-only).
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2, FileText } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
@@ -184,16 +184,26 @@ function EditableCell({
   // Disabled/computed cells are skipped entirely by keyboard navigation.
   const dataCellId = saving ? undefined : cellId
 
+  // Checkbox never remounts between editing/non-editing (there's no edit
+  // mode to toggle into), so unlike the other field types nothing else
+  // gives it DOM focus when keyboard navigation lands on it — do it here.
+  const checkboxRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (isEditing) checkboxRef.current?.focus()
+  }, [isEditing])
+
   if (type === 'checkbox') {
     return (
       <input
         type="checkbox"
+        ref={checkboxRef}
         data-cell-id={dataCellId}
         checked={!!value}
         disabled={saving}
         onChange={(e) => onCommit(e.target.checked)}
         onKeyDown={(e) => {
           if (!onNavigate) return
+          if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); onNavigate(e.currentTarget, 'right'); return }
           const dir: NavDirection | undefined =
             e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : undefined
           if (dir) { e.preventDefault(); onNavigate(e.currentTarget, dir) }
