@@ -353,13 +353,14 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
   // Render a single region's inner content (panels + widgets)
   const renderRegion = (region: LayoutSection) => {
     const sortedPanels = [...(region.panels ?? [])].sort((a: any, b: any) => a.order - b.order);
-    // HeaderHighlights are consumed by the header card — don't render them inline
+    // HeaderHighlights/Path are consumed above the tabs by record-detail-page — don't render them inline
     const sortedWidgets = [...(region.widgets ?? [])]
       .filter(
         (w: any) =>
           !w.hideOnView &&
           (w.widgetType === 'DropboxFiles' || !w.hideOnExisting) &&
-          w.widgetType !== 'HeaderHighlights',
+          w.widgetType !== 'HeaderHighlights' &&
+          w.widgetType !== 'Path',
       )
       .sort((a: any, b: any) => a.order - b.order);
 
@@ -391,7 +392,12 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
           // Component panels — render their widgets via LayoutWidgetsInline
           if (panel.panelType === 'components') {
             const panelWidgets = [...(panel.widgets ?? [])]
-              .filter((w: any) => !w.hideOnView && (w.widgetType === 'DropboxFiles' || !w.hideOnExisting))
+              .filter((w: any) =>
+                !w.hideOnView &&
+                (w.widgetType === 'DropboxFiles' || !w.hideOnExisting) &&
+                w.widgetType !== 'HeaderHighlights' &&
+                w.widgetType !== 'Path',
+              )
               .sort((a: any, b: any) => a.order - b.order);
 
             const isPanelCollapsed = collapsedPanelIds.has(panel.id);

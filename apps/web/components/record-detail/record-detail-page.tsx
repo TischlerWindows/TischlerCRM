@@ -24,6 +24,8 @@ import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-r
 import { containsDropboxContent, RecordTabRenderer } from './record-tab-renderer';
 import { InlineEditProvider, InlineEditToolbar, InlineEditBottomSpacer } from './inline-edit-context';
 import { RecordActions } from './record-actions';
+import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
+import { useEnabledWidgetIds } from '@/lib/use-widget-settings';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -136,6 +138,7 @@ export default function RecordDetailPage({
   const { hasAppPermission } = usePermissions();
   const canCustomize = hasAppPermission('customizeApplication');
   const { setRecordSetupContext } = useRecordSetupContext();
+  const { ids: enabledWidgetIds } = useEnabledWidgetIds();
 
   const [rawRecord, setRawRecord] = useState<RecordData | null>(null);
   const [record, setRecord] = useState<Record<string, any> | null>(null);
@@ -461,6 +464,25 @@ export default function RecordDetailPage({
 
   const showHeaderCard = hasHighlightsWidget || !isNewStyleLayout;
 
+  // ── Resolve Path widget (rendered above the tabs, below header highlights) ──
+  let pathWidget: any = null;
+  if (pageLayout?.tabs) {
+    outerPath: for (const tab of pageLayout.tabs) {
+      const regions = (tab as any).regions ?? [];
+      for (const region of regions) {
+        const pw = region.widgets?.find((w: any) => w.widgetType === 'Path')
+          ?? region.panels?.flatMap((p: any) => p.widgets ?? []).find((w: any) => w.widgetType === 'Path');
+        if (pw) {
+          pathWidget = pw;
+          break outerPath;
+        }
+      }
+    }
+  }
+  const pathObjectDefPayload = objectDef
+    ? { apiName: objectDef.apiName, label: objectDef.label, fields: objectDef.fields.map((f) => ({ apiName: f.apiName, label: f.label, type: String(f.type) })) }
+    : undefined;
+
   // ── Render ───────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
@@ -551,6 +573,18 @@ export default function RecordDetailPage({
           >
             <div className="space-y-4">
               <InlineEditToolbar />
+            {/* Path widget — rendered once, above the tabs, below header highlights */}
+            {pathWidget && (
+              <div className="print:hidden">
+                <LayoutWidgetsInline
+                  widgets={[pathWidget]}
+                  enabledIds={enabledWidgetIds}
+                  record={record ?? undefined}
+                  objectDef={pathObjectDefPayload}
+                  onRecordChange={handleInlineFieldsSaved}
+                />
+              </div>
+            )}
             {/* Tab navigation */}
             {pageLayout.tabs.length > 1 && (() => {
               const sortedTabsForNav = [...pageLayout.tabs]
