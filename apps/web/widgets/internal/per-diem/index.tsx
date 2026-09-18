@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, CalendarDays, FileText, Loader2, Plus, Trash2, WalletCards, X } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
@@ -126,6 +126,15 @@ function EditableCell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing])
 
+  // MultiLookupUserSearch's input has no autoFocus of its own (unlike the
+  // other field types' plain <input>/<textarea>), so nothing gives it DOM
+  // focus when keyboard nav lands here — without this, Tab/Escape/typing
+  // all silently do nothing since no element in the cell is focused.
+  const userCellRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (isEditing && type === 'user') userCellRef.current?.querySelector('input')?.focus()
+  }, [isEditing, type])
+
   const startEditing = () => {
     if (saving) return
     onStartEdit?.()
@@ -155,6 +164,7 @@ function EditableCell({
       // are left alone — the dropdown uses them to highlight options).
       return (
         <div
+          ref={userCellRef}
           onKeyDown={(event) => {
             if (event.key === 'Tab') {
               event.preventDefault()
@@ -231,6 +241,8 @@ function EditableCell({
           if (type === 'date') {
             if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(event.currentTarget, 'down', draft) }
             else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(event.currentTarget, 'up', draft) }
+            else if (event.key === 'ArrowRight') { event.preventDefault(); navigateFrom(event.currentTarget, 'right', draft) }
+            else if (event.key === 'ArrowLeft') { event.preventDefault(); navigateFrom(event.currentTarget, 'left', draft) }
             return
           }
           const el = event.currentTarget

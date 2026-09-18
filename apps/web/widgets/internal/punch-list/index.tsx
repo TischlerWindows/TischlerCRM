@@ -237,6 +237,8 @@ function EditableCell({
             if (e.key === 'Tab') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft) }
             else if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(e.currentTarget, 'down', draft) }
             else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(e.currentTarget, 'up', draft) }
+            else if (e.key === 'ArrowRight') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft) }
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); navigateFrom(e.currentTarget, 'left', draft) }
           }}
           className="w-full min-w-[7rem] border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
