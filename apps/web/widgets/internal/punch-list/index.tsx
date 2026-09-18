@@ -399,7 +399,9 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [serviceDate, setServiceDate] = useState(() => toDateInputValue(record?.serviceDate))
-  const [punchListCreated, setPunchListCreated] = useState(!!record?.punchListCreated)
+  // WorkOrder__punchListCreated pre-dates this widget and always wins over the
+  // bare `punchListCreated` mirror in flattenRecord's prefix-precedence rule.
+  const [punchListCreated, setPunchListCreated] = useState(!!(record?.WorkOrder__punchListCreated ?? record?.punchListCreated))
   const [punchListCompleted, setPunchListCompleted] = useState(!!(record?.punchListCompleted ?? record?.punchListPrinted))
   const [savingFlagKey, setSavingFlagKey] = useState<string | null>(null)
 
@@ -509,7 +511,13 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     setSavingFlagKey(key)
     setError(null)
     try {
-      await recordsService.updateRecord('WorkOrder', recordId, { data: { [key]: value } })
+      // Must also write the prefixed key for 'punchListCreated' — it's the
+      // pre-existing WorkOrder field and flattenRecord always prefers it over
+      // the bare mirror, so a bare-only write gets silently shadowed on reload.
+      const data = key === 'punchListCreated'
+        ? { punchListCreated: value, WorkOrder__punchListCreated: value }
+        : { [key]: value }
+      await recordsService.updateRecord('WorkOrder', recordId, { data })
     } catch (err: unknown) {
       setFlag(!value)
       setError(err instanceof Error ? err.message : 'Failed to save change')
@@ -584,8 +592,6 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
             />
             Punch List Completed
           </label>
-        </div>
-        <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
             Service Date
             <input
