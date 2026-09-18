@@ -68,6 +68,13 @@ export interface WidgetProps {
   } | null
   displayMode: DisplayMode
   orgId: string
+  /**
+   * Widgets that write directly to the record (bypassing the record's own
+   * edit form) call this with the changed field(s) so the parent page's
+   * live `record` state updates immediately — without it, any layout field
+   * bound to the same key stays stale until the page is refetched/reloaded.
+   */
+  onRecordChange?: (changed: Record<string, unknown>) => void
 }
 
 // Props for optional ConfigPanel.tsx escape hatch

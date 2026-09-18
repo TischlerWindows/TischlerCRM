@@ -616,6 +616,7 @@ export default function RecordDetailPage({
                         manualPanelIds={emptySet}
                         collapsedWidgetIds={emptySet}
                         toggleWidgetCollapse={noopToggle}
+                        onRecordChange={handleInlineFieldsSaved}
                       />
                     </div>
                   ))
@@ -648,6 +649,7 @@ export default function RecordDetailPage({
                       manualPanelIds={manualPanelIds}
                       collapsedWidgetIds={collapsedWidgetIds}
                       toggleWidgetCollapse={toggleWidgetCollapse}
+                      onRecordChange={handleInlineFieldsSaved}
                     />
                   );
                 })()
@@ -675,6 +677,7 @@ export default function RecordDetailPage({
                     manualPanelIds={manualPanelIds}
                     collapsedWidgetIds={collapsedWidgetIds}
                     toggleWidgetCollapse={toggleWidgetCollapse}
+                    onRecordChange={handleInlineFieldsSaved}
                   />
                 ))
             }

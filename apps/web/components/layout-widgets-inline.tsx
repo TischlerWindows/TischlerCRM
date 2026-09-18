@@ -150,6 +150,8 @@ interface LayoutWidgetsInlineProps {
   /** Widget-level collapse state */
   collapsedWidgetIds?: Set<string>
   toggleWidgetCollapse?: (widgetId: string) => void
+  /** Forwarded to each widget as `onRecordChange` — see WidgetProps. */
+  onRecordChange?: (changed: Record<string, unknown>) => void
 }
 
 function getIntegrationContext(
@@ -206,6 +208,7 @@ export function LayoutWidgetsInline({
   integrations,
   collapsedWidgetIds,
   toggleWidgetCollapse,
+  onRecordChange,
 }: LayoutWidgetsInlineProps) {
   if (!widgets?.length) return null
 
@@ -264,6 +267,7 @@ export function LayoutWidgetsInline({
                     integration={integration}
                     displayMode={displayMode}
                     orgId={orgId}
+                    onRecordChange={onRecordChange}
                   />
                 </React.Suspense>
               </WidgetErrorBoundary>
@@ -305,6 +309,7 @@ export function LayoutWidgetsInline({
                     integration={null}
                     displayMode="full"
                     orgId={orgId}
+                    onRecordChange={onRecordChange}
                   />
                 </React.Suspense>
               </WidgetErrorBoundary>

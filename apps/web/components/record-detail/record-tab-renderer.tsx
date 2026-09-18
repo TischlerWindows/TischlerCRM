@@ -168,6 +168,9 @@ export interface RecordTabRendererProps {
   /** Widget-level collapse state */
   collapsedWidgetIds: Set<string>;
   toggleWidgetCollapse: (widgetId: string) => void;
+  /** Forwarded to widgets so they can live-update the parent's record state
+   * after writing directly to the record (see WidgetProps.onRecordChange). */
+  onRecordChange?: (changed: Record<string, unknown>) => void;
 }
 
 interface InternalRendererProps extends RecordTabRendererProps {
@@ -427,6 +430,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                         objectDef={buildObjectDefPayload(objectDef)}
                         collapsedWidgetIds={collapsedWidgetIds}
                         toggleWidgetCollapse={toggleWidgetCollapse}
+                        onRecordChange={props.onRecordChange}
                       />
                     ) : (
                       <div className="py-4 text-center text-sm text-gray-400">No components configured</div>
@@ -655,6 +659,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
             objectDef={buildObjectDefPayload(objectDef)}
             collapsedWidgetIds={collapsedWidgetIds}
             toggleWidgetCollapse={toggleWidgetCollapse}
+            onRecordChange={props.onRecordChange}
           />
         )}
       </div>
@@ -792,6 +797,7 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
             objectDef={buildObjectDefPayload(objectDef)}
             collapsedWidgetIds={collapsedWidgetIds}
             toggleWidgetCollapse={toggleWidgetCollapse}
+            onRecordChange={props.onRecordChange}
           />
         </div>
       );

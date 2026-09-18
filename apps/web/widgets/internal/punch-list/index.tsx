@@ -385,7 +385,7 @@ function NewPunchListModal({
   )
 }
 
-export default function PunchListWidget({ record, object }: WidgetProps) {
+export default function PunchListWidget({ record, object, onRecordChange }: WidgetProps) {
   const { user } = useAuth()
   const recordId = record?.id ? String(record.id) : undefined
   const workOrderName = String(record?.name ?? record?.title ?? record?.workOrderNumber ?? '')
@@ -518,6 +518,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
         ? { punchListCreated: value, WorkOrder__punchListCreated: value }
         : { [key]: value }
       await recordsService.updateRecord('WorkOrder', recordId, { data })
+      onRecordChange?.(data)
     } catch (err: unknown) {
       setFlag(!value)
       setError(err instanceof Error ? err.message : 'Failed to save change')
@@ -534,6 +535,7 @@ export default function PunchListWidget({ record, object }: WidgetProps) {
     setError(null)
     try {
       await recordsService.updateRecord('WorkOrder', recordId, { data: { serviceDate: value || null } })
+      onRecordChange?.({ serviceDate: value || null })
     } catch (err: unknown) {
       setServiceDate(previous)
       setError(err instanceof Error ? err.message : 'Failed to save change')
