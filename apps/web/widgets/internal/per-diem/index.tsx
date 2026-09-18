@@ -150,15 +150,30 @@ function EditableCell({
 
   if (isEditing) {
     if (type === 'user') {
+      // MultiLookupUserSearch owns its own input/dropdown and has no notion
+      // of cell navigation, so Tab/Escape are intercepted here (ArrowUp/Down
+      // are left alone — the dropdown uses them to highlight options).
       return (
-        <UserLookupField
-          value={draft}
-          onClose={() => onStopEdit?.()}
-          onChange={(nextValue) => {
-            setDraft(nextValue)
-            if (nextValue !== value) onCommit(nextValue)
+        <div
+          onKeyDown={(event) => {
+            if (event.key === 'Tab') {
+              event.preventDefault()
+              if (onNavigate) navigateFrom(event.currentTarget, 'right', draft)
+              else onStopEdit?.()
+            } else if (event.key === 'Escape') {
+              onStopEdit?.()
+            }
           }}
-        />
+        >
+          <UserLookupField
+            value={draft}
+            onClose={() => onStopEdit?.()}
+            onChange={(nextValue) => {
+              setDraft(nextValue)
+              if (nextValue !== value) onCommit(nextValue)
+            }}
+          />
+        </div>
       )
     }
     if (type === 'textarea') {
