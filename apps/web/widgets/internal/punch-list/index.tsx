@@ -140,6 +140,7 @@ function EditableCell({
   value,
   type,
   saving,
+  computed,
   isEditing,
   onStartEdit,
   onStopEdit,
@@ -150,6 +151,9 @@ function EditableCell({
   value: unknown
   type: FieldType
   saving: boolean
+  /** Permanently non-editable (e.g. a calculated field) — always skipped by
+   * keyboard navigation, unlike `saving` which is only temporarily true. */
+  computed?: boolean
   isEditing?: boolean
   onStartEdit?: () => void
   onStopEdit?: () => void
@@ -181,8 +185,11 @@ function EditableCell({
     onNavigate?.(el, direction)
   }
 
-  // Disabled/computed cells are skipped entirely by keyboard navigation.
-  const dataCellId = saving ? undefined : cellId
+  // Only a permanently computed cell is skipped by keyboard navigation —
+  // a cell that's merely mid-save (saving=true for the whole row while any
+  // one field in it is in flight) must stay reachable, or Tab/Enter/arrows
+  // stop working across the entire row until that save resolves.
+  const dataCellId = computed ? undefined : cellId
 
   // Checkbox never remounts between editing/non-editing (there's no edit
   // mode to toggle into), so unlike the other field types nothing else
@@ -846,6 +853,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                         value={row.data?.[f.key]}
                         type={f.type}
                         saving={savingRowId === row.id || f.computed === true}
+                        computed={f.computed === true}
                         isEditing={editingCellId === `${row.id}:${f.key}`}
                         onStartEdit={() => setEditingCellId(`${row.id}:${f.key}`)}
                         onStopEdit={() => setEditingCellId(null)}
@@ -887,6 +895,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                     value={row.data?.[field.key] ?? (field.key === 'itemNumber' ? index + 1 : undefined)}
                     type={field.type}
                     saving={savingRowId === row.id || field.computed === true}
+                    computed={field.computed === true}
                     isEditing={editingCellId === `${row.id}:${field.key}`}
                     onStartEdit={() => setEditingCellId(`${row.id}:${field.key}`)}
                     onStopEdit={() => setEditingCellId(null)}

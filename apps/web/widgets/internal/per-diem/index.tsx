@@ -142,8 +142,11 @@ function EditableCell({
     onNavigate?.(el, direction)
   }
 
-  // Disabled cells are skipped entirely by keyboard navigation.
-  const dataCellId = saving ? undefined : cellId
+  // Per Diem has no permanently non-editable fields, so unlike Punch List's
+  // computed column, `saving` (temporary, whole-row) must never hide this
+  // cell from keyboard navigation — that would stall Tab/Enter/arrows across
+  // the entire row until the in-flight save resolves.
+  const dataCellId = cellId
 
   if (isEditing) {
     if (type === 'user') {
