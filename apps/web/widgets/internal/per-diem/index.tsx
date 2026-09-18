@@ -202,9 +202,18 @@ function EditableCell({
           if (event.key === 'Escape') { onStopEdit?.(); return }
           if (!onNavigate) return
           if (event.key === 'Tab') { event.preventDefault(); navigateFrom(event.currentTarget, 'right', draft); return }
-          if (isNumber || type === 'date') {
-            // Number/date inputs don't support selectionStart/End reliably, and
-            // native ArrowUp/Down on <input type=number> increments the value.
+          // Number inputs don't reliably support selectionStart/End (throws
+          // in Firefox) and native ArrowUp/Down increments the value, so
+          // arrows always navigate instead of moving the caret. Date inputs
+          // keep native ArrowLeft/Right to move between month/day/year.
+          if (isNumber) {
+            if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(event.currentTarget, 'down', draft) }
+            else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(event.currentTarget, 'up', draft) }
+            else if (event.key === 'ArrowRight') { event.preventDefault(); navigateFrom(event.currentTarget, 'right', draft) }
+            else if (event.key === 'ArrowLeft') { event.preventDefault(); navigateFrom(event.currentTarget, 'left', draft) }
+            return
+          }
+          if (type === 'date') {
             if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(event.currentTarget, 'down', draft) }
             else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(event.currentTarget, 'up', draft) }
             return

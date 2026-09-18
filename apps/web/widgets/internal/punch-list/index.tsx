@@ -282,11 +282,14 @@ function EditableCell({
           if (e.key === 'Escape') { onStopEdit?.(); return }
           if (!onNavigate) return
           if (e.key === 'Tab') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft); return }
-          // Number inputs don't support selectionStart/End, and their native
-          // ArrowUp/Down increments the value — always navigate instead.
+          // Number inputs don't reliably support selectionStart/End (throws
+          // in Firefox), and native ArrowUp/Down increments the value —
+          // arrow keys always navigate instead of moving the caret.
           if (isNumber) {
             if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(e.currentTarget, 'down', draft) }
             else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(e.currentTarget, 'up', draft) }
+            else if (e.key === 'ArrowRight') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft) }
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); navigateFrom(e.currentTarget, 'left', draft) }
             return
           }
           const el = e.currentTarget
