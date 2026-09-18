@@ -20,6 +20,7 @@ import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2, FileText } from 'luc
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { useAuth } from '@/lib/auth-context'
+import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
 import { generatePunchListPdf } from './pdf'
 
 type FieldType = 'text' | 'textarea' | 'checkbox' | 'number' | 'date'
@@ -130,55 +131,96 @@ function computeTotalHours(values: Record<string, unknown>): number {
 /**
  * Click-to-edit grid cell. Commits immediately on blur/Enter — punch list
  * rows are meant to be edited in place, one field at a time, with no
- * separate Save step.
+ * separate Save step. When `onNavigate` is supplied (desktop table only),
+ * Tab/Enter/arrow keys move to the adjacent cell Excel-style, matching the
+ * Summary pages' grid navigation.
  */
 function EditableCell({
+  cellId,
   value,
   type,
   saving,
+  isEditing,
+  onStartEdit,
+  onStopEdit,
   onCommit,
+  onNavigate,
 }: {
+  cellId?: string
   value: unknown
   type: FieldType
   saving: boolean
+  isEditing?: boolean
+  onStartEdit?: () => void
+  onStopEdit?: () => void
   onCommit: (newValue: unknown) => void
+  onNavigate?: (fromEl: HTMLElement, direction: NavDirection) => void
 }) {
-  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<unknown>(value)
+
+  useEffect(() => {
+    if (isEditing) setDraft(value ?? (type === 'checkbox' ? false : ''))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing])
 
   const startEdit = () => {
     if (saving) return
-    setDraft(value ?? (type === 'checkbox' ? false : ''))
-    setEditing(true)
+    onStartEdit?.()
   }
 
   const commit = (newValue: unknown) => {
-    setEditing(false)
+    onStopEdit?.()
     if (newValue !== value) onCommit(newValue)
   }
+
+  // Commits the draft, then hands off to the adjacent cell (or just stops
+  // editing if there's nowhere to go / navigation isn't wired up here).
+  const navigateFrom = (el: HTMLElement, direction: NavDirection, newValue: unknown) => {
+    onStopEdit?.()
+    if (newValue !== value) onCommit(newValue)
+    onNavigate?.(el, direction)
+  }
+
+  // Disabled/computed cells are skipped entirely by keyboard navigation.
+  const dataCellId = saving ? undefined : cellId
 
   if (type === 'checkbox') {
     return (
       <input
         type="checkbox"
+        data-cell-id={dataCellId}
         checked={!!value}
         disabled={saving}
         onChange={(e) => onCommit(e.target.checked)}
+        onKeyDown={(e) => {
+          if (!onNavigate) return
+          const dir: NavDirection | undefined =
+            e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : undefined
+          if (dir) { e.preventDefault(); onNavigate(e.currentTarget, dir) }
+        }}
         className="h-4 w-4 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
       />
     )
   }
 
-  if (editing) {
+  if (isEditing) {
     if (type === 'date') {
       return (
         <input
           type="date"
+          data-cell-id={dataCellId}
           autoFocus
           value={toDateInputValue(draft)}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => commit(draft)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(draft) } else if (e.key === 'Escape') setEditing(false) }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); onNavigate ? navigateFrom(e.currentTarget, 'right', draft) : commit(draft); return }
+            if (e.key === 'Escape') { onStopEdit?.(); return }
+            if (!onNavigate) return
+            if (e.key === 'Tab') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft) }
+            else if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(e.currentTarget, 'down', draft) }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(e.currentTarget, 'up', draft) }
+          }}
           className="w-full min-w-[7rem] border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
@@ -186,24 +228,58 @@ function EditableCell({
     if (type === 'textarea') {
       return (
         <textarea
+          data-cell-id={dataCellId}
           autoFocus
           value={typeof draft === 'string' ? draft : ''}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => commit(draft)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false) }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { onStopEdit?.(); return }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onNavigate ? navigateFrom(e.currentTarget, 'right', draft) : commit(draft); return }
+            if (!onNavigate) return
+            if (e.key === 'Tab') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft); return }
+            const el = e.currentTarget
+            const atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
+            const atStart = el.selectionStart === 0 && el.selectionEnd === 0
+            if (e.key === 'ArrowRight' && atEnd) { e.preventDefault(); navigateFrom(el, 'right', draft) }
+            else if (e.key === 'ArrowLeft' && atStart) { e.preventDefault(); navigateFrom(el, 'left', draft) }
+            else if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(el, 'down', draft) }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(el, 'up', draft) }
+          }}
           rows={2}
           className="w-full min-w-[9rem] border border-brand-navy/40 rounded px-1 py-1 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }
+    const isNumber = type === 'number'
     return (
       <input
-        type={type === 'number' ? 'number' : 'text'}
+        type={isNumber ? 'number' : 'text'}
+        data-cell-id={dataCellId}
         autoFocus
         value={typeof draft === 'string' || typeof draft === 'number' ? String(draft) : ''}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => commit(draft)}
-        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(draft) } else if (e.key === 'Escape') setEditing(false) }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); onNavigate ? navigateFrom(e.currentTarget, 'right', draft) : commit(draft); return }
+          if (e.key === 'Escape') { onStopEdit?.(); return }
+          if (!onNavigate) return
+          if (e.key === 'Tab') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft); return }
+          // Number inputs don't support selectionStart/End, and their native
+          // ArrowUp/Down increments the value — always navigate instead.
+          if (isNumber) {
+            if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(e.currentTarget, 'down', draft) }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(e.currentTarget, 'up', draft) }
+            return
+          }
+          const el = e.currentTarget
+          const atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
+          const atStart = el.selectionStart === 0 && el.selectionEnd === 0
+          if (e.key === 'ArrowRight' && atEnd) { e.preventDefault(); navigateFrom(el, 'right', draft) }
+          else if (e.key === 'ArrowLeft' && atStart) { e.preventDefault(); navigateFrom(el, 'left', draft) }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(el, 'down', draft) }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(el, 'up', draft) }
+        }}
         className="w-full min-w-[4.5rem] border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
       />
     )
@@ -213,7 +289,14 @@ function EditableCell({
   return (
     <button
       type="button"
+      data-cell-id={dataCellId}
       onClick={startEdit}
+      onKeyDown={(e) => {
+        if (!onNavigate) return
+        const dir: NavDirection | undefined =
+          e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : undefined
+        if (dir) { e.preventDefault(); onNavigate(e.currentTarget, dir) }
+      }}
       disabled={saving}
       className="w-full text-left rounded px-1 py-0.5 -mx-1 hover:bg-brand-navy/5 disabled:opacity-50 whitespace-normal break-words"
       title={type === 'textarea' ? display : undefined}
@@ -404,6 +487,15 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   const [punchListCreated, setPunchListCreated] = useState(!!(record?.WorkOrder__punchListCreated ?? record?.punchListCreated))
   const [punchListCompleted, setPunchListCompleted] = useState(!!(record?.punchListCompleted ?? record?.punchListPrinted))
   const [savingFlagKey, setSavingFlagKey] = useState<string | null>(null)
+  // Which grid cell (`${rowId}:${fieldKey}`) is currently in edit mode — lifted
+  // here (rather than local to EditableCell) so keyboard navigation can move
+  // editing from one cell to the next, Excel/Summary-page style.
+  const [editingCellId, setEditingCellId] = useState<string | null>(null)
+
+  const handleNavigate = (el: HTMLElement, direction: NavDirection) => {
+    const td = el.closest('td')
+    setEditingCellId(td ? findAdjacentCellId(td, direction) : null)
+  }
 
   const load = useCallback(async () => {
     if (!recordId) return
@@ -740,10 +832,15 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                   {ALL_FIELDS.map((f) => (
                     <td key={f.key} className={`px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${getCellWidthClass(f.key)}`}>
                       <EditableCell
+                        cellId={`${row.id}:${f.key}`}
                         value={row.data?.[f.key]}
                         type={f.type}
                         saving={savingRowId === row.id || f.computed === true}
+                        isEditing={editingCellId === `${row.id}:${f.key}`}
+                        onStartEdit={() => setEditingCellId(`${row.id}:${f.key}`)}
+                        onStopEdit={() => setEditingCellId(null)}
                         onCommit={(value) => handleCellCommit(row.id, f.key, value)}
+                        onNavigate={handleNavigate}
                       />
                     </td>
                   ))}
@@ -776,9 +873,13 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                 <div key={field.key} className={`${getMobileRowWidthClass(field)} shrink-0`}>
                   <p className="truncate text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
                   <EditableCell
+                    cellId={`${row.id}:${field.key}`}
                     value={row.data?.[field.key] ?? (field.key === 'itemNumber' ? index + 1 : undefined)}
                     type={field.type}
                     saving={savingRowId === row.id || field.computed === true}
+                    isEditing={editingCellId === `${row.id}:${field.key}`}
+                    onStartEdit={() => setEditingCellId(`${row.id}:${field.key}`)}
+                    onStopEdit={() => setEditingCellId(null)}
                     onCommit={(value) => handleCellCommit(row.id, field.key, value)}
                   />
                 </div>

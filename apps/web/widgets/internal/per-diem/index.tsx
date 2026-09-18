@@ -7,6 +7,7 @@ import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
 import { resolveLookupDisplayName } from '@/lib/utils'
 import { MultiLookupUserSearch } from '@/components/form/lookup-search'
+import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
 import { generatePerDiemPdf } from './pdf'
 
 type FieldType = 'text' | 'textarea' | 'currency' | 'date' | 'user'
@@ -98,36 +99,58 @@ function UserLookupField({
 }
 
 function EditableCell({
+  cellId,
   value,
   type,
   saving,
+  isEditing,
+  onStartEdit,
+  onStopEdit,
   onCommit,
+  onNavigate,
 }: {
+  cellId?: string
   value: unknown
   type: FieldType
   saving: boolean
+  isEditing?: boolean
+  onStartEdit?: () => void
+  onStopEdit?: () => void
   onCommit: (value: unknown) => void
+  onNavigate?: (fromEl: HTMLElement, direction: NavDirection) => void
 }) {
-  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<unknown>(value)
+
+  useEffect(() => {
+    if (isEditing) setDraft(value ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing])
 
   const startEditing = () => {
     if (saving) return
-    setDraft(value ?? '')
-    setEditing(true)
+    onStartEdit?.()
   }
 
   const commit = () => {
-    setEditing(false)
+    onStopEdit?.()
     if (draft !== value) onCommit(draft)
   }
 
-  if (editing) {
+  const navigateFrom = (el: HTMLElement, direction: NavDirection, newValue: unknown) => {
+    onStopEdit?.()
+    if (newValue !== value) onCommit(newValue)
+    onNavigate?.(el, direction)
+  }
+
+  // Disabled cells are skipped entirely by keyboard navigation.
+  const dataCellId = saving ? undefined : cellId
+
+  if (isEditing) {
     if (type === 'user') {
       return (
         <UserLookupField
           value={draft}
-          onClose={() => setEditing(false)}
+          onClose={() => onStopEdit?.()}
           onChange={(nextValue) => {
             setDraft(nextValue)
             if (nextValue !== value) onCommit(nextValue)
@@ -138,27 +161,58 @@ function EditableCell({
     if (type === 'textarea') {
       return (
         <textarea
+          data-cell-id={dataCellId}
           autoFocus
           value={typeof draft === 'string' ? draft : ''}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commit}
-          onKeyDown={(event) => { if (event.key === 'Escape') setEditing(false) }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') { onStopEdit?.(); return }
+            if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); onNavigate ? navigateFrom(event.currentTarget, 'right', draft) : commit(); return }
+            if (!onNavigate) return
+            if (event.key === 'Tab') { event.preventDefault(); navigateFrom(event.currentTarget, 'right', draft); return }
+            const el = event.currentTarget
+            const atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
+            const atStart = el.selectionStart === 0 && el.selectionEnd === 0
+            if (event.key === 'ArrowRight' && atEnd) { event.preventDefault(); navigateFrom(el, 'right', draft) }
+            else if (event.key === 'ArrowLeft' && atStart) { event.preventDefault(); navigateFrom(el, 'left', draft) }
+            else if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(el, 'down', draft) }
+            else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(el, 'up', draft) }
+          }}
           rows={2}
           className="w-full min-w-[12rem] resize-none rounded border border-brand-navy/40 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }
+    const isNumber = type === 'currency'
     return (
       <input
+        data-cell-id={dataCellId}
         autoFocus
-        type={type === 'date' ? 'date' : type === 'currency' ? 'number' : 'text'}
-        step={type === 'currency' ? '0.01' : undefined}
+        type={type === 'date' ? 'date' : isNumber ? 'number' : 'text'}
+        step={isNumber ? '0.01' : undefined}
         value={type === 'date' ? dateValue(draft) : typeof draft === 'string' || typeof draft === 'number' ? String(draft) : ''}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') { event.preventDefault(); commit() }
-          if (event.key === 'Escape') setEditing(false)
+          if (event.key === 'Enter') { event.preventDefault(); onNavigate ? navigateFrom(event.currentTarget, 'right', draft) : commit(); return }
+          if (event.key === 'Escape') { onStopEdit?.(); return }
+          if (!onNavigate) return
+          if (event.key === 'Tab') { event.preventDefault(); navigateFrom(event.currentTarget, 'right', draft); return }
+          if (isNumber || type === 'date') {
+            // Number/date inputs don't support selectionStart/End reliably, and
+            // native ArrowUp/Down on <input type=number> increments the value.
+            if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(event.currentTarget, 'down', draft) }
+            else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(event.currentTarget, 'up', draft) }
+            return
+          }
+          const el = event.currentTarget
+          const atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
+          const atStart = el.selectionStart === 0 && el.selectionEnd === 0
+          if (event.key === 'ArrowRight' && atEnd) { event.preventDefault(); navigateFrom(el, 'right', draft) }
+          else if (event.key === 'ArrowLeft' && atStart) { event.preventDefault(); navigateFrom(el, 'left', draft) }
+          else if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(el, 'down', draft) }
+          else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(el, 'up', draft) }
         }}
         className="w-full min-w-[7rem] rounded border border-brand-navy/40 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
       />
@@ -168,8 +222,15 @@ function EditableCell({
   return (
     <button
       type="button"
+      data-cell-id={dataCellId}
       onClick={startEditing}
       disabled={saving}
+      onKeyDown={(event) => {
+        if (!onNavigate) return
+        const dir: NavDirection | undefined =
+          event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : event.key === 'ArrowUp' ? 'up' : event.key === 'ArrowDown' ? 'down' : undefined
+        if (dir) { event.preventDefault(); onNavigate(event.currentTarget, dir) }
+      }}
       className="w-full rounded px-1 py-0.5 text-left hover:bg-brand-navy/5 disabled:opacity-50"
       title={type === 'textarea' ? displayValue(value, type) : undefined}
     >
@@ -246,6 +307,14 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const workOrderName = String(record?.name ?? record?.title ?? record?.workOrderNumber ?? '')
+  // Which grid cell (`${rowId}:${fieldKey}`) is currently in edit mode — lifted
+  // here so keyboard navigation can move editing to the next cell.
+  const [editingCellId, setEditingCellId] = useState<string | null>(null)
+
+  const handleNavigate = (el: HTMLElement, direction: NavDirection) => {
+    const td = el.closest('td')
+    setEditingCellId(td ? findAdjacentCellId(td, direction) : null)
+  }
 
   const load = useCallback(async () => {
     if (!recordId) return
@@ -407,7 +476,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
             <tbody>
               {rows.map((row, index) => (
                 <tr key={row.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  {FIELDS.map((field) => <td key={field.key} className="max-w-[24rem] border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words"><EditableCell value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, field.key, value)} /></td>)}
+                  {FIELDS.map((field) => <td key={field.key} className="max-w-[24rem] border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words"><EditableCell cellId={`${row.id}:${field.key}`} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:${field.key}`} onStartEdit={() => setEditingCellId(`${row.id}:${field.key}`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} onNavigate={handleNavigate} /></td>)}
                   <td className="w-8 border-b border-gray-100 px-1 py-1.5 align-top"><button type="button" onClick={() => void handleDelete(row)} disabled={deletingRowId === row.id || savingRowId === row.id} aria-label="Delete per diem record" title="Delete per diem record" className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">{deletingRowId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}</button></td>
                 </tr>
               ))}
@@ -422,23 +491,23 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
             <article key={row.id} className="flex min-w-[36rem] items-center gap-3 border-b border-gray-100 bg-white px-2 py-2 last:border-b-0">
               <div className="w-28 shrink-0">
                 <p className="text-[9px] font-semibold uppercase text-gray-400">Tech</p>
-                <EditableCell value={row.data?.serviceTechPerDiem} type="text" saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, 'serviceTechPerDiem', value)} />
+                <EditableCell cellId={`${row.id}:serviceTechPerDiem`} value={row.data?.serviceTechPerDiem} type="text" saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:serviceTechPerDiem`} onStartEdit={() => setEditingCellId(`${row.id}:serviceTechPerDiem`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, 'serviceTechPerDiem', value)} />
               </div>
               <div className="w-28 shrink-0">
                 <p className="text-[9px] font-semibold uppercase text-gray-400">Start Date</p>
-                <EditableCell value={row.data?.perDiemStartDate} type="date" saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, 'perDiemStartDate', value)} />
+                <EditableCell cellId={`${row.id}:perDiemStartDate`} value={row.data?.perDiemStartDate} type="date" saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:perDiemStartDate`} onStartEdit={() => setEditingCellId(`${row.id}:perDiemStartDate`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, 'perDiemStartDate', value)} />
               </div>
               <div className="w-28 shrink-0">
                 <p className="text-[9px] font-semibold uppercase text-gray-400">End Date</p>
-                <EditableCell value={row.data?.perDiemEndDate} type="date" saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, 'perDiemEndDate', value)} />
+                <EditableCell cellId={`${row.id}:perDiemEndDate`} value={row.data?.perDiemEndDate} type="date" saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:perDiemEndDate`} onStartEdit={() => setEditingCellId(`${row.id}:perDiemEndDate`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, 'perDiemEndDate', value)} />
               </div>
               <div className="w-24 shrink-0">
                 <p className="text-[9px] font-semibold uppercase text-gray-400">Amount</p>
-                <EditableCell value={row.data?.perDiemAmount} type="currency" saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, 'perDiemAmount', value)} />
+                <EditableCell cellId={`${row.id}:perDiemAmount`} value={row.data?.perDiemAmount} type="currency" saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:perDiemAmount`} onStartEdit={() => setEditingCellId(`${row.id}:perDiemAmount`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, 'perDiemAmount', value)} />
               </div>
               <div className="min-w-[14rem] flex-1">
                 <p className="text-[9px] font-semibold uppercase text-gray-400">Notes</p>
-                <EditableCell value={row.data?.perDiemNotes} type="textarea" saving={savingRowId === row.id} onCommit={(value) => void handleCommit(row.id, 'perDiemNotes', value)} />
+                <EditableCell cellId={`${row.id}:perDiemNotes`} value={row.data?.perDiemNotes} type="textarea" saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:perDiemNotes`} onStartEdit={() => setEditingCellId(`${row.id}:perDiemNotes`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, 'perDiemNotes', value)} />
               </div>
               <button type="button" onClick={() => void handleDelete(row)} disabled={deletingRowId === row.id || savingRowId === row.id} aria-label="Delete per diem record" className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">
                 {deletingRowId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
