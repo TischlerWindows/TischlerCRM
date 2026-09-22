@@ -26,6 +26,7 @@ export const INTERNAL_WIDGET_IDS = [
   'clock-in',
   'punch-list',
   'per-diem',
+  'autocad',
 ] as const
 export type InternalWidgetId = (typeof INTERNAL_WIDGET_IDS)[number]
 
