@@ -51,6 +51,7 @@ import { specVariantRoutes } from './routes/spec-variants.js';
 import { tokenMappingRoutes } from './routes/token-mappings.js';
 import { proposalPdfRoutes } from './routes/proposal-pdf.js';
 import { projectListPdfRoutes } from './routes/project-list-pdf.js';
+import { installProgressPdfRoutes } from './routes/install-progress-pdf.js';
 import { pdfEchoRoutes } from './routes/pdf-echo.js';
 import { seedCategoriesIfMissing } from './lib/support-tickets/categories.js';
 
@@ -551,6 +552,7 @@ export function buildApp() {
   app.register(tokenMappingRoutes);
   app.register(proposalPdfRoutes);
   app.register(projectListPdfRoutes);
+  app.register(installProgressPdfRoutes);
   app.register(pdfEchoRoutes);
 
   // Start the Postgres LISTEN connection so notify() events broadcast

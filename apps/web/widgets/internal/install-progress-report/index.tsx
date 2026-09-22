@@ -9,19 +9,24 @@
  * stage column (not declared as CustomFields — Record.data tolerates
  * arbitrary keys, same as how other widgets mirror state onto the parent).
  *
- * Rows are grouped into subtotal batches via the `groupBreak` checkbox
- * (checking it renders a subtotal row right after that row and starts a
- * new group) plus a grand total row at the end, matching the original
- * "Install Progress Report" spreadsheet's per-page subtotal + grand total.
+ * Rows are auto-batched into fixed-size groups (roughly one printed page's
+ * worth each) with a subtotal row rendered after each batch, plus a grand
+ * total row at the end, matching the original "Install Progress Report"
+ * spreadsheet's per-page subtotal + grand total. On screen, subtotals stay
+ * hidden; "Preview PDF" renders a real server-side PDF (PDFKit, see
+ * apps/api/src/lib/install-progress-pdf/renderer.ts) which paginates for
+ * real and draws a subtotal row at the bottom of each actual page.
  *
  * Stage checkboxes enforce a left-to-right progression: checking a later
  * stage marks all earlier stages complete too (and locks them); the only
  * checkbox a user can uncheck directly is the current furthest stage.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, ClipboardCheck, Loader2, Plus, Printer, Trash2 } from 'lucide-react'
+import { AlertCircle, ClipboardCheck, FileText, Loader2, Plus, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
+import { apiClient } from '@/lib/api-client'
+import { getRecordName } from '../shared/recordName'
 
 interface StageColumn {
   key: string
@@ -193,6 +198,7 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
   const [savingRowId, setSavingRowId] = useState<string | null>(null)
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
   const [stageColumns, setStageColumns] = useState<StageColumn[]>(() => parseStageColumns(record?.installProgressColumns))
+  const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const load = useCallback(async () => {
     if (!installationId) return
@@ -299,6 +305,58 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
     }
   }
 
+  const handlePreviewPdf = async () => {
+    if (generatingPdf) return
+    // Open the tab synchronously inside the click handler so popup blockers
+    // don't kill it after the await (matches the Project List Report flow).
+    const previewWindow = window.open('', '_blank')
+    setGeneratingPdf(true)
+    setError(null)
+    try {
+      const installationName = record ? getRecordName(record as Record<string, unknown>) : 'Installation'
+      const payloadRows = rows.map((row) => ({
+        page: row.data?.page,
+        unitType: row.data?.unitType,
+        code: row.data?.code,
+        openingNumber: row.data?.openingNumber,
+        location: row.data?.location,
+        remarks: row.data?.remarks,
+        sequence: row.data?.sequence,
+        stages: Object.fromEntries(stageColumns.map((c) => [c.key, !!row.data?.[`stage_${c.key}`]])),
+      }))
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+      const token = apiClient.getToken()
+      const response = await fetch(`${apiBase}/install-progress-pdf/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ installationName, stageColumns, rows: payloadRows }),
+      })
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }))
+        throw new Error(detail.error || `Failed to render PDF (${response.status})`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url
+      } else {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'Install_Progress_Report.pdf'
+        link.click()
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err: unknown) {
+      previewWindow?.close()
+      setError(err instanceof Error ? err.message : 'Failed to generate Install Progress Report PDF')
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
   // Subtotals are print-only: rows are auto-batched into fixed-size groups
   // (roughly one printed page's worth each) and a subtotal row is rendered
   // after each batch, hidden on screen and shown only when printing.
@@ -335,11 +393,12 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
         <div className="flex items-center gap-2 print:hidden">
           <button
             type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+            onClick={() => void handlePreviewPdf()}
+            disabled={generatingPdf}
+            className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
-            <Printer className="h-3.5 w-3.5" />
-            Print
+            {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+            {generatingPdf ? 'Preparing PDF…' : 'Preview PDF'}
           </button>
           <button
             type="button"
