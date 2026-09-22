@@ -71,6 +71,7 @@ const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'ClockIn',
   'PunchList',
   'PerDiem',
+  'AutoCad',
 ]);
 
 export function isWidgetType(value: string): value is WidgetType {

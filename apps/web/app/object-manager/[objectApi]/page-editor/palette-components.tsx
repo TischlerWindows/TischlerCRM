@@ -21,6 +21,7 @@ import {
   StretchHorizontal,
   Table,
   UserCheck,
+  Wrench,
 } from 'lucide-react';
 import type { ElementType } from 'react';
 
@@ -39,6 +40,7 @@ const LUCIDE_ICON_MAP: Record<string, ElementType> = {
   StretchHorizontal,
   Table,
   UserCheck,
+  Wrench,
 };
 
 function getLucideIcon(name: string): ElementType {
@@ -68,6 +70,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'clock-in': 'ClockIn',
   'punch-list': 'PunchList',
   'per-diem': 'PerDiem',
+  'autocad': 'AutoCad',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {

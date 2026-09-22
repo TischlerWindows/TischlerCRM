@@ -228,7 +228,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem' | 'AutoCad';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -407,6 +407,10 @@ export interface PerDiemConfig {
   type: 'PerDiem';
 }
 
+export interface AutoCadConfig {
+  type: 'AutoCad';
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -426,7 +430,8 @@ export type WidgetConfig =
   | ProjectListVerticalConfig
   | ClockInConfig
   | PunchListConfig
-  | PerDiemConfig;
+  | PerDiemConfig
+  | AutoCadConfig;
 
 export interface PageWidget {
   id: string;

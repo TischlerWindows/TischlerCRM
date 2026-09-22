@@ -37,6 +37,7 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   ClockIn: { type: 'ClockIn' },
   PunchList: { type: 'PunchList' },
   PerDiem: { type: 'PerDiem' },
+  AutoCad: { type: 'AutoCad' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────
