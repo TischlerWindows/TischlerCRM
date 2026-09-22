@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * AutoCad widget — a screw schedule grid for Work Orders. Each row picks a
+ * AutoCad widget — a screw schedule grid for Projects. Each row picks a
  * screw from a fixed catalog; width/name/length are parsed from that pick
  * and saved alongside it (not live Formula fields, computed on commit like
  * the Punch List widget's Total Estimate of Hours).
@@ -364,7 +364,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     setLoading(true)
     setError(null)
     try {
-      setRows(await recordsService.getRecords('AutoCad', { filter: { workOrder: recordId } }))
+      setRows(await recordsService.getRecords('AutoCad', { filter: { project: recordId } }))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load AutoCad items')
     } finally {
@@ -374,10 +374,10 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
 
   useEffect(() => { void load() }, [load])
 
-  if (object?.apiName && object.apiName !== 'WorkOrder') {
+  if (object?.apiName && object.apiName !== 'Project') {
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-        The AutoCad widget can only be placed on the Work Order object&rsquo;s layout.
+        The AutoCad widget can only be placed on the Project object&rsquo;s layout.
       </div>
     )
   }
@@ -404,7 +404,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     setCreating(true)
     setError(null)
     try {
-      const created = await recordsService.createRecord('AutoCad', { data: { workOrder: recordId } })
+      const created = await recordsService.createRecord('AutoCad', { data: { project: recordId } })
       if (created) setRows((prev) => [...prev, created])
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to add AutoCad row')

@@ -361,7 +361,7 @@ const CORE_OBJECTS = [
     apiName: 'AutoCad',
     label: 'AutoCad',
     pluralLabel: 'AutoCad Items',
-    description: 'Screw schedule items tracked against a Work Order',
+    description: 'Screw schedule items tracked against a Project',
     fields: [
       { apiName: 'tusProjectManager', label: 'TUS Project Manager', type: 'MultiLookupUser' },
       { apiName: 'screwSelection', label: 'Screw Selection', type: 'Picklist', picklistValues: SCREW_SELECTION_OPTIONS },
@@ -370,7 +370,7 @@ const CORE_OBJECTS = [
       { apiName: 'screwName', label: 'Screw Name or Item Name', type: 'Text' },
       { apiName: 'screwLength', label: 'Screw Length', type: 'Text' },
       { apiName: 'totalQty', label: 'Total QTY', type: 'Number' },
-      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
+      { apiName: 'project', label: 'Project', type: 'Lookup', required: true },
     ],
   },
   {
