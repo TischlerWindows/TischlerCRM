@@ -91,11 +91,16 @@ const WRAPPED_HEADER_KEYS = new Set([
   'totalEstimateOfHours',
 ])
 
-function getCellWidthClass(key: string): string {
-  if (key === 'itemNumber' || key === 'elevationPageNumber') return 'min-w-[3rem] max-w-[5rem]'
-  if (key === 'descriptionOfWork') return 'min-w-[5rem] max-w-[34rem]'
-  if (WRAPPED_HEADER_KEYS.has(key)) return 'min-w-[5rem] max-w-[9rem]'
-  return 'min-w-[5rem] max-w-[18rem]'
+/** Fixed column widths for the desktop table (used via <colgroup>, not
+ * min/max-width on individual cells) — with `table-layout: fixed`, columns
+ * are sized once from these and never resize when a cell's content swaps
+ * between its display value and an inline-edit input/textarea. */
+function getColWidthRem(key: string): string {
+  if (key === 'itemNumber') return '3.5rem'
+  if (key === 'elevationPageNumber') return '5rem'
+  if (key === 'descriptionOfWork') return '20rem'
+  if (WRAPPED_HEADER_KEYS.has(key)) return '6.5rem'
+  return '10rem'
 }
 
 function getMobileRowWidthClass(field: FieldDef): string {
@@ -240,7 +245,7 @@ function EditableCell({
             else if (e.key === 'ArrowRight') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft) }
             else if (e.key === 'ArrowLeft') { e.preventDefault(); navigateFrom(e.currentTarget, 'left', draft) }
           }}
-          className="w-full min-w-[7rem] border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }
@@ -266,7 +271,7 @@ function EditableCell({
             else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(el, 'up', draft) }
           }}
           rows={2}
-          className="w-full min-w-[9rem] border border-brand-navy/40 rounded px-1 py-1 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }
@@ -302,7 +307,7 @@ function EditableCell({
           else if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(el, 'down', draft) }
           else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(el, 'up', draft) }
         }}
-        className="w-full min-w-[4.5rem] border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
+        className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
       />
     )
   }
@@ -834,13 +839,19 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
         <div className="py-8 text-center text-sm text-gray-400">No punch list items yet.</div>
       ) : (
         <div className="hidden overflow-x-auto rounded-lg border border-gray-200 md:block">
-          <table className="min-w-full text-sm border-collapse">
+          <table className="w-full table-fixed text-sm border-collapse">
+            <colgroup>
+              {ALL_FIELDS.map((f) => (
+                <col key={f.key} style={{ width: getColWidthRem(f.key) }} />
+              ))}
+              <col style={{ width: '2rem' }} />
+            </colgroup>
             <thead className="bg-gray-100">
               <tr>
                 {ALL_FIELDS.map((f) => (
                   <th
                     key={f.key}
-                    className={`px-1.5 py-1 text-left font-semibold text-gray-600 border-b border-gray-200 ${getCellWidthClass(f.key)} ${WRAPPED_HEADER_KEYS.has(f.key) ? 'whitespace-normal break-words' : 'whitespace-nowrap'}`}
+                    className={`px-1.5 py-1 text-left font-semibold text-gray-600 border-b border-gray-200 ${WRAPPED_HEADER_KEYS.has(f.key) ? 'whitespace-normal break-words' : 'whitespace-nowrap'}`}
                   >
                     {f.label}
                   </th>
@@ -852,7 +863,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
               {rows.map((row, i) => (
                 <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   {ALL_FIELDS.map((f) => (
-                    <td key={f.key} className={`px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${getCellWidthClass(f.key)}`}>
+                    <td key={f.key} className="px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words">
                       <EditableCell
                         cellId={`${row.id}:${f.key}`}
                         value={row.data?.[f.key]}

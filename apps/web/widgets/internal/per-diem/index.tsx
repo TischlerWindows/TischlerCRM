@@ -56,6 +56,16 @@ interface UserRecord {
   title?: string
 }
 
+/** Fixed column widths for the desktop table (via <colgroup>) — with
+ * `table-layout: fixed`, columns never resize when a cell's content swaps
+ * between its display value and an inline-edit input/textarea. */
+function getColWidthRem(type: FieldType): string {
+  if (type === 'user') return '12rem'
+  if (type === 'currency') return '8rem'
+  if (type === 'date') return '9rem'
+  return '20rem'
+}
+
 function UserLookupField({
   value,
   onChange,
@@ -208,7 +218,7 @@ function EditableCell({
             else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(el, 'up', draft) }
           }}
           rows={2}
-          className="w-full min-w-[12rem] resize-none rounded border border-brand-navy/40 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          className="w-full resize-none rounded border border-brand-navy/40 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }
@@ -253,7 +263,7 @@ function EditableCell({
           else if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(el, 'down', draft) }
           else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(el, 'up', draft) }
         }}
-        className="w-full min-w-[7rem] rounded border border-brand-navy/40 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
+        className="w-full rounded border border-brand-navy/40 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
       />
     )
   }
@@ -505,7 +515,13 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
         <div className="py-8 text-center text-sm text-gray-400"><CalendarDays className="mx-auto mb-2 h-8 w-8 text-gray-300" />No per diem records yet.</div>
       ) : (
         <div className="hidden overflow-visible rounded-lg border border-gray-200 md:block">
-          <table className="min-w-full border-collapse text-sm">
+          <table className="w-full table-fixed border-collapse text-sm">
+            <colgroup>
+              {FIELDS.map((field) => (
+                <col key={field.key} style={{ width: getColWidthRem(field.type) }} />
+              ))}
+              <col style={{ width: '2rem' }} />
+            </colgroup>
             <thead className="bg-gray-100">
               <tr>
                 {FIELDS.map((field) => <th key={field.key} className="border-b border-gray-200 px-2 py-1.5 text-left font-semibold text-gray-600">{field.label}</th>)}
@@ -515,7 +531,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
             <tbody>
               {rows.map((row, index) => (
                 <tr key={row.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  {FIELDS.map((field) => <td key={field.key} className="max-w-[24rem] border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words"><EditableCell cellId={`${row.id}:${field.key}`} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:${field.key}`} onStartEdit={() => setEditingCellId(`${row.id}:${field.key}`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} onNavigate={handleNavigate} /></td>)}
+                  {FIELDS.map((field) => <td key={field.key} className="border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words"><EditableCell cellId={`${row.id}:${field.key}`} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:${field.key}`} onStartEdit={() => setEditingCellId(`${row.id}:${field.key}`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} onNavigate={handleNavigate} /></td>)}
                   <td className="w-8 border-b border-gray-100 px-1 py-1.5 align-top"><button type="button" onClick={() => void handleDelete(row)} disabled={deletingRowId === row.id || savingRowId === row.id} aria-label="Delete per diem record" title="Delete per diem record" className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">{deletingRowId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}</button></td>
                 </tr>
               ))}
