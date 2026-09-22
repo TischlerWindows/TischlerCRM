@@ -358,9 +358,6 @@ const CORE_OBJECTS = [
       { apiName: 'location', label: 'Location', type: 'Text' },
       { apiName: 'remarks', label: 'Remarks', type: 'LongTextArea' },
       { apiName: 'sequence', label: 'Sequence', type: 'Text' },
-      // Marks the last row of a subtotal group — the widget renders a subtotal
-      // row right after any row with this checked, then starts a new group.
-      { apiName: 'groupBreak', label: 'End of Group (show subtotal after this row)', type: 'Checkbox' },
       { apiName: 'installation', label: 'Installation', type: 'Lookup', required: true },
     ],
   },

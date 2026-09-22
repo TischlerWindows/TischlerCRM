@@ -299,18 +299,14 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
     }
   }
 
-  // Group rows into subtotal batches — a checked `groupBreak` ends the
-  // current batch (and a subtotal row is rendered right after it).
+  // Subtotals are print-only: rows are auto-batched into fixed-size groups
+  // (roughly one printed page's worth each) and a subtotal row is rendered
+  // after each batch, hidden on screen and shown only when printing.
+  const ROWS_PER_PRINT_PAGE = 20
   const groups: RecordData[][] = []
-  let current: RecordData[] = []
-  for (const row of rows) {
-    current.push(row)
-    if (row.data?.groupBreak) {
-      groups.push(current)
-      current = []
-    }
+  for (let i = 0; i < rows.length; i += ROWS_PER_PRINT_PAGE) {
+    groups.push(rows.slice(i, i + ROWS_PER_PRINT_PAGE))
   }
-  if (current.length > 0) groups.push(current)
 
   const stageCount = (rowSet: RecordData[], key: string) => {
     const dataKey = `stage_${key}`
@@ -405,7 +401,7 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
                 {TRAILING_TEXT_FIELDS.map((f) => (
                   <th key={f.key} className="border-b border-gray-200 px-1.5 py-1 text-left font-semibold text-gray-600">{f.label}</th>
                 ))}
-                <th className="w-16 border-b border-gray-200 px-1 py-1 text-center font-semibold text-gray-600 print:hidden">End of Group</th>
+                <th className="w-8 border-b border-gray-200 px-1 py-1" aria-label="Actions" />
               </tr>
             </thead>
             {groups.map((groupRows, groupIdx) => (
@@ -450,36 +446,27 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
                           />
                         </td>
                       ))}
-                      <td className="border-b border-gray-100 px-1 py-1 text-center align-middle print:hidden">
-                        <div className="flex items-center justify-center gap-1">
-                          <input
-                            type="checkbox"
-                            checked={!!row.data?.groupBreak}
-                            title="End of group (show subtotal after this row)"
-                            onChange={(e) => void handleCellCommit(row.id, { groupBreak: e.target.checked })}
-                            className="h-4 w-4 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => void handleDeleteRow(row)}
-                            disabled={deletingRowId === row.id || savingRowId === row.id}
-                            aria-label="Delete row"
-                            title="Delete row"
-                            className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-                          >
-                            {deletingRowId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                          </button>
-                        </div>
+                      <td className="border-b border-gray-100 px-1 py-1 text-center align-middle">
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteRow(row)}
+                          disabled={deletingRowId === row.id || savingRowId === row.id}
+                          aria-label="Delete row"
+                          title="Delete row"
+                          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40 print:hidden"
+                        >
+                          {deletingRowId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </button>
                       </td>
                     </tr>
                   )
                 })}
-                <tr className="bg-amber-50 font-semibold">
+                <tr className="hidden bg-amber-50 font-semibold print:table-row">
                   <td colSpan={LEADING_TEXT_FIELDS.length} className="border-b border-gray-200 px-1.5 py-1 text-right">Subtotal (this page):</td>
                   {stageColumns.map((col) => (
                     <td key={col.key} className="border-b border-gray-200 px-1 py-1 text-center">{stageCount(groupRows, col.key)}/{groupRows.length}</td>
                   ))}
-                  <td colSpan={TRAILING_TEXT_FIELDS.length + 1} className="border-b border-gray-200 px-1.5 py-1 print:hidden" />
+                  <td className="border-b border-gray-200 px-1.5 py-1" colSpan={TRAILING_TEXT_FIELDS.length + 1} />
                 </tr>
               </tbody>
             ))}
@@ -489,7 +476,7 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
                 {stageColumns.map((col) => (
                   <td key={col.key} className="px-1 py-1.5 text-center">{stageCount(rows, col.key)}/{rows.length}</td>
                 ))}
-                <td colSpan={TRAILING_TEXT_FIELDS.length + 1} className="print:hidden" />
+                <td colSpan={TRAILING_TEXT_FIELDS.length + 1} />
               </tr>
             </tfoot>
           </table>
