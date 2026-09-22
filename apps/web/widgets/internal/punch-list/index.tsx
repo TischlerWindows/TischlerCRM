@@ -204,6 +204,18 @@ function EditableCell({
     if (isEditing) checkboxRef.current?.focus()
   }, [isEditing])
 
+  // Grows the textarea to match its wrapped-text content height (same as
+  // the display button's height) so the row doesn't shrink to a fixed
+  // 2-row textarea and then jump back when editing ends.
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    if (isEditing && type === 'textarea' && textareaRef.current) {
+      const el = textareaRef.current
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    }
+  }, [isEditing, draft, type])
+
   if (type === 'checkbox') {
     return (
       <input
@@ -252,6 +264,7 @@ function EditableCell({
     if (type === 'textarea') {
       return (
         <textarea
+          ref={textareaRef}
           data-cell-id={dataCellId}
           autoFocus
           value={typeof draft === 'string' ? draft : ''}
@@ -270,8 +283,8 @@ function EditableCell({
             else if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(el, 'down', draft) }
             else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(el, 'up', draft) }
           }}
-          rows={2}
-          className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          rows={1}
+          className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm resize-none overflow-hidden focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }

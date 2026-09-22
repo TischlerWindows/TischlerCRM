@@ -145,6 +145,18 @@ function EditableCell({
     if (isEditing && type === 'user') userCellRef.current?.querySelector('input')?.focus()
   }, [isEditing, type])
 
+  // Grows the textarea to match its wrapped-text content height (same as
+  // the display button's height) so the row doesn't shrink to a fixed
+  // 2-row textarea and then jump back when editing ends.
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    if (isEditing && type === 'textarea' && textareaRef.current) {
+      const el = textareaRef.current
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    }
+  }, [isEditing, draft, type])
+
   const startEditing = () => {
     if (saving) return
     onStartEdit?.()
@@ -199,6 +211,7 @@ function EditableCell({
     if (type === 'textarea') {
       return (
         <textarea
+          ref={textareaRef}
           data-cell-id={dataCellId}
           autoFocus
           value={typeof draft === 'string' ? draft : ''}
@@ -217,8 +230,8 @@ function EditableCell({
             else if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(el, 'down', draft) }
             else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(el, 'up', draft) }
           }}
-          rows={2}
-          className="w-full resize-none rounded border border-brand-navy/40 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          rows={1}
+          className="w-full resize-none overflow-hidden rounded border border-brand-navy/40 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
     }
