@@ -38,6 +38,7 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   PunchList: { type: 'PunchList' },
   PerDiem: { type: 'PerDiem' },
   AutoCad: { type: 'AutoCad' },
+  InstallProgressReport: { type: 'InstallProgressReport' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────

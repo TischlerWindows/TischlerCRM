@@ -27,6 +27,7 @@ export const INTERNAL_WIDGET_IDS = [
   'punch-list',
   'per-diem',
   'autocad',
+  'install-progress-report',
 ] as const
 export type InternalWidgetId = (typeof INTERNAL_WIDGET_IDS)[number]
 

@@ -22,6 +22,7 @@ import { config as clockInManifest } from './clock-in/widget.config'
 import { config as punchListManifest } from './punch-list/widget.config'
 import { config as perDiemManifest } from './per-diem/widget.config'
 import { config as autocadManifest } from './autocad/widget.config'
+import { config as installProgressReportManifest } from './install-progress-report/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
 import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
@@ -129,6 +130,11 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     manifest: autocadManifest,
     widgetConfigType: 'AutoCad',
     Component: dynamic(() => import('./autocad/index')),
+  },
+  {
+    manifest: installProgressReportManifest,
+    widgetConfigType: 'InstallProgressReport',
+    Component: dynamic(() => import('./install-progress-report/index')),
   },
 ]
 

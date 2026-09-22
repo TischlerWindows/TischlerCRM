@@ -287,6 +287,9 @@ const CORE_OBJECTS = [
       { apiName: 'estimatedWoodBucksLabor', label: 'Estimated WB Labor', type: 'Currency' },
       { apiName: 'estimatedTravelTime', label: 'Estimated Travel Time', type: 'Currency' },
       { apiName: 'estimatedInternalLabor', label: 'Estimated Internal Labor', type: 'Currency' },
+      // Install Progress Report widget's dynamic stage-column definitions —
+      // JSON-encoded array of {key, label}, e.g. [{"key":"openingReady","label":"Opening Ready"}].
+      { apiName: 'installProgressColumns', label: 'Install Progress Report Columns', type: 'LongTextArea' },
     ],
   },
   {
@@ -340,6 +343,24 @@ const CORE_OBJECTS = [
       { apiName: 'screwLength', label: 'Screw Length', type: 'Picklist', picklistValues: SCREW_LENGTH_OPTIONS },
       { apiName: 'totalQty', label: 'Total QTY', type: 'Number' },
       { apiName: 'project', label: 'Project', type: 'Lookup', required: true },
+    ],
+  },
+  {
+    apiName: 'InstallProgressItem',
+    label: 'Install Progress Item',
+    pluralLabel: 'Install Progress Items',
+    description: 'Install Progress Report rows tracked against an Installation',
+    fields: [
+      { apiName: 'page', label: 'Shop Drawing Page', type: 'Text' },
+      { apiName: 'unitType', label: 'Unit', type: 'Text' },
+      { apiName: 'itemId', label: 'Item ID', type: 'Text' },
+      { apiName: 'location', label: 'Location', type: 'Text' },
+      { apiName: 'remarks', label: 'Remarks', type: 'LongTextArea' },
+      { apiName: 'sequence', label: 'Sequence', type: 'Text' },
+      // Marks the last row of a subtotal group — the widget renders a subtotal
+      // row right after any row with this checked, then starts a new group.
+      { apiName: 'groupBreak', label: 'End of Group (show subtotal after this row)', type: 'Checkbox' },
+      { apiName: 'installation', label: 'Installation', type: 'Lookup', required: true },
     ],
   },
   {

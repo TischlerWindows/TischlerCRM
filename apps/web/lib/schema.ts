@@ -228,7 +228,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem' | 'AutoCad';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem' | 'AutoCad' | 'InstallProgressReport';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -411,6 +411,10 @@ export interface AutoCadConfig {
   type: 'AutoCad';
 }
 
+export interface InstallProgressReportConfig {
+  type: 'InstallProgressReport';
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -431,7 +435,8 @@ export type WidgetConfig =
   | ClockInConfig
   | PunchListConfig
   | PerDiemConfig
-  | AutoCadConfig;
+  | AutoCadConfig
+  | InstallProgressReportConfig;
 
 export interface PageWidget {
   id: string;
