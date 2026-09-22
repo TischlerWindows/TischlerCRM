@@ -1,10 +1,8 @@
 'use client'
 
 /**
- * AutoCad widget — a screw schedule grid for Projects. Each row picks a
- * screw from a fixed catalog; width/name/length are parsed from that pick
- * and saved alongside it (not live Formula fields, computed on commit like
- * the Punch List widget's Total Estimate of Hours).
+ * AutoCad widget — a screw schedule grid for Projects. Width, Name, and
+ * Length are three independent dropdowns (not derived from each other).
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, Loader2, Plus, Trash2, Wrench } from 'lucide-react'
@@ -15,61 +13,32 @@ import { resolveLookupDisplayName } from '@/lib/utils'
 import { MultiLookupUserSearch } from '@/components/form/lookup-search'
 import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
 
-type FieldType = 'user' | 'select' | 'text' | 'number'
+type FieldType = 'user' | 'select' | 'number'
 
 interface FieldDef {
   key: string
   label: string
   type: FieldType
-  /** Parsed from screwSelection on save — never directly editable. */
-  computed?: boolean
+  /** Dropdown options — only used when type is 'select'. */
+  options?: string[]
 }
 
-/** Full screw descriptions selectable per row — keep in sync with
- * SCREW_SELECTION_OPTIONS in apps/api/src/ensure-core-objects.ts. */
-const SCREW_SELECTION_OPTIONS = [
-  '1/4" Pan Head Self-drilling Screws x 3/4"',
-  '1/4" Pan Head Self-drilling Screws x 1"',
-  '1/4" Pan Head Self-drilling Screws x 1-1/4"',
-  '1/4" Pan Head Self-drilling Screws x 1-1/2"',
-  '1/4" Pan Head Self-drilling Screws x 2"',
-  '1/4" Pan Head Self-drilling Screws x 2-1/2"',
-  '1/4" Pan Head Self-drilling Screws x 3"',
-  '1/4" Pan Head Self-drilling Screws x 4"',
-  '1/4" FH Tapcon Screws x 1-3/4"',
-  '1/4" FH Tapcon Screws x 2-1/4"',
-  '1/4" FH Tapcon Screws x 2-3/4"',
-  '1/4" FH Tapcon Screws x 3-1/4"',
-  '1/4" FH Tapcon Screws x 3-3/4"',
-  '1/4" FH Tapcon Screws x 4"',
-  '1/4" FH Tapcon Screws x 5"',
-  '1/4" FH Tapcon Screws x 6"',
-  '1/4" Hex Head Tapcon Screws x 1-3/4"',
-  '1/4" Hex Head Tapcon Screws x 2-3/4"',
-  '1/4" Hex Head Tapcon Screws x 3-1/4"',
-  '1/4" Hex Head Tapcon Screws x 3-3/4"',
-  '1/4" Hex Head Tapcon Screws x 4"',
-  '6/10 x 80mm Toptec',
-  '6/10 x 100mm Toptec',
-  '6/10 x 120mm Toptec',
-  '6/10 x 135mm Toptec',
-  '6/10 x 150mm Toptec',
-  '6/10 x 200mm Toptec',
-  '3 x 20mm FH Phil Wood Screws',
-  '3 x 25mm FH Phil Wood Screws',
-  '3 x 15mm FH Phil Wood Screws',
-  '4 x 35mm FH Phil Wood Screws',
-  '4 x 40mm FH Phil Wood Screws',
-  '6 x 40mm FH Phil Wood Screws',
-  '6 x 50mm FH Phil Wood Screws',
+/** Independent dropdown options for each column — a row's width/name/length
+ * are picked separately, with no combined "full description" field. */
+const SCREW_WIDTH_OPTIONS = ['1/4"', '6/10', '3', '4', '6']
+const SCREW_NAME_OPTIONS = ['Pan Head Self-drilling Screws', 'FH Tapcon Screws', 'Hex Head Tapcon Screws', 'Toptec', 'FH Phil Wood Screws']
+const SCREW_LENGTH_OPTIONS = [
+  '3/4"', '1"', '1-1/4"', '1-1/2"', '2"', '2-1/2"', '3"', '4"',
+  '1-3/4"', '2-1/4"', '2-3/4"', '3-1/4"', '3-3/4"', '5"', '6"',
+  '80mm', '100mm', '120mm', '135mm', '150mm', '200mm',
+  '20mm', '25mm', '15mm', '35mm', '40mm', '50mm',
 ]
 
 const ALL_FIELDS: FieldDef[] = [
   { key: 'tusProjectManager', label: 'TUS Project Manager', type: 'user' },
-  { key: 'screwSelection', label: 'Screw Selection', type: 'select' },
-  { key: 'screwWidth', label: 'Screw Width/Number for TopTec', type: 'text', computed: true },
-  { key: 'screwName', label: 'Screw Name or Item Name', type: 'text', computed: true },
-  { key: 'screwLength', label: 'Screw Length', type: 'text', computed: true },
+  { key: 'screwWidth', label: 'Screw Width/Number for TopTec', type: 'select', options: SCREW_WIDTH_OPTIONS },
+  { key: 'screwName', label: 'Screw Name or Item Name', type: 'select', options: SCREW_NAME_OPTIONS },
+  { key: 'screwLength', label: 'Screw Length', type: 'select', options: SCREW_LENGTH_OPTIONS },
   { key: 'totalQty', label: 'Total QTY', type: 'number' },
 ]
 
@@ -78,36 +47,15 @@ const ALL_FIELDS: FieldDef[] = [
  * between its display value and an inline-edit input/select. */
 function getColWidthRem(key: string): string {
   if (key === 'tusProjectManager') return '12rem'
-  if (key === 'screwSelection') return '20rem'
   if (key === 'screwName') return '16rem'
   if (key === 'totalQty') return '6rem'
   return '8rem'
 }
 
 function getMobileRowWidthClass(field: FieldDef): string {
-  if (field.key === 'screwSelection') return 'w-64'
   if (field.key === 'screwName') return 'w-48'
   if (field.key === 'totalQty') return 'w-20'
   return 'w-32'
-}
-
-/** "Width Name x Length" (e.g. `1/4" Pan Head Self-drilling Screws x 3/4"`)
- * or "Width x Length Name" (e.g. `6/10 x 80mm Toptec`) — either way, the
- * first measurement-like token is the width, the last is the length, and
- * everything else (minus the literal "x") is the name. */
-function parseScrewSelection(selection: string): { screwWidth: string; screwName: string; screwLength: string } {
-  const tokens = selection.trim().split(/\s+/).filter(Boolean)
-  const isMeasurement = (t: string) => /^\d+(\/\d+)?("|mm)?$/.test(t) || /^\d+-\d+\/\d+"?$/.test(t)
-  const measurementIdx = tokens.reduce<number[]>((acc, t, i) => {
-    if (isMeasurement(t)) acc.push(i)
-    return acc
-  }, [])
-  const firstIdx = measurementIdx[0] ?? 0
-  const lastIdx = measurementIdx[measurementIdx.length - 1] ?? tokens.length - 1
-  const screwWidth = tokens[firstIdx] ?? ''
-  const screwLength = tokens[lastIdx] ?? ''
-  const screwName = tokens.filter((t, i) => i !== firstIdx && i !== lastIdx && t.toLowerCase() !== 'x').join(' ')
-  return { screwWidth, screwName, screwLength }
 }
 
 interface UserRecord {
@@ -178,7 +126,7 @@ function EditableCell({
   value,
   type,
   saving,
-  computed,
+  options,
   isEditing,
   onStartEdit,
   onStopEdit,
@@ -189,9 +137,8 @@ function EditableCell({
   value: unknown
   type: FieldType
   saving: boolean
-  /** Permanently non-editable (parsed from screwSelection) — always skipped
-   * by keyboard navigation, unlike `saving` which is only temporarily true. */
-  computed?: boolean
+  /** Dropdown options — only used when type is 'select'. */
+  options?: string[]
   isEditing?: boolean
   onStartEdit?: () => void
   onStopEdit?: () => void
@@ -221,10 +168,10 @@ function EditableCell({
     onNavigate?.(el, direction)
   }
 
-  // Only a permanently computed cell is skipped by keyboard navigation — a
-  // cell that's merely mid-save (saving=true for the whole row) must stay
-  // reachable, or Tab/Enter/arrows stop working across the entire row.
-  const dataCellId = computed ? undefined : cellId
+  // A row that's merely mid-save (saving=true for the whole row while any
+  // one field in it is in flight) must stay reachable by keyboard nav, or
+  // Tab/Enter/arrows stop working across the entire row.
+  const dataCellId = cellId
 
   // MultiLookupUserSearch's input has no autoFocus of its own, so nothing
   // gives it DOM focus when keyboard nav lands here — without this,
@@ -282,7 +229,7 @@ function EditableCell({
           className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
         >
           <option value="">- Select -</option>
-          {SCREW_SELECTION_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+          {(options ?? []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       )
     }
@@ -386,11 +333,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     setSavingRowId(rowId)
     setError(null)
     try {
-      const changed: Record<string, unknown> = { [key]: value }
-      if (key === 'screwSelection') {
-        Object.assign(changed, parseScrewSelection(String(value ?? '')))
-      }
-      const updated = await recordsService.updateRecord('AutoCad', rowId, { data: changed })
+      const updated = await recordsService.updateRecord('AutoCad', rowId, { data: { [key]: value } })
       if (updated) setRows((prev) => prev.map((r) => (r.id === rowId ? updated : r)))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save change')
@@ -509,8 +452,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                         cellId={`${row.id}:${f.key}`}
                         value={row.data?.[f.key]}
                         type={f.type}
-                        saving={savingRowId === row.id || f.computed === true}
-                        computed={f.computed === true}
+                        saving={savingRowId === row.id}
+                        options={f.options}
                         isEditing={editingCellId === `${row.id}:${f.key}`}
                         onStartEdit={() => setEditingCellId(`${row.id}:${f.key}`)}
                         onStopEdit={() => setEditingCellId(null)}
@@ -551,8 +494,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                     cellId={`${row.id}:${field.key}`}
                     value={row.data?.[field.key]}
                     type={field.type}
-                    saving={savingRowId === row.id || field.computed === true}
-                    computed={field.computed === true}
+                    saving={savingRowId === row.id}
+                    options={field.options}
                     isEditing={editingCellId === `${row.id}:${field.key}`}
                     onStartEdit={() => setEditingCellId(`${row.id}:${field.key}`)}
                     onStopEdit={() => setEditingCellId(null)}
