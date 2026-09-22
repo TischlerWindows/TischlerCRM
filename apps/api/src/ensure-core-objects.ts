@@ -353,7 +353,8 @@ const CORE_OBJECTS = [
     fields: [
       { apiName: 'page', label: 'Shop Drawing Page', type: 'Text' },
       { apiName: 'unitType', label: 'Unit', type: 'Text' },
-      { apiName: 'itemId', label: 'Item ID', type: 'Text' },
+      { apiName: 'code', label: 'Code', type: 'Text' },
+      { apiName: 'openingNumber', label: 'Opening #', type: 'Text' },
       { apiName: 'location', label: 'Location', type: 'Text' },
       { apiName: 'remarks', label: 'Remarks', type: 'LongTextArea' },
       { apiName: 'sequence', label: 'Sequence', type: 'Text' },

@@ -36,7 +36,7 @@ const DEFAULT_STAGE_COLUMNS: StageColumn[] = [
   { key: 'unitWaterproofed', label: 'Unit Waterproofed' },
 ]
 
-type TextFieldKey = 'page' | 'unitType' | 'itemId' | 'location' | 'remarks' | 'sequence'
+type TextFieldKey = 'page' | 'unitType' | 'code' | 'openingNumber' | 'location' | 'remarks' | 'sequence'
 
 interface TextFieldDef {
   key: TextFieldKey
@@ -47,7 +47,8 @@ interface TextFieldDef {
 const LEADING_TEXT_FIELDS: TextFieldDef[] = [
   { key: 'page', label: 'Shop Drawing Page' },
   { key: 'unitType', label: 'Unit' },
-  { key: 'itemId', label: 'Item ID' },
+  { key: 'code', label: 'Code' },
+  { key: 'openingNumber', label: 'Opening #' },
   { key: 'location', label: 'Location' },
 ]
 
