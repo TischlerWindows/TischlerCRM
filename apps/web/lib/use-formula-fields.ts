@@ -6,6 +6,20 @@ import { evaluateFormula, extractCrossObjectRefs, expressionEngine, ExpressionCo
 import { FieldDef, ObjectDef } from '@/lib/schema';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
+import { getRecordName } from '../widgets/internal/shared/recordName';
+
+/** Field types whose stored record value is a raw lookup id (or, for
+ * MultiLookupUser, a semicolon-joined list of ids) rather than display text. */
+const LOOKUP_FIELD_TYPES = new Set(['Lookup', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup']);
+
+/** Display name for a related record fetched via fetchRelatedRecord — Users
+ * are plain `{name, email, ...}` objects (not wrapped record data), so they
+ * don't go through getRecordName's generic record-shape heuristics. */
+function displayNameForRelated(objectApiName: string, related: Record<string, any> | undefined): string | undefined {
+  if (!related) return undefined;
+  if (objectApiName === 'User') return related.name || related.email || undefined;
+  return getRecordName(related) || undefined;
+}
 
 /**
  * Cache for related record data fetched for cross-object formulas.
@@ -168,15 +182,58 @@ export function useFormulaFields(
     return targets;
   }, [objectDef, record, crossObjectRefs]);
 
+  // Record ids to prefetch for formula fields that reference a Lookup-type
+  // field BARE (no dot notation) — these need the related record's display
+  // name, not its raw stored id/ids.
+  const directLookupTargets = useMemo(() => {
+    if (!objectDef || !record) return [];
+
+    const referenced = new Set<string>();
+    for (const field of formulaFields) {
+      for (const ref of expressionEngine.getFieldReferences(field.formulaExpr!)) {
+        if (ref.includes('.')) continue;
+        referenced.add(ref);
+        referenced.add(ref.replace(/^[A-Za-z]+__/, ''));
+      }
+    }
+
+    const targets: { lookupObject: string; recordId: string }[] = [];
+    const seen = new Set<string>();
+    for (const fieldDef of objectDef.fields) {
+      if (!LOOKUP_FIELD_TYPES.has(fieldDef.type)) continue;
+      const bare = fieldDef.apiName.replace(/^[A-Za-z]+__/, '');
+      if (!referenced.has(fieldDef.apiName) && !referenced.has(bare)) continue;
+
+      const lookupObject = fieldDef.lookupObject || (fieldDef.type === 'LookupUser' || fieldDef.type === 'MultiLookupUser' ? 'User' : undefined);
+      if (!lookupObject) continue;
+
+      let raw = record[fieldDef.apiName] ?? record[bare];
+      if (fieldDef.type === 'PicklistLookup' && typeof raw === 'object' && raw !== null) raw = raw.lookup;
+      if (!raw) continue;
+
+      const ids = fieldDef.type === 'MultiLookupUser' && typeof raw === 'string'
+        ? raw.split(';').map((s: string) => s.trim()).filter(Boolean)
+        : [String(raw)];
+      for (const id of ids) {
+        const key = `${lookupObject}:${id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        targets.push({ lookupObject, recordId: id });
+      }
+    }
+    return targets;
+  }, [objectDef, record, formulaFields]);
+
   // Fetch related records
   useEffect(() => {
-    if (lookupTargets.length === 0) return;
+    const allTargets = [...lookupTargets, ...directLookupTargets];
+    if (allTargets.length === 0) return;
 
     let cancelled = false;
     setLoading(true);
 
     Promise.all(
-      lookupTargets.map(async (t) => {
+      allTargets.map(async (t) => {
         const related = await fetchRelatedRecord(t.lookupObject, t.recordId);
         return { key: `${t.lookupObject}:${t.recordId}`, data: related };
       })
@@ -192,7 +249,7 @@ export function useFormulaFields(
     });
 
     return () => { cancelled = true; };
-  }, [lookupTargets.map(t => `${t.lookupObject}:${t.recordId}`).join(',')]);
+  }, [[...lookupTargets, ...directLookupTargets].map(t => `${t.lookupObject}:${t.recordId}`).join(',')]);
 
   // Evaluate all formula fields
   const values = useMemo(() => {
@@ -257,6 +314,32 @@ export function useFormulaFields(
         const value = computeField(other);
         context[other.apiName] = value as any;
         if (bare !== other.apiName) context[bare] = value as any;
+      }
+
+      // A formula referencing a Lookup-type field BARE (no dot notation,
+      // e.g. `Project__internal_project_manager` instead of `.name`) would
+      // otherwise see the raw stored id instead of a display name — resolve
+      // it from the same related-record cache the cross-object refs use
+      // (populated by the directLookupTargets fetch effect below).
+      for (const fieldDef of objectDef?.fields ?? []) {
+        if (!LOOKUP_FIELD_TYPES.has(fieldDef.type)) continue;
+        const bare = fieldDef.apiName.replace(/^[A-Za-z]+__/, '');
+        if (!referencedNames.has(fieldDef.apiName) && !referencedNames.has(bare)) continue;
+        const lookupObject = fieldDef.lookupObject || (fieldDef.type === 'LookupUser' || fieldDef.type === 'MultiLookupUser' ? 'User' : undefined);
+        if (!lookupObject) continue;
+        let raw = context[fieldDef.apiName] ?? context[bare];
+        if (fieldDef.type === 'PicklistLookup' && typeof raw === 'object' && raw !== null) raw = (raw as any).lookup;
+        if (!raw) continue;
+        const ids = fieldDef.type === 'MultiLookupUser' && typeof raw === 'string'
+          ? raw.split(';').map((s) => s.trim()).filter(Boolean)
+          : [String(raw)];
+        const names = ids
+          .map((id) => displayNameForRelated(lookupObject, resolvedRelated[`${lookupObject}:${id}`] || relatedRecordCache[`${lookupObject}:${id}`]))
+          .filter((n): n is string => !!n);
+        if (names.length === 0) continue;
+        const resolved = names.join(', ');
+        context[fieldDef.apiName] = resolved as any;
+        if (bare !== fieldDef.apiName) context[bare] = resolved as any;
       }
       return context;
     };

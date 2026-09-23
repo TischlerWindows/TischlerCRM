@@ -224,6 +224,40 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
   return stringValue;
 }
 
+/** Field types whose stored record value is a raw lookup id (or, for
+ * MultiLookupUser, a semicolon-joined list of ids) rather than display text.
+ * Excludes 'LookupFields' — that type is a layout-only display config, not a
+ * stored value on the record. */
+const FORMULA_LOOKUP_FIELD_TYPES = new Set(['Lookup', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup']);
+
+/**
+ * Resolves a lookup-type field's raw stored value (id, or semicolon-joined
+ * ids for MultiLookupUser) into its display name(s), for use as a formula
+ * context value. A formula referencing a Lookup field bare (no dot notation,
+ * e.g. `Project__internal_project_manager` instead of
+ * `Project__internal_project_manager.name`) otherwise sees the raw id.
+ */
+export function resolveLookupFieldContextValue(fieldDef: FieldDef, rawValue: unknown): unknown {
+  if (rawValue === null || rawValue === undefined || rawValue === '') return rawValue;
+  if (!FORMULA_LOOKUP_FIELD_TYPES.has(fieldDef.type)) return rawValue;
+
+  const lookupObject = fieldDef.lookupObject || (fieldDef.type === 'LookupUser' || fieldDef.type === 'MultiLookupUser' ? 'User' : undefined);
+  if (!lookupObject) return rawValue;
+
+  if (fieldDef.type === 'MultiLookupUser' && typeof rawValue === 'string') {
+    const ids = rawValue.split(';').map((s) => s.trim()).filter(Boolean);
+    if (ids.length === 0) return rawValue;
+    return ids.map((id) => resolveLookupDisplayName(id, lookupObject)).join(', ');
+  }
+
+  let idValue: unknown = rawValue;
+  if (fieldDef.type === 'PicklistLookup' && typeof idValue === 'object' && idValue !== null) {
+    idValue = (idValue as { lookup?: unknown }).lookup;
+  }
+  if (!idValue) return rawValue;
+  return resolveLookupDisplayName(idValue, lookupObject);
+}
+
 /**
  * Check if a field name looks like a lookup field
  * @param fieldName The field name to check
@@ -583,6 +617,19 @@ export function evaluateFormulaForRecord(
       }
       context[fieldDef.apiName] = value as any;
       if (bare !== fieldDef.apiName) context[bare] = value as any;
+    }
+
+    // A formula referencing a Lookup-type field BARE (no dot notation, e.g.
+    // `Project__internal_project_manager` instead of `.name`) would otherwise
+    // see the raw stored id instead of a display name — resolve it here.
+    for (const fieldDef of objectDef.fields) {
+      const bare = fieldDef.apiName.replace(/^[A-Za-z]+__/, '');
+      if (!referencedNames.has(fieldDef.apiName) && !referencedNames.has(bare)) continue;
+      const raw = context[fieldDef.apiName] ?? context[bare];
+      const resolved = resolveLookupFieldContextValue(fieldDef, raw);
+      if (resolved === raw) continue;
+      context[fieldDef.apiName] = resolved as any;
+      if (bare !== fieldDef.apiName) context[bare] = resolved as any;
     }
   }
 
