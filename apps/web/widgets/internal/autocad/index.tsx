@@ -7,13 +7,14 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertCircle, Loader2, Plus, Trash2, Wrench } from 'lucide-react'
+import { AlertCircle, FileText, Loader2, Plus, Trash2, Wrench } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
 import { resolveLookupDisplayName } from '@/lib/utils'
 import { MultiLookupUserSearch } from '@/components/form/lookup-search'
 import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
+import { getRecordName } from '../shared/recordName'
 
 type FieldType = 'user' | 'combobox' | 'number'
 
@@ -404,6 +405,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   const [creating, setCreating] = useState(false)
   const [savingRowId, setSavingRowId] = useState<string | null>(null)
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
   // Which grid cell (`${rowId}:${fieldKey}`) is currently in edit mode —
   // lifted here so keyboard navigation can move editing to the next cell.
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
@@ -477,6 +479,58 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     }
   }
 
+  const handlePreviewPdf = async () => {
+    if (generatingPdf) return
+    // Open the tab synchronously inside the click handler so popup blockers
+    // don't kill it after the await (matches the other list-widget PDF flows).
+    const previewWindow = window.open('', '_blank')
+    setGeneratingPdf(true)
+    setError(null)
+    try {
+      const projectName = (typeof record?.projectName === 'string' && record.projectName)
+        || (record ? getRecordName(record as Record<string, unknown>) : 'Project')
+      const pmRaw = record?.internal_project_manager ?? record?.Project__internal_project_manager
+      const projectManager = pmRaw
+        ? String(pmRaw).split(';').map((id) => id.trim()).filter(Boolean).map((id) => resolveLookupDisplayName(id, 'User')).join(', ')
+        : ''
+      const payloadRows = rows.map((row) => ({
+        tusProjectManager: displayValue(row.data?.tusProjectManager, 'user'),
+        fastener: row.data?.fastener,
+        totalQty: row.data?.totalQty,
+      }))
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+      const token = apiClient.getToken()
+      const response = await fetch(`${apiBase}/autocad-pdf/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ projectName, projectManager, rows: payloadRows }),
+      })
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }))
+        throw new Error(detail.error || `Failed to render PDF (${response.status})`)
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url
+      } else {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'AutoCad_Fastener_Schedule.pdf'
+        link.click()
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err: unknown) {
+      previewWindow?.close()
+      setError(err instanceof Error ? err.message : 'Failed to generate AutoCad PDF')
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="hidden items-center justify-between border-b border-gray-200 pb-3 md:flex">
@@ -487,16 +541,28 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
             <p className="text-xs text-gray-500">{rows.length} item{rows.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => void handleAddBlankRow()}
-          disabled={creating}
-          aria-label="Add blank AutoCad row"
-          title="Add blank AutoCad row"
-          className="inline-flex h-8 w-8 items-center justify-center rounded border border-brand-navy text-brand-navy hover:bg-brand-navy/5 disabled:opacity-50"
-        >
-          {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-4 w-4" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handlePreviewPdf()}
+            disabled={generatingPdf}
+            aria-label="Preview PDF"
+            title="Preview PDF"
+            className="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleAddBlankRow()}
+            disabled={creating}
+            aria-label="Add blank AutoCad row"
+            title="Add blank AutoCad row"
+            className="inline-flex h-8 w-8 items-center justify-center rounded border border-brand-navy text-brand-navy hover:bg-brand-navy/5 disabled:opacity-50"
+          >
+            {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-3 md:hidden">
@@ -507,6 +573,15 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
             <p className="text-xs text-gray-500">{rows.length} item{rows.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => void handlePreviewPdf()}
+          disabled={generatingPdf}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 disabled:opacity-50"
+        >
+          {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+          PDF
+        </button>
         <button
           type="button"
           onClick={() => void handleAddBlankRow()}
