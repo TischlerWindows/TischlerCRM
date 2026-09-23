@@ -22,7 +22,7 @@
  * checkbox a user can uncheck directly is the current furthest stage.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, ChevronLeft, ChevronRight, ClipboardCheck, FileText, Loader2, Plus, Trash2 } from 'lucide-react'
+import { AlertCircle, ChevronLeft, ChevronRight, ClipboardCheck, FileText, GripVertical, Loader2, Plus, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
@@ -164,6 +164,10 @@ function StageColumnChip({
   onMoveRight,
   canMoveLeft,
   canMoveRight,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  isDragging,
 }: {
   column: StageColumn
   onRename: (label: string) => void
@@ -172,12 +176,25 @@ function StageColumnChip({
   onMoveRight: () => void
   canMoveLeft: boolean
   canMoveRight: boolean
+  onDragStart: () => void
+  onDragOver: (e: React.DragEvent) => void
+  onDragEnd: () => void
+  isDragging: boolean
 }) {
   const [label, setLabel] = useState(column.label)
   useEffect(() => setLabel(column.label), [column.label])
 
   return (
-    <span className="flex items-center gap-1 rounded border border-gray-300 bg-white py-0.5 pl-1 pr-0.5">
+    <span
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      className={`flex items-center gap-1 rounded border border-gray-300 bg-white py-0.5 pl-1 pr-0.5 ${isDragging ? 'opacity-40' : ''}`}
+    >
+      <span className="cursor-move text-gray-300 hover:text-gray-500" aria-hidden="true">
+        <GripVertical className="h-3.5 w-3.5" />
+      </span>
       <button
         type="button"
         onClick={onMoveLeft}
@@ -227,6 +244,7 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
   const [stageColumns, setStageColumns] = useState<StageColumn[]>(() => parseStageColumns(record?.installProgressColumns))
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -288,6 +306,27 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
     const next = [...stageColumns]
     ;[next[index], next[swapWith]] = [next[swapWith], next[index]]
     void persistStageColumns(next)
+  }
+
+  const handleColumnDragStart = (index: number) => {
+    setDraggedColumnIndex(index)
+  }
+
+  const handleColumnDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (draggedColumnIndex === null || draggedColumnIndex === index) return
+    const next = [...stageColumns]
+    const dragged = next[draggedColumnIndex]
+    if (!dragged) return
+    next.splice(draggedColumnIndex, 1)
+    next.splice(index, 0, dragged)
+    setStageColumns(next)
+    setDraggedColumnIndex(index)
+  }
+
+  const handleColumnDragEnd = () => {
+    setDraggedColumnIndex(null)
+    void persistStageColumns(stageColumns)
   }
 
   const handleCellCommit = async (rowId: string, patch: Record<string, unknown>) => {
@@ -461,6 +500,10 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
             onMoveRight={() => handleMoveColumn(col.key, 'right')}
             canMoveLeft={i > 0}
             canMoveRight={i < stageColumns.length - 1}
+            onDragStart={() => handleColumnDragStart(i)}
+            onDragOver={(e) => handleColumnDragOver(e, i)}
+            onDragEnd={handleColumnDragEnd}
+            isDragging={draggedColumnIndex === i}
           />
         ))}
         <button
