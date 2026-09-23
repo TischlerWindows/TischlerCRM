@@ -2,15 +2,47 @@ import { prisma } from '@crm/db/client';
 import { Prisma } from '@prisma/client';
 import { generateId } from '@crm/db/record-id';
 
-/** Independent dropdown options for an AutoCad item's width/name/length —
- * each column picks separately (no combined "full description" field). */
-const SCREW_WIDTH_OPTIONS = ['1/4"', '6/10', '3', '4', '6'];
-const SCREW_NAME_OPTIONS = ['Pan Head Self-drilling Screws', 'FH Tapcon Screws', 'Hex Head Tapcon Screws', 'Toptec', 'FH Phil Wood Screws'];
-const SCREW_LENGTH_OPTIONS = [
-  '3/4"', '1"', '1-1/4"', '1-1/2"', '2"', '2-1/2"', '3"', '4"',
-  '1-3/4"', '2-1/4"', '2-3/4"', '3-1/4"', '3-3/4"', '5"', '6"',
-  '80mm', '100mm', '120mm', '135mm', '150mm', '200mm',
-  '20mm', '25mm', '15mm', '35mm', '40mm', '50mm',
+/** Full fastener catalog for AutoCad rows — a single searchable picklist
+ * (replaces the old independent width/name/length dropdowns). */
+const FASTENER_OPTIONS = [
+  '1/4" Pan Head Self-drilling Screws x 3/4"',
+  '1/4" Pan Head Self-drilling Screws x 1"',
+  '1/4" Pan Head Self-drilling Screws x 1-1/4"',
+  '1/4" Pan Head Self-drilling Screws x 1-1/2"',
+  '1/4" Pan Head Self-drilling Screws x 2"',
+  '1/4" Pan Head Self-drilling Screws x 2-1/2"',
+  '1/4" Pan Head Self-drilling Screws x 3"',
+  '1/4" Pan Head Self-drilling Screws x 4"',
+  '1/4" FH Tapcon Screws x 1-3/4"',
+  '1/4" FH Tapcon Screws x 2-1/4"',
+  '1/4" FH Tapcon Screws x 2-3/4"',
+  '1/4" FH Tapcon Screws x 3-1/4"',
+  '1/4" FH Tapcon Screws x 3-3/4"',
+  '1/4" FH Tapcon Screws x 4"',
+  '1/4" FH Tapcon Screws x 5"',
+  '1/4" FH Tapcon Screws x 6"',
+  '1/4" Hex Head Tapcon Screws x 1-3/4"',
+  '1/4" Hex Head Tapcon Screws x 2-3/4"',
+  '1/4" Hex Head Tapcon Screws x 3-1/4"',
+  '1/4" Hex Head Tapcon Screws x 3-3/4"',
+  '1/4" Hex Head Tapcon Screws x 4"',
+  '6/10 x 80mm Toptec',
+  '6/10 x 100mm Toptec',
+  '6/10 x 120mm Toptec',
+  '6/10 x 135mm Toptec',
+  '6/10 x 150mm Toptec',
+  '6/10 x 200mm Toptec',
+  '3 x 20mm FH Phil Wood Screws',
+  '3 x 25mm FH Phil Wood Screws',
+  '3 x 15mm FH Phil Wood Screws',
+  '4 x 35mm FH Phil Wood Screws',
+  '4 x 40mm FH Phil Wood Screws',
+  '6 x 40mm FH Phil Wood Screws',
+  '6 x 50mm FH Phil Wood Screws',
+  '6 x 70mm FH Phil Wood Screws',
+  'Aluminum Angle pieces',
+  'Installation Clips',
+  'BTI Brackets',
 ];
 
 /**
@@ -338,9 +370,7 @@ const CORE_OBJECTS = [
     description: 'Screw schedule items tracked against a Project',
     fields: [
       { apiName: 'tusProjectManager', label: 'TUS Project Manager', type: 'MultiLookupUser' },
-      { apiName: 'screwWidth', label: 'Screw Width/Number for TopTec', type: 'Picklist', picklistValues: SCREW_WIDTH_OPTIONS },
-      { apiName: 'screwName', label: 'Screw Name or Item Name', type: 'Picklist', picklistValues: SCREW_NAME_OPTIONS },
-      { apiName: 'screwLength', label: 'Screw Length', type: 'Picklist', picklistValues: SCREW_LENGTH_OPTIONS },
+      { apiName: 'fastener', label: 'Fastener', type: 'Picklist', picklistValues: FASTENER_OPTIONS },
       { apiName: 'totalQty', label: 'Total QTY', type: 'Number' },
       { apiName: 'project', label: 'Project', type: 'Lookup', required: true },
     ],

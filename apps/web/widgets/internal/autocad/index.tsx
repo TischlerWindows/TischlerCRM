@@ -1,10 +1,12 @@
 'use client'
 
 /**
- * AutoCad widget — a screw schedule grid for Projects. Width, Name, and
- * Length are three independent dropdowns (not derived from each other).
+ * AutoCad widget — a screw/fastener schedule grid for Projects. Fastener is
+ * a single searchable picklist (replaces the old independent Width/Name/
+ * Length dropdowns).
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertCircle, Loader2, Plus, Trash2, Wrench } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
@@ -13,32 +15,62 @@ import { resolveLookupDisplayName } from '@/lib/utils'
 import { MultiLookupUserSearch } from '@/components/form/lookup-search'
 import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
 
-type FieldType = 'user' | 'select' | 'number'
+type FieldType = 'user' | 'combobox' | 'number'
 
 interface FieldDef {
   key: string
   label: string
   type: FieldType
-  /** Dropdown options — only used when type is 'select'. */
+  /** Searchable dropdown options — only used when type is 'combobox'. */
   options?: string[]
 }
 
-/** Independent dropdown options for each column — a row's width/name/length
- * are picked separately, with no combined "full description" field. */
-const SCREW_WIDTH_OPTIONS = ['1/4"', '6/10', '3', '4', '6']
-const SCREW_NAME_OPTIONS = ['Pan Head Self-drilling Screws', 'FH Tapcon Screws', 'Hex Head Tapcon Screws', 'Toptec', 'FH Phil Wood Screws']
-const SCREW_LENGTH_OPTIONS = [
-  '3/4"', '1"', '1-1/4"', '1-1/2"', '2"', '2-1/2"', '3"', '4"',
-  '1-3/4"', '2-1/4"', '2-3/4"', '3-1/4"', '3-3/4"', '5"', '6"',
-  '80mm', '100mm', '120mm', '135mm', '150mm', '200mm',
-  '20mm', '25mm', '15mm', '35mm', '40mm', '50mm',
+/** Full fastener catalog — a single searchable dropdown (replaces the old
+ * independent width/name/length columns). */
+const FASTENER_OPTIONS = [
+  '1/4" Pan Head Self-drilling Screws x 3/4"',
+  '1/4" Pan Head Self-drilling Screws x 1"',
+  '1/4" Pan Head Self-drilling Screws x 1-1/4"',
+  '1/4" Pan Head Self-drilling Screws x 1-1/2"',
+  '1/4" Pan Head Self-drilling Screws x 2"',
+  '1/4" Pan Head Self-drilling Screws x 2-1/2"',
+  '1/4" Pan Head Self-drilling Screws x 3"',
+  '1/4" Pan Head Self-drilling Screws x 4"',
+  '1/4" FH Tapcon Screws x 1-3/4"',
+  '1/4" FH Tapcon Screws x 2-1/4"',
+  '1/4" FH Tapcon Screws x 2-3/4"',
+  '1/4" FH Tapcon Screws x 3-1/4"',
+  '1/4" FH Tapcon Screws x 3-3/4"',
+  '1/4" FH Tapcon Screws x 4"',
+  '1/4" FH Tapcon Screws x 5"',
+  '1/4" FH Tapcon Screws x 6"',
+  '1/4" Hex Head Tapcon Screws x 1-3/4"',
+  '1/4" Hex Head Tapcon Screws x 2-3/4"',
+  '1/4" Hex Head Tapcon Screws x 3-1/4"',
+  '1/4" Hex Head Tapcon Screws x 3-3/4"',
+  '1/4" Hex Head Tapcon Screws x 4"',
+  '6/10 x 80mm Toptec',
+  '6/10 x 100mm Toptec',
+  '6/10 x 120mm Toptec',
+  '6/10 x 135mm Toptec',
+  '6/10 x 150mm Toptec',
+  '6/10 x 200mm Toptec',
+  '3 x 20mm FH Phil Wood Screws',
+  '3 x 25mm FH Phil Wood Screws',
+  '3 x 15mm FH Phil Wood Screws',
+  '4 x 35mm FH Phil Wood Screws',
+  '4 x 40mm FH Phil Wood Screws',
+  '6 x 40mm FH Phil Wood Screws',
+  '6 x 50mm FH Phil Wood Screws',
+  '6 x 70mm FH Phil Wood Screws',
+  'Aluminum Angle pieces',
+  'Installation Clips',
+  'BTI Brackets',
 ]
 
 const ALL_FIELDS: FieldDef[] = [
   { key: 'tusProjectManager', label: 'TUS Project Manager', type: 'user' },
-  { key: 'screwWidth', label: 'Screw Width/Number for TopTec', type: 'select', options: SCREW_WIDTH_OPTIONS },
-  { key: 'screwName', label: 'Screw Name or Item Name', type: 'select', options: SCREW_NAME_OPTIONS },
-  { key: 'screwLength', label: 'Screw Length', type: 'select', options: SCREW_LENGTH_OPTIONS },
+  { key: 'fastener', label: 'Fastener', type: 'combobox', options: FASTENER_OPTIONS },
   { key: 'totalQty', label: 'Total QTY', type: 'number' },
 ]
 
@@ -47,13 +79,13 @@ const ALL_FIELDS: FieldDef[] = [
  * between its display value and an inline-edit input/select. */
 function getColWidthRem(key: string): string {
   if (key === 'tusProjectManager') return '12rem'
-  if (key === 'screwName') return '16rem'
+  if (key === 'fastener') return '22rem'
   if (key === 'totalQty') return '6rem'
   return '8rem'
 }
 
 function getMobileRowWidthClass(field: FieldDef): string {
-  if (field.key === 'screwName') return 'w-48'
+  if (field.key === 'fastener') return 'w-64'
   if (field.key === 'totalQty') return 'w-20'
   return 'w-32'
 }
@@ -104,6 +136,86 @@ function UserLookupField({
       }}
       portalDropdown
     />
+  )
+}
+
+/** Searchable dropdown for the Fastener column — a portal-rendered list
+ * (like MultiLookupUserSearch's `portalDropdown`) so it isn't clipped by
+ * the table's horizontally-scrolling wrapper. */
+function FastenerComboBox({
+  value,
+  options,
+  onSelect,
+  onSelectAndNavigate,
+  onCancel,
+}: {
+  value: unknown
+  options: string[]
+  onSelect: (value: string) => void
+  onSelectAndNavigate: (value: string, el: HTMLElement) => void
+  onCancel: () => void
+}) {
+  const [query, setQuery] = useState(typeof value === 'string' ? value : '')
+  const [highlighted, setHighlighted] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+    const rect = inputRef.current?.getBoundingClientRect()
+    if (rect) setDropdownPosition({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 280) })
+  }, [])
+
+  const filtered = options.filter((opt) => opt.toLowerCase().includes(query.trim().toLowerCase()))
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        type="text"
+        value={query}
+        placeholder="Search fasteners…"
+        onChange={(e) => { setQuery(e.target.value); setHighlighted(0) }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') { e.preventDefault(); onCancel(); return }
+          if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted((h) => Math.min(h + 1, filtered.length - 1)); return }
+          if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted((h) => Math.max(h - 1, 0)); return }
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            const picked = filtered[highlighted]
+            if (picked) onSelect(picked)
+            else onCancel()
+            return
+          }
+          if (e.key === 'Tab') {
+            const picked = filtered[highlighted]
+            if (picked) { e.preventDefault(); onSelectAndNavigate(picked, e.currentTarget) }
+          }
+        }}
+        onBlur={() => setTimeout(onCancel, 150)}
+        className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
+      />
+      {dropdownPosition && typeof document !== 'undefined' && createPortal(
+        <ul
+          className="fixed z-[100] max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white text-sm shadow-lg"
+          style={{ top: dropdownPosition.top, left: dropdownPosition.left, width: dropdownPosition.width }}
+        >
+          {filtered.length > 0 ? filtered.map((opt, i) => (
+            <li
+              key={opt}
+              onMouseDown={(e) => { e.preventDefault(); onSelect(opt) }}
+              className={`cursor-pointer px-2 py-1.5 ${i === highlighted ? 'bg-brand-navy/10' : 'hover:bg-gray-50'}`}
+            >
+              {opt}
+            </li>
+          )) : (
+            <li className="px-2 py-1.5 text-xs text-gray-400">No matches.</li>
+          )}
+        </ul>,
+        document.body,
+      )}
+    </div>
   )
 }
 
@@ -210,27 +322,15 @@ function EditableCell({
         </div>
       )
     }
-    if (type === 'select') {
+    if (type === 'combobox') {
       return (
-        <select
-          data-cell-id={dataCellId}
-          autoFocus
-          value={typeof draft === 'string' ? draft : ''}
-          onChange={(e) => { setDraft(e.target.value); commit(e.target.value) }}
-          onBlur={() => onStopEdit?.()}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') { onStopEdit?.(); return }
-            if (!onNavigate) return
-            if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft); return }
-            // ArrowUp/Down are left native (cycle the select's own options).
-            if (e.key === 'ArrowRight') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft) }
-            else if (e.key === 'ArrowLeft') { e.preventDefault(); navigateFrom(e.currentTarget, 'left', draft) }
-          }}
-          className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
-        >
-          <option value="">- Select -</option>
-          {(options ?? []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
+        <FastenerComboBox
+          value={draft}
+          options={options ?? []}
+          onSelect={(nextValue) => { setDraft(nextValue); commit(nextValue) }}
+          onSelectAndNavigate={(nextValue, el) => { setDraft(nextValue); navigateFrom(el, 'right', nextValue) }}
+          onCancel={() => onStopEdit?.()}
+        />
       )
     }
     const isNumber = type === 'number'
