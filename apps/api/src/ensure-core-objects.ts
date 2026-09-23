@@ -397,7 +397,6 @@ const CORE_OBJECTS = [
     pluralLabel: 'AutoCad Items',
     description: 'Screw schedule items tracked against a Project',
     fields: [
-      { apiName: 'tusProjectManager', label: 'TUS Project Manager', type: 'MultiLookupUser' },
       { apiName: 'fastener', label: 'Fastener', type: 'Picklist', picklistValues: FASTENER_OPTIONS },
       { apiName: 'totalQty', label: 'Total QTY', type: 'Number' },
       { apiName: 'project', label: 'Project', type: 'Lookup', required: true },

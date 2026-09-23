@@ -12,11 +12,10 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
 import { resolveLookupDisplayName } from '@/lib/utils'
-import { MultiLookupUserSearch } from '@/components/form/lookup-search'
 import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
 import { getRecordName } from '../shared/recordName'
 
-type FieldType = 'user' | 'combobox' | 'number'
+type FieldType = 'combobox' | 'number'
 
 interface FieldDef {
   key: string
@@ -70,7 +69,6 @@ const FASTENER_OPTIONS = [
 ]
 
 const ALL_FIELDS: FieldDef[] = [
-  { key: 'tusProjectManager', label: 'TUS Project Manager', type: 'user' },
   { key: 'fastener', label: 'Fastener', type: 'combobox', options: FASTENER_OPTIONS },
   { key: 'totalQty', label: 'Total QTY', type: 'number' },
 ]
@@ -79,7 +77,6 @@ const ALL_FIELDS: FieldDef[] = [
  * `table-layout: fixed`, columns never resize when a cell's content swaps
  * between its display value and an inline-edit input/select. */
 function getColWidthRem(key: string): string {
-  if (key === 'tusProjectManager') return '12rem'
   if (key === 'fastener') return '22rem'
   if (key === 'totalQty') return '6rem'
   return '8rem'
@@ -89,55 +86,6 @@ function getMobileRowWidthClass(field: FieldDef): string {
   if (field.key === 'fastener') return 'w-64'
   if (field.key === 'totalQty') return 'w-20'
   return 'w-32'
-}
-
-interface UserRecord {
-  id: string
-  name?: string
-  email?: string
-  title?: string
-}
-
-function UserLookupField({
-  value,
-  onChange,
-  onClose,
-}: {
-  value: unknown
-  onChange: (value: unknown) => void
-  onClose?: () => void
-}) {
-  const [users, setUsers] = useState<UserRecord[]>([])
-  const [query, setQuery] = useState('')
-  const [active, setActive] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    apiClient.get<UserRecord[]>('/admin/users').then((result) => {
-      if (!cancelled) setUsers(Array.isArray(result) ? result : [])
-    }).catch(() => {
-      if (!cancelled) setUsers([])
-    })
-    return () => { cancelled = true }
-  }, [])
-
-  return (
-    <MultiLookupUserSearch
-      fieldDef={{ id: 'tusProjectManager', apiName: 'tusProjectManager', label: 'TUS Project Manager', type: 'MultiLookupUser' }}
-      value={value}
-      onChange={onChange}
-      userRecords={users}
-      lookupQuery={query}
-      isActive={active}
-      onQueryChange={setQuery}
-      onFocus={() => setActive(true)}
-      onBlur={() => {
-        setTimeout(() => setActive(false), 150)
-        onClose?.()
-      }}
-      portalDropdown
-    />
-  )
 }
 
 /** Searchable dropdown for the Fastener column — a portal-rendered list
@@ -229,10 +177,6 @@ function FastenerComboBox({
 
 function displayValue(value: unknown, type: FieldType): string {
   if (value === undefined || value === null || value === '') return '-'
-  if (type === 'user') {
-    const ids = String(value).split(';').map((id) => id.trim()).filter(Boolean)
-    return ids.length > 0 ? ids.map((id) => resolveLookupDisplayName(id, 'User')).join(', ') : '-'
-  }
   return String(value)
 }
 
@@ -293,43 +237,7 @@ function EditableCell({
   // Tab/Enter/arrows stop working across the entire row.
   const dataCellId = cellId
 
-  // MultiLookupUserSearch's input has no autoFocus of its own, so nothing
-  // gives it DOM focus when keyboard nav lands here — without this,
-  // Tab/Escape/typing all silently do nothing since nothing is focused.
-  const userCellRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (isEditing && type === 'user') userCellRef.current?.querySelector('input')?.focus()
-  }, [isEditing, type])
-
   if (isEditing) {
-    if (type === 'user') {
-      // MultiLookupUserSearch owns its own input/dropdown and has no notion
-      // of cell navigation, so Tab/Escape are intercepted here (ArrowUp/Down
-      // are left alone — the dropdown uses them to highlight options).
-      return (
-        <div
-          ref={userCellRef}
-          onKeyDown={(e) => {
-            if (e.key === 'Tab') {
-              e.preventDefault()
-              if (onNavigate) navigateFrom(e.currentTarget, 'right', draft)
-              else onStopEdit?.()
-            } else if (e.key === 'Escape') {
-              onStopEdit?.()
-            }
-          }}
-        >
-          <UserLookupField
-            value={draft}
-            onClose={() => onStopEdit?.()}
-            onChange={(nextValue) => {
-              setDraft(nextValue)
-              if (nextValue !== value) onCommit(nextValue)
-            }}
-          />
-        </div>
-      )
-    }
     if (type === 'combobox') {
       return (
         <FastenerComboBox
