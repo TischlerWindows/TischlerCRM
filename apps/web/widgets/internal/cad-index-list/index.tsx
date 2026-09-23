@@ -29,6 +29,21 @@ interface ColumnDef {
   multiline?: boolean
 }
 
+/** Active Excel-style "fill handle" drag — copies the source cell's value
+ * into every cell the drag passes over. Locked to a single row (dragging
+ * left/right) or a single column (dragging up/down) once the pointer moves
+ * far enough in one axis to tell which the user means; checkbox columns are
+ * skipped when a horizontal drag passes over them. */
+interface FillDrag {
+  rowIndex: number
+  colIndex: number
+  colKey: string
+  value: unknown
+  direction: 'row' | 'col' | null
+  /** Row index (direction 'col') or column index (direction 'row') the drag has reached. */
+  targetIndex: number
+}
+
 const REPORT_TYPES = [
   'Pre-Installation Survey List',
   'Installation Progress List',
@@ -155,6 +170,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [activeReportType, setActiveReportType] = useState<ReportType>(REPORT_TYPES[0])
+  const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -177,15 +193,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     [rows, activeReportType],
   )
 
-  if (object?.apiName && object.apiName !== 'Project') {
-    return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-        The CAD Index List widget can only be placed on the Project object&rsquo;s layout.
-      </div>
-    )
-  }
-
-  const handleCellCommit = async (rowId: string, key: string, value: unknown) => {
+  const handleCellCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
     setSavingRowId(rowId)
     setError(null)
     try {
@@ -196,6 +204,87 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     } finally {
       setSavingRowId(null)
     }
+  }, [])
+
+  // Commit the fill-handle drag on mouseup, wherever the pointer is released —
+  // re-registered on every fillDrag update so the closure always sees the
+  // latest dragged-over range.
+  useEffect(() => {
+    if (!fillDrag) return
+    const onMouseUp = () => {
+      const drag = fillDrag
+      setFillDrag(null)
+      if (!drag.direction) return
+      if (drag.direction === 'col') {
+        const lo = Math.min(drag.rowIndex, drag.targetIndex)
+        const hi = Math.max(drag.rowIndex, drag.targetIndex)
+        for (let r = lo; r <= hi; r++) {
+          if (r === drag.rowIndex) continue
+          const row = activeRows[r]
+          if (row) void handleCellCommit(row.id, drag.colKey, drag.value)
+        }
+      } else {
+        const lo = Math.min(drag.colIndex, drag.targetIndex)
+        const hi = Math.max(drag.colIndex, drag.targetIndex)
+        const row = activeRows[drag.rowIndex]
+        if (row) {
+          for (let c = lo; c <= hi; c++) {
+            if (c === drag.colIndex) continue
+            const col = columns[c]
+            if (col && col.type !== 'checkbox') void handleCellCommit(row.id, col.key, drag.value)
+          }
+        }
+      }
+    }
+    window.addEventListener('mouseup', onMouseUp)
+    return () => window.removeEventListener('mouseup', onMouseUp)
+  }, [fillDrag, activeRows, columns, handleCellCommit])
+
+  if (object?.apiName && object.apiName !== 'Project') {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+        The CAD Index List widget can only be placed on the Project object&rsquo;s layout.
+      </div>
+    )
+  }
+
+  const handleFillHandleMouseDown = (rowIndex: number, colIndex: number, colKey: string, value: unknown) => {
+    setFillDrag({ rowIndex, colIndex, colKey, value, direction: null, targetIndex: colIndex })
+  }
+
+  const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
+    setFillDrag((prev) => {
+      if (!prev) return prev
+      if (prev.direction === null) {
+        if (rowIndex === prev.rowIndex && colIndex === prev.colIndex) return prev
+        const dRow = rowIndex - prev.rowIndex
+        const dCol = colIndex - prev.colIndex
+        return Math.abs(dRow) >= Math.abs(dCol)
+          ? { ...prev, direction: 'col', targetIndex: rowIndex }
+          : { ...prev, direction: 'row', targetIndex: colIndex }
+      }
+      if (prev.direction === 'col') {
+        if (colIndex !== prev.colIndex) return prev
+        return { ...prev, targetIndex: rowIndex }
+      }
+      if (rowIndex !== prev.rowIndex) return prev
+      return { ...prev, targetIndex: colIndex }
+    })
+  }
+
+  const isCellInFillRange = (rowIndex: number, colIndex: number): boolean => {
+    if (!fillDrag) return false
+    if (!fillDrag.direction) return rowIndex === fillDrag.rowIndex && colIndex === fillDrag.colIndex
+    if (fillDrag.direction === 'col') {
+      if (colIndex !== fillDrag.colIndex) return false
+      const lo = Math.min(fillDrag.rowIndex, fillDrag.targetIndex)
+      const hi = Math.max(fillDrag.rowIndex, fillDrag.targetIndex)
+      return rowIndex >= lo && rowIndex <= hi
+    }
+    if (rowIndex !== fillDrag.rowIndex) return false
+    const lo = Math.min(fillDrag.colIndex, fillDrag.targetIndex)
+    const hi = Math.max(fillDrag.colIndex, fillDrag.targetIndex)
+    return colIndex >= lo && colIndex <= hi
   }
 
   const handleAddRow = async () => {
@@ -350,10 +439,14 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
               </tr>
             </thead>
             <tbody>
-              {activeRows.map((row) => (
+              {activeRows.map((row, rowIndex) => (
                 <tr key={row.id} className="hover:bg-brand-navy/5">
-                  {columns.map((col) => (
-                    <td key={col.key} className="border-b border-gray-100 px-1.5 py-1 align-top">
+                  {columns.map((col, colIndex) => (
+                    <td
+                      key={col.key}
+                      onMouseEnter={() => handleFillDragEnter(rowIndex, colIndex)}
+                      className={`relative border-b border-gray-100 px-1.5 py-1 align-top ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                    >
                       {col.type === 'checkbox' ? (
                         <div className="flex items-center justify-center">
                           <input
@@ -365,13 +458,21 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                           />
                         </div>
                       ) : (
-                        <TextCell
-                          value={row.data?.[col.key]}
-                          type={col.type}
-                          multiline={col.multiline}
-                          saving={savingRowId === row.id}
-                          onCommit={(value) => void handleCellCommit(row.id, col.key, col.type === 'number' ? (value === '' ? '' : Number(value)) : value)}
-                        />
+                        <>
+                          <TextCell
+                            value={row.data?.[col.key]}
+                            type={col.type}
+                            multiline={col.multiline}
+                            saving={savingRowId === row.id}
+                            onCommit={(value) => void handleCellCommit(row.id, col.key, col.type === 'number' ? (value === '' ? '' : Number(value)) : value)}
+                          />
+                          {/* Excel-style fill handle — drag to copy this cell's value across adjacent cells. */}
+                          <span
+                            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleFillHandleMouseDown(rowIndex, colIndex, col.key, row.data?.[col.key]) }}
+                            aria-hidden="true"
+                            className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
+                          />
+                        </>
                       )}
                     </td>
                   ))}
