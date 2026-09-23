@@ -1,17 +1,17 @@
 'use client'
 
 /**
- * CAD Index List widget — 4 independent per-Project checklists
- * (Installation Completion Sign Off, Pre-Installation Survey List,
- * Installation Progress List, Final Adjustment Check List). All 4 share one
- * underlying CadIndexItem object, partitioned by a `reportType` field — rows
- * added under one report never appear under another (each "Add Row" stamps
- * the currently-active reportType), so from a data perspective they behave
- * as 4 fully independent lists, not 4 views onto shared rows.
+ * CAD Index List widget — 3 independent per-Project checklists
+ * (Pre-Installation Survey List, Installation Progress List, Final
+ * Adjustment Check List). All 3 share one underlying CadIndexItem object,
+ * partitioned by a `reportType` field — rows added under one report never
+ * appear under another (each "Add Row" stamps the currently-active
+ * reportType), so from a data perspective they behave as 3 fully
+ * independent lists, not 3 views onto shared rows.
  *
  * Each report gets its own "Preview PDF" (server-side PDFKit, see
  * apps/api/src/lib/cad-index-pdf/renderer.ts — one generic column-driven
- * renderer shared by all 4 reports, not 4 hardcoded layouts).
+ * renderer shared by all reports, not one hardcoded layout per report).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertCircle, FileText, ListChecks, Loader2, Plus, Trash2 } from 'lucide-react'
@@ -30,7 +30,6 @@ interface ColumnDef {
 }
 
 const REPORT_TYPES = [
-  'Installation Completion Sign Off',
   'Pre-Installation Survey List',
   'Installation Progress List',
   'Final Adjustment Check List',
@@ -47,11 +46,6 @@ const BASE_UNIT_COLUMNS: ColumnDef[] = [
 ]
 
 const REPORT_COLUMNS: Record<ReportType, ColumnDef[]> = {
-  'Installation Completion Sign Off': [
-    ...BASE_UNIT_COLUMNS,
-    { key: 'installationCompleteNoPunch', label: 'Installation Complete / No Punch List Item', type: 'checkbox' },
-    { key: 'punchListItem', label: 'Punch List Item', type: 'checkbox' },
-  ],
   'Pre-Installation Survey List': [
     ...BASE_UNIT_COLUMNS,
     { key: 'roProperlyFramed', label: 'R.O. Properly Framed (Y/N)', type: 'checkbox' },
