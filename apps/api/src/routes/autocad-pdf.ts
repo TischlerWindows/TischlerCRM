@@ -7,7 +7,6 @@ const renderSchema = z.object({
   projectManager: z.string(),
   rows: z.array(
     z.object({
-      tusProjectManager: z.unknown().optional(),
       fastener: z.unknown().optional(),
       totalQty: z.unknown().optional(),
     }),
@@ -36,7 +35,6 @@ export async function autocadPdfRoutes(app: FastifyInstance) {
     let pdfBuffer: Buffer;
     try {
       const rows = parsed.data.rows.map((r) => ({
-        tusProjectManager: r.tusProjectManager,
         fastener: r.fastener,
         totalQty: r.totalQty,
       }));

@@ -494,7 +494,6 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
         ? String(pmRaw).split(';').map((id) => id.trim()).filter(Boolean).map((id) => resolveLookupDisplayName(id, 'User')).join(', ')
         : ''
       const payloadRows = rows.map((row) => ({
-        tusProjectManager: displayValue(row.data?.tusProjectManager, 'user'),
         fastener: row.data?.fastener,
         totalQty: row.data?.totalQty,
       }))

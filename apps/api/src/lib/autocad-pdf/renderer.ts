@@ -18,7 +18,6 @@ import { fileURLToPath } from 'url';
 const LOGO_PATH = join(dirname(fileURLToPath(import.meta.url)), 'tischler-logo.png');
 
 export interface AutoCadRow {
-  tusProjectManager?: unknown;
   fastener?: unknown;
   totalQty?: unknown;
 }
@@ -30,7 +29,6 @@ interface Column {
 }
 
 const COLUMNS: Column[] = [
-  { key: 'tusProjectManager', label: 'TUS Project Manager', width: 140 },
   { key: 'fastener', label: 'Fastener', width: 260 },
   { key: 'totalQty', label: 'Total QTY', width: 80 },
 ];
@@ -99,7 +97,7 @@ function drawHeaderBlock(doc: PDFKit.PDFDocument, projectName: string, projectMa
 function drawTitle(doc: PDFKit.PDFDocument, y: number, rowCount: number): number {
   const { left } = doc.page.margins;
   doc.font('Helvetica-Bold').fontSize(11).fillColor(TITLE_COLOR);
-  doc.text('AutoCad — Fastener Schedule', left, y);
+  doc.text('AutoCad — Fastener Count', left, y);
   doc.font('Helvetica').fontSize(8).fillColor('#6b7280');
   doc.text(`${rowCount} row${rowCount === 1 ? '' : 's'}`, left, doc.y);
   return doc.y + 6;
