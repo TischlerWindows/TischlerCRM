@@ -164,7 +164,14 @@ function FastenerComboBox({
     inputRef.current?.focus()
     inputRef.current?.select()
     const rect = inputRef.current?.getBoundingClientRect()
-    if (rect) setDropdownPosition({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 280) })
+    // The desktop table and mobile card list both render an EditableCell for
+    // every cell id, with only one hidden via CSS (`hidden`/`md:hidden`) at
+    // any given viewport width — so the hidden copy's input has a zero-size
+    // rect (display:none collapses layout). Skip it, or its dropdown portal
+    // renders floating at (0,0) in the corner of the page.
+    if (rect && (rect.width > 0 || rect.height > 0)) {
+      setDropdownPosition({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 280) })
+    }
   }, [])
 
   const filtered = options.filter((opt) => opt.toLowerCase().includes(query.trim().toLowerCase()))
