@@ -1,7 +1,7 @@
 /**
  * Installation Cost Grid widget — main entry point.
  * Renders KPI bar, tabbed views (costs, technicians, variance, executive),
- * and the technician assignment modal for a single Installation record.
+ * and the technician assignment modal for a single Project record.
  */
 'use client'
 import { useState, useEffect } from 'react'
@@ -101,10 +101,10 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
 
   return (
     <div className="space-y-4">
-      {/* Installation Header */}
+      {/* Project Header */}
       <div className="text-center py-2">
         <h2 className="text-lg font-bold text-brand-navy">
-          {instData.installationName || 'Installation'}
+          {instData.installationName || instData.projectName || 'Project'}
         </h2>
         {data.projectName && (
           <p className="text-sm text-gray-500 mt-0.5">

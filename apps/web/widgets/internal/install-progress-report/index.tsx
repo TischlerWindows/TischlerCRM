@@ -2,9 +2,9 @@
 
 /**
  * Install Progress Report widget — shop-drawing/unit install progress
- * tracker for an Installation. Progress-stage columns are dynamic (add,
+ * tracker for a Project. Progress-stage columns are dynamic (add,
  * rename, delete) — the set is stored as a JSON column-definition list on
- * the Installation record (`installProgressColumns`); each row is an
+ * the Project record (`installProgressColumns`); each row is an
  * InstallProgressItem record with one `stage_<key>` boolean per defined
  * stage column (not declared as CustomFields — Record.data tolerates
  * arbitrary keys, same as how other widgets mirror state onto the parent).
@@ -190,7 +190,7 @@ function StageColumnChip({
 }
 
 export default function InstallProgressReportWidget({ record, object }: WidgetProps) {
-  const installationId = record?.id ? String(record.id) : undefined
+  const projectId = record?.id ? String(record.id) : undefined
   const [rows, setRows] = useState<RecordData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -201,24 +201,24 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
   const [generatingPdf, setGeneratingPdf] = useState(false)
 
   const load = useCallback(async () => {
-    if (!installationId) return
+    if (!projectId) return
     setLoading(true)
     setError(null)
     try {
-      setRows(await recordsService.getRecords('InstallProgressItem', { filter: { installation: installationId } }))
+      setRows(await recordsService.getRecords('InstallProgressItem', { filter: { project: projectId } }))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load Install Progress Report items')
     } finally {
       setLoading(false)
     }
-  }, [installationId])
+  }, [projectId])
 
   useEffect(() => { void load() }, [load])
 
-  if (object?.apiName && object.apiName !== 'Installation') {
+  if (object?.apiName && object.apiName !== 'Project') {
     return (
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-        The Install Progress Report widget can only be placed on the Installation object&rsquo;s layout.
+        The Install Progress Report widget can only be placed on the Project object&rsquo;s layout.
       </div>
     )
   }
@@ -226,9 +226,9 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
   const persistStageColumns = async (next: StageColumn[]) => {
     const previous = stageColumns
     setStageColumns(next)
-    if (!installationId) return
+    if (!projectId) return
     try {
-      await recordsService.updateRecord('Installation', installationId, { data: { installProgressColumns: JSON.stringify(next) } })
+      await recordsService.updateRecord('Project', projectId, { data: { installProgressColumns: JSON.stringify(next) } })
     } catch (err: unknown) {
       setStageColumns(previous)
       setError(err instanceof Error ? err.message : 'Failed to save progress columns')
@@ -278,11 +278,11 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
   }
 
   const handleAddRow = async () => {
-    if (!installationId) return
+    if (!projectId) return
     setCreating(true)
     setError(null)
     try {
-      const created = await recordsService.createRecord('InstallProgressItem', { data: { installation: installationId } })
+      const created = await recordsService.createRecord('InstallProgressItem', { data: { project: projectId } })
       if (created) setRows((prev) => [...prev, created])
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to add row')
@@ -313,7 +313,7 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
     setGeneratingPdf(true)
     setError(null)
     try {
-      const installationName = record ? getRecordName(record as Record<string, unknown>) : 'Installation'
+      const installationName = record ? getRecordName(record as Record<string, unknown>) : 'Project'
       const payloadRows = rows.map((row) => ({
         page: row.data?.page,
         unitType: row.data?.unitType,
