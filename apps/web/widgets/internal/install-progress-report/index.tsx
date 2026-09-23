@@ -22,7 +22,7 @@
  * checkbox a user can uncheck directly is the current furthest stage.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, ClipboardCheck, FileText, Loader2, Plus, Trash2 } from 'lucide-react'
+import { AlertCircle, ChevronLeft, ChevronRight, ClipboardCheck, FileText, Loader2, Plus, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
@@ -160,16 +160,44 @@ function StageColumnChip({
   column,
   onRename,
   onRemove,
+  onMoveLeft,
+  onMoveRight,
+  canMoveLeft,
+  canMoveRight,
 }: {
   column: StageColumn
   onRename: (label: string) => void
   onRemove: () => void
+  onMoveLeft: () => void
+  onMoveRight: () => void
+  canMoveLeft: boolean
+  canMoveRight: boolean
 }) {
   const [label, setLabel] = useState(column.label)
   useEffect(() => setLabel(column.label), [column.label])
 
   return (
-    <span className="flex items-center gap-1 rounded border border-gray-300 bg-white py-0.5 pl-2 pr-0.5">
+    <span className="flex items-center gap-1 rounded border border-gray-300 bg-white py-0.5 pl-1 pr-0.5">
+      <button
+        type="button"
+        onClick={onMoveLeft}
+        disabled={!canMoveLeft}
+        aria-label={`Move ${column.label} column left`}
+        title="Move column left"
+        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:pointer-events-none disabled:opacity-30"
+      >
+        <ChevronLeft className="h-3 w-3" />
+      </button>
+      <button
+        type="button"
+        onClick={onMoveRight}
+        disabled={!canMoveRight}
+        aria-label={`Move ${column.label} column right`}
+        title="Move column right"
+        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:pointer-events-none disabled:opacity-30"
+      >
+        <ChevronRight className="h-3 w-3" />
+      </button>
       <input
         value={label}
         onChange={(e) => setLabel(e.target.value)}
@@ -251,6 +279,15 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
     if (!col) return
     if (!window.confirm(`Delete the "${col.label}" column? This cannot be undone.`)) return
     void persistStageColumns(stageColumns.filter((c) => c.key !== key))
+  }
+
+  const handleMoveColumn = (key: string, direction: 'left' | 'right') => {
+    const index = stageColumns.findIndex((c) => c.key === key)
+    const swapWith = direction === 'left' ? index - 1 : index + 1
+    if (index === -1 || swapWith < 0 || swapWith >= stageColumns.length) return
+    const next = [...stageColumns]
+    ;[next[index], next[swapWith]] = [next[swapWith], next[index]]
+    void persistStageColumns(next)
   }
 
   const handleCellCommit = async (rowId: string, patch: Record<string, unknown>) => {
@@ -414,12 +451,16 @@ export default function InstallProgressReportWidget({ record, object }: WidgetPr
 
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <span className="text-xs font-semibold text-gray-600">Progress columns:</span>
-        {stageColumns.map((col) => (
+        {stageColumns.map((col, i) => (
           <StageColumnChip
             key={col.key}
             column={col}
             onRename={(label) => handleRenameColumn(col.key, label)}
             onRemove={() => handleRemoveColumn(col.key)}
+            onMoveLeft={() => handleMoveColumn(col.key, 'left')}
+            onMoveRight={() => handleMoveColumn(col.key, 'right')}
+            canMoveLeft={i > 0}
+            canMoveRight={i < stageColumns.length - 1}
           />
         ))}
         <button
