@@ -420,6 +420,41 @@ const CORE_OBJECTS = [
     ],
   },
   {
+    apiName: 'CadIndexItem',
+    label: 'CAD Index Item',
+    pluralLabel: 'CAD Index Items',
+    description: 'CAD Index List widget rows tracked against a Project — reportType partitions rows into 4 independent lists',
+    fields: [
+      { apiName: 'reportType', label: 'Report Type', type: 'Picklist', required: true, picklistValues: [
+        'Installation Completion Sign Off',
+        'Pre-Installation Survey List',
+        'Installation Progress List',
+        'Final Adjustment Check List',
+      ] },
+      { apiName: 'unit', label: 'Unit', type: 'Text' },
+      { apiName: 'opening', label: 'Opening', type: 'Text' },
+      { apiName: 'qty', label: 'Qty', type: 'Number' },
+      { apiName: 'shopDrawingPage', label: 'Shop Drawing Page', type: 'Text' },
+      { apiName: 'itemType', label: 'Type', type: 'Text' },
+      { apiName: 'location', label: 'Location', type: 'Text' },
+      // Report 1 — Installation Completion Sign Off
+      { apiName: 'installationCompleteNoPunch', label: 'Installation Complete / No Punch List Item', type: 'Checkbox' },
+      { apiName: 'punchListItem', label: 'Punch List Item', type: 'Checkbox' },
+      // Report 2 — Pre-Installation Survey List
+      { apiName: 'roProperlyFramed', label: 'R.O. Properly Framed (Y/N)', type: 'Checkbox' },
+      { apiName: 'roWaterproofed', label: 'R.O. Waterproofed (Y/N)', type: 'Checkbox' },
+      { apiName: 'panReady', label: 'Pan Ready (if applicable) (Y/N)', type: 'Checkbox' },
+      { apiName: 'benchmarkShot', label: 'Tischler Benchmark Shot (Y/N)', type: 'Checkbox' },
+      // Report 3 — Installation Progress List / Report 4 — Final Adjustment Check List (shared)
+      { apiName: 'unitInstalled', label: 'Unit Installed', type: 'Checkbox' },
+      { apiName: 'technicalCheckCompleted', label: 'Technical check completed', type: 'Checkbox' },
+      { apiName: 'alarmContactChecked', label: 'Alarm Contact Checked', type: 'Checkbox' },
+      { apiName: 'rollScreenAdjusted', label: 'Roll Screen Adjusted', type: 'Checkbox' },
+      { apiName: 'remarks', label: 'Remarks', type: 'LongTextArea' },
+      { apiName: 'project', label: 'Project', type: 'Lookup', required: true },
+    ],
+  },
+  {
     apiName: 'WorkOrder',
     label: 'Work Order',
     pluralLabel: 'Work Orders',

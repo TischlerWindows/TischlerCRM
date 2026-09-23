@@ -28,6 +28,7 @@ export const INTERNAL_WIDGET_IDS = [
   'per-diem',
   'autocad',
   'install-progress-report',
+  'cad-index-list',
 ] as const
 export type InternalWidgetId = (typeof INTERNAL_WIDGET_IDS)[number]
 

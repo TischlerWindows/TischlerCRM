@@ -16,6 +16,7 @@ import {
   LayoutGrid,
   LayoutList,
   List,
+  ListChecks,
   Minus,
   Puzzle,
   Sparkles,
@@ -36,6 +37,7 @@ const LUCIDE_ICON_MAP: Record<string, ElementType> = {
   LayoutGrid,
   LayoutList,
   List,
+  ListChecks,
   Minus,
   Puzzle,
   Sparkles,
@@ -74,6 +76,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'per-diem': 'PerDiem',
   'autocad': 'AutoCad',
   'install-progress-report': 'InstallProgressReport',
+  'cad-index-list': 'CadIndexList',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {

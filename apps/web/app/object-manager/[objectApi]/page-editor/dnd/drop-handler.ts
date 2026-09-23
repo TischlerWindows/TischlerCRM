@@ -39,6 +39,7 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   PerDiem: { type: 'PerDiem' },
   AutoCad: { type: 'AutoCad' },
   InstallProgressReport: { type: 'InstallProgressReport' },
+  CadIndexList: { type: 'CadIndexList' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────

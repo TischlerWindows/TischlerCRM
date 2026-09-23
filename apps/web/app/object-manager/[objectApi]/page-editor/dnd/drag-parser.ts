@@ -73,6 +73,7 @@ const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'PerDiem',
   'AutoCad',
   'InstallProgressReport',
+  'CadIndexList',
 ]);
 
 export function isWidgetType(value: string): value is WidgetType {
