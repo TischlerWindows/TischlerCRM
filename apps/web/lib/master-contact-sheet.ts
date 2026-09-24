@@ -147,15 +147,30 @@ function getField(data: Record<string, unknown> | undefined, key: string): unkno
   return undefined
 }
 
+/** Lookup fields are sometimes a bare id, sometimes `{ lookup | id | value: id }`. */
+function readLookupId(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>
+    for (const key of ['lookup', 'id', 'value']) {
+      if (typeof obj[key] === 'string') return obj[key] as string
+    }
+  }
+  return ''
+}
+
 /** Builds the PDF payload's sections: each field's value is the Project's
  * own saved value if set, else an auto-filled suggestion resolved from the
  * linked Property/TeamMember records (never persisted — just for this PDF). */
 export async function buildMasterContactSheetSections(record: Record<string, unknown>): Promise<ContactSheetSection[]> {
   const computed: Record<string, unknown> = {}
 
-  const propertyId = getField(record, 'property')
+  // Legacy Salesforce-imported Project rows store this lookup under the
+  // auto-generated `PropertyId` key instead of the modern bare `property`
+  // key — same fallback used by project-list/index.tsx, summary/page.tsx, etc.
+  const propertyId = readLookupId(getField(record, 'property') || getField(record, 'PropertyId'))
   if (propertyId) {
-    const property = await recordsService.getRecord('Property', String(propertyId))
+    const property = await recordsService.getRecord('Property', propertyId)
     if (property) {
       const address = getField(property.data, 'address')
       const city = getField(property.data, 'city')
@@ -174,11 +189,11 @@ export async function buildMasterContactSheetSections(record: Record<string, unk
       const match = teamMembers.find((tm) => getField(tm.data, 'role') === role)
       if (!match) continue
       computed[`${prefix}ContractHolder`] = !!getField(match.data, 'contractHolder')
-      const contactId = getField(match.data, 'contact')
-      const accountId = getField(match.data, 'account')
+      const contactId = readLookupId(getField(match.data, 'contact'))
+      const accountId = readLookupId(getField(match.data, 'account'))
       let linked: Record<string, unknown> | undefined
-      if (contactId) linked = (await recordsService.getRecord('Contact', String(contactId)))?.data
-      else if (accountId) linked = (await recordsService.getRecord('Account', String(accountId)))?.data
+      if (contactId) linked = (await recordsService.getRecord('Contact', contactId))?.data
+      else if (accountId) linked = (await recordsService.getRecord('Account', accountId))?.data
       if (linked) {
         const name = getRecordName(linked)
         if (name) computed[`${prefix}Name`] = name
