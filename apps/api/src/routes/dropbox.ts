@@ -167,7 +167,7 @@ async function ensureDropboxFolders(accessToken: string, paths: string[]): Promi
 /**
  * Create the full Opportunity subfolder structure (the 9 numbered folders,
  * the '5. AutoCad' subfolder set, the '9. Photos' Site/Finished pair, and
- * the OPP#### working folder inside '1. Estimation'). Idempotent —
+ * the "Proposal - Date" working folder inside '1. Estimation'). Idempotent —
  * pre-existing folders (409) are ignored. Used both when an Opportunity is
  * linked to a Property and when it stands alone (no Property attached) so
  * both cases get the identical folder set.
@@ -175,8 +175,9 @@ async function ensureDropboxFolders(accessToken: string, paths: string[]): Promi
 async function createOpportunityFolderStructure(
   accessToken: string,
   childPath: string,
-  safeName: string,
+  estimationFolderName: string,
 ): Promise<void> {
+  const safeEstimationName = estimationFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
   await ensureDropboxFolders(
     accessToken,
     OPPORTUNITY_SUBFOLDERS.map((subfolder) => `${childPath}/${subfolder}`),
@@ -184,7 +185,7 @@ async function createOpportunityFolderStructure(
   await ensureDropboxFolders(accessToken, [
     ...OPPORTUNITY_PHOTOS_SUBFOLDERS.map((subfolder) => `${childPath}/9. Photos/${subfolder}`),
     ...OPPORTUNITY_AUTOCAD_SUBFOLDERS.map((subfolder) => `${childPath}/5. AutoCad/${subfolder}`),
-    `${childPath}/1. Estimation/${safeName}`,
+    `${childPath}/1. Estimation/${safeEstimationName}`,
   ]);
 }
 
@@ -496,6 +497,43 @@ function deriveOpportunityFolderName(data: Record<string, any>, createdAt?: Date
     return `${baseNum} (${baseName})${requoteSuffix}${dateStr}`;
   }
   return `${oppNum}${dateStr}`;
+}
+
+/**
+ * Build the name for the "working" folder created directly inside an
+ * Opportunity's '1. Estimation' subfolder — "Proposal - 4-21-26" for the
+ * base quote, "Proposal - Requote 1 - 4-22-26" for a requote. Unlike
+ * deriveOpportunityFolderName (used for the Opportunity's own top-level
+ * folder), this deliberately omits the OPP#### number/customer name since
+ * that's already visible one level up.
+ */
+function deriveEstimationSubfolderName(data: Record<string, any>, createdAt?: Date | string | null): string {
+  let oppNum = '';
+  for (const [k, v] of Object.entries(data)) {
+    if (k.replace(/^[A-Za-z]+__/, '') === 'opportunityNumber' && typeof v === 'string' && v) {
+      oppNum = v;
+    }
+  }
+  const requoteMatch = oppNum.match(/-\s*Requote\s*(\d+)$/i);
+  const requoteSuffix = requoteMatch ? ` - Requote ${requoteMatch[1]}` : '';
+  const resolvedDate = createdAt ?? (data.createdAt || data.CreatedDate || null);
+  return `Proposal${requoteSuffix} - ${fmtLeadDate(resolvedDate)}`;
+}
+
+/**
+ * Same as deriveEstimationSubfolderName, but for the couple of call sites
+ * that only have an already-built legacy "OPP0001 (Name) [- Requote N] -
+ * M-D-YY" string on hand (no record id to fetch real data/createdAt from —
+ * e.g. /dropbox/ensure-linked-folder, which is a pure path-building
+ * endpoint). Parses the requote number and trailing date straight out of
+ * that string instead of guessing today's date.
+ */
+function deriveEstimationSubfolderNameFromLegacyName(legacyFolderName: string): string {
+  const requoteMatch = legacyFolderName.match(/Requote\s*(\d+)/i);
+  const requoteSuffix = requoteMatch ? ` - Requote ${requoteMatch[1]}` : '';
+  const dateMatch = legacyFolderName.match(/(\d{1,2}-\d{1,2}-\d{2,4})\s*$/);
+  const datePart = dateMatch ? dateMatch[1] : fmtLeadDate(null);
+  return `Proposal${requoteSuffix} - ${datePart}`;
 }
 
 // ── Derive Dropbox folder name from record data ───────────────────
@@ -1101,29 +1139,9 @@ export async function tryRenameDropboxFolder(
       autorename: false,
       allow_ownership_transfer: false,
     });
-
-    // ── Rename the Estimation sub-folder for Opportunities ──
-    // Structure: {oppFolder}/1. Estimation/{oppFolder}
-    // After the main move above, the Estimation subfolder retains the old name,
-    // so rename it to match the new Opportunity folder name.
-    if (objectApiName === 'Opportunity' && oldChildName !== newChildName) {
-      const safeOld = oldChildName.replace(/[\\/:*?"<>|]/g, '_').trim();
-      const safeNew = newChildName.replace(/[\\/:*?"<>|]/g, '_').trim();
-      const estimationOldPath = `${newPath}/1. Estimation/${safeOld}`;
-      const estimationNewPath = `${newPath}/1. Estimation/${safeNew}`;
-      try {
-        console.log(`[dropbox] Renaming estimation sub-folder: ${estimationOldPath} → ${estimationNewPath}`);
-        await dropboxApi(accessToken, '/files/move_v2', {
-          from_path: estimationOldPath,
-          to_path: estimationNewPath,
-          autorename: false,
-          allow_ownership_transfer: false,
-        });
-      } catch (estErr: any) {
-        // Non-fatal — subfolder may not exist or may already have the right name
-        console.warn('[dropbox] Estimation sub-folder rename skipped (non-fatal):', estErr.message);
-      }
-    }
+    // Note: the '1. Estimation' working-folder name ("Proposal - Date") is
+    // independent of the Opportunity's own folder name (which may include the
+    // customer name), so no rename is needed there when the outer name changes.
   } catch (err: any) {
     // Non-fatal — old folder might not exist yet, or new path already exists
     console.error('[dropbox] tryRenameDropboxFolder failed (non-fatal):', err.message);
@@ -1239,7 +1257,7 @@ export async function tryEnsureLinkedFolder(
           }
           await backfillFolderId(accessToken, childRecordId, standalonePath);
         }
-        await createOpportunityFolderStructure(accessToken, standalonePath, safeStandaloneName);
+        await createOpportunityFolderStructure(accessToken, standalonePath, deriveEstimationSubfolderName(childData, oppRecSA?.createdAt));
       }
       return;
     }
@@ -1283,10 +1301,12 @@ export async function tryEnsureLinkedFolder(
 
     // Derive child folder name
     let childFolderName: string;
+    let childCreatedAt: Date | string | null | undefined;
     if (childObjectApiName === 'Opportunity') {
       // Fetch the record's createdAt for the date suffix
       const oppObj0 = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
       const oppRec0 = oppObj0 ? await prisma.record.findFirst({ where: { id: childRecordId, objectId: oppObj0.id }, select: { createdAt: true } }) : null;
+      childCreatedAt = oppRec0?.createdAt;
       childFolderName = deriveOpportunityFolderName(childData, oppRec0?.createdAt) || deriveDropboxFolderName(childData, childRecordId, childObjectApiName);
     } else if (childObjectApiName === 'Lead') {
       // Resolve the Contact lookup display name asynchronously before deriving the folder name
@@ -1322,6 +1342,7 @@ export async function tryEnsureLinkedFolder(
 
       // Resolve the parent OPP folder name via stored ID (handles name changes)
       let parentOppFolderName = parentOppNumber;
+      let parentEstimationSubfolderName: string | null = null;
       const oppObj = await prisma.customObject.findFirst({
         where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
       });
@@ -1344,6 +1365,7 @@ export async function tryEnsureLinkedFolder(
               } else {
                 parentOppFolderName = (deriveOpportunityFolderName(oppData, opp.createdAt) || parentOppNumber).replace(/[\\/:*?"<>|]/g, '_').trim();
               }
+              parentEstimationSubfolderName = deriveEstimationSubfolderName(oppData, opp.createdAt).replace(/[\\/:*?"<>|]/g, '_').trim();
               break;
             }
           }
@@ -1351,10 +1373,13 @@ export async function tryEnsureLinkedFolder(
         }
       }
 
-      // The date is already embedded in safeName via deriveOpportunityFolderName
-      const requoteSafeName = safeName.replace(/[\\/:*?"<>|]/g, '_').trim();
+      // The requote's own Estimation working-folder name — "Proposal - Requote N - Date"
+      const requoteSafeName = deriveEstimationSubfolderName(childData, childCreatedAt).replace(/[\\/:*?"<>|]/g, '_').trim();
       const requotePath = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${requoteSafeName}`;
-      const parentOppEstimationFolder = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${parentOppFolderName}`;
+      // The parent Opportunity's own "Proposal - Date" folder is the copy-source for the requote.
+      // Fall back to parsing it out of the resolved parent folder name if we couldn't get its raw data.
+      const parentOppEstimationFolderName = parentEstimationSubfolderName ?? deriveEstimationSubfolderNameFromLegacyName(parentOppFolderName).replace(/[\\/:*?"<>|]/g, '_').trim();
+      const parentOppEstimationFolder = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${parentOppEstimationFolderName}`;
       console.log(`[dropbox] Creating requote folder inside parent estimation: ${requotePath}`);
 
       let requoteCreated = false;
@@ -1430,7 +1455,7 @@ export async function tryEnsureLinkedFolder(
         // For Opportunities, always re-ensure the full subfolder structure even when
         // the main OPP folder already exists — subfolders may have been manually deleted.
         if (childObjectApiName === 'Opportunity') {
-          await createOpportunityFolderStructure(accessToken, childPath, safeName);
+          await createOpportunityFolderStructure(accessToken, childPath, deriveEstimationSubfolderName(childData, childCreatedAt));
         }
         return;
       }
@@ -1460,7 +1485,7 @@ export async function tryEnsureLinkedFolder(
     // Create subfolders for Opportunity records — always attempt (idempotent) so
     // subfolders are present whether the folder was just created or already existed.
     if (childObjectApiName === 'Opportunity') {
-      await createOpportunityFolderStructure(accessToken, childPath, safeName);
+      await createOpportunityFolderStructure(accessToken, childPath, deriveEstimationSubfolderName(childData, childCreatedAt));
     }
 
     // ── Copy files from related record folder ──
@@ -2440,9 +2465,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
             const _eOppNum = (Object.entries(rDataE).find(([k]) => k.replace(/^[A-Za-z]+__/, '') === 'opportunityNumber')?.[1] as string) ?? '';
             const _eIsReq = Boolean(rDataE._isRequote) || /\s*-\s*Requote\s*\d+$/i.test(_eOppNum);
             if (!_eIsReq) {
-              const estName = deriveOpportunityFolderName(rDataE, oppRecE.createdAt) || deriveDropboxFolderName(rDataE, recordId, 'Opportunity');
-              const estSafe = estName.replace(/[\\/:*?"<>|]/g, '_').trim();
-              await createOpportunityFolderStructure(accessToken, storedFolder.fullPath, estSafe);
+              await createOpportunityFolderStructure(accessToken, storedFolder.fullPath, deriveEstimationSubfolderName(rDataE, oppRecE.createdAt));
             }
           }
         } catch { /* non-fatal */ }
@@ -2600,8 +2623,8 @@ export async function dropboxRoutes(app: FastifyInstance) {
                   }
                 }
 
-                // The date is already embedded in safeName via deriveOpportunityFolderName
-                const requoteSafeName2 = safeName.replace(/[\\/:*?"<>|]/g, '_').trim();
+                // The requote's own Estimation working-folder name — "Proposal - Requote N - Date"
+                const requoteSafeName2 = deriveEstimationSubfolderName(rData, record.createdAt).replace(/[\\/:*?"<>|]/g, '_').trim();
                 const requotePath = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${requoteSafeName2}`;
                 let requoteFolderId: string | undefined;
                 try {
@@ -2649,7 +2672,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
               // Create (or recreate) Opportunity subfolders — always attempt so
               // they're restored if the folder was deleted and recreated.
               if (objectApiName === 'Opportunity') {
-                await createOpportunityFolderStructure(accessToken, childPath, safeName);
+                await createOpportunityFolderStructure(accessToken, childPath, deriveEstimationSubfolderName(rData, record.createdAt));
               }
 
               return reply.send({ created: true, path: childPath, linked: true, folderName: childFolderName });
@@ -2715,8 +2738,9 @@ export async function dropboxRoutes(app: FastifyInstance) {
     // Opportunities without a linked Property still get the full 9-folder
     // structure (only when the top-level folder is newly created here).
     if (created && objectApiName === 'Opportunity') {
-      const safeName = (folderName || recordId).replace(/[\\/:*?"<>|]/g, '_').trim();
-      await createOpportunityFolderStructure(accessToken, folderPath, safeName);
+      const oppObjStandaloneEF = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
+      const oppRecStandaloneEF = oppObjStandaloneEF ? await prisma.record.findFirst({ where: { id: recordId, objectId: oppObjStandaloneEF.id } }) : null;
+      await createOpportunityFolderStructure(accessToken, folderPath, deriveEstimationSubfolderName((oppRecStandaloneEF?.data as Record<string, any>) ?? {}, oppRecStandaloneEF?.createdAt));
     }
 
     reply.send({ created, path: folderPath, folderName: folderName || undefined });
@@ -2797,7 +2821,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     // Create subfolders for Opportunity / Project records
     if (created && (childObjectApiName === 'Opportunity' || childObjectApiName === 'Project')) {
-      await createOpportunityFolderStructure(accessToken, childPath, safeName);
+      await createOpportunityFolderStructure(accessToken, childPath, deriveEstimationSubfolderNameFromLegacyName(childFolderName));
     }
 
     reply.send({ created, path: childPath });
