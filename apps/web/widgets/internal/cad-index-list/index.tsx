@@ -167,7 +167,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [activeReportType, setActiveReportType] = useState<ReportType>(REPORT_TYPES[0])
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
-  const [selectedCellId, setSelectedCellId] = useState<string | null>(null)
+  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -409,8 +409,8 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                     return (
                       <td
                         key={col.key}
-                        onMouseEnter={() => handleFillDragEnter(rowIndex, colIndex)}
-                        onClick={() => { if (col.type !== 'checkbox') setSelectedCellId(cellId) }}
+                        onMouseEnter={() => { handleFillDragEnter(rowIndex, colIndex); if (col.type !== 'checkbox') setHoveredCellId(cellId) }}
+                        onMouseLeave={() => setHoveredCellId((prev) => (prev === cellId ? null : prev))}
                         className={`relative border-b border-gray-100 px-1.5 py-1 align-top ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
                       >
                         {col.type === 'checkbox' ? (
@@ -432,8 +432,8 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                               saving={savingRowId === row.id}
                               onCommit={(value) => void handleCellCommit(row.id, col.key, col.type === 'number' ? (value === '' ? '' : Number(value)) : value)}
                             />
-                            {/* Excel-style fill handle — only shown on the selected cell, drag down/up to copy its value into that column's other rows. */}
-                            {selectedCellId === cellId && (
+                            {/* Excel-style fill handle — only shown while hovering the cell, drag down/up to copy its value into that column's other rows. */}
+                            {hoveredCellId === cellId && (
                               <span
                                 onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleFillHandleMouseDown(rowIndex, colIndex, col.key, row.data?.[col.key]) }}
                                 aria-hidden="true"
