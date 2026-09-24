@@ -165,6 +165,8 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
     recordId: string
     folderName: string
     defaultSubPath?: string
+    estimationSubfolderName?: string
+    linkedOpportunityEstimationFolderName?: string
   } | null>(null)
 
   useEffect(() => {
@@ -185,13 +187,13 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
         if (objectApiName === 'Opportunity' && res.isRequote && (res.parentOpportunityFolderName || res.parentOpportunityNumber)) {
           // Requote → open requote folder inside parent OPP's 1. Estimation
           const parentFolder = res.parentOpportunityFolderName || res.parentOpportunityNumber
-          subPath = `${res.subfolder}/${parentFolder}/1. Estimation/${res.childFolderName}`
+          subPath = `${res.subfolder}/${parentFolder}/1. Estimation/${res.estimationSubfolderName || res.childFolderName}`
         } else if (objectApiName === 'Opportunity') {
-          // Opportunity → open the OPP#### folder inside 1. Estimation
-          subPath = `${res.subfolder}/${res.childFolderName}/1. Estimation/${res.childFolderName}`
+          // Opportunity → open the Proposal folder inside 1. Estimation
+          subPath = `${res.subfolder}/${res.childFolderName}/1. Estimation/${res.estimationSubfolderName || res.childFolderName}`
         } else if (objectApiName === 'Project' && res.linkedOpportunityFolderName) {
-          // Project → open the linked Opportunity's folder
-          subPath = `${res.subfolder}/${res.linkedOpportunityFolderName}`
+          // Project → open the linked Opportunity's Proposal folder
+          subPath = `${res.subfolder}/${res.linkedOpportunityFolderName}/1. Estimation/${res.linkedOpportunityEstimationFolderName || res.linkedOpportunityFolderName}`
         }
 
         setResolved({
