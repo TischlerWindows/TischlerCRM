@@ -166,7 +166,6 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
     folderName: string
     defaultSubPath?: string
     estimationSubfolderName?: string
-    linkedOpportunityEstimationFolderName?: string
   } | null>(null)
 
   useEffect(() => {
@@ -192,8 +191,8 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
           // Opportunity → open the Proposal folder inside 1. Estimation
           subPath = `${res.subfolder}/${res.childFolderName}/1. Estimation/${res.estimationSubfolderName || res.childFolderName}`
         } else if (objectApiName === 'Project' && res.linkedOpportunityFolderName) {
-          // Project → open the linked Opportunity's Proposal folder
-          subPath = `${res.subfolder}/${res.linkedOpportunityFolderName}/1. Estimation/${res.linkedOpportunityEstimationFolderName || res.linkedOpportunityFolderName}`
+          // Project → open the linked Opportunity folder root
+          subPath = `${res.subfolder}/${res.linkedOpportunityFolderName}`
         }
 
         setResolved({

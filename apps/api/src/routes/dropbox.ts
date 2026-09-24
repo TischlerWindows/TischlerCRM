@@ -2007,7 +2007,6 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
       // For Project, also resolve the linked Opportunity folder name
       let linkedOpportunityFolderName: string | undefined;
-      let linkedOpportunityEstimationFolderName: string | undefined;
       if (objectApiName === 'Project') {
         const oppId = await findLinkedOpportunityId(recordData, 'Project');
         if (oppId) {
@@ -2021,7 +2020,6 @@ export async function dropboxRoutes(app: FastifyInstance) {
             if (oppRecord) {
               const oppData = oppRecord.data as Record<string, any>;
               linkedOpportunityFolderName = deriveOpportunityFolderName(oppData, oppRecord.createdAt) || deriveDropboxFolderName(oppData, oppId);
-              linkedOpportunityEstimationFolderName = deriveEstimationSubfolderName(oppData, oppRecord.createdAt);
               // Check if Opportunity folder was renamed in Dropbox
               if (accessToken) {
                 const oppFolder = await resolveStoredFolder(accessToken, oppId);
@@ -2079,7 +2077,6 @@ export async function dropboxRoutes(app: FastifyInstance) {
         subfolder,
         childFolderName,
         ...(linkedOpportunityFolderName ? { linkedOpportunityFolderName } : {}),
-        ...(linkedOpportunityEstimationFolderName ? { linkedOpportunityEstimationFolderName } : {}),
         ...(objectApiName === 'Opportunity'
           ? { estimationSubfolderName: deriveEstimationSubfolderName(recordData, record.createdAt) }
           : {}),
