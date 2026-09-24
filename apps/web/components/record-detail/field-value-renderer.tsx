@@ -345,7 +345,7 @@ export function renderValue(
             {phone}
           </a>
         ) : null}
-        {prefix ? <span className="text-base italic underline text-brand-navy">{prefix}</span> : null}
+        {prefix ? <span className="text-base underline text-brand-navy">{prefix}</span> : null}
       </span>
     );
   }
