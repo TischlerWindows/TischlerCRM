@@ -56,6 +56,21 @@ export function containsDropboxContent(node: any, objectDef?: ObjectDef): boolea
   );
 }
 
+function normalizePathStageValues(
+  data: Record<string, unknown>,
+  objectDef: ObjectDef | undefined,
+): Record<string, unknown> {
+  if (!objectDef?.paths?.length) return data;
+
+  const normalized = { ...data };
+  for (const path of objectDef.paths) {
+    const stageId = normalized[path.trackingFieldApiName];
+    const stage = path.stages.find((candidate) => candidate.id === stageId);
+    if (stage) normalized[path.trackingFieldApiName] = stage.name;
+  }
+  return normalized;
+}
+
 function LookupFieldsCell({
   config,
   record,
@@ -311,7 +326,10 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
   }
   // Draft overlays MUST be spread last so a live in-progress edit always wins
   // over the record/prefixed-alias snapshot underneath it.
-  const layoutVisibilityData = { ...record, ...formulaValues, ...prefixedRecord, ...rawDrafts, ...bareDrafts } as Record<string, unknown>;
+  const layoutVisibilityData = normalizePathStageValues(
+    { ...record, ...formulaValues, ...prefixedRecord, ...rawDrafts, ...bareDrafts } as Record<string, unknown>,
+    objectDef,
+  );
   const regions = (tab as any).regions as LayoutSection[];
 
   const visibleRegions = regions.filter((region) => {
@@ -729,7 +747,10 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
   }
   // Draft overlays MUST be spread last so a live in-progress edit always wins
   // over the record/prefixed-alias snapshot underneath it.
-  const layoutVisibilityData = { ...record, ...formulaValues, ...prefixedRecord2, ...rawDrafts2, ...bareDrafts2 } as Record<string, unknown>;
+  const layoutVisibilityData = normalizePathStageValues(
+    { ...record, ...formulaValues, ...prefixedRecord2, ...rawDrafts2, ...bareDrafts2 } as Record<string, unknown>,
+    objectDef,
+  );
   const legacyTab = tab as any;
   const sorted = [...(legacyTab.sections ?? [])].sort((a: any, b: any) => a.order - b.order);
 
