@@ -24,6 +24,7 @@ import { config as perDiemManifest } from './per-diem/widget.config'
 import { config as autocadManifest } from './autocad/widget.config'
 import { config as installProgressReportManifest } from './install-progress-report/widget.config'
 import { config as cadIndexListManifest } from './cad-index-list/widget.config'
+import { config as masterContactSheetManifest } from './master-contact-sheet/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
 import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
@@ -141,6 +142,11 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     manifest: cadIndexListManifest,
     widgetConfigType: 'CadIndexList',
     Component: dynamic(() => import('./cad-index-list/index')),
+  },
+  {
+    manifest: masterContactSheetManifest,
+    widgetConfigType: 'MasterContactSheet',
+    Component: dynamic(() => import('./master-contact-sheet/index')),
   },
 ]
 

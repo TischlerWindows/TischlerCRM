@@ -29,6 +29,7 @@ export const INTERNAL_WIDGET_IDS = [
   'autocad',
   'install-progress-report',
   'cad-index-list',
+  'master-contact-sheet',
 ] as const
 export type InternalWidgetId = (typeof INTERNAL_WIDGET_IDS)[number]
 

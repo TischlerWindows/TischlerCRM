@@ -8,6 +8,7 @@ import { internalWidgets } from '@/widgets/internal/registry';
 import { externalWidgets } from '@/widgets/external/registry';
 import {
   Activity,
+  BookUser,
   Cloud,
   Clock,
   ClipboardCheck,
@@ -29,6 +30,7 @@ import type { ElementType } from 'react';
 
 const LUCIDE_ICON_MAP: Record<string, ElementType> = {
   Activity,
+  BookUser,
   Cloud,
   Clock,
   ClipboardCheck,
@@ -77,6 +79,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'autocad': 'AutoCad',
   'install-progress-report': 'InstallProgressReport',
   'cad-index-list': 'CadIndexList',
+  'master-contact-sheet': 'MasterContactSheet',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {

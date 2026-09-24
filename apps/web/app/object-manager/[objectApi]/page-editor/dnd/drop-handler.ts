@@ -40,6 +40,7 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   AutoCad: { type: 'AutoCad' },
   InstallProgressReport: { type: 'InstallProgressReport' },
   CadIndexList: { type: 'CadIndexList' },
+  MasterContactSheet: { type: 'MasterContactSheet' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────
