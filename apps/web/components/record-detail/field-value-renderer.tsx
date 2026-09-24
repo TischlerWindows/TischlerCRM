@@ -345,7 +345,7 @@ export function renderValue(
             {phone}
           </a>
         ) : null}
-        {prefix ? <span className="text-xs text-gray-500">{prefix}</span> : null}
+        {prefix ? <span className="text-base font-bold underline text-gray-700">{prefix}</span> : null}
       </span>
     );
   }
