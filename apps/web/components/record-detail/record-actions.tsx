@@ -12,6 +12,7 @@ import { PageLayout, type LayoutTab, type ObjectDef } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { generateRecordPdf } from '@/lib/record-pdf';
 import { openPdfPreview } from '@/lib/pdf-preview';
+import { buildMasterContactSheetSections } from '@/lib/master-contact-sheet';
 import { getFormattingEffectsForTab } from '@/lib/layout-formatting';
 import { assembleProposal } from '@crm/proposal-assembly';
 import { findSummaryForOpportunity, getSavedSummaries } from '@/lib/proposal-summary-resolver';
@@ -71,6 +72,7 @@ export function RecordActions({
   const [isCloning, setIsCloning] = useState(false);
   const [isRequoting, setIsRequoting] = useState(false);
   const [isGeneratingRecordPdf, setIsGeneratingRecordPdf] = useState(false);
+  const [isGeneratingContactSheet, setIsGeneratingContactSheet] = useState(false);
   const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
   const [showRequotePrompt, setShowRequotePrompt] = useState(false);
   const [requoteName, setRequoteName] = useState('');
@@ -242,6 +244,49 @@ export function RecordActions({
       showToast(message, 'error');
     } finally {
       setIsGeneratingRecordPdf(false);
+    }
+  };
+
+  const handleGenerateMasterContactSheet = async () => {
+    if (!record) return;
+    // Open the tab synchronously inside the click handler so popup blockers
+    // don't kill it after the awaits below.
+    const previewWindow = window.open('', '_blank');
+    setIsGeneratingContactSheet(true);
+    try {
+      const sections = await buildMasterContactSheetSections(record);
+      const projectName = String(record.projectName ?? title ?? 'Project');
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const token = apiClient.getToken();
+      const response = await fetch(`${apiBase}/master-contact-sheet-pdf/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ projectName, sections }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(detail.error || `Failed to render PDF (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url;
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'Master_Contact_Sheet.pdf';
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      previewWindow?.close();
+      const message = error instanceof Error ? error.message : 'Failed to generate Master Contact Sheet.';
+      showToast(message, 'error');
+    } finally {
+      setIsGeneratingContactSheet(false);
     }
   };
 
@@ -449,6 +494,18 @@ export function RecordActions({
               </>
             )}
           </div>
+        )}
+        {objectApiName === 'Project' && (
+          <button
+            onClick={() => void handleGenerateMasterContactSheet()}
+            disabled={isGeneratingContactSheet}
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileText className="w-3.5 h-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">
+              {isGeneratingContactSheet ? 'Preparing...' : 'Master Contact Sheet'}
+            </span>
+          </button>
         )}
         {showDelete && canDelete && (
           <button

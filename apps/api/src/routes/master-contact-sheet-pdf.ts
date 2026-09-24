@@ -22,8 +22,8 @@ export async function masterContactSheetPdfRoutes(app: FastifyInstance) {
   /**
    * POST /master-contact-sheet-pdf/render
    *
-   * Renders the Master Contact Sheet widget's current field values as a
-   * PDF, server-side, using PDFKit.
+   * Renders the Project's "Generate Master Contact Sheet" button data
+   * (apps/web/lib/master-contact-sheet.ts) as a PDF, server-side, using PDFKit.
    */
   app.post('/master-contact-sheet-pdf/render', async (req, reply) => {
     if (!(req as { user?: { sub?: string } }).user?.sub) {

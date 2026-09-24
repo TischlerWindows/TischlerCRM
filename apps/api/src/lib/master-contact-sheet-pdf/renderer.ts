@@ -1,10 +1,11 @@
 /**
- * Server-side PDFKit renderer for the Master Contact Sheet widget — a
- * form-style (not tabular) printable project contact directory. Portrait,
- * section header bars + two-column label/value rows, auto-paginating when
- * a page fills up. Section/field content is fully driven by what the
- * frontend sends (apps/web/widgets/internal/master-contact-sheet/index.tsx)
- * so this file has no per-section hardcoding beyond the visual layout.
+ * Server-side PDFKit renderer for the Project record's "Generate Master
+ * Contact Sheet" button (apps/web/lib/master-contact-sheet.ts +
+ * apps/web/components/record-detail/record-actions.tsx) — a form-style (not
+ * tabular) printable project contact directory. Portrait, section header
+ * bars + two-column label/value rows, auto-paginating when a page fills up.
+ * Section/field content is fully driven by what the frontend sends so this
+ * file has no per-section hardcoding beyond the visual layout.
  */
 import PDFDocument from 'pdfkit';
 import { existsSync } from 'fs';

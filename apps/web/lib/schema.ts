@@ -228,7 +228,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem' | 'AutoCad' | 'InstallProgressReport' | 'CadIndexList' | 'MasterContactSheet';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem' | 'AutoCad' | 'InstallProgressReport' | 'CadIndexList';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -419,10 +419,6 @@ export interface CadIndexListConfig {
   type: 'CadIndexList';
 }
 
-export interface MasterContactSheetConfig {
-  type: 'MasterContactSheet';
-}
-
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -445,8 +441,7 @@ export type WidgetConfig =
   | PerDiemConfig
   | AutoCadConfig
   | InstallProgressReportConfig
-  | CadIndexListConfig
-  | MasterContactSheetConfig;
+  | CadIndexListConfig;
 
 export interface PageWidget {
   id: string;
