@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   generateId,
+  pathFieldDefs,
   type FieldDef,
   type ObjectDef,
   type PageLayout,
@@ -99,6 +100,7 @@ export interface EditorLifecycle {
   /* Schema-derived data */
   object: ObjectDef | undefined;
   allFields: FieldDef[];
+  visibilityFields: FieldDef[];
   objectApiName: string;
   layoutId: string;
   routeKey: string;
@@ -268,6 +270,13 @@ export function useEditorLifecycle(): EditorLifecycle {
 
   /* ---- Derived data ---- */
   const allFields = useMemo<FieldDef[]>(() => object?.fields ?? [], [object]);
+  // Real fields + synthetic Path-stage fields — for condition/visibility-rule
+  // pickers only (NOT the field palette, since a Path's stage isn't a real
+  // droppable field).
+  const visibilityFields = useMemo<FieldDef[]>(
+    () => [...allFields, ...pathFieldDefs(object)],
+    [allFields, object],
+  );
   const sortedTabs = useMemo(
     () => [...layout.tabs].sort((a, b) => a.order - b.order),
     [layout.tabs],
@@ -444,6 +453,7 @@ export function useEditorLifecycle(): EditorLifecycle {
   return {
     object,
     allFields,
+    visibilityFields,
     objectApiName,
     layoutId,
     routeKey,

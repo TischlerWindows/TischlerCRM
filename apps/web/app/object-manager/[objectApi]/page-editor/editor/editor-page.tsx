@@ -50,6 +50,7 @@ export default function EditorPage() {
           activeTab={lifecycle.activeTab}
           activeRegions={lifecycle.activeRegions}
           allFields={lifecycle.allFields}
+          visibilityFields={lifecycle.visibilityFields}
           routeKey={lifecycle.routeKey}
           layoutId={lifecycle.layoutId}
           showTemplateGallery={lifecycle.showTemplateGallery}
@@ -80,7 +81,7 @@ export default function EditorPage() {
             }}
             rules={layout.formattingRules ?? []}
             onApply={(next) => setFormattingRules(next)}
-            objectFields={lifecycle.object.fields}
+            objectFields={lifecycle.visibilityFields}
             targetFilter={lifecycle.rulesTargetFilter}
             initialRuleId={lifecycle.rulesInitialRuleId}
           />

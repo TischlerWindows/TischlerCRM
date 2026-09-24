@@ -637,6 +637,22 @@ export function isTeamMemberSlotApiName(apiName: string): boolean {
   return apiName.startsWith('__tm:');
 }
 
+/** Synthetic FieldDefs for each Path's hidden stage-tracking field
+ * (`__path_<id>_stage`), so a Path's current stage can be picked as a
+ * condition in visibility rules / conditional formatting the same way a
+ * real Picklist field can — the field itself never appears in the page
+ * editor's field palette, only in condition builders. */
+export function pathFieldDefs(object: Pick<ObjectDef, 'paths'> | null | undefined): FieldDef[] {
+  if (!object?.paths?.length) return [];
+  return object.paths.map((path): FieldDef => ({
+    id: `path-field-${path.id}`,
+    apiName: path.trackingFieldApiName,
+    label: `${path.name} (Path Stage)`,
+    type: 'Picklist',
+    picklistValues: [...path.stages].sort((a, b) => a.order - b.order).map((s) => s.name),
+  }));
+}
+
 export interface LayoutPanel {
   id: string;
   label: string;

@@ -21,6 +21,9 @@ export interface EditorCanvasProps {
   activeTab: LayoutTab | null;
   activeRegions: LayoutSection[];
   allFields: FieldDef[];
+  /** allFields plus synthetic Path-stage fields — for visibility-rule/condition
+   * pickers only, never the draggable field palette. */
+  visibilityFields: FieldDef[];
   routeKey: string;
   layoutId: string;
   showTemplateGallery: boolean;
@@ -35,6 +38,7 @@ export function EditorCanvas({
   activeTab,
   activeRegions,
   allFields,
+  visibilityFields,
   routeKey,
   layoutId,
   showTemplateGallery,
@@ -177,7 +181,7 @@ export function EditorCanvas({
       <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
         <FloatingProperties
           onClose={() => setSelectedElement(null)}
-          availableFields={allFields}
+          availableFields={visibilityFields}
         />
       </div>
     </div>
