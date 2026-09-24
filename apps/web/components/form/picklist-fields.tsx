@@ -380,6 +380,54 @@ export function PicklistTextInput({
   );
 }
 
+// ── PhoneWithPrefix input ──────────────────────────────────────────
+
+export function PhoneWithPrefixInput({
+  fieldDef,
+  value,
+  onChange,
+  disabled,
+  formData,
+  visibilityCtx,
+}: {
+  fieldDef: FieldDef;
+  value: any;
+  onChange: (val: any) => void;
+  disabled?: boolean;
+  formData: Record<string, any>;
+  visibilityCtx: VisibilityContext;
+}) {
+  const options = filterPicklistValues(
+    fieldDef.picklistValues || [],
+    fieldDef,
+    formData,
+    visibilityCtx,
+  );
+  const phoneValue =
+    typeof value === 'object' && value !== null
+      ? value
+      : { prefix: '', phone: '' };
+
+  return (
+    <div className="flex gap-2 items-center">
+      <PicklistTextDropdown
+        options={options}
+        value={phoneValue.prefix || ''}
+        onChange={(prefix) => onChange({ ...phoneValue, prefix })}
+        disabled={disabled}
+      />
+      <Input
+        type="tel"
+        value={phoneValue.phone || ''}
+        onChange={(e) => onChange({ ...phoneValue, phone: e.target.value })}
+        disabled={disabled}
+        placeholder="Enter phone number"
+        className="min-w-0 flex-1"
+      />
+    </div>
+  );
+}
+
 // ── DropdownWithCustomInput ─────────────────────────────────────────
 // A dropdown with a built-in "Custom..." option. When "Custom..." is
 // chosen, a free-text input appears beneath the dropdown so the user

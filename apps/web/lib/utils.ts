@@ -434,6 +434,13 @@ export function formatFieldValue(rawValue: any, fieldType?: string, lookupObject
       return '-';
     }
 
+    // Handle PhoneWithPrefix objects (designation + phone number)
+    if (fieldType === 'PhoneWithPrefix' && (value.phone !== undefined || value.prefix !== undefined)) {
+      const phone = value.phone || '';
+      const prefix = value.prefix || '';
+      return [phone, prefix].filter(Boolean).join(' — ') || '-';
+    }
+
     // Handle PicklistText objects (combined picklist + text value)
     if (fieldType === 'PicklistText' || (value.picklist !== undefined && value.text !== undefined)) {
       const parts = [value.picklist, value.text].filter(Boolean);

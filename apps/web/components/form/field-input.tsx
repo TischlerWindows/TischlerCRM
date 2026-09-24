@@ -45,6 +45,7 @@ import {
   PicklistInput,
   MultiPicklistInput,
   PicklistTextInput,
+  PhoneWithPrefixInput,
   PicklistTextDropdown,
   DropdownWithCustomInput,
   filterPicklistValues,
@@ -148,6 +149,7 @@ export function getFieldIcon(type: FieldType) {
     EncryptedText: Lock,
     Email: Mail,
     Phone: Phone,
+    PhoneWithPrefix: Phone,
     URL: Globe,
     Number: Hash,
     Currency: DollarSign,
@@ -481,6 +483,18 @@ export function FieldInput({
       break;
     case 'Phone':
       inputElement = <Input {...commonProps} type="tel" />;
+      break;
+    case 'PhoneWithPrefix':
+      inputElement = (
+        <PhoneWithPrefixInput
+          fieldDef={fieldDef}
+          value={value}
+          onChange={(val) => onFieldChange(fieldDef.apiName, val)}
+          disabled={isReadOnly}
+          formData={formData}
+          visibilityCtx={visibilityCtx}
+        />
+      );
       break;
     case 'URL':
       if (fieldDef.staticUrl) {

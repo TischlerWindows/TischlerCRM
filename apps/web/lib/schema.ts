@@ -4,7 +4,7 @@ export type FieldType =
   | "AutoNumber" | "Formula" | "RollupSummary"
   | "Lookup" | "ExternalLookup" | "LookupFields"
   | "Checkbox" | "Currency" | "Date" | "DateTime" | "Email"
-  | "Geolocation" | "Number" | "Percent" | "Phone"
+  | "Geolocation" | "Number" | "Percent" | "Phone" | "PhoneWithPrefix"
   | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText" | "PicklistLookup"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
   | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser" | "LookupUser" | "MultiLookupUser"
@@ -34,6 +34,7 @@ export function normalizeFieldType(raw: string): FieldType {
     number: 'Number',
     percent: 'Percent',
     phone: 'Phone',
+    phonewithprefix: 'PhoneWithPrefix',
     picklist: 'Picklist',
     multipicklist: 'MultiPicklist',
     multiselectpicklist: 'MultiPicklist',
@@ -979,6 +980,7 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'Number', value: 'Number', type: 'Number' },
   { label: 'Percent', value: 'Percent', type: 'Percent' },
   { label: 'Phone', value: 'Phone', type: 'Phone' },
+  { label: 'Phone with Prefix', value: 'PhoneWithPrefix', type: 'PhoneWithPrefix' },
   { label: 'Picklist', value: 'Picklist', type: 'Picklist' },
   { label: 'Multi-Select Picklist', value: 'MultiPicklist', type: 'MultiPicklist' },
   { label: 'Picklist with Text', value: 'PicklistText', type: 'PicklistText' },

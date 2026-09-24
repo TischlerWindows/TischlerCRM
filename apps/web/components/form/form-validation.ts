@@ -62,6 +62,15 @@ export function validateFields(
         if (!value.picklist && !value.lookup) empty = true;
       }
 
+      // PhoneWithPrefix: treat { prefix: '', phone: '' } as empty
+      if (
+        fieldDef.type === 'PhoneWithPrefix' &&
+        typeof value === 'object' &&
+        value !== null
+      ) {
+        if (!value.prefix && !value.phone) empty = true;
+      }
+
       // CompositeText: treat all-blank sub-fields as empty
       if (
         fieldDef.type === 'CompositeText' &&
@@ -130,6 +139,13 @@ export function validateFields(
             errors[panelField.fieldApiName] = 'Invalid phone format';
           }
           break;
+        case 'PhoneWithPrefix': {
+          const phone = typeof value === 'object' && value !== null ? value.phone : '';
+          if (phone && !/^[\d\s\-\+\(\)\.]+$/.test(phone)) {
+            errors[panelField.fieldApiName] = 'Invalid phone format';
+          }
+          break;
+        }
         case 'Number':
         case 'Currency':
         case 'Percent':

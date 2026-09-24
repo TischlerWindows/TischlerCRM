@@ -83,6 +83,7 @@ const FIELD_TYPES: FieldTypeOption[] = [
   { value: 'Number', label: 'Number', description: 'Allows users to enter any number. Leading zeros are removed.', category: 'Standard', icon: Hash },
   { value: 'Percent', label: 'Percent', description: 'Allows users to enter a percentage number, for example, \'10\' and automatically adds the percent sign to the number.', category: 'Standard', icon: Percent },
   { value: 'Phone', label: 'Phone', description: 'Allows users to enter any phone number. Automatically formats it as a phone number.', category: 'Standard', icon: Phone },
+  { value: 'PhoneWithPrefix', label: 'Phone with Prefix', description: 'Lets users choose a designation such as Mobile, Home, or Work, then enter a phone number.', category: 'Standard', icon: Phone },
   { value: 'Picklist', label: 'Picklist', description: 'Allows users to select a value from a list you define.', category: 'Standard', icon: List },
   { value: 'MultiPicklist', label: 'Picklist (Multi-Select)', description: 'Allows users to select multiple values from a list you define.', category: 'Standard', icon: List },
   { value: 'PicklistText', label: 'Picklist with Text', description: 'A side-by-side combination of a picklist dropdown and a free-text input. Choose which side displays the dropdown.', category: 'Standard', icon: List },
@@ -1037,7 +1038,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                     </div>
                   )}
 
-                  {(selectedType === 'Picklist' || selectedType === 'MultiPicklist' || selectedType === 'DropdownWithCustom') && (
+                  {(selectedType === 'Picklist' || selectedType === 'MultiPicklist' || selectedType === 'DropdownWithCustom' || selectedType === 'PhoneWithPrefix') && (
                     <div>
                       <Label>Picklist Values</Label>
                       <div className="border border-gray-200 rounded-lg overflow-hidden">

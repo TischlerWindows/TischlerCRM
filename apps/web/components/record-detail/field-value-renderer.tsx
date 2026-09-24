@@ -334,6 +334,22 @@ export function renderValue(
   }
 
   // Phone
+  if (fieldType === 'PhoneWithPrefix' && typeof value === 'object' && value !== null) {
+    const phone = value.phone || '';
+    const prefix = value.prefix || '';
+    if (!phone && !prefix) return '-';
+    return (
+      <span className="inline-flex flex-col">
+        {phone ? (
+          <a href={`tel:${phone}`} className="text-brand-navy hover:underline underline-offset-2">
+            {phone}
+          </a>
+        ) : null}
+        {prefix ? <span className="text-xs text-gray-500">{prefix}</span> : null}
+      </span>
+    );
+  }
+
   if (fieldType === 'Phone') {
     return (
       <a href={`tel:${value}`} className="text-brand-navy hover:underline underline-offset-2">

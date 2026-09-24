@@ -11,6 +11,7 @@ import {
   PicklistInput,
   MultiPicklistInput,
   PicklistTextInput,
+  PhoneWithPrefixInput,
   DropdownWithCustomInput,
   PicklistTextDropdown,
   filterPicklistValues,
@@ -28,7 +29,7 @@ import type { VisibilityContext } from '@/lib/field-visibility';
 const INLINE_EDITABLE_TYPES = new Set<string>([
   'Text', 'TextArea', 'LongTextArea', 'RichTextArea', 'EncryptedText',
   'Number', 'Currency', 'Percent',
-  'Email', 'Phone', 'URL',
+  'Email', 'Phone', 'PhoneWithPrefix', 'URL',
   'Date', 'DateTime', 'Time',
   'Checkbox',
   'Picklist', 'MultiPicklist', 'MultiSelectPicklist', 'PicklistText', 'DropdownWithCustom',
@@ -299,6 +300,16 @@ function FieldEditor({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}
           className={common}
+        />
+      );
+    case 'PhoneWithPrefix':
+      return (
+        <PhoneWithPrefixInput
+          fieldDef={fieldDef}
+          value={draft}
+          onChange={setDraft}
+          formData={dependencyFormData}
+          visibilityCtx={NO_VISIBILITY_CTX}
         />
       );
     case 'URL':
