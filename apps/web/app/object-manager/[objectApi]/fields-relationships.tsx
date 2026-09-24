@@ -176,7 +176,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       ...formData,
       type,
       subFields: type === 'CompositeText' ? formData.subFields : [],
-      picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' || type === 'PicklistLookup' || type === 'DropdownWithCustom' ? formData.picklistValues : [],
+      picklistValues: type === 'Picklist' || type === 'MultiPicklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' || type === 'PicklistLookup' || type === 'DropdownWithCustom' || type === 'PhoneWithPrefix' ? formData.picklistValues : [],
       lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup' || type === 'LookupFields') ? formData.lookupObject : ((type === 'LookupUser' || type === 'MultiLookupUser') ? 'User' : ''),
       lookupField: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.lookupField : '',
       relationshipName: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.relationshipName : '',
@@ -431,7 +431,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       newField.formulaExpr = formData.formulaExpr;
       newField.formulaReturnType = formData.formulaReturnType || 'Text';
     }
-    if (t === 'Picklist' || t === 'MultiPicklist' || t === 'PicklistText' || t === 'PicklistLookup' || t === 'DropdownWithCustom') {
+    if (t === 'Picklist' || t === 'MultiPicklist' || t === 'PicklistText' || t === 'PicklistLookup' || t === 'DropdownWithCustom' || t === 'PhoneWithPrefix') {
       newField.picklistValues = [...formData.picklistValues];
       // Only save picklistColors if any color is set
       const colors = Object.fromEntries(
@@ -476,7 +476,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       updateField(objectApiName, editingField.apiName, newField as FieldDef);
       const fieldApiName = editingField.apiName;
       const isMultiSelect = formData.type === 'MultiPicklist' || formData.type === 'MultiSelectPicklist';
-      const hasOptionList = ['Picklist', 'MultiPicklist', 'MultiSelectPicklist', 'PicklistText', 'PicklistLookup', 'DropdownWithCustom'].includes(formData.type);
+      const hasOptionList = ['Picklist', 'MultiPicklist', 'MultiSelectPicklist', 'PicklistText', 'PicklistLookup', 'DropdownWithCustom', 'PhoneWithPrefix'].includes(formData.type);
       const renameOps = pendingRenames
         // Adding a brand-new value (via "Add Value") records a blank
         // placeholder as its "old" value until the user types the real text —
