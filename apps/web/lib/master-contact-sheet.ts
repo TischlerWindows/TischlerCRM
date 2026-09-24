@@ -172,11 +172,19 @@ export async function buildMasterContactSheetSections(record: Record<string, unk
   if (propertyId) {
     const property = await recordsService.getRecord('Property', propertyId)
     if (property) {
-      const address = getField(property.data, 'address')
-      const city = getField(property.data, 'city')
-      const state = getField(property.data, 'state')
-      const zip = getField(property.data, 'zipCode')
-      if (address) computed.jobLocationAddress = address
+      // The LocationSearch field (address_search: {street, city, state,
+      // postalCode, lat, lng}) is the authoritative address source and
+      // takes priority over the plain `address` field, which is often left
+      // blank — same resolution order as field-value-renderer.tsx's
+      // Property-lookup preview.
+      const blob = getField(property.data, 'address_search')
+      const blobObj = blob && typeof blob === 'object' ? (blob as Record<string, unknown>) : undefined
+      const street = (typeof blobObj?.street === 'string' && blobObj.street)
+        || (typeof getField(property.data, 'address') === 'string' ? (getField(property.data, 'address') as string) : '')
+      const city = (typeof blobObj?.city === 'string' && blobObj.city) || getField(property.data, 'city')
+      const state = (typeof blobObj?.state === 'string' && blobObj.state) || getField(property.data, 'state')
+      const zip = (typeof blobObj?.postalCode === 'string' && blobObj.postalCode) || getField(property.data, 'zipCode')
+      if (street) computed.jobLocationAddress = street
       const cityStateZip = [city, state].filter(Boolean).join(', ') + (zip ? ` ${zip}` : '')
       if (cityStateZip.trim()) computed.jobLocationCityStateZip = cityStateZip.trim()
     }
