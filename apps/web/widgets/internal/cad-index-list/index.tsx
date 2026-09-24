@@ -92,24 +92,31 @@ function TextCell({
   multiline,
   saving,
   onCommit,
+  onEditingChange,
 }: {
   value: unknown
   type: 'text' | 'number'
   multiline?: boolean
   saving: boolean
   onCommit: (value: string) => void
+  onEditingChange?: (editing: boolean) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
 
+  const setEditingState = (next: boolean) => {
+    setEditing(next)
+    onEditingChange?.(next)
+  }
+
   const startEdit = () => {
     if (saving) return
     setDraft(typeof value === 'string' || typeof value === 'number' ? String(value) : '')
-    setEditing(true)
+    setEditingState(true)
   }
 
   const commit = (next: string) => {
-    setEditing(false)
+    setEditingState(false)
     if (next !== (value ?? '')) onCommit(next)
   }
 
@@ -122,7 +129,7 @@ function TextCell({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => commit(draft)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false) }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setEditingState(false) }}
           className="w-full resize-none rounded border border-brand-navy/40 px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
       )
@@ -136,7 +143,7 @@ function TextCell({
         onBlur={() => commit(draft)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); commit(draft) }
-          else if (e.key === 'Escape') setEditing(false)
+          else if (e.key === 'Escape') setEditingState(false)
         }}
         className="w-full rounded border border-brand-navy/40 px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
       />
@@ -168,6 +175,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const [activeReportType, setActiveReportType] = useState<ReportType>(REPORT_TYPES[0])
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
+  const [editingCellId, setEditingCellId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -431,9 +439,10 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                               multiline={col.multiline}
                               saving={savingRowId === row.id}
                               onCommit={(value) => void handleCellCommit(row.id, col.key, col.type === 'number' ? (value === '' ? '' : Number(value)) : value)}
+                              onEditingChange={(editing) => setEditingCellId(editing ? cellId : null)}
                             />
-                            {/* Excel-style fill handle — only shown while hovering the cell, drag down/up to copy its value into that column's other rows. */}
-                            {hoveredCellId === cellId && (
+                            {/* Excel-style fill handle — only shown while hovering the cell, and not while typing in it. Drag down/up to copy its value into that column's other rows. */}
+                            {hoveredCellId === cellId && editingCellId !== cellId && (
                               <span
                                 onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleFillHandleMouseDown(rowIndex, colIndex, col.key, row.data?.[col.key]) }}
                                 aria-hidden="true"
