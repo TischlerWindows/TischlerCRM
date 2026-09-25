@@ -156,7 +156,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     });
   });
 
-  // ── Create user (invite flow or manual password) ─────────────────────────
+  // ── Create user (unconfigured or manual temporary password) ──────────────
   app.post('/admin/users', async (req, reply) => {
     const parsed = createUserSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -228,22 +228,10 @@ export async function usersAdminRoutes(app: FastifyInstance) {
       return reply.code(201).send({ user, inviteSent: false });
     }
 
-    // Invite flow (existing behavior)
-    const inviteToken = crypto.randomBytes(32).toString('hex');
-    const inviteTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
     const user = await prisma.user.create({
-      data: {
-        ...commonData,
-        inviteToken,
-        inviteTokenExpiry,
-        inviteSentAt: new Date(),
-      },
+      data: commonData,
       select: userSelect,
     });
-
-    const inviteUrl = buildInviteUrl(inviteToken);
-    const { sent } = await notifications.sendInviteEmail(user, inviteUrl);
 
     await logAudit({
       actorId,
@@ -251,11 +239,11 @@ export async function usersAdminRoutes(app: FastifyInstance) {
       objectType: 'User',
       objectId: user.id,
       objectName: user.name ?? user.email,
-      after: { email: parsed.data.email, name: parsed.data.name, profileId: parsed.data.profileId },
+      after: { email: parsed.data.email, name: parsed.data.name, profileId: parsed.data.profileId, inviteSent: false },
       ipAddress: extractIp(req),
     });
 
-    return reply.code(201).send({ user, inviteUrl: sent ? undefined : inviteUrl, inviteSent: sent });
+    return reply.code(201).send({ user, inviteSent: false });
   });
 
   // ── Update user ──────────────────────────────────────────────────────────
