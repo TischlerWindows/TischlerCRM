@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiClient } from './api-client';
 
 interface User {
@@ -73,15 +73,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('user');
+    localStorage.removeItem('admin_token_backup');
+    localStorage.removeItem('admin_user_backup');
     // Clear auth cookie
     document.cookie = 'auth-token=; Max-Age=0; path=/; Secure; SameSite=Strict';
     // Clear API client token
     apiClient.setToken(null);
     setToken(null);
     setUser(null);
-  };
+    setIsImpersonating(false);
+  }, []);
 
   const setAuth = (newToken: string, newUser: User) => {
     setToken(newToken);

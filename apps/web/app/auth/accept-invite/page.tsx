@@ -1,18 +1,24 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
 
 function AcceptInviteForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token') ?? '';
+  const { logout, setAuth } = useAuth();
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    logout();
+  }, [logout]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,13 +28,14 @@ function AcceptInviteForm() {
     setLoading(true);
     try {
       const result = await apiClient.acceptInvite(token, password);
-      apiClient.setToken(result.token);
+      setAuth(result.token, result.user);
       router.replace('/dashboard');
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Unable to accept invite.';
       setError(
-        e.message.includes('invalid or has expired')
+        message.includes('invalid or has expired')
           ? 'This invite link has expired or is invalid. Contact your administrator for a new invite.'
-          : e.message
+          : message
       );
     } finally {
       setLoading(false);
