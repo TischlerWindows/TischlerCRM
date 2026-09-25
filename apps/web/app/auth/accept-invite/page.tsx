@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
@@ -16,10 +16,6 @@ function AcceptInviteForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    logout();
-  }, [logout]);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -28,6 +24,7 @@ function AcceptInviteForm() {
     setLoading(true);
     try {
       const result = await apiClient.acceptInvite(token, password);
+      logout();
       setAuth(result.token, result.user);
       router.replace('/dashboard');
     } catch (e: unknown) {
