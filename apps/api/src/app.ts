@@ -229,8 +229,13 @@ export function buildApp() {
     });
     if (!user) return reply.status(400).send({ error: 'This invite link is invalid or has expired.' });
 
-    await prisma.user.update({
-      where: { id: user.id },
+    const consumed = await prisma.user.updateMany({
+      where: {
+        id: user.id,
+        inviteToken: body.token,
+        inviteTokenExpiry: { gt: new Date() },
+        deletedAt: null,
+      },
       data: {
         passwordHash: hashPassword(body.password),
         inviteToken: null,
@@ -240,6 +245,9 @@ export function buildApp() {
         isActive: true,
       },
     });
+    if (consumed.count !== 1) {
+      return reply.status(400).send({ error: 'This invite link is invalid or has expired.' });
+    }
 
     await logAudit({
       actorId: user.id,
