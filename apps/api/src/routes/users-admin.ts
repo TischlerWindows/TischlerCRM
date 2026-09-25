@@ -75,6 +75,13 @@ function buildInviteUrl(inviteToken: string): string {
   return `${frontendUrl}/auth/accept-invite?token=${inviteToken}`;
 }
 
+function buildPasswordResetUrl(resetToken: string): string {
+  const frontendUrl =
+    process.env.FRONTEND_URL ??
+    (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/api\/?$/, '');
+  return `${frontendUrl}/auth/reset-password?token=${resetToken}`;
+}
+
 export async function usersAdminRoutes(app: FastifyInstance) {
   // ── List users ──────────────────────────────────────────────────────────
   app.get('/admin/users', async (req, reply) => {
@@ -362,6 +369,48 @@ export async function usersAdminRoutes(app: FastifyInstance) {
       ipAddress: extractIp(req),
     });
 
+    return reply.send({ success: true });
+  });
+
+  // ── Admin send password reset link ──────────────────────────────────────
+  app.post('/admin/users/:id/send-password-reset-link', async (req, reply) => {
+    const pp = idParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: 'Invalid user ID' });
+    const { id } = pp.data;
+
+    const existing = await prisma.user.findUnique({ where: { id, deletedAt: null } });
+    if (!existing) return reply.code(404).send({ error: 'User not found' });
+    if (!existing.passwordHash) {
+      return reply.code(400).send({ error: 'This user has not completed account setup. Resend their invite instead.' });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
+    await prisma.user.update({
+      where: { id },
+      data: { passwordResetToken: resetToken, passwordResetTokenExpiry: resetTokenExpiry },
+    });
+
+    const resetUrl = buildPasswordResetUrl(resetToken);
+    const { sent } = await notifications.sendPasswordResetEmail(
+      { id: existing.id, name: existing.name, email: existing.email },
+      resetUrl,
+    );
+
+    const actorId = (req as any).user.sub;
+    await logAudit({
+      actorId,
+      action: 'RESET_PASSWORD',
+      objectType: 'User',
+      objectId: id,
+      objectName: existing.name ?? existing.email,
+      after: { event: 'password_reset_link_sent_by_admin', sent } as any,
+      ipAddress: extractIp(req),
+    });
+
+    if (!sent) {
+      return reply.code(502).send({ error: 'Password reset email could not be sent. Check the email integration and try again.' });
+    }
     return reply.send({ success: true });
   });
 

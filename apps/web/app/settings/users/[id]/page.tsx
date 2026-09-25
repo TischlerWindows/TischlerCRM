@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ChevronLeft, User, Phone, Building2,
-  Lock, Unlock, Trash2, RefreshCw, Send, Save, X,
+  Lock, Unlock, Trash2, RefreshCw, Send, Save, X, Mail,
   Clock, AlertCircle, CheckCircle,
 } from 'lucide-react';
 import { apiClient, type UserDetail, type LoginEventRow, type UpdateUserInput, type Profile, type UserRow } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
 
 const TIMEZONES = [
   'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -49,6 +50,8 @@ function InviteBadge({ status }: { status: string }) {
 export default function UserRecordPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   const [user, setUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,7 +60,6 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
   const [success, setSuccess] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [tab, setTab] = useState<Tab>('details');
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const [loginHistory, setLoginHistory] = useState<LoginEventRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -66,6 +68,7 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pwError, setPwError] = useState<string | null>(null);
+  const [sendingResetLink, setSendingResetLink] = useState(false);
 
   // Form fields
   const [formName, setFormName] = useState('');
@@ -104,13 +107,6 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
       setFormManagerId(u.manager?.id ?? '');
       setDirty(false);
 
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      if (token) {
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          setIsAdmin(payload.role === 'ADMIN');
-        } catch { /* noop */ }
-      }
     } catch (e: any) {
       setError(e.message ?? 'Failed to load user');
     } finally {
@@ -204,12 +200,26 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
     if (newPassword.length < 8) { setPwError('Password must be at least 8 characters.'); return; }
     try {
       await apiClient.adminSetUserPassword(id, newPassword);
-      setSuccess('Password updated');
+      setSuccess('Temporary password set. The user must change it at next login.');
       setConfirmAction(null);
       setNewPassword('');
       setConfirmPassword('');
     } catch (e: any) {
       setPwError(e.message ?? 'Failed to reset password');
+    }
+  };
+
+  const handleSendPasswordResetLink = async () => {
+    setSendingResetLink(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await apiClient.adminSendPasswordResetLink(id);
+      setSuccess(`Password reset link sent to ${user?.email ?? 'the user'}.`);
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to send password reset link');
+    } finally {
+      setSendingResetLink(false);
     }
   };
 
@@ -296,8 +306,17 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
               onClick={() => setConfirmAction('resetpw')}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Reset Password
+              <RefreshCw className="w-3.5 h-3.5" /> Set Temporary Password
             </button>
+            {(user.inviteStatus === 'ACCEPTED' || user.inviteStatus === 'LEGACY') && (
+              <button
+                onClick={handleSendPasswordResetLink}
+                disabled={sendingResetLink}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Mail className="w-3.5 h-3.5" /> {sendingResetLink ? 'Sending Reset Link…' : 'Send Password Reset Link'}
+              </button>
+            )}
             {(user.inviteStatus === 'PENDING' || user.inviteStatus === 'EXPIRED' || user.inviteStatus === 'NOT_SENT') && (
               <button
                 onClick={handleResendInvite}
@@ -516,11 +535,12 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
         </div>
       </main>
 
-      {/* ── Reset Password Modal ──────────────────────────────────────── */}
+      {/* ── Temporary Password Modal ──────────────────────────────────── */}
       {confirmAction === 'resetpw' && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setConfirmAction(null)}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-gray-900 mb-4">Reset Password</h3>
+            <h3 className="text-base font-semibold text-gray-900 mb-2">Set Temporary Password</h3>
+            <p className="text-sm text-gray-500 mb-4">The user will be required to choose a new password after their next login.</p>
             {pwError && <p className="text-sm text-red-600 mb-3">{pwError}</p>}
             <div className="space-y-3 mb-5">
               <div>
@@ -534,7 +554,7 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
             </div>
             <div className="flex justify-end gap-2">
               <button onClick={() => { setConfirmAction(null); setPwError(null); setNewPassword(''); setConfirmPassword(''); }} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={handleResetPassword} className="px-4 py-2 text-sm bg-[#151f6d] text-white rounded-lg hover:bg-[#1c2b99]">Update Password</button>
+              <button onClick={handleResetPassword} className="px-4 py-2 text-sm bg-[#151f6d] text-white rounded-lg hover:bg-[#1c2b99]">Set Temporary Password</button>
             </div>
           </div>
         </div>

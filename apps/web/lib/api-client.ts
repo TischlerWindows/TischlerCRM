@@ -353,6 +353,10 @@ class ApiClient {
     return this.post(`/admin/users/${id}/reset-password`, { password: newPassword });
   }
 
+  async adminSendPasswordResetLink(id: string): Promise<{ success: boolean }> {
+    return this.post(`/admin/users/${id}/send-password-reset-link`);
+  }
+
   async resendUserInvite(id: string): Promise<{ inviteUrl?: string; inviteSent: boolean }> {
     return this.post(`/admin/users/${id}/resend-invite`);
   }

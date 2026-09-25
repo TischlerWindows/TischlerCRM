@@ -307,14 +307,22 @@ export function buildApp() {
     });
     if (!user) return reply.status(400).send({ error: 'This reset link is invalid or has expired.' });
 
-    await prisma.user.update({
-      where: { id: user.id },
+    const consumed = await prisma.user.updateMany({
+      where: {
+        id: user.id,
+        passwordResetToken: body.token,
+        passwordResetTokenExpiry: { gt: new Date() },
+        deletedAt: null,
+      },
       data: {
         passwordHash: hashPassword(body.password),
         passwordResetToken: null,
         passwordResetTokenExpiry: null,
       },
     });
+    if (consumed.count !== 1) {
+      return reply.status(400).send({ error: 'This reset link is invalid or has expired.' });
+    }
 
     await logAudit({
       actorId: user.id,
