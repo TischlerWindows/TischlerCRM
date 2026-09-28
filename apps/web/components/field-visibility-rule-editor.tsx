@@ -20,6 +20,7 @@ interface FieldVisibilityRuleEditorProps {
   availableFields: FieldDef[];
   onSave: (conditions: ConditionExpr[]) => void;
   onCancel: () => void;
+  logic?: 'AND' | 'OR';
 }
 
 export default function FieldVisibilityRuleEditor({
@@ -27,6 +28,7 @@ export default function FieldVisibilityRuleEditor({
   availableFields,
   onSave,
   onCancel,
+  logic = 'AND',
 }: FieldVisibilityRuleEditorProps) {
   // Separate user-based conditions from field-based conditions
   const existingUserCondition = (field.visibleIf || []).find(c => c.left === '__currentUser__');
@@ -131,7 +133,7 @@ export default function FieldVisibilityRuleEditor({
     <div ref={containerRef} className="space-y-4 p-4 border rounded-lg bg-gray-50">
       <div>
         <h3 className="font-semibold text-sm mb-2">Field Visibility Rules for {field.label}</h3>
-        <p className="text-xs text-gray-600 mb-4">This field will only show if ALL conditions are met (AND logic)</p>
+        <p className="text-xs text-gray-600 mb-4">This field will show when {logic === 'OR' ? 'any condition is met (OR)' : 'all conditions are met (AND)'}.</p>
       </div>
 
       {/* Existing Conditions */}

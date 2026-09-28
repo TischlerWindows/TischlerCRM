@@ -82,6 +82,7 @@ export interface FieldDef {
   helpText?: string;
   controllingField?: string; // for dependent picklists
   visibleIf?: ConditionExpr[]; // conditional visibility rules
+  visibleIfLogic?: 'AND' | 'OR';
   picklistDependencies?: PicklistDependencyRule[]; // conditional visibility for picklist values
   formulaExpr?: string;        // for formula fields
   formulaReturnType?: 'Text' | 'Number' | 'Currency' | 'Percent' | 'Date' | 'DateTime';
@@ -478,6 +479,7 @@ export interface LegacyPageSection {
   /** Shown under the section title in form/detail when supported */
   description?: string;
   visibleIf?: ConditionExpr[];
+  visibleIfLogic?: 'AND' | 'OR';
   /** When false, the section is completely hidden on the record detail view */
   showInRecord?: boolean;
   /** When false, the section is hidden in the create/edit form template */
@@ -624,6 +626,7 @@ export interface PanelField {
    * definition's own object-wide visibleIf. Both are evaluated; the field
    * shows only when neither hides it. */
   visibleIf?: ConditionExpr[];
+  visibleIfLogic?: 'AND' | 'OR';
   hideOnNew?: boolean;       // Hide on New Record form (creation)
   hideOnView?: boolean;      // Hide on View (read-only detail page)
   hideOnEdit?: boolean;      // Hide on Edit (edit dialog)
@@ -669,7 +672,8 @@ export interface LayoutPanel {
   panelType?: 'fields' | 'components';
   widgets?: LayoutWidget[];
   hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
-  visibleIf?: ConditionExpr[]; // show only when ALL conditions are met
+  visibleIf?: ConditionExpr[];
+  visibleIfLogic?: 'AND' | 'OR';
   hideOnNew?: boolean;       // Hide on New Record form (creation)
   hideOnView?: boolean;      // Hide on View (read-only detail page)
   hideOnEdit?: boolean;      // Hide on Edit (edit dialog)
@@ -704,7 +708,8 @@ export interface LayoutSection {
   panels: LayoutPanel[];
   widgets: LayoutWidget[];
   hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
-  visibleIf?: ConditionExpr[]; // show only when ALL conditions are met
+  visibleIf?: ConditionExpr[];
+  visibleIfLogic?: 'AND' | 'OR';
   hideOnNew?: boolean;       // Hide on New Record form (creation)
   hideOnView?: boolean;      // Hide on View (read-only detail page)
   hideOnEdit?: boolean;      // Hide on Edit (edit dialog)

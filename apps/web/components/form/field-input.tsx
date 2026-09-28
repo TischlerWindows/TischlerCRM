@@ -246,10 +246,12 @@ export function FieldInput({
     fieldDef.visibleIf,
     formData,
     visibilityCtx,
+    fieldDef.visibleIfLogic,
   ) && evaluateVisibility(
     (layoutField as any)?.visibleIf,
     formData,
     visibilityCtx,
+    layoutField?.visibleIfLogic,
   );
   if (!isVisible) return null;
 

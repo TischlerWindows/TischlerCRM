@@ -21,7 +21,7 @@ export default function ConditionalFieldWrapper({
   children,
   className = '',
 }: ConditionalFieldWrapperProps) {
-  const isVisible = evaluateVisibility(field.visibleIf, recordData);
+  const isVisible = evaluateVisibility(field.visibleIf, recordData, undefined, field.visibleIfLogic);
 
   if (!isVisible) {
     return null; // Field is not visible
@@ -34,7 +34,7 @@ export default function ConditionalFieldWrapper({
  * Hook to check if a field should be visible
  */
 export function useFieldVisibility(field: FieldDef, recordData: RecordData): boolean {
-  return evaluateVisibility(field.visibleIf, recordData);
+  return evaluateVisibility(field.visibleIf, recordData, undefined, field.visibleIfLogic);
 }
 
 /**
@@ -44,5 +44,5 @@ export function filterVisibleFields(
   fields: (FieldDef & { pageField?: PageField })[],
   recordData: RecordData
 ) {
-  return fields.filter(field => evaluateVisibility(field.visibleIf, recordData));
+  return fields.filter(field => evaluateVisibility(field.visibleIf, recordData, undefined, field.visibleIfLogic));
 }

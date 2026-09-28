@@ -122,8 +122,8 @@ function getVisibleFields(
 
       const field = objectDef.fields.find((candidate) => candidate.apiName === placement.fieldApiName);
       if (!field) return [];
-      if (!evaluateVisibility(field.visibleIf, record)) return [];
-      if (placement.visibleIf?.length && !evaluateVisibility(placement.visibleIf, record)) return [];
+      if (!evaluateVisibility(field.visibleIf, record, undefined, field.visibleIfLogic)) return [];
+      if (placement.visibleIf?.length && !evaluateVisibility(placement.visibleIf, record, undefined, placement.visibleIfLogic)) return [];
       if (getFormattingEffectsForField(pageLayout, field.apiName, record)?.hidden) return [];
 
       const rawValue = readRecordValue(field, record);
@@ -284,7 +284,7 @@ export async function generateRecordPdf({
     const visiblePanels = [...(tab.regions ?? [])]
       .filter((region) => {
         if (region.hidden || region.hideOnView || region.hideOnExisting) return false;
-        if (region.visibleIf?.length && !evaluateVisibility(region.visibleIf, record)) return false;
+        if (region.visibleIf?.length && !evaluateVisibility(region.visibleIf, record, undefined, region.visibleIfLogic)) return false;
         return !getFormattingEffectsForRegion(pageLayout, region.id, record)?.hidden;
       })
       .sort((left, right) => left.gridRow - right.gridRow || left.gridColumn - right.gridColumn)
@@ -293,7 +293,7 @@ export async function generateRecordPdf({
           if (panel.panelType === 'components' || panel.hidden || panel.hideOnView || panel.hideOnExisting) {
             return false;
           }
-          if (panel.visibleIf?.length && !evaluateVisibility(panel.visibleIf, record)) return false;
+          if (panel.visibleIf?.length && !evaluateVisibility(panel.visibleIf, record, undefined, panel.visibleIfLogic)) return false;
           return !getFormattingEffectsForPanel(pageLayout, panel.id, record)?.hidden;
         })
         .sort((left, right) => left.order - right.order)

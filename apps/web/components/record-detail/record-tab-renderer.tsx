@@ -336,7 +336,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
     if (region.hidden) return false;
     // Detail page is "view" mode — check hideOnView with legacy hideOnExisting fallback
     if ((region as any).hideOnView || ((region as any).hideOnExisting && !containsDropboxContent(region, objectDef))) return false;
-    if ((region as any).visibleIf?.length > 0 && !evaluateVisibility((region as any).visibleIf, layoutVisibilityData)) return false;
+    if ((region as any).visibleIf?.length > 0 && !evaluateVisibility((region as any).visibleIf, layoutVisibilityData, undefined, region.visibleIfLogic)) return false;
     const regionFx = getFormattingEffectsForRegion(pageLayout, region.id, layoutVisibilityData);
     return !regionFx?.hidden;
   });
@@ -403,7 +403,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
           {sortedPanels.map((panel: any) => {
             if (panel.hidden) return null;
             if (panel.hideOnView || (panel.hideOnExisting && !containsDropboxContent(panel, objectDef))) return null;
-            if (panel.visibleIf?.length > 0 && !evaluateVisibility(panel.visibleIf, layoutVisibilityData)) return null;
+            if (panel.visibleIf?.length > 0 && !evaluateVisibility(panel.visibleIf, layoutVisibilityData, undefined, panel.visibleIfLogic)) return null;
             const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
           if (panelFx?.hidden) return null;
 
@@ -487,8 +487,8 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
             if (f.hideOnExisting && fd.type !== 'DropboxFiles') return false;
             // LookupFields field type: always pass through
             if (fd.type === 'LookupFields') return true;
-            if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
-            if (f.visibleIf?.length > 0 && !evaluateVisibility(f.visibleIf, layoutVisibilityData)) return false;
+            if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData, undefined, fd.visibleIfLogic)) return false;
+            if (f.visibleIf?.length > 0 && !evaluateVisibility(f.visibleIf, layoutVisibilityData, undefined, f.visibleIfLogic)) return false;
             const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
             if (fFx?.hidden) return false;
             return true;
@@ -756,7 +756,7 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
 
   const eligible = sorted.filter((section: any) => {
     if (section.showInRecord === false) return false;
-    if (!evaluateVisibility(section.visibleIf, layoutVisibilityData)) return false;
+    if (!evaluateVisibility(section.visibleIf, layoutVisibilityData, undefined, section.visibleIfLogic)) return false;
     const sectionFx = getFormattingEffectsForSection(pageLayout, section.id, layoutVisibilityData);
     if (sectionFx?.hidden) return false;
     const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
@@ -767,7 +767,7 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
         .map((f: any) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, objectDef, f)! }))
         .filter((entry: any) => entry.fieldDef != null)
         .filter(({ layoutField, fieldDef }: any) => {
-          if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) return false;
+          if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData, undefined, fieldDef.visibleIfLogic)) return false;
           const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
           if (fFx?.hidden) return false;
           return true;
@@ -839,7 +839,7 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
         .map((f: PageField) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, objectDef, f)! }))
         .filter((entry) => entry.fieldDef != null)
         .filter(({ layoutField, fieldDef }) => {
-          if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) return false;
+          if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData, undefined, fieldDef.visibleIfLogic)) return false;
           const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
           if (fFx?.hidden) return false;
           return true;
@@ -899,7 +899,7 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
                 .map((f: PageField) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, objectDef, f)! }))
                 .filter((e: any) => e.fieldDef != null)
                 .filter(({ layoutField, fieldDef }: any) => {
-                  if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) return false;
+                  if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData, undefined, fieldDef.visibleIfLogic)) return false;
                   const fx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
                   return !fx?.hidden;
                 });

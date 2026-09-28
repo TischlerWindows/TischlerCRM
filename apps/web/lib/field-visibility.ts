@@ -1,5 +1,7 @@
 import { ConditionExpr } from './schema';
 
+export type VisibilityLogic = 'AND' | 'OR';
+
 export interface RecordData {
   [fieldApiName: string]: any;
 }
@@ -10,18 +12,19 @@ export interface VisibilityContext {
 
 /**
  * Evaluates whether a field should be visible based on visibility conditions
- * @param conditions - Array of condition expressions (AND logic - all must be true)
+ * @param conditions - Array of condition expressions
  * @param recordData - Current record field values
  * @param context - Optional context with current user info for user-based visibility
  * @returns true if field should be visible, false otherwise
  */
-export function evaluateVisibility(conditions: ConditionExpr[] | undefined, recordData: RecordData, context?: VisibilityContext): boolean {
+export function evaluateVisibility(conditions: ConditionExpr[] | undefined, recordData: RecordData, context?: VisibilityContext, logic: VisibilityLogic = 'AND'): boolean {
   if (!conditions || conditions.length === 0) {
     return true; // No conditions = always visible
   }
 
-  // All conditions must be true (AND logic)
-  return conditions.every(condition => evaluateCondition(condition, recordData, context));
+  return logic === 'OR'
+    ? conditions.some(condition => evaluateCondition(condition, recordData, context))
+    : conditions.every(condition => evaluateCondition(condition, recordData, context));
 }
 
 /**

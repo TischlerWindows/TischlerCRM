@@ -430,16 +430,18 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
     return () => { if (savedTimer.current) clearTimeout(savedTimer.current); };
   }, []);
 
-  const handleSaveConditions = useCallback((conditions: import('@/lib/schema').ConditionExpr[]) => {
+  const handleSaveConditions = useCallback((conditions: import('@/lib/schema').ConditionExpr[], logic?: 'AND' | 'OR') => {
     if (!selection) return;
+    const visibleIfLogic = logic ?? (selection.kind === 'region' ? selection.region.visibleIfLogic : selection.kind === 'panel' ? selection.panel.visibleIfLogic : selection.kind === 'field' ? selection.field.visibleIfLogic : undefined) ?? 'AND';
     if (selection.kind === 'region') {
-      updateSection(selection.region.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
+      updateSection(selection.region.id, { visibleIf: conditions.length > 0 ? conditions : undefined, visibleIfLogic });
     } else if (selection.kind === 'panel') {
-      updatePanel(selection.panel.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
+      updatePanel(selection.panel.id, { visibleIf: conditions.length > 0 ? conditions : undefined, visibleIfLogic });
     } else if (selection.kind === 'field') {
       updateField(selection.field.id ?? selection.field.fieldApiName, selection.panel.id, {
         visibleIf: conditions.length > 0 ? conditions : undefined,
-      } as any);
+        visibleIfLogic,
+      });
     }
     setSaved(true);
     if (savedTimer.current) clearTimeout(savedTimer.current);
@@ -494,6 +496,11 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
       : selection.kind === 'field'
       ? (selection.field as any).visibleIf ?? []
       : [];
+  const visibleIfLogic = selection.kind === 'region'
+    ? selection.region.visibleIfLogic ?? 'AND'
+    : selection.kind === 'panel'
+    ? selection.panel.visibleIfLogic ?? 'AND'
+    : selection.field.visibleIfLogic ?? 'AND';
 
   // Build a fake FieldDef so we can reuse FieldVisibilityRuleEditor
   const fakeField: import('@/lib/schema').FieldDef = {
@@ -502,6 +509,7 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
     label: 'Visibility conditions',
     type: 'Text',
     visibleIf: visibleIfConditions,
+    visibleIfLogic,
   };
 
   return (
@@ -568,10 +576,19 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
             Show only when
           </div>
           <div className="text-[11px] text-gray-500 mb-2">
-            When conditions are set, this {selection.kind === 'region' ? 'section' : selection.kind === 'panel' ? 'panel' : 'field'} is hidden by default and only shown when <strong>all</strong> conditions are met.
+            When conditions are set, this {selection.kind === 'region' ? 'section' : selection.kind === 'panel' ? 'panel' : 'field'} is hidden by default and only shown when <strong>{visibleIfLogic === 'OR' ? 'any' : 'all'}</strong> conditions are met.
+          </div>
+          <div className="mb-3 flex overflow-hidden rounded-md border border-gray-200 text-xs" role="group" aria-label="Visibility rule logic">
+            {(['AND', 'OR'] as const).map((logic) => (
+              <button key={logic} type="button" onClick={() => handleSaveConditions(visibleIfConditions, logic)} aria-pressed={visibleIfLogic === logic}
+                className={`flex-1 py-1.5 font-medium ${visibleIfLogic === logic ? 'bg-brand-navy text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                {logic}
+              </button>
+            ))}
           </div>
           <FieldVisibilityRuleEditor
             field={fakeField}
+            logic={visibleIfLogic}
             availableFields={
               selection.kind === 'field'
                 ? availableFields.filter((f) => f.apiName !== selection.field.fieldApiName)

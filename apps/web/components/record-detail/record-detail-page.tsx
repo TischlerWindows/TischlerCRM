@@ -544,7 +544,7 @@ export default function RecordDetailPage({
                     {highlightApiNames.map((apiName) => {
                       const fd = getFieldDef(apiName, objectDef);
                       if (!fd) return null;
-                      if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return null;
+                      if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData, undefined, fd.visibleIfLogic)) return null;
                       const fFx = getFormattingEffectsForField(pageLayout!, apiName, layoutVisibilityData);
                       if (fFx?.hidden) return null;
                       const raw = getRecordValue(apiName, record, fd, formulaValues);

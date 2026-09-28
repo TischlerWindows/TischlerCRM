@@ -620,8 +620,8 @@ export default function DynamicForm({
             // "show only when" rules) so an invisible field can't block save
             // by being flagged as a missing required value.
             if (
-              !evaluateVisibility(fd.visibleIf, formData, visibilityCtx) ||
-              !evaluateVisibility((field as any).visibleIf, formData, visibilityCtx)
+              !evaluateVisibility(fd.visibleIf, formData, visibilityCtx, fd.visibleIfLogic) ||
+              !evaluateVisibility(field.visibleIf, formData, visibilityCtx, field.visibleIfLogic)
             ) return;
             pairs.push({ panelField: field, fieldDef: fd });
           });
@@ -671,7 +671,11 @@ export default function DynamicForm({
       panelField: import('@/lib/schema').PanelField;
       fieldDef: FieldDef;
     }>;
-    const newErrors = validateFields(pairs, formData);
+    const visiblePairs = pairs.filter(({ panelField, fieldDef }) =>
+      evaluateVisibility(fieldDef.visibleIf, formData, visibilityCtx, fieldDef.visibleIfLogic) &&
+      evaluateVisibility(panelField.visibleIf, formData, visibilityCtx, panelField.visibleIfLogic)
+    );
+    const newErrors = validateFields(visiblePairs, formData);
     setErrors((prev) => ({ ...prev, ...newErrors }));
     // Block Next when any slot in the section (or anywhere in the form,
     // since slots register globally) has an in-progress pick missing its
@@ -714,6 +718,7 @@ export default function DynamicForm({
               (region as any).visibleIf,
               formData,
               visibilityCtx,
+              region.visibleIfLogic,
             );
             const regionFx = getFormattingEffectsForRegion(
               layout,
@@ -734,7 +739,7 @@ export default function DynamicForm({
               !panelFx?.hidden &&
               !panel.hidden &&
               !isHiddenByLifecycle(panel as any, layoutType) &&
-              evaluateVisibility((panel as any).visibleIf, formData, visibilityCtx) &&
+              evaluateVisibility(panel.visibleIf, formData, visibilityCtx, panel.visibleIfLogic) &&
               // Auto-skip wizard steps that contain only auto-generated /
               // read-only system fields (e.g. the default "System Information"
               // panel with just Created By + Last Modified By). On a brand-new
@@ -1217,7 +1222,7 @@ export default function DynamicForm({
       // Synthetic TeamMemberSlot fields bypass the FieldDef lookup; the renderer
       // dispatches on kind below and renders TeamMemberSlotField instead of FieldInput.
       if ((f as any).kind === 'teamMemberSlot' && (f as any).slotConfig) {
-        if (!evaluateVisibility((f as any).visibleIf, formData, visibilityCtx)) continue;
+        if (!evaluateVisibility(f.visibleIf, formData, visibilityCtx, f.visibleIfLogic)) continue;
         gridFields.push({
           fieldDef: { apiName: f.fieldApiName, label: '', type: 'Text' } as FieldDef,
           pageField: f as any,
@@ -1247,8 +1252,8 @@ export default function DynamicForm({
         // otherwise they'd still reserve their grid cell, leaving a gap
         // where the remaining visible fields don't flow in to fill it.
         const isVisible =
-          evaluateVisibility(fd.visibleIf, formData, visibilityCtx) &&
-          evaluateVisibility((f as any).visibleIf, formData, visibilityCtx);
+          evaluateVisibility(fd.visibleIf, formData, visibilityCtx, fd.visibleIfLogic) &&
+          evaluateVisibility(f.visibleIf, formData, visibilityCtx, f.visibleIfLogic);
         if (!isVisible) continue;
         const formatFx = getFormattingEffectsForField(layout, fd.apiName, formData, visibilityCtx);
         if (formatFx?.hidden) continue;
@@ -1583,6 +1588,7 @@ export default function DynamicForm({
                   (region as any).visibleIf,
                   formData,
                   visibilityCtx,
+                  region.visibleIfLogic,
                 );
                 if (!isRegionVisible) return false;
                 if ((region as any).showInTemplate === false) return false;
@@ -1632,7 +1638,7 @@ export default function DynamicForm({
                       .filter((p) => {
                         if (p.hidden) return false;
                         if (isHiddenByLifecycle(p as any, layoutType)) return false;
-                        if ((p as any).visibleIf?.length > 0 && !evaluateVisibility((p as any).visibleIf, formData, visibilityCtx)) return false;
+                        if ((p.visibleIf?.length ?? 0) > 0 && !evaluateVisibility(p.visibleIf, formData, visibilityCtx, p.visibleIfLogic)) return false;
                         const panelFx = getFormattingEffectsForPanel(layout, p.id, formData, visibilityCtx);
                         if (panelFx?.hidden) return false;
                         return true;
@@ -1718,6 +1724,7 @@ export default function DynamicForm({
                   (region as any).visibleIf,
                   formData,
                   visibilityCtx,
+                  region.visibleIfLogic,
                 );
                 if (!isRegionVisible) return [];
                 if ((region as any).showInTemplate === false) return [];
@@ -1733,7 +1740,7 @@ export default function DynamicForm({
                   .sort((a, b) => a.order - b.order)
                   .filter((p) => {
                     if (p.hidden) return false;
-                    if ((p as any).visibleIf?.length > 0 && !evaluateVisibility((p as any).visibleIf, formData, visibilityCtx)) return false;
+                    if ((p.visibleIf?.length ?? 0) > 0 && !evaluateVisibility(p.visibleIf, formData, visibilityCtx, p.visibleIfLogic)) return false;
                     const panelFx = getFormattingEffectsForPanel(layout, p.id, formData, visibilityCtx);
                     if (panelFx?.hidden) return false;
                     return true;
@@ -1830,6 +1837,7 @@ export default function DynamicForm({
                                       pf.visibleIf,
                                       formData,
                                       visibilityCtx,
+                                      pf.visibleIfLogic,
                                     );
                                     if (!isVisible) return null;
                                     const parentRecordId =
@@ -1858,10 +1866,12 @@ export default function DynamicForm({
                                     fieldDef.visibleIf,
                                     formData,
                                     visibilityCtx,
+                                    fieldDef.visibleIfLogic,
                                   ) && evaluateVisibility(
                                     (entry.panelField as any)?.visibleIf,
                                     formData,
                                     visibilityCtx,
+                                    entry.panelField?.visibleIfLogic,
                                   );
                                   if (!isVisible) return null;
                                   const val = formData[fieldDef.apiName];
