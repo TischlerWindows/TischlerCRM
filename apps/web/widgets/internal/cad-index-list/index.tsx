@@ -14,7 +14,7 @@
  * renderer shared by all reports, not one hardcoded layout per report).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertCircle, ChevronLeft, ChevronRight, FileText, GripVertical, ListChecks, Loader2, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { AlertCircle, ChevronLeft, ChevronRight, FileText, GripVertical, ListChecks, Loader2, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
@@ -181,6 +181,9 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const [savingColumns, setSavingColumns] = useState(false)
   const [draggedColumnKey, setDraggedColumnKey] = useState<string | null>(null)
   const [dropBoundary, setDropBoundary] = useState<{ index: number; edge: 'before' | 'after' } | null>(null)
+  const [addingColumn, setAddingColumn] = useState(false)
+  const [newColumnLabel, setNewColumnLabel] = useState('')
+  const [newColumnType, setNewColumnType] = useState<ColumnType>('text')
 
   useEffect(() => { setColumnOrder(record?.cadIndexColumnOrder) }, [projectId, record?.cadIndexColumnOrder])
 
@@ -213,7 +216,12 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
       const parsed = typeof previous === 'string' ? JSON.parse(previous) : previous
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) saved = parsed as Record<string, unknown>
     } catch { /* Treat malformed saved settings as defaults. */ }
-    if (nextColumns) saved[activeReportType] = nextColumns.map((column) => column.key)
+    if (nextColumns) {
+      const custom = nextColumns.filter((column) => column.key.startsWith('cadCustom_'))
+      saved[activeReportType] = custom.length
+        ? { order: nextColumns.map((column) => column.key), custom }
+        : nextColumns.map((column) => column.key)
+    }
     else delete saved[activeReportType]
     const next = JSON.stringify(saved)
     setColumnOrder(next)
@@ -235,6 +243,42 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     const [moved] = next.splice(fromIndex, 1)
     next.splice(toIndex, 0, moved)
     void persistColumnOrder(next)
+  }
+
+  const handleAddColumn = (event: React.FormEvent) => {
+    event.preventDefault()
+    const label = newColumnLabel.trim()
+    if (!label || savingColumns) return
+    if (columns.some((column) => column.label.toLowerCase() === label.toLowerCase())) {
+      setError('A column with that name already exists')
+      return
+    }
+    const key = `cadCustom_${crypto.randomUUID().replace(/-/g, '')}`
+    void persistColumnOrder([...columns, { key, label, type: newColumnType }])
+    setNewColumnLabel('')
+    setNewColumnType('text')
+    setAddingColumn(false)
+  }
+
+  const handleRenameColumn = (column: ColumnDef) => {
+    const label = window.prompt('Rename column:', column.label)?.trim()
+    if (!label || label === column.label) return
+    if (columns.some((item) => item.key !== column.key && item.label.toLowerCase() === label.toLowerCase())) {
+      setError('A column with that name already exists')
+      return
+    }
+    void persistColumnOrder(columns.map((item) => item.key === column.key ? { ...item, label } : item))
+  }
+
+  const handleRemoveColumn = (column: ColumnDef) => {
+    if (!window.confirm(`Remove "${column.label}"? Existing values in this column will no longer be shown.`)) return
+    void persistColumnOrder(columns.filter((item) => item.key !== column.key))
+  }
+
+  const handleResetColumns = () => {
+    if (columns.some((column) => column.key.startsWith('cadCustom_')) &&
+        !window.confirm('Reset this report to default columns? Custom columns and their values will no longer be shown.')) return
+    void persistColumnOrder()
   }
 
   const handleCellCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
@@ -413,7 +457,8 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
             <button
               key={type}
               type="button"
-              onClick={() => { setActiveReportType(type); setDraggedColumnKey(null); setDropBoundary(null) }}
+              onClick={() => { setActiveReportType(type); setDraggedColumnKey(null); setDropBoundary(null); setAddingColumn(false) }}
+              disabled={savingColumns}
               className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
                 activeReportType === type
                   ? 'bg-brand-navy text-white'
@@ -424,16 +469,40 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => void persistColumnOrder()}
-          disabled={savingColumns || !projectId || columns.every((column, index) => column.key === REPORT_COLUMNS[activeReportType][index]?.key)}
-          title="Reset this report's columns to their default order"
-          className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <RotateCcw className="h-3.5 w-3.5" /> Reset to Default
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setAddingColumn((current) => !current)} disabled={savingColumns || !projectId} className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40">
+            <Plus className="h-3.5 w-3.5" /> Add Column
+          </button>
+          <button
+            type="button"
+            onClick={handleResetColumns}
+            disabled={savingColumns || !projectId || columns.every((column, index) => column.key === REPORT_COLUMNS[activeReportType][index]?.key)}
+            title="Reset this report's columns to their default order"
+            className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Reset to Default
+          </button>
+        </div>
       </div>
+
+      {addingColumn && (
+        <form onSubmit={handleAddColumn} className="flex flex-wrap items-end gap-2 rounded border border-gray-200 bg-gray-50 p-2">
+          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+            Column name
+            <input autoFocus required maxLength={80} value={newColumnLabel} onChange={(event) => setNewColumnLabel(event.target.value)} className="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs" />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+            Type
+            <select value={newColumnType} onChange={(event) => setNewColumnType(event.target.value as ColumnType)} className="rounded border border-gray-300 bg-white px-2 py-1.5 text-xs">
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="checkbox">Checkbox</option>
+            </select>
+          </label>
+          <button type="submit" disabled={savingColumns || !newColumnLabel.trim()} className="rounded bg-brand-navy px-2 py-1.5 text-xs font-medium text-white disabled:opacity-40">Add</button>
+          <button type="button" onClick={() => setAddingColumn(false)} className="rounded px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-200">Cancel</button>
+        </form>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
@@ -492,6 +561,12 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                     <div className="flex items-center gap-1">
                       <GripVertical className="h-3 w-3 shrink-0 cursor-grab text-gray-400" aria-hidden="true" />
                       <span className="min-w-0 flex-1">{col.label}</span>
+                      {col.key.startsWith('cadCustom_') && (
+                        <>
+                          <button type="button" onClick={() => handleRenameColumn(col)} disabled={savingColumns} aria-label={`Rename ${col.label} column`} title="Rename column" className="rounded p-0.5 text-gray-400 hover:bg-gray-200 disabled:opacity-30"><Pencil className="h-3 w-3" /></button>
+                          <button type="button" onClick={() => handleRemoveColumn(col)} disabled={savingColumns} aria-label={`Remove ${col.label} column`} title="Remove column" className="rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-600 disabled:opacity-30"><Trash2 className="h-3 w-3" /></button>
+                        </>
+                      )}
                       <button type="button" onClick={() => moveColumn(colIndex, colIndex - 1)} disabled={savingColumns || colIndex === 0} aria-label={`Move ${col.label} column left`} title="Move column left" className="rounded p-0.5 text-gray-400 hover:bg-gray-200 disabled:opacity-30"><ChevronLeft className="h-3 w-3" /></button>
                       <button type="button" onClick={() => moveColumn(colIndex, colIndex + 1)} disabled={savingColumns || colIndex === columns.length - 1} aria-label={`Move ${col.label} column right`} title="Move column right" className="rounded p-0.5 text-gray-400 hover:bg-gray-200 disabled:opacity-30"><ChevronRight className="h-3 w-3" /></button>
                     </div>
