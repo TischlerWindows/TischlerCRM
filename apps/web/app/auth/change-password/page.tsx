@@ -2,7 +2,49 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Eye, EyeOff } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+
+function PasswordInput({ id, label, value, onChange, placeholder, minLength }: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  minLength?: number;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div>
+      <label htmlFor={id} className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={visible ? 'text' : 'password'}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="w-full border border-gray-200 rounded-lg pl-3 pr-11 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#151f6d]/20 focus:border-[#151f6d]"
+          required
+          minLength={minLength}
+          placeholder={placeholder}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible(!visible)}
+          aria-label={`${visible ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+          aria-pressed={visible}
+          title={`${visible ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-gray-500 hover:text-[#151f6d]"
+        >
+          {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -21,8 +63,8 @@ export default function ChangePasswordPage() {
     try {
       await apiClient.changePassword(currentPassword, newPassword);
       router.replace('/');
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Unable to change password.');
     } finally {
       setLoading(false);
     }
@@ -46,42 +88,30 @@ export default function ChangePasswordPage() {
             </div>
           )}
           <div className="mb-4">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
-              Current Password
-            </label>
-            <input
-              type="password"
+            <PasswordInput
+              id="current-password"
+              label="Current Password"
               value={currentPassword}
-              onChange={e => setCurrentPassword(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#151f6d]/20 focus:border-[#151f6d]"
-              required
+              onChange={setCurrentPassword}
               placeholder="Enter temporary password"
             />
           </div>
           <div className="mb-4">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
-              New Password
-            </label>
-            <input
-              type="password"
+            <PasswordInput
+              id="new-password"
+              label="New Password"
               value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#151f6d]/20 focus:border-[#151f6d]"
-              required
+              onChange={setNewPassword}
               minLength={8}
               placeholder="Min. 8 characters"
             />
           </div>
           <div className="mb-6">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
-              Confirm New Password
-            </label>
-            <input
-              type="password"
+            <PasswordInput
+              id="confirm-password"
+              label="Confirm New Password"
               value={confirm}
-              onChange={e => setConfirm(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#151f6d]/20 focus:border-[#151f6d]"
-              required
+              onChange={setConfirm}
               minLength={8}
               placeholder="Re-enter new password"
             />
