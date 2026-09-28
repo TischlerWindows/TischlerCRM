@@ -111,6 +111,8 @@ export function renderFactoryOrderSpecPDF(spec: SpecPdfData, projectName: string
       row([String(index + 1), item, value?.specification ?? '', value?.remarks ?? ''], [25, 185, 165, 165]);
     });
 
+    doc.addPage();
+    y = 36;
     band('HARDWARE SPECIFICATIONS');
     row(['HARDWARE', 'ITEM', 'SUPPLIED BY', 'FINISH / TYPE'], [110, 170, 125, 135], true);
     HARDWARE_ITEMS.forEach(([group, item], index) => {
