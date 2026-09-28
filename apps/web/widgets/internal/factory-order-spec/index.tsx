@@ -16,6 +16,7 @@ const headingClass = 'bg-brand-navy px-3 py-2 text-sm font-bold uppercase text-w
 
 export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) {
   const projectId = record?.id ? String(record.id) : ''
+  const projectName = getRecordName(record as Record<string, unknown>)
   const rawSpec = record?.factoryOrderSpec ?? record?.Project__factoryOrderSpec
   const [spec, setSpec] = useState<FactoryOrderSpec>(() => parseFactoryOrderSpec(rawSpec))
   const [dirty, setDirty] = useState(false)
@@ -40,7 +41,7 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
     setSaving(true)
     setError(null)
     try {
-      await recordsService.updateRecord('Project', projectId, { data: { factoryOrderSpec: JSON.stringify(spec) } })
+      await recordsService.updateRecord('Project', projectId, { data: { factoryOrderSpec: JSON.stringify({ ...spec, project: projectName }) } })
       setDirty(false)
       setSaved(true)
     } catch (err: unknown) {
@@ -63,7 +64,7 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ spec, projectName: getRecordName(record as Record<string, unknown>) }),
+        body: JSON.stringify({ spec: { ...spec, project: projectName }, projectName }),
       })
       if (!response.ok) {
         const detail = await response.json().catch(() => ({ error: response.statusText }))
@@ -90,17 +91,19 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
     return <p className="text-sm text-amber-700">Factory Order Spec is available on Project records only.</p>
   }
 
-  const metadata: Array<{ key: 're' | 'project' | 'to' | 'from'; label: string }> = [
-    { key: 're', label: 'Re' }, { key: 'project', label: 'Project' },
-    { key: 'to', label: 'To' }, { key: 'from', label: 'From' },
-  ]
+  const hardwareGroups = HARDWARE_ITEMS.reduce<Array<{ group: string; items: string[] }>>((groups, { group, item }) => {
+    const current = groups[groups.length - 1]
+    if (current?.group === group) current.items.push(item)
+    else groups.push({ group, items: [item] })
+    return groups
+  }, [])
 
   return (
     <div className="space-y-4 text-sm text-gray-800">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-3">
         <div>
           <h2 className="text-base font-bold text-brand-navy">Factory Order Specification</h2>
-          <p className="text-xs text-gray-500">{getRecordName(record as Record<string, unknown>)}</p>
+          <p className="text-xs text-gray-500">{projectName}</p>
         </div>
         <div className="flex items-center gap-2">
           {saved && !dirty && <span role="status" className="inline-flex items-center gap-1 text-xs text-green-700"><Check className="h-3.5 w-3.5" /> Saved</span>}
@@ -119,10 +122,18 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
       <section aria-label="Order information" className="border border-gray-200">
         <h3 className={headingClass}>Order Specification</h3>
         <div className="grid gap-px bg-gray-200 sm:grid-cols-2">
-          {metadata.map(({ key, label }) => (
+          <label className="flex min-w-0 items-center gap-2 bg-white px-2 py-1 text-xs font-semibold uppercase text-gray-600">
+            <span className="w-16 shrink-0">Re</span>
+            <input className={inputClass} value={spec.re} onChange={(event) => update({ re: event.target.value })} />
+          </label>
+          <div className="flex min-w-0 items-center gap-2 bg-white px-2 py-1 text-xs font-semibold uppercase text-gray-600">
+            <span className="w-16 shrink-0">Project</span>
+            <span className="min-w-0 break-words px-2 py-1.5 text-sm font-normal normal-case text-gray-800">{projectName}</span>
+          </div>
+          {(['to', 'from'] as const).map((key) => (
             <label key={key} className="flex min-w-0 items-center gap-2 bg-white px-2 py-1 text-xs font-semibold uppercase text-gray-600">
-              <span className="w-16 shrink-0">{label}</span>
-              <input className={inputClass} value={spec[key]} onChange={(event) => update({ [key]: event.target.value })} placeholder={key === 'project' ? getRecordName(record as Record<string, unknown>) : undefined} />
+              <span className="w-16 shrink-0">{key}</span>
+              <input className={inputClass} value={spec[key]} onChange={(event) => update({ [key]: event.target.value })} />
             </label>
           ))}
         </div>
@@ -163,15 +174,18 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
       <section aria-label="Hardware specifications" className="overflow-x-auto border border-gray-200">
         <table className="w-full min-w-[650px] border-collapse text-xs">
           <thead className="bg-brand-navy text-left text-white"><tr><th colSpan={2} className="px-2 py-2">Hardware</th><th colSpan={2} className="px-2 py-2">Specifications</th></tr><tr className="bg-gray-100 text-gray-700"><th className="w-[19%] px-2 py-1">Group</th><th className="w-[30%] px-2 py-1">Item</th><th className="w-[25%] px-2 py-1">Supplied by</th><th className="px-2 py-1">Finish / Type</th></tr></thead>
-          <tbody>{HARDWARE_ITEMS.map(({ group, item }) => {
+          {hardwareGroups.map(({ group, items }) => <tbody key={group}>{items.map((item, index) => {
             const key = hardwareKey(group, item)
             const row = spec.hardware[key]
             return <tr key={key} className="border-t border-gray-200 even:bg-gray-50">
-              <th scope="row" className="px-2 py-1 text-left font-medium">{group}</th><td className="px-2 py-1">{item}</td>
+              {index === 0 && (
+                <th scope="rowgroup" rowSpan={items.length} className="border-r border-gray-200 bg-gray-100 px-2 py-2 text-left align-top font-semibold text-brand-navy">{group}</th>
+              )}
+              <td className="px-2 py-1">{item}</td>
               <td className="border-l border-gray-200"><input aria-label={`${group} ${item} supplied by`} className={inputClass} value={row?.suppliedBy ?? ''} onChange={(event) => update({ hardware: { ...spec.hardware, [key]: { ...row, suppliedBy: event.target.value, finishType: row?.finishType ?? '' } } })} /></td>
               <td className="border-l border-gray-200"><input aria-label={`${group} ${item} finish or type`} className={inputClass} value={row?.finishType ?? ''} onChange={(event) => update({ hardware: { ...spec.hardware, [key]: { ...row, suppliedBy: row?.suppliedBy ?? '', finishType: event.target.value } } })} /></td>
             </tr>
-          })}</tbody>
+          })}</tbody>)}
         </table>
       </section>
 

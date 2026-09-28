@@ -98,7 +98,7 @@ export function renderFactoryOrderSpecPDF(spec: SpecPdfData, projectName: string
     doc.font('Helvetica-Bold').fontSize(15).fillColor(NAVY).text('ORDER SPECIFICATION', LEFT, y);
     y = doc.y + 12;
     band('ORDER INFORMATION');
-    row(['RE:', spec.re, 'PROJECT:', spec.project || projectName], [55, 215, 70, 200]);
+    row(['RE:', spec.re, 'PROJECT:', projectName], [55, 215, 70, 200]);
     row(['TO:', spec.to, 'FROM:', spec.from], [55, 215, 70, 200]);
     row(['PRODUCT:', spec.products.join('  /  ')], [90, 450]);
     note('APPROVED SHOP DRAWINGS FOR FACTORY ORDER, DATE & REVISION NUMBER:', spec.approvedDrawings);
@@ -113,9 +113,9 @@ export function renderFactoryOrderSpecPDF(spec: SpecPdfData, projectName: string
 
     band('HARDWARE SPECIFICATIONS');
     row(['HARDWARE', 'ITEM', 'SUPPLIED BY', 'FINISH / TYPE'], [110, 170, 125, 135], true);
-    HARDWARE_ITEMS.forEach(([group, item]) => {
+    HARDWARE_ITEMS.forEach(([group, item], index) => {
       const value = spec.hardware[`${group}:${item}`];
-      row([group, item, value?.suppliedBy ?? '', value?.finishType ?? ''], [110, 170, 125, 135]);
+      row([index === 0 || HARDWARE_ITEMS[index - 1][0] !== group ? group : '', item, value?.suppliedBy ?? '', value?.finishType ?? ''], [110, 170, 125, 135]);
     });
 
     band('SHIPPING');
