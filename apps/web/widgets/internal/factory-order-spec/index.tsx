@@ -1,0 +1,198 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { AlertCircle, Check, FileText, Loader2, Save } from 'lucide-react'
+import type { WidgetProps } from '@/lib/widgets/types'
+import { recordsService } from '@/lib/records-service'
+import { apiClient } from '@/lib/api-client'
+import { getRecordName } from '../shared/recordName'
+import {
+  HARDWARE_ITEMS, PRODUCT_OPTIONS, SPEC_ITEMS, hardwareKey,
+  parseFactoryOrderSpec, type FactoryOrderSpec,
+} from '@/lib/factory-order-spec'
+
+const inputClass = 'w-full min-w-0 border-0 bg-transparent px-2 py-1.5 text-sm text-gray-800 outline-none focus:bg-blue-50 focus:ring-1 focus:ring-inset focus:ring-brand-navy'
+const headingClass = 'bg-brand-navy px-3 py-2 text-sm font-bold uppercase text-white'
+
+export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) {
+  const projectId = record?.id ? String(record.id) : ''
+  const rawSpec = record?.factoryOrderSpec ?? record?.Project__factoryOrderSpec
+  const [spec, setSpec] = useState<FactoryOrderSpec>(() => parseFactoryOrderSpec(rawSpec))
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    setSpec(parseFactoryOrderSpec(rawSpec))
+    setDirty(false)
+  }, [projectId, rawSpec])
+
+  const update = (patch: Partial<FactoryOrderSpec>) => {
+    setSpec((current) => ({ ...current, ...patch }))
+    setDirty(true)
+    setSaved(false)
+  }
+
+  const save = async () => {
+    if (!projectId || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await recordsService.updateRecord('Project', projectId, { data: { factoryOrderSpec: JSON.stringify(spec) } })
+      setDirty(false)
+      setSaved(true)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save factory order spec')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const previewPdf = async () => {
+    const previewWindow = window.open('', '_blank')
+    setGeneratingPdf(true)
+    setError(null)
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+      const token = apiClient.getToken()
+      const response = await fetch(`${apiBase}/factory-order-spec-pdf/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ spec, projectName: getRecordName(record as Record<string, unknown>) }),
+      })
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }))
+        throw new Error(detail.error || 'Failed to render Factory Order Spec PDF')
+      }
+      const url = URL.createObjectURL(await response.blob())
+      if (previewWindow && !previewWindow.closed) previewWindow.location.href = url
+      else {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'Factory_Order_Spec.pdf'
+        link.click()
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err: unknown) {
+      previewWindow?.close()
+      setError(err instanceof Error ? err.message : 'Failed to generate Factory Order Spec PDF')
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
+  if (object.apiName !== 'Project') {
+    return <p className="text-sm text-amber-700">Factory Order Spec is available on Project records only.</p>
+  }
+
+  const metadata: Array<{ key: 're' | 'project' | 'to' | 'from'; label: string }> = [
+    { key: 're', label: 'Re' }, { key: 'project', label: 'Project' },
+    { key: 'to', label: 'To' }, { key: 'from', label: 'From' },
+  ]
+
+  return (
+    <div className="space-y-4 text-sm text-gray-800">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-3">
+        <div>
+          <h2 className="text-base font-bold text-brand-navy">Factory Order Specification</h2>
+          <p className="text-xs text-gray-500">{getRecordName(record as Record<string, unknown>)}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {saved && !dirty && <span role="status" className="inline-flex items-center gap-1 text-xs text-green-700"><Check className="h-3.5 w-3.5" /> Saved</span>}
+          <button type="button" onClick={() => void previewPdf()} disabled={generatingPdf} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40">
+            {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+            {generatingPdf ? 'Preparing PDF' : 'Preview PDF'}
+          </button>
+          <button type="button" onClick={() => void save()} disabled={!projectId || !dirty || saving} className="inline-flex items-center gap-1.5 rounded bg-brand-navy px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-navy/90 disabled:opacity-40">
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {saving ? 'Saving' : 'Save Spec'}
+          </button>
+        </div>
+      </div>
+      {error && <div role="alert" className="flex items-center gap-2 border border-red-200 bg-red-50 p-2 text-red-700"><AlertCircle className="h-4 w-4" />{error}</div>}
+
+      <section aria-label="Order information" className="border border-gray-200">
+        <h3 className={headingClass}>Order Specification</h3>
+        <div className="grid gap-px bg-gray-200 sm:grid-cols-2">
+          {metadata.map(({ key, label }) => (
+            <label key={key} className="flex min-w-0 items-center gap-2 bg-white px-2 py-1 text-xs font-semibold uppercase text-gray-600">
+              <span className="w-16 shrink-0">{label}</span>
+              <input className={inputClass} value={spec[key]} onChange={(event) => update({ [key]: event.target.value })} placeholder={key === 'project' ? getRecordName(record as Record<string, unknown>) : undefined} />
+            </label>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-gray-200 px-3 py-2">
+          <span className="text-xs font-semibold uppercase text-gray-600">Product</span>
+          {PRODUCT_OPTIONS.map((product) => (
+            <label key={product} className="inline-flex items-center gap-1 text-xs">
+              <input type="checkbox" checked={spec.products.includes(product)} onChange={(event) => update({ products: event.target.checked ? [...spec.products, product] : spec.products.filter((value) => value !== product) })} />
+              {product}
+            </label>
+          ))}
+        </div>
+        <label className="block border-t border-gray-200 px-3 py-2 text-xs font-semibold uppercase text-gray-600">
+          Approved shop drawings for factory order, date &amp; revision number
+          <input className={`${inputClass} mt-1 border border-gray-200`} value={spec.approvedDrawings} onChange={(event) => update({ approvedDrawings: event.target.value })} />
+        </label>
+        <label className="block border-t border-gray-200 px-3 py-2 text-xs font-semibold uppercase text-gray-600">
+          On hold items / pre-production release
+          <textarea rows={2} className={`${inputClass} mt-1 resize-y border border-gray-200`} value={spec.onHoldItems} onChange={(event) => update({ onHoldItems: event.target.value })} />
+        </label>
+      </section>
+
+      <section aria-label="Specifications" className="overflow-x-auto border border-gray-200">
+        <table className="w-full min-w-[650px] border-collapse text-xs">
+          <thead className="bg-brand-navy text-left text-white"><tr><th className="w-10 px-2 py-2">#</th><th className="w-[34%] px-2 py-2">Item</th><th className="w-[32%] px-2 py-2">Specification</th><th className="px-2 py-2">Remarks</th></tr></thead>
+          <tbody>{SPEC_ITEMS.map((item, index) => {
+            const key = String(index + 1)
+            const row = spec.specifications[key]
+            return <tr key={key} className="border-t border-gray-200 even:bg-gray-50">
+              <td className="px-2 py-1">{key}</td><th scope="row" className="px-2 py-1 text-left font-medium">{item}</th>
+              <td className="border-l border-gray-200"><input aria-label={`${item} specification`} className={inputClass} value={row?.specification ?? ''} onChange={(event) => update({ specifications: { ...spec.specifications, [key]: { ...row, specification: event.target.value, remarks: row?.remarks ?? '' } } })} /></td>
+              <td className="border-l border-gray-200"><input aria-label={`${item} remarks`} className={inputClass} value={row?.remarks ?? ''} onChange={(event) => update({ specifications: { ...spec.specifications, [key]: { ...row, specification: row?.specification ?? '', remarks: event.target.value } } })} /></td>
+            </tr>
+          })}</tbody>
+        </table>
+      </section>
+
+      <section aria-label="Hardware specifications" className="overflow-x-auto border border-gray-200">
+        <table className="w-full min-w-[650px] border-collapse text-xs">
+          <thead className="bg-brand-navy text-left text-white"><tr><th colSpan={2} className="px-2 py-2">Hardware</th><th colSpan={2} className="px-2 py-2">Specifications</th></tr><tr className="bg-gray-100 text-gray-700"><th className="w-[19%] px-2 py-1">Group</th><th className="w-[30%] px-2 py-1">Item</th><th className="w-[25%] px-2 py-1">Supplied by</th><th className="px-2 py-1">Finish / Type</th></tr></thead>
+          <tbody>{HARDWARE_ITEMS.map(({ group, item }) => {
+            const key = hardwareKey(group, item)
+            const row = spec.hardware[key]
+            return <tr key={key} className="border-t border-gray-200 even:bg-gray-50">
+              <th scope="row" className="px-2 py-1 text-left font-medium">{group}</th><td className="px-2 py-1">{item}</td>
+              <td className="border-l border-gray-200"><input aria-label={`${group} ${item} supplied by`} className={inputClass} value={row?.suppliedBy ?? ''} onChange={(event) => update({ hardware: { ...spec.hardware, [key]: { ...row, suppliedBy: event.target.value, finishType: row?.finishType ?? '' } } })} /></td>
+              <td className="border-l border-gray-200"><input aria-label={`${group} ${item} finish or type`} className={inputClass} value={row?.finishType ?? ''} onChange={(event) => update({ hardware: { ...spec.hardware, [key]: { ...row, suppliedBy: row?.suppliedBy ?? '', finishType: event.target.value } } })} /></td>
+            </tr>
+          })}</tbody>
+        </table>
+      </section>
+
+      <section aria-label="Shipping" className="border border-gray-200">
+        <h3 className={headingClass}>Shipping</h3>
+        {([['jobsiteAddress', 'Jobsite Address'], ['destinationPort', 'Destination Port'], ['shippingWeek', 'Shipping Week']] as const).map(([key, label]) => (
+          <label key={key} className="flex flex-col border-t border-gray-200 px-3 py-1 text-xs font-semibold text-gray-600 sm:flex-row sm:items-center">
+            <span className="w-36 shrink-0">{label}</span><input className={inputClass} value={spec[key]} onChange={(event) => update({ [key]: event.target.value })} />
+          </label>
+        ))}
+      </section>
+      <section aria-label="Additional remarks" className="border border-gray-200">
+        <h3 className={headingClass}>Additional Remarks</h3>
+        <textarea rows={4} className={`${inputClass} resize-y`} aria-label="Additional remarks" value={spec.additionalRemarks} onChange={(event) => update({ additionalRemarks: event.target.value })} />
+      </section>
+      <div className="border-t border-gray-200 pt-3 text-sm">
+        <p>Please confirm this order with me at your earliest convenience. Thank you!</p>
+        <p className="mt-3">Sincerely,</p>
+        <input aria-label="Signature name" className={`${inputClass} mt-2 max-w-xs`} value={spec.signatureName} onChange={(event) => update({ signatureName: event.target.value })} />
+        <input aria-label="Signature title" className={`${inputClass} max-w-xs italic`} value={spec.signatureTitle} onChange={(event) => update({ signatureTitle: event.target.value })} />
+      </div>
+    </div>
+  )
+}

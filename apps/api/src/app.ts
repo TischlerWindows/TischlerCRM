@@ -53,6 +53,7 @@ import { proposalPdfRoutes } from './routes/proposal-pdf.js';
 import { projectListPdfRoutes } from './routes/project-list-pdf.js';
 import { installProgressPdfRoutes } from './routes/install-progress-pdf.js';
 import { cadIndexPdfRoutes } from './routes/cad-index-pdf.js';
+import { factoryOrderSpecPdfRoutes } from './routes/factory-order-spec-pdf.js';
 import { autocadPdfRoutes } from './routes/autocad-pdf.js';
 import { masterContactSheetPdfRoutes } from './routes/master-contact-sheet-pdf.js';
 import { pdfEchoRoutes } from './routes/pdf-echo.js';
@@ -573,6 +574,7 @@ export function buildApp() {
   app.register(projectListPdfRoutes);
   app.register(installProgressPdfRoutes);
   app.register(cadIndexPdfRoutes);
+  app.register(factoryOrderSpecPdfRoutes);
   app.register(autocadPdfRoutes);
   app.register(masterContactSheetPdfRoutes);
   app.register(pdfEchoRoutes);

@@ -11,6 +11,7 @@ import {
   Cloud,
   Clock,
   ClipboardCheck,
+  ClipboardList,
   Component,
   FolderOpen,
   LayoutGrid,
@@ -32,6 +33,7 @@ const LUCIDE_ICON_MAP: Record<string, ElementType> = {
   Cloud,
   Clock,
   ClipboardCheck,
+  ClipboardList,
   Component,
   FolderOpen,
   LayoutGrid,
@@ -77,6 +79,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'autocad': 'AutoCad',
   'install-progress-report': 'InstallProgressReport',
   'cad-index-list': 'CadIndexList',
+  'factory-order-spec': 'FactoryOrderSpec',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {
