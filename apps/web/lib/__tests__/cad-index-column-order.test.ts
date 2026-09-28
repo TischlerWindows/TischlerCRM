@@ -18,4 +18,10 @@ describe('CAD Index List column order', () => {
     expect(orderedColumns('Survey', columns, '{invalid')).toEqual(columns)
     expect(orderedColumns('Survey', columns, '{}')).toEqual(columns)
   })
+
+  it('resets only the selected report when its saved order is removed', () => {
+    const saved = JSON.stringify({ Progress: ['remarks', 'unit', 'qty'] })
+    expect(orderedColumns('Survey', columns, saved)).toEqual(columns)
+    expect(orderedColumns('Progress', columns, saved).map((column) => column.key)).toEqual(['remarks', 'unit', 'qty'])
+  })
 })

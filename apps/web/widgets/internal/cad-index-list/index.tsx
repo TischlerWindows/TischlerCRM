@@ -14,7 +14,7 @@
  * renderer shared by all reports, not one hardcoded layout per report).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertCircle, ChevronLeft, ChevronRight, FileText, GripVertical, ListChecks, Loader2, Plus, Trash2 } from 'lucide-react'
+import { AlertCircle, ChevronLeft, ChevronRight, FileText, GripVertical, ListChecks, Loader2, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
@@ -180,6 +180,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const [columnOrder, setColumnOrder] = useState<unknown>(() => record?.cadIndexColumnOrder)
   const [savingColumns, setSavingColumns] = useState(false)
   const [draggedColumnKey, setDraggedColumnKey] = useState<string | null>(null)
+  const [dropBoundary, setDropBoundary] = useState<{ index: number; edge: 'before' | 'after' } | null>(null)
 
   useEffect(() => { setColumnOrder(record?.cadIndexColumnOrder) }, [projectId, record?.cadIndexColumnOrder])
 
@@ -204,7 +205,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     [rows, activeReportType],
   )
 
-  const persistColumnOrder = async (nextColumns: ColumnDef[]) => {
+  const persistColumnOrder = async (nextColumns?: ColumnDef[]) => {
     if (!projectId || savingColumns) return
     const previous = columnOrder
     let saved: Record<string, unknown> = {}
@@ -212,7 +213,9 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
       const parsed = typeof previous === 'string' ? JSON.parse(previous) : previous
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) saved = parsed as Record<string, unknown>
     } catch { /* Treat malformed saved settings as defaults. */ }
-    const next = JSON.stringify({ ...saved, [activeReportType]: nextColumns.map((column) => column.key) })
+    if (nextColumns) saved[activeReportType] = nextColumns.map((column) => column.key)
+    else delete saved[activeReportType]
+    const next = JSON.stringify(saved)
     setColumnOrder(next)
     setSavingColumns(true)
     setError(null)
@@ -404,21 +407,32 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {REPORT_TYPES.map((type) => (
-          <button
-            key={type}
-            type="button"
-            onClick={() => setActiveReportType(type)}
-            className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
-              activeReportType === type
-                ? 'bg-brand-navy text-white'
-                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-            }`}
-          >
-            {type}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1.5">
+          {REPORT_TYPES.map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => { setActiveReportType(type); setDraggedColumnKey(null); setDropBoundary(null) }}
+              className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
+                activeReportType === type
+                  ? 'bg-brand-navy text-white'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => void persistColumnOrder()}
+          disabled={savingColumns || !projectId || columns.every((column, index) => column.key === REPORT_COLUMNS[activeReportType][index]?.key)}
+          title="Reset this report's columns to their default order"
+          className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <RotateCcw className="h-3.5 w-3.5" /> Reset to Default
+        </button>
       </div>
 
       {error && (
@@ -444,19 +458,37 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                     draggable={!savingColumns}
                     onDragStart={(event) => {
                       setDraggedColumnKey(col.key)
+                      setDropBoundary(null)
                       event.dataTransfer.effectAllowed = 'move'
                       event.dataTransfer.setData('text/plain', col.key)
                     }}
-                    onDragOver={(event) => { if (draggedColumnKey) event.preventDefault() }}
+                    onDragOver={(event) => {
+                      if (!draggedColumnKey) return
+                      event.preventDefault()
+                      event.dataTransfer.dropEffect = 'move'
+                      const edge = event.clientX < event.currentTarget.getBoundingClientRect().left + event.currentTarget.offsetWidth / 2 ? 'before' : 'after'
+                      const boundary = colIndex + (edge === 'after' ? 1 : 0)
+                      const fromIndex = columns.findIndex((column) => column.key === draggedColumnKey)
+                      setDropBoundary(fromIndex === boundary || fromIndex + 1 === boundary ? null : { index: colIndex, edge })
+                    }}
+                    onDragLeave={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropBoundary(null)
+                    }}
                     onDrop={(event) => {
                       event.preventDefault()
-                      const fromIndex = columns.findIndex((column) => column.key === draggedColumnKey)
-                      moveColumn(fromIndex, colIndex)
+                      const fromIndex = columns.findIndex((column) => column.key === event.dataTransfer.getData('text/plain'))
+                      const after = event.clientX >= event.currentTarget.getBoundingClientRect().left + event.currentTarget.offsetWidth / 2
+                      const boundary = colIndex + (after ? 1 : 0)
+                      moveColumn(fromIndex, boundary - (fromIndex < boundary ? 1 : 0))
                       setDraggedColumnKey(null)
+                      setDropBoundary(null)
                     }}
-                    onDragEnd={() => setDraggedColumnKey(null)}
-                    className={`group border-b border-gray-200 px-1.5 py-1 text-left font-semibold text-gray-600 ${draggedColumnKey === col.key ? 'opacity-40' : ''}`}
+                    onDragEnd={() => { setDraggedColumnKey(null); setDropBoundary(null) }}
+                    className={`group relative border-b border-gray-200 px-1.5 py-1 text-left font-semibold text-gray-600 ${draggedColumnKey === col.key ? 'opacity-40' : ''}`}
                   >
+                    {dropBoundary?.index === colIndex && (
+                      <span aria-hidden="true" className={`pointer-events-none absolute inset-y-0 z-10 w-[3px] bg-blue-600 ${dropBoundary.edge === 'before' ? 'left-0' : 'right-0'}`} />
+                    )}
                     <div className="flex items-center gap-1">
                       <GripVertical className="h-3 w-3 shrink-0 cursor-grab text-gray-400" aria-hidden="true" />
                       <span className="min-w-0 flex-1">{col.label}</span>
