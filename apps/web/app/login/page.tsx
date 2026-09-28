@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { AlertCircle } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { PasswordVisibilityInput } from '@/components/password-visibility-input';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -93,8 +94,8 @@ export default function LoginPage() {
                 Forgot password?
               </Link>
             </div>
-            <input
-              type="password"
+            <PasswordVisibilityInput
+              toggleLabel="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/30 focus:border-brand-navy outline-none transition text-brand-dark"

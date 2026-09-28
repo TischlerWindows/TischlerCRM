@@ -4,6 +4,7 @@ import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { PasswordVisibilityInput } from '@/components/password-visibility-input';
 
 function AcceptInviteForm() {
   const router = useRouter();
@@ -62,8 +63,8 @@ function AcceptInviteForm() {
         <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
           Password
         </label>
-        <input
-          type="password"
+        <PasswordVisibilityInput
+          toggleLabel="password"
           value={password}
           onChange={e => setPassword(e.target.value)}
           className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#151f6d]/20 focus:border-[#151f6d]"
@@ -76,8 +77,8 @@ function AcceptInviteForm() {
         <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">
           Confirm Password
         </label>
-        <input
-          type="password"
+        <PasswordVisibilityInput
+          toggleLabel="confirm password"
           value={confirm}
           onChange={e => setConfirm(e.target.value)}
           className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#151f6d]/20 focus:border-[#151f6d]"

@@ -9,6 +9,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 import { SettingsFilterBar } from '@/components/settings/settings-filter-bar';
 import { SettingsContentCard } from '@/components/settings/settings-content-card';
+import { PasswordVisibilityInput } from '@/components/password-visibility-input';
 
 const AVATAR_COLORS = ['#151f6d', '#da291c', '#2563eb', '#059669', '#7c3aed', '#d97706', '#0f1754'];
 
@@ -445,8 +446,8 @@ export default function UsersPage() {
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
                       Temporary Password <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="password"
+                    <PasswordVisibilityInput
+                      toggleLabel="temporary password"
                       value={tempPassword}
                       onChange={e => setTempPassword(e.target.value)}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#151f6d]/20 focus:border-[#151f6d]"

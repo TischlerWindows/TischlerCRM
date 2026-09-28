@@ -18,6 +18,7 @@ import {
 } from '../form/picklist-fields';
 import { LookupSearch, LookupUserSearch, MultiLookupUserSearch, getLookupTargetApi, getRecordLabel } from '../form/lookup-search';
 import type { VisibilityContext } from '@/lib/field-visibility';
+import { PasswordVisibilityInput } from '@/components/password-visibility-input';
 
 /**
  * Field types safe to edit inline. Excluded: computed/system types
@@ -232,8 +233,8 @@ function FieldEditor({
       );
     case 'EncryptedText':
       return (
-        <input
-          type="password"
+        <PasswordVisibilityInput
+          toggleLabel={fieldDef.label.toLowerCase()}
           value={typeof draft === 'string' ? draft : ''}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={onKeyDown}

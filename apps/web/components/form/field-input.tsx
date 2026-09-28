@@ -10,6 +10,7 @@ import {
   isSystemField,
 } from '@/lib/schema';
 import { Input } from '@/components/ui/input';
+import { PasswordVisibilityInput } from '@/components/password-visibility-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { evaluateVisibility, VisibilityContext } from '@/lib/field-visibility';
@@ -513,7 +514,7 @@ export function FieldInput({
       }
       break;
     case 'EncryptedText':
-      inputElement = <Input {...commonProps} type="password" />;
+      inputElement = <PasswordVisibilityInput {...commonProps} toggleLabel={fieldDef.label.toLowerCase()} className={cn('w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', commonProps.className)} />;
       break;
 
     // ── AutoNumber ───────────────────────────────────────────

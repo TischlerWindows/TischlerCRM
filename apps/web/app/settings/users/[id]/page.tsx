@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { apiClient, type UserDetail, type LoginEventRow, type UpdateUserInput, type Profile, type UserRow } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { PasswordVisibilityInput } from '@/components/password-visibility-input';
 
 const TIMEZONES = [
   'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -545,11 +546,11 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
             <div className="space-y-3 mb-5">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">New Password</label>
-                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className={inputCls} minLength={8} placeholder="Min. 8 characters" />
+                <PasswordVisibilityInput toggleLabel="new password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className={inputCls} minLength={8} placeholder="Min. 8 characters" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1.5">Confirm Password</label>
-                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={inputCls} minLength={8} placeholder="Re-enter password" />
+                <PasswordVisibilityInput toggleLabel="confirm password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className={inputCls} minLength={8} placeholder="Re-enter password" />
               </div>
             </div>
             <div className="flex justify-end gap-2">
