@@ -1,6 +1,20 @@
 jest.mock('next/dynamic', () => (fn: () => Promise<any>) => fn)
 
 import { getExternalRegistration, getInternalRegistrationByType } from '@/lib/widgets/registry-loader'
+import { enabledWidgetIds } from '@/lib/use-widget-settings'
+
+describe('widget enablement', () => {
+  it('shows registered internal widgets omitted from the API but honors explicit disables', () => {
+    const ids = enabledWidgetIds([
+      { widgetId: 'cad-index-list', enabled: false },
+      { widgetId: 'dropbox-browser', kind: 'external', enabled: true },
+    ])
+    expect(ids.has('factory-order-spec')).toBe(true)
+    expect(ids.has('cad-index-list')).toBe(false)
+    expect(ids.has('dropbox-browser')).toBe(true)
+    expect(ids.has('demo-widget')).toBe(false)
+  })
+})
 
 describe('getExternalRegistration', () => {
   it('returns the registration for a known external widget ID', () => {

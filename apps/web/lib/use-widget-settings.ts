@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { getInternalRegistrationByType } from '@/lib/widgets/registry-loader'
+import { internalWidgets } from '@/widgets/internal/registry'
 import type { WidgetConfig } from '@/lib/schema'
 
 export interface WidgetSetting {
@@ -13,6 +14,15 @@ export interface WidgetSetting {
 
 let cachedPromise: Promise<WidgetSetting[]> | null = null
 let cachedValue: WidgetSetting[] | null = null
+
+export function enabledWidgetIds(settings: WidgetSetting[]): Set<string> {
+  const enabled = new Set(internalWidgets.map((widget) => widget.id))
+  for (const setting of settings) {
+    if (setting.enabled) enabled.add(setting.widgetId)
+    else enabled.delete(setting.widgetId)
+  }
+  return enabled
+}
 
 function fetchWidgetSettings(): Promise<WidgetSetting[]> {
   if (cachedPromise) return cachedPromise
@@ -44,7 +54,7 @@ export function useEnabledWidgetIds(): {
   error: Error | null
 } {
   const [ids, setIds] = useState<Set<string>>(
-    () => new Set((cachedValue ?? []).filter((s) => s.enabled).map((s) => s.widgetId)),
+    () => enabledWidgetIds(cachedValue ?? []),
   )
   const [loading, setLoading] = useState(cachedValue === null)
   const [error, setError] = useState<Error | null>(null)
@@ -54,7 +64,7 @@ export function useEnabledWidgetIds(): {
     fetchWidgetSettings()
       .then((list) => {
         if (cancelled) return
-        setIds(new Set(list.filter((s) => s.enabled).map((s) => s.widgetId)))
+        setIds(enabledWidgetIds(list))
         setLoading(false)
       })
       .catch((err) => {
