@@ -14,11 +14,12 @@
  * renderer shared by all reports, not one hardcoded layout per report).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertCircle, FileText, ListChecks, Loader2, Plus, Trash2 } from 'lucide-react'
+import { AlertCircle, ChevronLeft, ChevronRight, FileText, GripVertical, ListChecks, Loader2, Plus, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
 import { getRecordName } from '../shared/recordName'
+import { orderedColumns } from '@/lib/cad-index-column-order'
 
 type ColumnType = 'text' | 'number' | 'checkbox'
 
@@ -176,6 +177,11 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
+  const [columnOrder, setColumnOrder] = useState<unknown>(() => record?.cadIndexColumnOrder)
+  const [savingColumns, setSavingColumns] = useState(false)
+  const [draggedColumnKey, setDraggedColumnKey] = useState<string | null>(null)
+
+  useEffect(() => { setColumnOrder(record?.cadIndexColumnOrder) }, [projectId, record?.cadIndexColumnOrder])
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -192,11 +198,41 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
 
   useEffect(() => { void load() }, [load])
 
-  const columns = REPORT_COLUMNS[activeReportType]
+  const columns = orderedColumns(activeReportType, REPORT_COLUMNS[activeReportType], columnOrder)
   const activeRows = useMemo(
     () => rows.filter((r) => r.data?.reportType === activeReportType),
     [rows, activeReportType],
   )
+
+  const persistColumnOrder = async (nextColumns: ColumnDef[]) => {
+    if (!projectId || savingColumns) return
+    const previous = columnOrder
+    let saved: Record<string, unknown> = {}
+    try {
+      const parsed = typeof previous === 'string' ? JSON.parse(previous) : previous
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) saved = parsed as Record<string, unknown>
+    } catch { /* Treat malformed saved settings as defaults. */ }
+    const next = JSON.stringify({ ...saved, [activeReportType]: nextColumns.map((column) => column.key) })
+    setColumnOrder(next)
+    setSavingColumns(true)
+    setError(null)
+    try {
+      await recordsService.updateRecord('Project', projectId, { data: { cadIndexColumnOrder: next } })
+    } catch (err: unknown) {
+      setColumnOrder(previous)
+      setError(err instanceof Error ? err.message : 'Failed to save column order')
+    } finally {
+      setSavingColumns(false)
+    }
+  }
+
+  const moveColumn = (fromIndex: number, toIndex: number) => {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= columns.length || toIndex >= columns.length || fromIndex === toIndex) return
+    const next = [...columns]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    void persistColumnOrder(next)
+  }
 
   const handleCellCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
     setSavingRowId(rowId)
@@ -396,20 +432,48 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-5 w-5 animate-spin text-brand-navy" />
         </div>
-      ) : activeRows.length === 0 ? (
-        <div className="py-8 text-center text-sm text-gray-400">No rows yet for this report.</div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
           <table className="w-full border-collapse text-xs">
             <thead className="bg-gray-100">
               <tr>
-                {columns.map((col) => (
-                  <th key={col.key} className="border-b border-gray-200 px-1.5 py-1 text-left font-semibold text-gray-600">{col.label}</th>
+                {columns.map((col, colIndex) => (
+                  <th
+                    key={col.key}
+                    scope="col"
+                    draggable={!savingColumns}
+                    onDragStart={(event) => {
+                      setDraggedColumnKey(col.key)
+                      event.dataTransfer.effectAllowed = 'move'
+                      event.dataTransfer.setData('text/plain', col.key)
+                    }}
+                    onDragOver={(event) => { if (draggedColumnKey) event.preventDefault() }}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      const fromIndex = columns.findIndex((column) => column.key === draggedColumnKey)
+                      moveColumn(fromIndex, colIndex)
+                      setDraggedColumnKey(null)
+                    }}
+                    onDragEnd={() => setDraggedColumnKey(null)}
+                    className={`group border-b border-gray-200 px-1.5 py-1 text-left font-semibold text-gray-600 ${draggedColumnKey === col.key ? 'opacity-40' : ''}`}
+                  >
+                    <div className="flex items-center gap-1">
+                      <GripVertical className="h-3 w-3 shrink-0 cursor-grab text-gray-400" aria-hidden="true" />
+                      <span className="min-w-0 flex-1">{col.label}</span>
+                      <button type="button" onClick={() => moveColumn(colIndex, colIndex - 1)} disabled={savingColumns || colIndex === 0} aria-label={`Move ${col.label} column left`} title="Move column left" className="rounded p-0.5 text-gray-400 hover:bg-gray-200 disabled:opacity-30"><ChevronLeft className="h-3 w-3" /></button>
+                      <button type="button" onClick={() => moveColumn(colIndex, colIndex + 1)} disabled={savingColumns || colIndex === columns.length - 1} aria-label={`Move ${col.label} column right`} title="Move column right" className="rounded p-0.5 text-gray-400 hover:bg-gray-200 disabled:opacity-30"><ChevronRight className="h-3 w-3" /></button>
+                    </div>
+                  </th>
                 ))}
                 <th className="w-8 border-b border-gray-200 px-1 py-1" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
+              {activeRows.length === 0 && (
+                <tr>
+                  <td colSpan={columns.length + 1} className="py-8 text-center text-sm text-gray-400">No rows yet for this report.</td>
+                </tr>
+              )}
               {activeRows.map((row, rowIndex) => (
                 <tr key={row.id} className="hover:bg-brand-navy/5">
                   {columns.map((col, colIndex) => {
