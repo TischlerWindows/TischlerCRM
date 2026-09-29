@@ -7,6 +7,7 @@ const renderSchema = z.object({
   projectName: z.string(),
   columns: z.array(z.object({ key: z.string(), label: z.string(), type: z.enum(['text', 'number', 'checkbox']) })),
   rows: z.array(z.record(z.string(), z.unknown())),
+  comments: z.string().max(10000).optional(),
 });
 
 export async function cadIndexPdfRoutes(app: FastifyInstance) {
@@ -30,7 +31,7 @@ export async function cadIndexPdfRoutes(app: FastifyInstance) {
     let pdfBuffer: Buffer;
     try {
       const columns = parsed.data.columns.map((c) => ({ key: c.key, label: c.label, type: c.type }));
-      pdfBuffer = await renderCadIndexPDF(parsed.data.title, parsed.data.projectName, columns, parsed.data.rows);
+      pdfBuffer = await renderCadIndexPDF(parsed.data.title, parsed.data.projectName, columns, parsed.data.rows, parsed.data.comments ?? '');
     } catch (err) {
       app.log.error({ err }, 'CAD Index List PDF render failed');
       return reply.code(500).send({ error: 'Failed to render CAD Index List PDF' });

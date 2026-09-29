@@ -20,6 +20,7 @@ import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
 import { getRecordName } from '../shared/recordName'
 import { orderedColumns } from '@/lib/cad-index-column-order'
+import { parseCadIndexComments } from '@/lib/cad-index-comments'
 
 type ColumnType = 'text' | 'number' | 'checkbox'
 
@@ -184,8 +185,11 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const [addingColumn, setAddingColumn] = useState(false)
   const [newColumnLabel, setNewColumnLabel] = useState('')
   const [newColumnType, setNewColumnType] = useState<ColumnType>('text')
+  const [comments, setComments] = useState<Record<string, string>>(() => parseCadIndexComments(record?.cadIndexComments))
+  const [savingComments, setSavingComments] = useState(false)
 
   useEffect(() => { setColumnOrder(record?.cadIndexColumnOrder) }, [projectId, record?.cadIndexColumnOrder])
+  useEffect(() => { setComments(parseCadIndexComments(record?.cadIndexComments)) }, [projectId, record?.cadIndexComments])
 
   const load = useCallback(async () => {
     if (!projectId) return
@@ -279,6 +283,21 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     if (columns.some((column) => column.key.startsWith('cadCustom_')) &&
         !window.confirm('Reset this report to default columns? Custom columns and their values will no longer be shown.')) return
     void persistColumnOrder()
+  }
+
+  const persistComments = async (reportType: ReportType, value: string) => {
+    if (!projectId || savingComments) return
+    const next = { ...comments, [reportType]: value }
+    setComments(next)
+    setSavingComments(true)
+    setError(null)
+    try {
+      await recordsService.updateRecord('Project', projectId, { data: { cadIndexComments: JSON.stringify(next) } })
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save additional comments')
+    } finally {
+      setSavingComments(false)
+    }
   }
 
   const handleCellCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
@@ -394,6 +413,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
           projectName,
           columns: columns.map((c) => ({ key: c.key, label: c.label, type: c.type })),
           rows: payloadRows,
+          comments: comments[activeReportType] ?? '',
         }),
       })
       if (!response.ok) {
@@ -458,7 +478,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
               key={type}
               type="button"
               onClick={() => { setActiveReportType(type); setDraggedColumnKey(null); setDropBoundary(null); setAddingColumn(false) }}
-              disabled={savingColumns}
+              disabled={savingColumns || savingComments}
               className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${
                 activeReportType === type
                   ? 'bg-brand-navy text-white'
@@ -642,6 +662,23 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
             </tbody>
           </table>
         </div>
+      )}
+      {!loading && (
+        <label className="block space-y-1.5">
+          <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-600">
+            Additional Comments
+            {savingComments && <Loader2 className="h-3.5 w-3.5 animate-spin text-brand-navy" />}
+          </span>
+          <textarea
+            rows={4}
+            maxLength={10000}
+            value={comments[activeReportType] ?? ''}
+            onChange={(event) => setComments((current) => ({ ...current, [activeReportType]: event.target.value }))}
+            onBlur={(event) => void persistComments(activeReportType, event.target.value)}
+            placeholder={`Additional comments for ${activeReportType}`}
+            className="w-full resize-y rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/30"
+          />
+        </label>
       )}
     </div>
   )

@@ -158,6 +158,7 @@ export async function renderCadIndexPDF(
   projectName: string,
   columns: CadIndexColumn[],
   rows: Array<Record<string, unknown>>,
+  comments = '',
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
@@ -190,6 +191,18 @@ export async function renderCadIndexPDF(
         drawDataRow(doc, scaled, row, i, left, y, height);
         y += height;
       });
+
+      const commentsHeight = Math.max(48, measuredTextHeight(doc, comments, usableWidth) + 12);
+      if (y + 22 + commentsHeight > bottom) {
+        doc.addPage();
+        drawTitle(doc, title, projectName, rows.length);
+        y = doc.y;
+      }
+      doc.rect(left, y, usableWidth, 22).fill(TITLE_COLOR);
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff').text('ADDITIONAL COMMENTS', left + 5, y + 7);
+      y += 22;
+      cellRect(doc, left, y, usableWidth, commentsHeight);
+      cellText(doc, comments, left, y, usableWidth, commentsHeight);
 
       const range = doc.bufferedPageRange();
       for (let i = range.start; i < range.start + range.count; i++) {
