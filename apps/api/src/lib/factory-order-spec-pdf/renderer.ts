@@ -175,6 +175,8 @@ export function renderFactoryOrderSpecPDF(spec: SpecPdfData, projectName: string
       row([index === 0 || HARDWARE_ITEMS[index - 1][0] !== group ? group : '', item, value?.suppliedBy ?? '', value?.finishType ?? ''], [110, 170, 125, 135]);
     });
 
+    doc.addPage();
+    y = 36;
     band('SHIPPING');
     row(['Jobsite Address:', spec.jobsiteAddress], [130, 410]);
     row(['Destination Port:', spec.destinationPort], [130, 410]);
