@@ -7,6 +7,8 @@ import { FieldDef, normalizeFieldType, type PageField } from '@/lib/schema';
 import type { ObjectDef } from '@/lib/schema';
 import LocationMapPreview from '@/components/location-map-preview';
 import { DropboxFileBrowser } from '@/components/dropbox-file-browser';
+import { apiClient } from '@/lib/api-client';
+import { activeLookupUsers, type LookupUserIdentity } from '@/lib/user-lookup';
 
 // ── Lookup route map ───────────────────────────────────────────────────
 const LOOKUP_ROUTE_MAP: Record<string, string> = {
@@ -22,6 +24,34 @@ const LOOKUP_ROUTE_MAP: Record<string, string> = {
   Installation: 'installations',
   User: 'settings/users',
 };
+
+function LookupUserValue({ value }: { value: unknown }) {
+  const [users, setUsers] = React.useState<LookupUserIdentity[] | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    apiClient.get<LookupUserIdentity[]>('/users/lookup')
+      .then((records) => { if (!cancelled) setUsers(Array.isArray(records) ? records : []); })
+      .catch(() => { if (!cancelled) setUsers([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!users) return <span className="text-gray-400">-</span>;
+  const active = activeLookupUsers(value, users);
+  if (active.length === 0) return '-';
+  return (
+    <span className="space-x-1">
+      {active.map((user, index) => (
+        <React.Fragment key={user.id}>
+          <Link href={`/settings/users/${user.id}`} className="text-brand-navy hover:underline underline-offset-2">
+            {user.name || user.email || 'User'}
+          </Link>
+          {index < active.length - 1 ? ',' : ''}
+        </React.Fragment>
+      ))}
+    </span>
+  );
+}
 
 // ── getFieldDef ────────────────────────────────────────────────────────
 /**
@@ -211,33 +241,16 @@ export function renderValue(
 
   // MultiLookupUser → comma-separated clickable links, one per selected user
   if (fieldType === 'MultiLookupUser') {
-    const ids = typeof value === 'string'
-      ? value.split(';').map((v) => v.trim()).filter(Boolean)
-      : Array.isArray(value) ? value.map(String) : [];
-    if (ids.length === 0) return '-';
-    const route = LOOKUP_ROUTE_MAP.User;
-    return (
-      <span className="space-x-1">
-        {ids.map((id, idx) => {
-          const label = resolveLookupDisplayName(id, 'User');
-          return (
-            <span key={id}>
-              {route ? (
-                <Link href={`/${route}/${id}`} className="text-brand-navy hover:underline underline-offset-2">
-                  {label}
-                </Link>
-              ) : label}
-              {idx < ids.length - 1 ? ',' : ''}
-            </span>
-          );
-        })}
-      </span>
-    );
+    return <LookupUserValue value={value} />;
+  }
+
+  if (fieldType === 'LookupUser') {
+    return <LookupUserValue value={value} />;
   }
 
   // Lookup → clickable link showing resolved label (not raw UUID)
-  if ((fieldType === 'Lookup' || fieldType === 'LookupUser') && (fieldDef?.lookupObject || fieldType === 'LookupUser')) {
-    const lookupTarget = fieldDef?.lookupObject || 'User';
+  if (fieldType === 'Lookup' && fieldDef?.lookupObject) {
+    const lookupTarget = fieldDef.lookupObject;
     const route = LOOKUP_ROUTE_MAP[lookupTarget];
     const displayLabel = resolveLookupDisplayName(value, lookupTarget);
     const link = route ? (

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { FieldDef, ObjectDef } from '@/lib/schema';
 import { cn, resolveLookupDisplayName, upsertLookupCacheRecord } from '@/lib/utils';
 import LocationMapPreview from '@/components/location-map-preview';
+import { normalizeSingleLookupUserValue } from '@/lib/user-lookup';
 
 // ── getRecordLabel ───────────────────────────────────────────────────
 // Derives a human-readable label from a flattened lookup record.
@@ -544,13 +545,18 @@ export function LookupUserSearch({
 }: LookupUserSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const selectedUser = value
-    ? userRecords.find((u) => String(u.id) === String(value))
+  const normalizedValue = normalizeSingleLookupUserValue(value, userRecords);
+  const selectedUser = normalizedValue
+    ? userRecords.find((u) => String(u.id) === normalizedValue)
     : null;
   const selectedUserLabel = selectedUser
     ? selectedUser.name || selectedUser.email || ''
     : '';
   const userDisplayValue = isActive ? lookupQuery : selectedUserLabel;
+
+  useEffect(() => {
+    if (userRecords.length > 0 && value && String(value) !== normalizedValue) onChange(normalizedValue);
+  }, [normalizedValue, onChange, userRecords.length, value]);
 
   const filteredUsers = userRecords.filter((user) => {
     const query = lookupQuery.toLowerCase();

@@ -369,7 +369,7 @@ function useLookupUserCandidates() {
   useEffect(() => {
     let cancelled = false;
     apiClient
-      .get<any[]>('/admin/users')
+      .get<any[]>('/users/lookup')
       .then((users) => {
         if (!cancelled) setRecords(Array.isArray(users) ? users : []);
       })

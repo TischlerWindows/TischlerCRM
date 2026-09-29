@@ -62,7 +62,7 @@ async function getLookupRecords(objectType: string): Promise<any[]> {
   }
 
   lookupLoadingPromises[objectType] = (objectType === 'User'
-    ? apiClient.get<any[]>('/admin/users').then(users => {
+    ? apiClient.get<any[]>('/users/lookup').then(users => {
         const arr = Array.isArray(users) ? users : [];
         lookupCache[objectType] = arr;
         delete lookupLoadingPromises[objectType];

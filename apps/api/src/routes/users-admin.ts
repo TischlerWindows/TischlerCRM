@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
@@ -82,7 +83,43 @@ function buildPasswordResetUrl(resetToken: string): string {
   return `${frontendUrl}/auth/reset-password?token=${resetToken}`;
 }
 
+function normalizedLookupFieldKey(key: string): string {
+  return key.replace(/^[A-Za-z]+__/, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
+
+function removeUserFromLookupValue(value: unknown, userId: string, multi: boolean): { changed: boolean; value: unknown } {
+  if (typeof value === 'string') {
+    const ids = value.split(';').map((id) => id.trim()).filter(Boolean);
+    if (!ids.includes(userId)) return { changed: false, value };
+    const remaining = ids.filter((id) => id !== userId);
+    return { changed: true, value: multi ? remaining.join(';') : (remaining.at(-1) ?? '') };
+  }
+  if (Array.isArray(value)) {
+    const remaining = value.map(String).filter((id) => id !== userId);
+    if (remaining.length === value.length) return { changed: false, value };
+    return { changed: true, value: multi ? remaining : (remaining.at(-1) ?? '') };
+  }
+  if (value && typeof value === 'object') {
+    const lookup = value as Record<string, unknown>;
+    if (lookup.lookup === userId || lookup.id === userId || lookup.value === userId) {
+      return { changed: true, value: '' };
+    }
+  }
+  return { changed: false, value };
+}
+
 export async function usersAdminRoutes(app: FastifyInstance) {
+  // ── Active users for LookupUser controls ────────────────────────────────
+  app.get('/users/lookup', async (req, reply) => {
+    if (!(req as any).user?.sub) return reply.code(401).send({ error: 'Unauthorized' });
+    const users = await prisma.user.findMany({
+      where: { deletedAt: null, isActive: true, id: { not: DELETED_USER_PLACEHOLDER_ID } },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, email: true, title: true },
+    });
+    return reply.send(users);
+  });
+
   // ── Resolve one active user for LookupUser display/defaults ──────────────
   app.get('/users/lookup/:id', async (req, reply) => {
     if (!(req as any).user?.sub) return reply.code(401).send({ error: 'Unauthorized' });
@@ -478,9 +515,45 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     if (existing.deletedAt) return reply.code(204).send();
 
     const actorId = (req as any).user.sub;
-    await prisma.user.update({
-      where: { id },
-      data: { deletedAt: new Date(), deletedById: actorId, isActive: false },
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: { deletedAt: new Date(), deletedById: actorId, isActive: false },
+      });
+
+      const lookupFields = await tx.customField.findMany({
+        where: { isActive: true, type: { in: ['LookupUser', 'MultiLookupUser'] } },
+        select: { objectId: true, apiName: true, type: true },
+      });
+      const fieldsByObject = new Map<string, typeof lookupFields>();
+      for (const field of lookupFields) {
+        const fields = fieldsByObject.get(field.objectId) ?? [];
+        fields.push(field);
+        fieldsByObject.set(field.objectId, fields);
+      }
+
+      const records = await tx.record.findMany({
+        where: { objectId: { in: [...fieldsByObject.keys()] }, deletedAt: null },
+        select: { id: true, objectId: true, data: true },
+      });
+      for (const record of records) {
+        const data = record.data && typeof record.data === 'object' && !Array.isArray(record.data)
+          ? { ...(record.data as Record<string, unknown>) }
+          : {};
+        let changed = false;
+        for (const field of fieldsByObject.get(record.objectId) ?? []) {
+          const targetKey = normalizedLookupFieldKey(field.apiName);
+          for (const key of Object.keys(data)) {
+            if (normalizedLookupFieldKey(key) !== targetKey) continue;
+            const cleaned = removeUserFromLookupValue(data[key], id, field.type === 'MultiLookupUser');
+            if (cleaned.changed) {
+              data[key] = cleaned.value;
+              changed = true;
+            }
+          }
+        }
+        if (changed) await tx.record.update({ where: { id: record.id }, data: { data: data as Prisma.InputJsonValue } });
+      }
     });
 
     await logAudit({
