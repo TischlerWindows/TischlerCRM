@@ -1,4 +1,15 @@
 import PDFDocument from 'pdfkit';
+import { existsSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const ASSET_DIR = dirname(fileURLToPath(import.meta.url));
+const LOGO_PATH = existsSync(join(ASSET_DIR, 'factory-order-logo.png'))
+  ? join(ASSET_DIR, 'factory-order-logo.png')
+  : join(ASSET_DIR, 'tischler-logo.png');
+const T_MARK_PATH = existsSync(join(ASSET_DIR, 'factory-order-t-logo.png'))
+  ? join(ASSET_DIR, 'factory-order-t-logo.png')
+  : join(ASSET_DIR, 'tischler-t-logo.png');
 
 export interface SpecPdfData {
   re: string;
@@ -48,18 +59,62 @@ const NAVY = '#1e3a5f';
 const LINE = '#cbd5e1';
 const LEFT = 36;
 const WIDTH = 540;
+const PAGE_BOTTOM = 60;
+const FIRST_PAGE_CONTENT_TOP = 88;
+
+function drawBranding(doc: PDFKit.PDFDocument): void {
+  const range = doc.bufferedPageRange();
+  for (let index = 0; index < range.count; index++) {
+    doc.switchToPage(range.start + index);
+    const savedBottom = doc.page.margins.bottom;
+    const savedTop = doc.page.margins.top;
+    const savedX = doc.x;
+    const savedY = doc.y;
+    doc.page.margins.bottom = 0;
+    doc.page.margins.top = 0;
+
+    if (index === 0 && existsSync(LOGO_PATH)) {
+      doc.image(LOGO_PATH, (doc.page.width - 180) / 2, 12, {
+        fit: [180, 54], align: 'center', valign: 'center',
+      });
+    }
+    if (existsSync(T_MARK_PATH)) {
+      doc.image(T_MARK_PATH, 12, doc.page.height - 66, {
+        fit: [58, 58], align: 'left', valign: 'bottom',
+      });
+    }
+
+    const footerY = doc.page.height - 34;
+    doc.font('Helvetica').fontSize(6).fillColor('#6b7280')
+      .text('Tischler und Sohn  |  Confidential', LEFT, footerY, {
+        width: WIDTH, align: 'center', lineBreak: false,
+      });
+    doc.text(`Page ${index + 1} of ${range.count}`, doc.page.width - LEFT - 70, footerY, {
+      width: 70, align: 'right', lineBreak: false,
+    });
+
+    doc.page.margins.bottom = savedBottom;
+    doc.page.margins.top = savedTop;
+    doc.x = savedX;
+    doc.y = savedY;
+  }
+}
 
 export function renderFactoryOrderSpecPDF(spec: SpecPdfData, projectName: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'LETTER', margins: { top: 36, right: 36, bottom: 36, left: 36 } });
+    const doc = new PDFDocument({
+      size: 'LETTER',
+      margins: { top: 36, right: 36, bottom: PAGE_BOTTOM, left: 36 },
+      bufferPages: true,
+    });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('error', reject);
     doc.on('end', () => resolve(Buffer.concat(chunks)));
-    let y = 36;
+    let y = FIRST_PAGE_CONTENT_TOP;
 
     const ensureSpace = (height: number) => {
-      if (y + height > doc.page.height - 36) {
+      if (y + height > doc.page.height - PAGE_BOTTOM) {
         doc.addPage();
         y = 36;
       }
@@ -135,6 +190,7 @@ export function renderFactoryOrderSpecPDF(spec: SpecPdfData, projectName: string
     doc.font('Helvetica-Bold').text(spec.signatureName, LEFT, y);
     y = doc.y + 3;
     doc.font('Helvetica-Oblique').text(spec.signatureTitle, LEFT, y);
+    drawBranding(doc);
     doc.end();
   });
 }
