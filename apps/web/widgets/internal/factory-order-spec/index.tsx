@@ -9,8 +9,9 @@ import { getRecordName } from '../shared/recordName'
 import {
   HARDWARE_ITEMS, PRODUCT_OPTIONS, SPEC_ITEMS, applyFactoryOrderDefaults,
   factoryOrderDefaultsFromProject, hardwareKey, parseFactoryOrderSpec,
-  readLookupId, readProjectField, refreshFactoryOrderDefaults, type FactoryOrderSpec,
+  readProjectField, refreshFactoryOrderDefaults, type FactoryOrderSpec,
 } from '@/lib/factory-order-spec'
+import { normalizeSingleLookupUserValue, type LookupUserIdentity } from '@/lib/user-lookup'
 
 const inputClass = 'w-full min-w-0 border-0 bg-transparent px-2 py-1.5 text-sm text-gray-800 outline-none focus:bg-blue-50 focus:ring-1 focus:ring-inset focus:ring-brand-navy'
 const headingClass = 'bg-brand-navy px-3 py-2 text-sm font-bold uppercase text-white'
@@ -19,7 +20,7 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
   const projectId = record?.id ? String(record.id) : ''
   const projectName = getRecordName(record as Record<string, unknown>)
   const recordData = record as Record<string, unknown>
-  const managerId = readLookupId(readProjectField(recordData, 'internal_project_manager'))
+  const managerValue = readProjectField(recordData, 'Project__internal_project_manager')
   const productSpecification = readProjectField(recordData, 'product_specification')
   const insectRollScreens = readProjectField(recordData, 'Insect_Roll_Screens__c')
   const projectDefaults = useMemo(
@@ -39,15 +40,17 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
     let cancelled = false
     setSpec(applyFactoryOrderDefaults(parseFactoryOrderSpec(rawSpec), projectDefaults))
     setDirty(false)
-    if (managerId) {
-      apiClient.get<{ id: string; name: string | null; email: string }>(`/users/lookup/${encodeURIComponent(managerId)}`)
-        .then((user) => {
-          if (!cancelled) setSpec((current) => applyFactoryOrderDefaults(current, { from: user.name || user.email }))
+    if (managerValue) {
+      apiClient.get<LookupUserIdentity[]>('/users/lookup')
+        .then((users) => {
+          const managerId = normalizeSingleLookupUserValue(managerValue, users)
+          const user = users.find((candidate) => candidate.id === managerId)
+          if (!cancelled && user) setSpec((current) => applyFactoryOrderDefaults(current, { from: user.name || user.email || undefined }))
         })
         .catch(() => { /* Legacy/orphaned user lookup: leave From blank for manual entry. */ })
     }
     return () => { cancelled = true }
-  }, [projectId, rawSpec, managerId, projectDefaults])
+  }, [projectId, rawSpec, managerValue, projectDefaults])
 
   const update = (patch: Partial<FactoryOrderSpec>, manualOverride?: string) => {
     setSpec((current) => ({
@@ -62,10 +65,12 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
   }
 
   const resolveManagerName = async () => {
-    if (!managerId) return ''
+    if (!managerValue) return ''
     try {
-      const user = await apiClient.get<{ id: string; name: string | null; email: string }>(`/users/lookup/${encodeURIComponent(managerId)}`)
-      return user.name || user.email
+      const users = await apiClient.get<LookupUserIdentity[]>('/users/lookup')
+      const managerId = normalizeSingleLookupUserValue(managerValue, users)
+      const user = users.find((candidate) => candidate.id === managerId)
+      return user?.name || user?.email || ''
     } catch {
       return ''
     }
