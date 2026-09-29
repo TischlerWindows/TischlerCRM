@@ -569,8 +569,11 @@ export default function FieldVisibilityRuleEditor({
         </Button>
       </div>
 
-      {conditions.length === 0 && (
+      {conditions.length === 0 && !(enableUserVisibility && selectedUserIds.length > 0) && (
         <p className="text-xs text-gray-500 italic">No rules - field will always be visible</p>
+      )}
+      {conditions.length === 0 && enableUserVisibility && selectedUserIds.length > 0 && (
+        <p className="text-xs text-blue-700">Visible only to {selectedUserIds.length} selected user{selectedUserIds.length === 1 ? '' : 's'}.</p>
       )}
     </div>
   );

@@ -438,7 +438,7 @@ export default function RecordDetailPage({
     ? [...pageLayout.tabs]
         .filter((tab) => {
           if (tab.hideOnView || (tab.hideOnExisting && !containsDropboxContent(tab, objectDef))) return false;
-          if (!evaluateVisibility(tab.visibleIf, layoutVisibilityData, undefined, tab.visibleIfLogic)) return false;
+          if (!evaluateVisibility(tab.visibleIf, layoutVisibilityData, { currentUserId: authUser?.id }, tab.visibleIfLogic)) return false;
           return !getFormattingEffectsForTab(pageLayout, tab.id, layoutVisibilityData)?.hidden;
         })
         .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))

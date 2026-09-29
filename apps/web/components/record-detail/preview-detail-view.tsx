@@ -6,6 +6,7 @@ import { getFormattingEffectsForTab } from '@/lib/layout-formatting';
 import { evaluateVisibility } from '@/lib/field-visibility';
 import { collectDefaultCollapsedWidgetIds } from '@/lib/widget-collapse-defaults';
 import { RecordTabRenderer } from './record-tab-renderer';
+import { useAuth } from '@/lib/auth-context';
 
 export interface PreviewDetailViewProps {
   layout: PageLayout;
@@ -21,6 +22,7 @@ export interface PreviewDetailViewProps {
  * buttons, breadcrumbs, routing) — this is a read-only preview.
  */
 export function PreviewDetailView({ layout, record, objectDef }: PreviewDetailViewProps) {
+  const { user } = useAuth();
   const [activeTabIdx, setActiveTabIdx] = useState(0);
   const [sectionToggles, setSectionToggles] = useState<Record<string, boolean>>({});
   const [collapsedPanelIds, setCollapsedPanelIds] = useState<Set<string>>(new Set());
@@ -58,13 +60,13 @@ export function PreviewDetailView({ layout, record, objectDef }: PreviewDetailVi
       .filter((tab: any) => {
         // Detail page is "view" mode — check hideOnView (with legacy hideOnExisting fallback)
         if (tab.hideOnView || tab.hideOnExisting) return false;
-        if (!evaluateVisibility(tab.visibleIf, record ?? {}, undefined, tab.visibleIfLogic)) return false;
+        if (!evaluateVisibility(tab.visibleIf, record ?? {}, { currentUserId: user?.id }, tab.visibleIfLogic)) return false;
         const tabFx = getFormattingEffectsForTab(layout, tab.id, record as any);
         if (tabFx?.hidden) return false;
         return true;
       })
       .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
-  }, [layout, record]);
+  }, [layout, record, user?.id]);
 
   if (!layout) {
     return (

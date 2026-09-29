@@ -21,4 +21,11 @@ describe('field visibility logic', () => {
   it('keeps empty conditions visible regardless of logic', () => {
     expect(evaluateVisibility([], {}, undefined, 'OR')).toBe(true);
   });
+
+  it('shows user-specific content only to selected users and fails closed without context', () => {
+    const userCondition: ConditionExpr[] = [{ left: '__currentUser__', op: 'IN', right: ['user-1'] }];
+    expect(evaluateVisibility(userCondition, {}, { currentUserId: 'user-1' })).toBe(true);
+    expect(evaluateVisibility(userCondition, {}, { currentUserId: 'user-2' })).toBe(false);
+    expect(evaluateVisibility(userCondition, {})).toBe(false);
+  });
 });

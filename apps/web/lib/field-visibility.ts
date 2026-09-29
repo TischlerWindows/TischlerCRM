@@ -33,7 +33,7 @@ export function evaluateVisibility(conditions: ConditionExpr[] | undefined, reco
 function evaluateCondition(condition: ConditionExpr, recordData: RecordData, context?: VisibilityContext): boolean {
   // Special: user-based visibility
   if (condition.left === '__currentUser__') {
-    if (!context?.currentUserId) return true; // If no user context, show by default
+    if (!context?.currentUserId) return false;
     if (condition.op === 'IN' && Array.isArray(condition.right)) {
       return condition.right.includes(context.currentUserId);
     }
