@@ -83,6 +83,19 @@ function buildPasswordResetUrl(resetToken: string): string {
 }
 
 export async function usersAdminRoutes(app: FastifyInstance) {
+  // ── Resolve one active user for LookupUser display/defaults ──────────────
+  app.get('/users/lookup/:id', async (req, reply) => {
+    if (!(req as any).user?.sub) return reply.code(401).send({ error: 'Unauthorized' });
+    const pp = idParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: 'Invalid user ID' });
+    const user = await prisma.user.findFirst({
+      where: { id: pp.data.id, deletedAt: null, isActive: true },
+      select: { id: true, name: true, email: true },
+    });
+    if (!user) return reply.code(404).send({ error: 'User not found' });
+    return reply.send(user);
+  });
+
   // ── List users ──────────────────────────────────────────────────────────
   app.get('/admin/users', async (req, reply) => {
     const qParsed = listQuerySchema.safeParse(req.query);

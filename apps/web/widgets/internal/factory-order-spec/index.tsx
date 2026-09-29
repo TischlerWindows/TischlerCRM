@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, Check, FileText, Loader2, Save } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
 import { getRecordName } from '../shared/recordName'
 import {
-  HARDWARE_ITEMS, PRODUCT_OPTIONS, SPEC_ITEMS, hardwareKey,
-  parseFactoryOrderSpec, type FactoryOrderSpec,
+  HARDWARE_ITEMS, PRODUCT_OPTIONS, SPEC_ITEMS, applyFactoryOrderDefaults,
+  factoryOrderDefaultsFromProject, hardwareKey, parseFactoryOrderSpec,
+  readLookupId, readProjectField, type FactoryOrderSpec,
 } from '@/lib/factory-order-spec'
 
 const inputClass = 'w-full min-w-0 border-0 bg-transparent px-2 py-1.5 text-sm text-gray-800 outline-none focus:bg-blue-50 focus:ring-1 focus:ring-inset focus:ring-brand-navy'
@@ -17,8 +18,16 @@ const headingClass = 'bg-brand-navy px-3 py-2 text-sm font-bold uppercase text-w
 export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) {
   const projectId = record?.id ? String(record.id) : ''
   const projectName = getRecordName(record as Record<string, unknown>)
+  const recordData = record as Record<string, unknown>
+  const managerId = readLookupId(readProjectField(recordData, 'internal_project_manager'))
+  const productSpecification = readProjectField(recordData, 'product_specification')
+  const insectRollScreens = readProjectField(recordData, 'Insect_Roll_Screens__c')
+  const projectDefaults = useMemo(
+    () => factoryOrderDefaultsFromProject({ product_specification: productSpecification, Insect_Roll_Screens__c: insectRollScreens }),
+    [productSpecification, insectRollScreens],
+  )
   const rawSpec = record?.factoryOrderSpec ?? record?.Project__factoryOrderSpec
-  const [spec, setSpec] = useState<FactoryOrderSpec>(() => parseFactoryOrderSpec(rawSpec))
+  const [spec, setSpec] = useState<FactoryOrderSpec>(() => applyFactoryOrderDefaults(parseFactoryOrderSpec(rawSpec), projectDefaults))
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [generatingPdf, setGeneratingPdf] = useState(false)
@@ -26,12 +35,27 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    setSpec(parseFactoryOrderSpec(rawSpec))
+    let cancelled = false
+    setSpec(applyFactoryOrderDefaults(parseFactoryOrderSpec(rawSpec), projectDefaults))
     setDirty(false)
-  }, [projectId, rawSpec])
+    if (managerId) {
+      apiClient.get<{ id: string; name: string | null; email: string }>(`/users/lookup/${encodeURIComponent(managerId)}`)
+        .then((user) => {
+          if (!cancelled) setSpec((current) => applyFactoryOrderDefaults(current, { from: user.name || user.email }))
+        })
+        .catch(() => { /* Legacy/orphaned user lookup: leave From blank for manual entry. */ })
+    }
+    return () => { cancelled = true }
+  }, [projectId, rawSpec, managerId, projectDefaults])
 
-  const update = (patch: Partial<FactoryOrderSpec>) => {
-    setSpec((current) => ({ ...current, ...patch }))
+  const update = (patch: Partial<FactoryOrderSpec>, manualOverride?: string) => {
+    setSpec((current) => ({
+      ...current,
+      ...patch,
+      manualOverrides: manualOverride && !current.manualOverrides.includes(manualOverride)
+        ? [...current.manualOverrides, manualOverride]
+        : current.manualOverrides,
+    }))
     setDirty(true)
     setSaved(false)
   }
@@ -133,7 +157,7 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
           {(['to', 'from'] as const).map((key) => (
             <label key={key} className="flex min-w-0 items-center gap-2 bg-white px-2 py-1 text-xs font-semibold uppercase text-gray-600">
               <span className="w-16 shrink-0">{key}</span>
-              <input className={inputClass} value={spec[key]} onChange={(event) => update({ [key]: event.target.value })} />
+              <input className={inputClass} value={spec[key]} onChange={(event) => update({ [key]: event.target.value }, key === 'from' ? 'from' : undefined)} />
             </label>
           ))}
         </div>
@@ -141,7 +165,7 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
           <span className="text-xs font-semibold uppercase text-gray-600">Product</span>
           {PRODUCT_OPTIONS.map((product) => (
             <label key={product} className="inline-flex items-center gap-1 text-xs">
-              <input type="checkbox" checked={spec.products.includes(product)} onChange={(event) => update({ products: event.target.checked ? [...spec.products, product] : spec.products.filter((value) => value !== product) })} />
+              <input type="checkbox" checked={spec.products.includes(product)} onChange={(event) => update({ products: event.target.checked ? [...spec.products, product] : spec.products.filter((value) => value !== product) }, 'products')} />
               {product}
             </label>
           ))}
@@ -164,7 +188,7 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
             const row = spec.specifications[key]
             return <tr key={key} className="border-t border-gray-200 even:bg-gray-50">
               <td className="px-2 py-1">{key}</td><th scope="row" className="px-2 py-1 text-left font-medium">{item}</th>
-              <td className="border-l border-gray-200"><input aria-label={`${item} specification`} className={inputClass} value={row?.specification ?? ''} onChange={(event) => update({ specifications: { ...spec.specifications, [key]: { ...row, specification: event.target.value, remarks: row?.remarks ?? '' } } })} /></td>
+              <td className="border-l border-gray-200"><input aria-label={`${item} specification`} className={inputClass} value={row?.specification ?? ''} onChange={(event) => update({ specifications: { ...spec.specifications, [key]: { ...row, specification: event.target.value, remarks: row?.remarks ?? '' } } }, key === '19' ? 'rollScreen' : undefined)} /></td>
               <td className="border-l border-gray-200"><input aria-label={`${item} remarks`} className={inputClass} value={row?.remarks ?? ''} onChange={(event) => update({ specifications: { ...spec.specifications, [key]: { ...row, specification: row?.specification ?? '', remarks: event.target.value } } })} /></td>
             </tr>
           })}</tbody>

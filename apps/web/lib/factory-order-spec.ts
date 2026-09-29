@@ -59,6 +59,13 @@ export interface FactoryOrderSpec {
   additionalRemarks: string
   signatureName: string
   signatureTitle: string
+  manualOverrides: string[]
+}
+
+export interface FactoryOrderDefaults {
+  from?: string
+  products?: string[]
+  rollScreen?: string
 }
 
 export const hardwareKey = (group: string, item: string) => `${group}:${item}`
@@ -95,5 +102,64 @@ export function parseFactoryOrderSpec(raw: unknown): FactoryOrderSpec {
     shippingWeek: text(data.shippingWeek), additionalRemarks: text(data.additionalRemarks),
     signatureName: data.signatureName === undefined ? 'Michel Marclay' : text(data.signatureName),
     signatureTitle: data.signatureTitle === undefined ? 'Project Manager' : text(data.signatureTitle),
+    manualOverrides: Array.isArray(data.manualOverrides)
+      ? data.manualOverrides.filter((value): value is string => typeof value === 'string')
+      : [],
+  }
+}
+
+export function applyFactoryOrderDefaults(spec: FactoryOrderSpec, defaults: FactoryOrderDefaults): FactoryOrderSpec {
+  const overridden = new Set(spec.manualOverrides)
+  const next: FactoryOrderSpec = {
+    ...spec,
+    products: [...spec.products],
+    specifications: { ...spec.specifications },
+  }
+  if (!overridden.has('from') && !next.from.trim() && defaults.from) next.from = defaults.from
+  if (!overridden.has('products') && next.products.length === 0 && defaults.products?.length) {
+    next.products = defaults.products.filter((product): product is string =>
+      PRODUCT_OPTIONS.some((option) => option === product))
+  }
+  if (!overridden.has('rollScreen') && !next.specifications['19']?.specification.trim() && defaults.rollScreen) {
+    next.specifications['19'] = { ...next.specifications['19'], specification: defaults.rollScreen }
+  }
+  return next
+}
+
+const normalizedFieldName = (key: string) => key
+  .replace(/^[A-Za-z]+__/, '')
+  .replace(/__c$/i, '')
+  .replace(/[^a-z0-9]/gi, '')
+  .toLowerCase()
+
+export function readProjectField(record: Record<string, unknown>, apiName: string): unknown {
+  const target = normalizedFieldName(apiName)
+  const source = record.data && typeof record.data === 'object'
+    ? record.data as Record<string, unknown>
+    : record
+  const key = Object.keys(source).find((candidate) => normalizedFieldName(candidate) === target)
+  return key ? source[key] : undefined
+}
+
+export function readLookupId(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return ''
+  const lookup = value as Record<string, unknown>
+  const id = lookup.lookup ?? lookup.id ?? lookup.value
+  return typeof id === 'string' ? id : ''
+}
+
+export function factoryOrderDefaultsFromProject(record: Record<string, unknown>, managerName = ''): FactoryOrderDefaults {
+  const rawProduct = readProjectField(record, 'product_specification')
+  const productValues = Array.isArray(rawProduct) ? rawProduct : String(rawProduct ?? '').split(/[;,]/)
+  const normalizeProduct = (value: unknown) => String(value).toLowerCase().replace(/[^a-z0-9]/g, '')
+  const products = PRODUCT_OPTIONS.filter((option) =>
+    productValues.some((value) => normalizeProduct(value).includes(normalizeProduct(option))))
+  const rawRollScreens = readProjectField(record, 'Insect_Roll_Screens__c')
+  const rollScreensEnabled = rawRollScreens === true || ['yes', 'y', 'true', '1'].includes(String(rawRollScreens ?? '').trim().toLowerCase())
+  return {
+    from: managerName || undefined,
+    products,
+    rollScreen: rollScreensEnabled ? 'Yes' : undefined,
   }
 }
