@@ -163,6 +163,12 @@ function normalizeTab(rawTab: unknown, tabIndex: number): LayoutTab {
     label: typeof candidate.label === 'string' ? candidate.label : `Tab ${tabIndex + 1}`,
     order: typeof candidate.order === 'number' ? candidate.order : tabIndex,
     regions: regionsRaw.map((region: unknown, regionIndex: number) => normalizeRegion(region, regionIndex)),
+    ...(Array.isArray(candidate.visibleIf) ? { visibleIf: candidate.visibleIf as LayoutTab['visibleIf'] } : {}),
+    ...(candidate.visibleIfLogic === 'OR' || candidate.visibleIfLogic === 'AND' ? { visibleIfLogic: candidate.visibleIfLogic } : {}),
+    ...(typeof candidate.hideOnNew === 'boolean' ? { hideOnNew: candidate.hideOnNew } : {}),
+    ...(typeof candidate.hideOnView === 'boolean' ? { hideOnView: candidate.hideOnView } : {}),
+    ...(typeof candidate.hideOnEdit === 'boolean' ? { hideOnEdit: candidate.hideOnEdit } : {}),
+    ...(typeof candidate.hideOnExisting === 'boolean' ? { hideOnExisting: candidate.hideOnExisting } : {}),
   };
 }
 
@@ -301,6 +307,8 @@ export function migrateLegacyLayout(legacy: LegacyPageLayout): PageLayout {
           label: tab.label,
           order: typeof tab.order === 'number' ? tab.order : tabIndex,
           regions: toLayoutSectionsFromLegacyTab(tab),
+          visibleIf: tab.visibleIf,
+          visibleIfLogic: tab.visibleIfLogic,
         }));
 
   const tabs = tabsSource.map((tab: unknown, index: number) => normalizeTab(tab, index));

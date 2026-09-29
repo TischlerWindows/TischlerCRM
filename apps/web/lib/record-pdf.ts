@@ -276,6 +276,7 @@ export async function generateRecordPdf({
     .filter((tab) => !onlyTabId || tab.id === onlyTabId)
     .filter((tab) => {
       if (tab.hideOnView || tab.hideOnExisting) return false;
+      if (!evaluateVisibility(tab.visibleIf, record, undefined, tab.visibleIfLogic)) return false;
       return !getFormattingEffectsForTab(pageLayout, tab.id, record)?.hidden;
     })
     .sort((left, right) => left.order - right.order);

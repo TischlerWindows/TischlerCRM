@@ -528,6 +528,8 @@ export interface LegacyPageTab {
   label: string;
   order: number;
   sections: LegacyPageSection[];
+  visibleIf?: ConditionExpr[];
+  visibleIfLogic?: 'AND' | 'OR';
   /** Widgets on the tab canvas (not inside a section), e.g. related lists above the fold */
   widgets?: PageWidget[];
 }
@@ -722,6 +724,8 @@ export interface LayoutTab {
   label: string;
   order: number;
   regions: LayoutSection[];
+  visibleIf?: ConditionExpr[];
+  visibleIfLogic?: 'AND' | 'OR';
   hideOnNew?: boolean;       // Hide on New Record form (creation)
   hideOnView?: boolean;      // Hide on View (read-only detail page)
   hideOnEdit?: boolean;      // Hide on Edit (edit dialog)

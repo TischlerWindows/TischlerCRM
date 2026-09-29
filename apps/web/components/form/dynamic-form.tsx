@@ -370,12 +370,17 @@ export default function DynamicForm({
   }, [layout])
 
   useEffect(() => {
-    if (layout && layout.tabs.length > 0 && !activeTab) {
-      const firstVisible = layout.tabs.find((t) => !isHiddenByLifecycle(t as any, layoutType));
+    if (layout && layout.tabs.length > 0) {
+      const isVisible = (tab: import('@/lib/schema').LayoutTab) =>
+        !isHiddenByLifecycle(tab as any, layoutType) &&
+        evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic);
+      const activeIsVisible = layout.tabs.some((tab) => tab.id === activeTab && isVisible(tab));
+      if (activeIsVisible) return;
+      const firstVisible = layout.tabs.find(isVisible);
       if (firstVisible) setActiveTab(firstVisible.id);
       else if (layout.tabs[0]) setActiveTab(layout.tabs[0].id);
     }
-  }, [layout, activeTab, layoutType]);
+  }, [layout, activeTab, layoutType, formData, authUser?.id]);
 
   // Auto-populate AutoUser fields
   useEffect(() => {
@@ -608,6 +613,7 @@ export default function DynamicForm({
     }> = [];
     layout.tabs.forEach((tab) => {
       if (isHiddenByLifecycle(tab as any, layoutType)) return;
+      if (!evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic)) return;
       tab.regions.forEach((region) => {
         if (isHiddenByLifecycle(region as any, layoutType)) return;
         region.panels.forEach((panel) => {
@@ -707,6 +713,7 @@ export default function DynamicForm({
     const allSections: WizardSection[] = [];
     layout.tabs.forEach((tab) => {
       if (isHiddenByLifecycle(tab as any, layoutType)) return;
+      if (!evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic)) return;
       tab.regions.forEach((region) => {
         if (isHiddenByLifecycle(region as any, layoutType)) return;
         // Filter panels first so we can correctly mark the LAST visible panel.
@@ -1204,7 +1211,10 @@ export default function DynamicForm({
   };
 
   // ── renderSectionContent ──────────────────────────────────────
-  const currentTab = layout.tabs.find((t) => t.id === activeTab);
+  const currentTab = layout.tabs.find((tab) =>
+    tab.id === activeTab &&
+    !isHiddenByLifecycle(tab as any, layoutType) &&
+    evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic));
   if (!currentTab) return null;
 
   const renderSectionContent = (panel: LayoutPanel) => {
@@ -1483,7 +1493,9 @@ export default function DynamicForm({
         {!isWizardMode && layout.tabs.length > 1 && (
           <div className="flex gap-2 border-b px-6 pt-4 bg-white">
             {layout.tabs
-              .filter((tab) => !isHiddenByLifecycle(tab as any, layoutType))
+              .filter((tab) =>
+                !isHiddenByLifecycle(tab as any, layoutType) &&
+                evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic))
               .map((tab) => (
               <button
                 key={tab.id}
@@ -1718,7 +1730,9 @@ export default function DynamicForm({
                 </p>
               </div>
             </div>
-            {layout.tabs.map((tab) =>
+            {layout.tabs.filter((tab) =>
+              !isHiddenByLifecycle(tab as any, layoutType) &&
+              evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic)).map((tab) =>
               tab.regions.flatMap((region) => {
                 const isRegionVisible = evaluateVisibility(
                   (region as any).visibleIf,

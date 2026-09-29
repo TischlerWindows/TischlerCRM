@@ -432,8 +432,10 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
 
   const handleSaveConditions = useCallback((conditions: import('@/lib/schema').ConditionExpr[], logic?: 'AND' | 'OR') => {
     if (!selection) return;
-    const visibleIfLogic = logic ?? (selection.kind === 'region' ? selection.region.visibleIfLogic : selection.kind === 'panel' ? selection.panel.visibleIfLogic : selection.kind === 'field' ? selection.field.visibleIfLogic : undefined) ?? 'AND';
-    if (selection.kind === 'region') {
+    const visibleIfLogic = logic ?? (selection.kind === 'tab' ? selection.tab.visibleIfLogic : selection.kind === 'region' ? selection.region.visibleIfLogic : selection.kind === 'panel' ? selection.panel.visibleIfLogic : selection.kind === 'field' ? selection.field.visibleIfLogic : undefined) ?? 'AND';
+    if (selection.kind === 'tab') {
+      updateTab(selection.tab.id, { visibleIf: conditions.length > 0 ? conditions : undefined, visibleIfLogic });
+    } else if (selection.kind === 'region') {
       updateSection(selection.region.id, { visibleIf: conditions.length > 0 ? conditions : undefined, visibleIfLogic });
     } else if (selection.kind === 'panel') {
       updatePanel(selection.panel.id, { visibleIf: conditions.length > 0 ? conditions : undefined, visibleIfLogic });
@@ -446,14 +448,19 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
     setSaved(true);
     if (savedTimer.current) clearTimeout(savedTimer.current);
     savedTimer.current = setTimeout(() => setSaved(false), 3000);
-  }, [selection, updateSection, updatePanel, updateField]);
+  }, [selection, updateSection, updatePanel, updateField, updateTab]);
 
   // Conditional returns come AFTER all hooks
   if (!selection) return null;
   if (selection.kind === 'widget') return null;
 
-  // For tabs, only show the HideOnCheckboxes (no always show/hide or visibleIf)
   if (selection.kind === 'tab') {
+    const conditions = selection.tab.visibleIf ?? [];
+    const logic = selection.tab.visibleIfLogic ?? 'AND';
+    const fakeField: import('@/lib/schema').FieldDef = {
+      id: 'tab-visibility-conditions', apiName: '__tab_visibility__',
+      label: 'Tab visibility conditions', type: 'Text', visibleIf: conditions, visibleIfLogic: logic,
+    };
     return (
       <div className="overflow-y-auto flex-1 p-3 space-y-4">
         <HideOnCheckboxes
@@ -464,6 +471,22 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
           onChange={(patch) => updateTab(selection.tab.id, patch)}
           elementLabel="tab"
         />
+        <div className="border-t border-gray-100 pt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Show only when</div>
+          <div className="text-[11px] text-gray-500 mb-2">
+            When conditions are set, this tab is hidden by default and only shown when <strong>{logic === 'OR' ? 'any' : 'all'}</strong> conditions are met.
+          </div>
+          <div className="mb-3 flex overflow-hidden rounded-md border border-gray-200 text-xs" role="group" aria-label="Tab visibility rule logic">
+            {(['AND', 'OR'] as const).map((option) => (
+              <button key={option} type="button" onClick={() => handleSaveConditions(conditions, option)} aria-pressed={logic === option}
+                className={`flex-1 py-1.5 font-medium ${logic === option ? 'bg-brand-navy text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                {option}
+              </button>
+            ))}
+          </div>
+          <FieldVisibilityRuleEditor field={fakeField} logic={logic} availableFields={availableFields} onSave={handleSaveConditions} onCancel={() => {}} />
+          {saved && <div className="mt-2 flex items-center gap-1.5 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700"><Check className="h-3.5 w-3.5" />Visibility rules saved</div>}
+        </div>
       </div>
     );
   }

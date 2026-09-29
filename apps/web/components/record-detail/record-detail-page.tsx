@@ -434,6 +434,15 @@ export default function RecordDetailPage({
   const subtitle = getRecordSubtitle();
 
   const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
+  const visiblePageTabs = pageLayout?.tabs
+    ? [...pageLayout.tabs]
+        .filter((tab) => {
+          if (tab.hideOnView || (tab.hideOnExisting && !containsDropboxContent(tab, objectDef))) return false;
+          if (!evaluateVisibility(tab.visibleIf, layoutVisibilityData, undefined, tab.visibleIfLogic)) return false;
+          return !getFormattingEffectsForTab(pageLayout, tab.id, layoutVisibilityData)?.hidden;
+        })
+        .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
+    : [];
 
   // ── Resolve HeaderHighlights widget config ───────────────────────────
   let highlightApiNames: string[] = [];
@@ -586,19 +595,8 @@ export default function RecordDetailPage({
               </div>
             )}
             {/* Tab navigation */}
-            {pageLayout.tabs.length > 1 && (() => {
-              const sortedTabsForNav = [...pageLayout.tabs]
-                .filter((tab: any) => {
-                  // Detail page is "view" mode — check hideOnView (with legacy hideOnExisting fallback)
-                  if (tab.hideOnView || (tab.hideOnExisting && !containsDropboxContent(tab, objectDef))) return false;
-                  // Hide tabs via formatting rules
-                  const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
-                  if (tabFx?.hidden) return false;
-                  return true;
-                })
-                .sort((a: any, b: any) =>
-                  (a.order ?? 0) - (b.order ?? 0),
-                );
+            {visiblePageTabs.length > 1 && (() => {
+              const sortedTabsForNav = visiblePageTabs;
               return (
                 <div className="print:hidden flex items-center gap-2 overflow-x-auto pb-1">
                   {sortedTabsForNav.map((tab: any, idx: number) => (
@@ -620,17 +618,10 @@ export default function RecordDetailPage({
             })()}
             {/* Render tabs */}
             {isPrintMode
-              ? [...pageLayout.tabs]
-                  .filter((tab: any) => {
-                    if (tab.hideOnView || (tab.hideOnExisting && !containsDropboxContent(tab, objectDef))) return false;
-                    const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
-                    if (tabFx?.hidden) return false;
-                    return true;
-                  })
-                  .sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0))
+              ? visiblePageTabs
                   .map((tab: any, idx: number) => (
                     <div key={tab.id ?? idx} className="break-inside-avoid">
-                      {pageLayout.tabs.length > 1 && (
+                      {visiblePageTabs.length > 1 && (
                         <h2 className="mb-2 border-b border-gray-300 pb-1 text-base font-bold text-gray-900">
                           {tab.label || `Tab ${idx + 1}`}
                         </h2>
@@ -654,18 +645,9 @@ export default function RecordDetailPage({
                       />
                     </div>
                   ))
-              : pageLayout.tabs.length > 1
+              : visiblePageTabs.length > 1
               ? (() => {
-                  const sortedTabsForRender = [...pageLayout.tabs]
-                    .filter((tab: any) => {
-                      if (tab.hideOnView || (tab.hideOnExisting && !containsDropboxContent(tab, objectDef))) return false;
-                      const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
-                      if (tabFx?.hidden) return false;
-                      return true;
-                    })
-                    .sort((a: any, b: any) =>
-                      (a.order ?? 0) - (b.order ?? 0),
-                    );
+                  const sortedTabsForRender = visiblePageTabs;
                   const tab = sortedTabsForRender[activeTabIdx] ?? sortedTabsForRender[0];
                   return (
                     <RecordTabRenderer
@@ -687,13 +669,7 @@ export default function RecordDetailPage({
                     />
                   );
                 })()
-              : pageLayout.tabs
-                  .filter((tab: any) => {
-                    if (tab.hideOnView || (tab.hideOnExisting && !containsDropboxContent(tab, objectDef))) return false;
-                    const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
-                    if (tabFx?.hidden) return false;
-                    return true;
-                  })
+              : visiblePageTabs
                   .map((tab, ti) => (
                   <RecordTabRenderer
                     key={(tab as any).id ?? ti}

@@ -33,6 +33,22 @@ function makeLegacyLayout(overrides: Partial<LegacyPageLayout> = {}): LegacyPage
 }
 
 describe('migrateLegacyLayout', () => {
+  it('preserves tab visibility rules and OR logic from editor tabs', () => {
+    const legacy = makeLegacyLayout({
+      extensions: {
+        editorTabs: [{
+          id: 'conditional-tab', label: 'Conditional', order: 0, regions: [],
+          visibleIf: [{ left: 'status', op: '==', right: 'Open' }],
+          visibleIfLogic: 'OR', hideOnNew: true,
+        }],
+      },
+    })
+    const tab = migrateLegacyLayout(legacy).tabs[0]
+    expect(tab.visibleIf).toEqual([{ left: 'status', op: '==', right: 'Open' }])
+    expect(tab.visibleIfLogic).toBe('OR')
+    expect(tab.hideOnNew).toBe(true)
+  })
+
   it('converts a legacy layout with PageTab/PageSection/PageField correctly', () => {
     const legacy = makeLegacyLayout();
     const result = migrateLegacyLayout(legacy);

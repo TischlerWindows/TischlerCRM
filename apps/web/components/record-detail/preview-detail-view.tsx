@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ObjectDef, PageLayout } from '@/lib/schema';
 import { getFormattingEffectsForTab } from '@/lib/layout-formatting';
+import { evaluateVisibility } from '@/lib/field-visibility';
 import { collectDefaultCollapsedWidgetIds } from '@/lib/widget-collapse-defaults';
 import { RecordTabRenderer } from './record-tab-renderer';
 
@@ -57,6 +58,7 @@ export function PreviewDetailView({ layout, record, objectDef }: PreviewDetailVi
       .filter((tab: any) => {
         // Detail page is "view" mode — check hideOnView (with legacy hideOnExisting fallback)
         if (tab.hideOnView || tab.hideOnExisting) return false;
+        if (!evaluateVisibility(tab.visibleIf, record ?? {}, undefined, tab.visibleIfLogic)) return false;
         const tabFx = getFormattingEffectsForTab(layout, tab.id, record as any);
         if (tabFx?.hidden) return false;
         return true;
