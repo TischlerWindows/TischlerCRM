@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertCircle, Check, FileText, Loader2, Save } from 'lucide-react'
+import { AlertCircle, Check, FileText, Loader2, RotateCcw, Save } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
@@ -9,7 +9,7 @@ import { getRecordName } from '../shared/recordName'
 import {
   HARDWARE_ITEMS, PRODUCT_OPTIONS, SPEC_ITEMS, applyFactoryOrderDefaults,
   factoryOrderDefaultsFromProject, hardwareKey, parseFactoryOrderSpec,
-  readLookupId, readProjectField, type FactoryOrderSpec,
+  readLookupId, readProjectField, refreshFactoryOrderDefaults, type FactoryOrderSpec,
 } from '@/lib/factory-order-spec'
 
 const inputClass = 'w-full min-w-0 border-0 bg-transparent px-2 py-1.5 text-sm text-gray-800 outline-none focus:bg-blue-50 focus:ring-1 focus:ring-inset focus:ring-brand-navy'
@@ -31,6 +31,7 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
@@ -58,6 +59,30 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
     }))
     setDirty(true)
     setSaved(false)
+  }
+
+  const resolveManagerName = async () => {
+    if (!managerId) return ''
+    try {
+      const user = await apiClient.get<{ id: string; name: string | null; email: string }>(`/users/lookup/${encodeURIComponent(managerId)}`)
+      return user.name || user.email
+    } catch {
+      return ''
+    }
+  }
+
+  const refreshAutoFill = async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    setError(null)
+    try {
+      const managerName = await resolveManagerName()
+      setSpec((current) => refreshFactoryOrderDefaults(current, { ...projectDefaults, from: managerName || undefined }))
+      setDirty(true)
+      setSaved(false)
+    } finally {
+      setRefreshing(false)
+    }
   }
 
   const save = async () => {
@@ -131,6 +156,10 @@ export default function FactoryOrderSpecWidget({ record, object }: WidgetProps) 
         </div>
         <div className="flex items-center gap-2">
           {saved && !dirty && <span role="status" className="inline-flex items-center gap-1 text-xs text-green-700"><Check className="h-3.5 w-3.5" /> Saved</span>}
+          <button type="button" onClick={() => void refreshAutoFill()} disabled={refreshing || saving} title="Reload From, Product, and Roll screen from this Project" className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40">
+            {refreshing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+            {refreshing ? 'Refreshing' : 'Refresh Auto-Fill'}
+          </button>
           <button type="button" onClick={() => void previewPdf()} disabled={generatingPdf} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40">
             {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
             {generatingPdf ? 'Preparing PDF' : 'Preview PDF'}

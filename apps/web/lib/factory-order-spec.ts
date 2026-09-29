@@ -126,6 +126,21 @@ export function applyFactoryOrderDefaults(spec: FactoryOrderSpec, defaults: Fact
   return next
 }
 
+export function refreshFactoryOrderDefaults(spec: FactoryOrderSpec, defaults: FactoryOrderDefaults): FactoryOrderSpec {
+  return {
+    ...spec,
+    from: defaults.from ?? '',
+    products: defaults.products?.filter((product): product is string =>
+      PRODUCT_OPTIONS.some((option) => option === product)) ?? [],
+    specifications: {
+      ...spec.specifications,
+      '19': { ...spec.specifications['19'], specification: defaults.rollScreen ?? '' },
+    },
+    manualOverrides: spec.manualOverrides.filter((key) =>
+      key !== 'from' && key !== 'products' && key !== 'rollScreen'),
+  }
+}
+
 const normalizedFieldName = (key: string) => key
   .replace(/^[A-Za-z]+__/, '')
   .replace(/__c$/i, '')

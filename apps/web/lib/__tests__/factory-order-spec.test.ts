@@ -1,4 +1,4 @@
-import { HARDWARE_ITEMS, SPEC_ITEMS, applyFactoryOrderDefaults, factoryOrderDefaultsFromProject, hardwareKey, parseFactoryOrderSpec, readLookupId } from '../factory-order-spec'
+import { HARDWARE_ITEMS, SPEC_ITEMS, applyFactoryOrderDefaults, factoryOrderDefaultsFromProject, hardwareKey, parseFactoryOrderSpec, readLookupId, refreshFactoryOrderDefaults } from '../factory-order-spec'
 
 describe('Factory Order Spec', () => {
   it('initializes every row from the template', () => {
@@ -51,5 +51,22 @@ describe('Factory Order Spec', () => {
       from: 'Jane Manager', products: ['Dade County', 'FPA-Certified'], rollScreen: 'Yes',
     })
     expect(readLookupId({ lookup: 'user-123' })).toBe('user-123')
+  })
+
+  it('refreshes only automatic targets and clears their manual overrides', () => {
+    const spec = parseFactoryOrderSpec(null)
+    spec.from = 'Manual Manager'
+    spec.products = ['Standard']
+    spec.specifications['1'].specification = 'Oak'
+    spec.specifications['19'].specification = 'No'
+    spec.manualOverrides = ['from', 'products', 'rollScreen', 'other']
+    const refreshed = refreshFactoryOrderDefaults(spec, {
+      from: 'Current Manager', products: ['Coastal'], rollScreen: 'Yes',
+    })
+    expect(refreshed.from).toBe('Current Manager')
+    expect(refreshed.products).toEqual(['Coastal'])
+    expect(refreshed.specifications['19'].specification).toBe('Yes')
+    expect(refreshed.specifications['1'].specification).toBe('Oak')
+    expect(refreshed.manualOverrides).toEqual(['other'])
   })
 })
