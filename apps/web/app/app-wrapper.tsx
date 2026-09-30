@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import UniversalSearch from '@/components/universal-search';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { useAuth } from '@/lib/auth-context';
-import { usePermissions } from '@/lib/permissions-context';
+import { usePermissions, type AppPermissions } from '@/lib/permissions-context';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSetting, setSetting } from '@/lib/preferences';
 import { RecordSetupProvider, useRecordSetupContext } from '@/lib/record-setup-context';
@@ -45,7 +45,8 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [draggedTabHref, setDraggedTabHref] = useState<string | null>(null);
+  const [lastDragTargetHref, setLastDragTargetHref] = useState<string | null>(null);
   const [showAddTab, setShowAddTab] = useState(false);
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
   const [showHelp, setShowHelp] = useState(false);
@@ -63,6 +64,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     '/opportunities': 'Opportunity',
     '/projects': 'Project',
     '/service': 'Service',
+    '/workorders': 'WorkOrder',
     '/quotes': 'Quote',
     '/installations': 'Installation',
     '/tasks': 'Task',
@@ -85,20 +87,16 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   };
 
   // Filter tabs so users only see objects they have read access to
-  const filteredTabs = useMemo(() => {
-    return tabs.filter((tab) => {
-      // Check object-level permissions
-      const objectApiName = hrefToObjectMap[tab.href];
-      if (objectApiName) return canAccess(objectApiName, 'read');
+  const canShowTab = (tab: { name: string; href: string }): boolean => {
+    const objectApiName = hrefToObjectMap[tab.href];
+    if (objectApiName) return canAccess(objectApiName, 'read');
 
-      // Check app-level permissions for Reports/Dashboards
-      const appPerm = hrefToAppPermMap[tab.href];
-      if (appPerm) return hasAppPermission(appPerm as any);
+    const appPerm = hrefToAppPermMap[tab.href];
+    if (appPerm) return hasAppPermission(appPerm as keyof AppPermissions);
 
-      // Non-object, non-restricted tabs (Settings, etc.) are always shown
-      return true;
-    });
-  }, [tabs, canAccess, hasAppPermission, schema]);
+    return true;
+  };
+  const filteredTabs = tabs.filter(canShowTab);
   const allowPageScroll = pathname === '/' || 
     pathname?.includes('/[id]') || 
     pathname?.includes('/new') ||
@@ -229,31 +227,36 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   };
 
   const handleResetToDefault = () => {
-    setTabs(defaultTabs);
-    saveTabConfiguration(defaultTabs);
+    const accessibleDefaults = defaultTabs.filter(canShowTab);
+    setTabs(accessibleDefaults);
+    saveTabConfiguration(accessibleDefaults);
   };
 
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
+  const handleDragStart = (href: string) => {
+    setDraggedTabHref(href);
+    setLastDragTargetHref(null);
   };
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: React.DragEvent, targetHref: string) => {
     e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
+    if (draggedTabHref === null || draggedTabHref === targetHref || lastDragTargetHref === targetHref) return;
 
     const newTabs = [...tabs];
+    const draggedIndex = newTabs.findIndex((tab) => tab.href === draggedTabHref);
+    const targetIndex = newTabs.findIndex((tab) => tab.href === targetHref);
     const draggedTab = newTabs[draggedIndex];
-    if (!draggedTab) return;
+    if (!draggedTab || targetIndex < 0) return;
     newTabs.splice(draggedIndex, 1);
-    newTabs.splice(index, 0, draggedTab);
+    newTabs.splice(targetIndex, 0, draggedTab);
 
     setTabs(newTabs);
-    setDraggedIndex(index);
+    setLastDragTargetHref(targetHref);
     saveTabConfiguration(newTabs);
   };
 
   const handleDragEnd = () => {
-    setDraggedIndex(null);
+    setDraggedTabHref(null);
+    setLastDragTargetHref(null);
   };
 
   const handleAddTab = (tab: { name: string; href: string }) => {
@@ -263,8 +266,8 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     setShowAddTab(false);
   };
 
-  const handleRemoveTab = (index: number) => {
-    const newTabs = tabs.filter((_, i) => i !== index);
+  const handleRemoveTab = (href: string) => {
+    const newTabs = tabs.filter((tab) => tab.href !== href);
     setTabs(newTabs);
     saveTabConfiguration(newTabs);
   };
@@ -568,11 +571,11 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                 <button onClick={() => setShowAddTab(true)} className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-brand-dark/80">Add More Items</button>
               </div>
               <div className="space-y-1.5">
-                {tabs.map((item, index) => (
-                  <div key={item.name} draggable onDragStart={() => handleDragStart(index)} onDragOver={(e) => handleDragOver(e, index)} onDragEnd={handleDragEnd} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200 cursor-move group transition-colors">
+                {filteredTabs.map((item) => (
+                  <div key={item.href} draggable onDragStart={() => handleDragStart(item.href)} onDragOver={(e) => handleDragOver(e, item.href)} onDragEnd={handleDragEnd} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200 cursor-move group transition-colors">
                     <GripVertical className="w-4 h-4 text-gray-400" />
                     <span className="flex-1 text-sm font-medium text-brand-dark">{resolveTabName(item)}</span>
-                    <button onClick={() => handleRemoveTab(index)} className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100" title="Remove"><X className="w-3.5 h-3.5 text-gray-500" /></button>
+                    <button onClick={() => handleRemoveTab(item.href)} className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100" title="Remove"><X className="w-3.5 h-3.5 text-gray-500" /></button>
                   </div>
                 ))}
               </div>
@@ -606,12 +609,13 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
             </div>
             <div className="px-6 py-4 max-h-96 overflow-y-auto">
               <div className="space-y-1.5">
-                {defaultTabs.filter(dt => !tabs.some(t => t.href === dt.href)).map((item) => (
+                {defaultTabs.filter(dt => canShowTab(dt) && !tabs.some(t => t.href === dt.href)).map((item) => (
                   <button key={item.href} onClick={() => handleAddTab(item)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-brand-light rounded-md border border-gray-200 transition-colors text-left">
                     <span className="text-sm font-medium text-brand-dark">{item.name}</span>
                   </button>
                 ))}
                 {availableObjects
+                  .filter(canShowTab)
                   .filter(obj => !tabs.some(t => t.href === obj.href))
                   .filter(obj => !defaultTabs.some(dt => dt.href === obj.href))
                   .map((obj) => (
@@ -620,8 +624,8 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                     <span className="text-[10px] text-brand-gray ml-auto px-1.5 py-0.5 bg-gray-100 rounded">Custom</span>
                   </button>
                 ))}
-                {defaultTabs.filter(dt => !tabs.some(t => t.href === dt.href)).length === 0 && 
-                 availableObjects.filter(obj => !tabs.some(t => t.href === obj.href) && !defaultTabs.some(dt => dt.href === obj.href)).length === 0 && (
+                {defaultTabs.filter(dt => canShowTab(dt) && !tabs.some(t => t.href === dt.href)).length === 0 &&
+                 availableObjects.filter(obj => canShowTab(obj) && !tabs.some(t => t.href === obj.href) && !defaultTabs.some(dt => dt.href === obj.href)).length === 0 && (
                   <p className="text-brand-dark/50 text-sm py-8 text-center">All available items are already added.</p>
                 )}
               </div>
