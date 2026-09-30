@@ -560,7 +560,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
           <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold text-brand-dark">Edit Navigation Items</h2>
-              <p className="text-sm text-brand-dark/60 mt-1">Reorder, add, or remove navigation tabs.</p>
+              <p className="text-sm text-brand-dark/60 mt-1">Reorder, add, or remove tabs for your account.</p>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <div className="flex items-center justify-between mb-4">

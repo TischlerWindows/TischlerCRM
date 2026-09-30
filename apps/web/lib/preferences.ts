@@ -11,6 +11,12 @@ let prefsCachePromise: Promise<Record<string, any>> | null = null;
 let settingsCache: Record<string, any> | null = null;
 let settingsCachePromise: Promise<Record<string, any>> | null = null;
 
+const PER_USER_SETTING_KEYS = new Set(['tabConfiguration']);
+
+export function isPerUserSettingKey(key: string): boolean {
+  return PER_USER_SETTING_KEYS.has(key);
+}
+
 // Load all user preferences (cached per session)
 async function loadAllPreferences(): Promise<Record<string, any>> {
   if (prefsCache) return prefsCache;
@@ -70,12 +76,14 @@ export async function deletePreference(key: string): Promise<void> {
 // ---- Org Settings (shared across all users) ----
 
 export async function getSetting<T = any>(key: string, defaultValue?: T): Promise<T | undefined> {
+  if (isPerUserSettingKey(key)) return getPreference<T>(key, defaultValue);
   const settings = await loadAllSettings();
   const val = settings[key];
   return val !== undefined ? val : defaultValue;
 }
 
 export async function setSetting(key: string, value: any): Promise<void> {
+  if (isPerUserSettingKey(key)) return setPreference(key, value);
   if (settingsCache) settingsCache[key] = value;
   apiClient.setSetting(key, value).catch(err => {
     console.warn(`[Settings] Failed to save "${key}":`, err);

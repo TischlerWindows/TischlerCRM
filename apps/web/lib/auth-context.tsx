@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiClient } from './api-client';
+import { invalidatePrefsCache } from './preferences';
 
 interface User {
   id: string;
@@ -74,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    invalidatePrefsCache();
     localStorage.removeItem('user');
     localStorage.removeItem('admin_token_backup');
     localStorage.removeItem('admin_user_backup');
@@ -87,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setAuth = (newToken: string, newUser: User) => {
+    invalidatePrefsCache();
     setToken(newToken);
     setUser(newUser);
     // Sync token to API client
