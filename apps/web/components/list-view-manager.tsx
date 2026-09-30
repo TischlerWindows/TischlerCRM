@@ -221,32 +221,34 @@ export function ListViewManager({
   onSave,
   onDelete,
 }: ListViewManagerProps) {
-  const [editing, setEditing] = useState(false);
+  const [editingMode, setEditingMode] = useState<'new' | 'filter' | 'sort' | null>(null);
   const [draft, setDraft] = useState<ListViewDefinition>(activeView);
   const [error, setError] = useState('');
 
   const openNew = () => {
     setDraft({ id: '', name: '', filters: [], sortField: null, sortDirection: 'asc' });
     setError('');
-    setEditing(true);
+    setEditingMode('new');
   };
 
-  const openEdit = () => {
+  const openEdit = (mode: 'filter' | 'sort') => {
     setDraft({ ...activeView, filters: activeView.filters.map(filter => ({ ...filter })) });
     setError('');
-    setEditing(true);
+    setEditingMode(mode);
   };
 
   const saveDraft = () => {
-    const name = draft.name.trim();
+    const name = draft.id === ALL_RECORDS_VIEW.id ? ALL_RECORDS_VIEW.name : draft.name.trim();
     if (!name) {
       setError('Enter a name for this list view.');
       return;
     }
     const id = draft.id || globalThis.crypto?.randomUUID?.() || `view-${Date.now()}`;
     onSave({ ...draft, id, name });
-    setEditing(false);
+    setEditingMode(null);
   };
+
+  const closeEditor = () => setEditingMode(null);
 
   const updateFilter = (index: number, changes: Partial<ListViewCondition>) => {
     setDraft(current => ({
@@ -259,50 +261,55 @@ export function ListViewManager({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <label className="text-sm font-medium text-gray-700" htmlFor={`list-view-${activeView.id}`}>List View</label>
-        <select
-          id={`list-view-${activeView.id}`}
-          className={`${inputClass} min-w-48`}
-          value={activeView.id}
-          onChange={event => onSelect(event.target.value)}
-        >
-          {views.map(view => <option key={view.id} value={view.id}>{view.name}</option>)}
-        </select>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <label className="text-sm font-medium text-gray-700" htmlFor={`list-view-${activeView.id}`}>List View</label>
+          <select
+            id={`list-view-${activeView.id}`}
+            className={`${inputClass} min-w-48 max-w-full`}
+            value={activeView.id}
+            onChange={event => onSelect(event.target.value)}
+          >
+            {views.map(view => <option key={view.id} value={view.id}>{view.name}</option>)}
+          </select>
+        </div>
         {canManage && (
-          <>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <button type="button" onClick={openNew} className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
               <Plus className="h-4 w-4" /> New List View
             </button>
-            {activeView.id !== ALL_RECORDS_VIEW.id && (
-              <button type="button" onClick={openEdit} className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Edit View</button>
-            )}
+            <button type="button" onClick={() => openEdit('filter')} className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Filter</button>
+            <button type="button" onClick={() => openEdit('sort')} className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Column Sort</button>
             {activeView.id !== ALL_RECORDS_VIEW.id && (
               <button type="button" onClick={() => onDelete(activeView.id)} className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50">
                 <Trash2 className="h-4 w-4" /> Delete View
               </button>
             )}
-          </>
+          </div>
         )}
       </div>
 
-      {editing && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={() => setEditing(false)}>
+      {editingMode && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onClick={closeEditor}>
           <div role="dialog" aria-modal="true" aria-labelledby="list-view-title" className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl" onClick={event => event.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-              <h2 id="list-view-title" className="text-lg font-semibold text-gray-900">{draft.id ? 'Edit List View' : 'New List View'}</h2>
-              <button type="button" aria-label="Close" onClick={() => setEditing(false)} className="rounded p-1 text-gray-500 hover:bg-gray-100"><X className="h-5 w-5" /></button>
+              <h2 id="list-view-title" className="text-lg font-semibold text-gray-900">
+                {editingMode === 'new' ? 'New List View' : editingMode === 'filter' ? 'Edit Filters' : 'Column Sort'}
+              </h2>
+              <button type="button" aria-label="Close" onClick={closeEditor} className="rounded p-1 text-gray-500 hover:bg-gray-100"><X className="h-5 w-5" /></button>
             </div>
             <div className="space-y-5 overflow-y-auto px-5 py-4">
-              <label className="block text-sm font-medium text-gray-700">
-                View name
-                {draft.id === ALL_RECORDS_VIEW.id ? (
-                  <span className={`${inputClass} mt-1 block w-full bg-gray-50`}>{ALL_RECORDS_VIEW.name}</span>
-                ) : (
-                  <input className={`${inputClass} mt-1 block w-full`} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} maxLength={80} />
-                )}
-              </label>
-              <section>
+              {editingMode !== 'sort' && (
+                <label className="block text-sm font-medium text-gray-700">
+                  View name
+                  {draft.id === ALL_RECORDS_VIEW.id ? (
+                    <span className={`${inputClass} mt-1 block w-full bg-gray-50`}>{ALL_RECORDS_VIEW.name}</span>
+                  ) : (
+                    <input className={`${inputClass} mt-1 block w-full`} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} maxLength={80} />
+                  )}
+                </label>
+              )}
+              {(editingMode === 'new' || editingMode === 'filter') && <section>
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-gray-800">Filters</h3>
                   <button type="button" onClick={() => setDraft(current => ({ ...current, filters: [...current.filters, { field: fields[0]?.id ?? '', operator: 'contains', value: '' }] }))} disabled={fields.length === 0} className="inline-flex items-center gap-1 text-sm font-medium text-brand-navy disabled:opacity-50"><Plus className="h-4 w-4" /> Add Filter</button>
@@ -324,8 +331,8 @@ export function ListViewManager({
                   ))}
                   {draft.filters.length === 0 && <p className="text-sm text-gray-500">No filters. This view shows all matching records.</p>}
                 </div>
-              </section>
-              <section className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr]">
+              </section>}
+              {(editingMode === 'new' || editingMode === 'sort') && <section className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr]">
                 <label className="text-sm font-medium text-gray-700">
                   Sort by
                   <select className={`${inputClass} mt-1 block w-full`} value={draft.sortField ?? ''} onChange={event => setDraft(current => ({ ...current, sortField: event.target.value || null }))}>
@@ -340,11 +347,11 @@ export function ListViewManager({
                     <option value="desc">Descending</option>
                   </select>
                 </label>
-              </section>
+              </section>}
               {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
             </div>
             <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
-              <button type="button" onClick={() => setEditing(false)} className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={closeEditor} className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
               <button type="button" onClick={saveDraft} className="inline-flex items-center gap-2 rounded bg-brand-navy px-4 py-2 text-sm font-medium text-white hover:bg-brand-navy-dark"><Save className="h-4 w-4" /> Save View</button>
             </div>
           </div>
