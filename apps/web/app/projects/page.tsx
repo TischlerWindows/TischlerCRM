@@ -116,6 +116,7 @@ export default function ProjectsPage() {
   const [prefillData, setPrefillData] = useState<Record<string, any> | undefined>(undefined);
   const [prefillLookupQueries, setPrefillLookupQueries] = useState<Record<string, string> | undefined>(undefined);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [draftVisibleColumns, setDraftVisibleColumns] = useState<string[]>([]);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -251,12 +252,9 @@ export default function ProjectsPage() {
     fetchProjects();
   }, [fetchProjects]);
 
-  const toggleColumnVisibility = (columnId: string) => {
-    const newVisibleColumns = visibleColumns.includes(columnId)
-      ? visibleColumns.filter(id => id !== columnId)
-      : [...visibleColumns, columnId];
-    setVisibleColumns(newVisibleColumns);
-    setPreference('projectsVisibleColumns', newVisibleColumns);
+  const openColumnSettings = () => {
+    setDraftVisibleColumns([...visibleColumns]);
+    setShowFilterSettings(true);
   };
 
   const handleColumnDragStart = (index: number) => {
@@ -266,42 +264,48 @@ export default function ProjectsPage() {
   const handleColumnDragOver = (index: number) => {
     if (draggedColumnIndex === null || draggedColumnIndex === index) return;
 
-    const newColumns = [...visibleColumns];
+    const newColumns = [...draftVisibleColumns];
     const draggedColumn = newColumns[draggedColumnIndex];
     if (!draggedColumn) return;
     newColumns.splice(draggedColumnIndex, 1);
     newColumns.splice(index, 0, draggedColumn);
 
-    setVisibleColumns(newColumns);
+    setDraftVisibleColumns(newColumns);
     setDraggedColumnIndex(index);
   };
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    setPreference('projectsVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
-    if (!visibleColumns.includes(columnId)) {
-      const newVisibleColumns = [...visibleColumns, columnId];
-      setVisibleColumns(newVisibleColumns);
-      setPreference('projectsVisibleColumns', newVisibleColumns);
+    if (!draftVisibleColumns.includes(columnId)) {
+      setDraftVisibleColumns([...draftVisibleColumns, columnId]);
     }
     setShowAddColumn(false);
   };
 
   const handleRemoveColumn = (columnId: string) => {
-    const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
-    setVisibleColumns(newVisibleColumns);
-    setPreference('projectsVisibleColumns', newVisibleColumns);
+    const newVisibleColumns = draftVisibleColumns.filter(id => id !== columnId);
+    setDraftVisibleColumns(newVisibleColumns);
   };
 
   const handleResetColumns = () => {
     const defaultColumns = AVAILABLE_COLUMNS
       .filter(col => col.defaultVisible)
       .map(col => col.id);
-    setVisibleColumns(defaultColumns);
-    setPreference('projectsVisibleColumns', defaultColumns);
+    setDraftVisibleColumns(defaultColumns);
+  };
+
+  const handleSaveColumns = () => {
+    setVisibleColumns(draftVisibleColumns);
+    setPreference('projectsVisibleColumns', draftVisibleColumns);
+    setShowFilterSettings(false);
+  };
+
+  const handleCancelColumns = () => {
+    setDraftVisibleColumns(visibleColumns);
+    setShowFilterSettings(false);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
@@ -773,7 +777,7 @@ export default function ProjectsPage() {
               Project List Report
             </button>
             <button
-              onClick={() => setShowFilterSettings(true)}
+              onClick={openColumnSettings}
               className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <Settings className="w-5 h-5 mr-2" />
@@ -1115,12 +1119,12 @@ export default function ProjectsPage() {
 
       {/* Column Filter Settings Dialog */}
       {showFilterSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={() => setShowFilterSettings(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={handleCancelColumns}>
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-gray-200 px-6 py-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">Configure Columns</h2>
-                <button onClick={() => setShowFilterSettings(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <button onClick={handleCancelColumns} className="text-gray-400 hover:text-gray-600 transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1129,7 +1133,7 @@ export default function ProjectsPage() {
             
             <div className="px-6 py-4 max-h-96 overflow-y-auto">
               <div className="space-y-2">
-                {visibleColumns.map((columnId, index) => {
+                {draftVisibleColumns.map((columnId, index) => {
                   const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                   if (!column) return null;
                   return (
@@ -1164,8 +1168,8 @@ export default function ProjectsPage() {
             </div>
             
             <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
-              <button onClick={() => setShowFilterSettings(false)} className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={() => setShowFilterSettings(false)} className="px-6 py-2 text-sm bg-brand-navy text-white rounded hover:bg-brand-navy-dark transition-colors">Save</button>
+              <button onClick={handleCancelColumns} className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleSaveColumns} className="px-6 py-2 text-sm bg-brand-navy text-white rounded hover:bg-brand-navy-dark transition-colors">Save</button>
             </div>
           </div>
         </div>
@@ -1188,12 +1192,12 @@ export default function ProjectsPage() {
               />
               <div className="max-h-80 overflow-y-auto">
                 <div className="space-y-2">
-                  {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).map((column) => (
+                  {AVAILABLE_COLUMNS.filter(col => !draftVisibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).map((column) => (
                     <button key={column.id} onClick={() => { handleAddColumn(column.id); setColumnSearchTerm(''); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left">
                       <span className="text-sm font-medium text-gray-900">{column.label}</span>
                     </button>
                   ))}
-                  {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).length === 0 && (
+                  {AVAILABLE_COLUMNS.filter(col => !draftVisibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).length === 0 && (
                     <p className="text-gray-500 text-sm py-8 text-center">{columnSearchTerm ? 'No fields match your search.' : 'All available columns are already visible.'}</p>
                   )}
                 </div>
