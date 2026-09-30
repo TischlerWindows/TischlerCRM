@@ -34,4 +34,20 @@ describe('list view evaluation', () => {
     expect(applyListView(records, blankOwners)).toEqual([records[0]]);
     expect(applyListView(records, null)).toBe(records);
   });
+
+  it('orders Recently Viewed records by the current user timestamp', () => {
+    const recentlyViewed: ListViewDefinition = {
+      id: 'recently-viewed',
+      name: 'Recently Viewed',
+      filters: [],
+      sortField: null,
+      sortDirection: 'desc',
+    };
+    const records = [{ id: 'older' }, { id: 'newer' }, { id: 'never-opened' }];
+
+    expect(applyListView(records, recentlyViewed, { older: 10, newer: 30 })).toEqual([
+      records[1],
+      records[0],
+    ]);
+  });
 });

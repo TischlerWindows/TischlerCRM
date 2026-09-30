@@ -367,6 +367,7 @@ export default function ContactsPage() {
   const listViews = useListViews({ objectApiName: 'Contact', onViewChange: handleListViewChange });
 
   const handleSort = (columnId: string) => {
+    if (listViews.activeView.id === 'recently-viewed') return;
     const direction = listViews.sortFromColumn(columnId);
     setSortColumn(columnId);
     setSortDirection(direction);
@@ -457,7 +458,7 @@ export default function ContactsPage() {
     });
   }, [contacts, searchTerm, sidebarFilter, filterConditions, sortColumn, sortDirection]);
 
-  const filteredContacts = applyListView(baseFilteredContacts, activeListView);
+  const filteredContacts = applyListView(baseFilteredContacts, activeListView, listViews.recentlyViewedAt);
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     const existingNumbers = contacts.map(c => c.contactNumber).filter(num => num?.startsWith('C')).map(num => parseInt(num.replace(/^C-?/, ''), 10)).filter(num => !isNaN(num));

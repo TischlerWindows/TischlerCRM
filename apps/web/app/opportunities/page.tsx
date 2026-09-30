@@ -333,6 +333,7 @@ export default function OpportunitiesPage() {
   const listViews = useListViews({ objectApiName: 'Opportunity', onViewChange: handleListViewChange });
 
   const handleSort = (columnId: string) => {
+    if (listViews.activeView.id === 'recently-viewed') return;
     const direction = listViews.sortFromColumn(columnId);
     setSortColumn(columnId);
     setSortDirection(direction);
@@ -407,7 +408,7 @@ export default function OpportunitiesPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const filteredOpportunities = applyListView(baseFilteredOpportunities, activeListView);
+  const filteredOpportunities = applyListView(baseFilteredOpportunities, activeListView, listViews.recentlyViewedAt);
 
   const toggleColumnVisibility = (columnId: string) => {
     const newVisibleColumns = visibleColumns.includes(columnId)

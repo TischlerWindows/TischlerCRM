@@ -271,6 +271,7 @@ export default function QuotesPage() {
   const listViews = useListViews({ objectApiName: 'Quote', onViewChange: handleListViewChange });
 
   const handleSort = (columnId: string) => {
+    if (listViews.activeView.id === 'recently-viewed') return;
     const direction = listViews.sortFromColumn(columnId);
     setSortColumn(columnId);
     setSortDirection(direction);
@@ -341,7 +342,7 @@ export default function QuotesPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const filteredQuotes = applyListView(baseFilteredQuotes, activeListView);
+  const filteredQuotes = applyListView(baseFilteredQuotes, activeListView, listViews.recentlyViewedAt);
 
   const handleColumnDragStart = (index: number) => {
     setDraggedColumnIndex(index);

@@ -360,6 +360,7 @@ export default function ProjectsPage() {
   };
 
   const handleSort = (columnId: string) => {
+    if (listViews.activeView.id === 'recently-viewed') return;
     const direction = listViews.sortFromColumn(columnId);
     setSortColumn(columnId);
     setSortDirection(direction);
@@ -430,7 +431,7 @@ export default function ProjectsPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const filteredProjects = applyListView(baseFilteredProjects, activeListView);
+  const filteredProjects = applyListView(baseFilteredProjects, activeListView, listViews.recentlyViewedAt);
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     try {

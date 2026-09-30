@@ -297,6 +297,7 @@ export default function PropertiesPage() {
   const listViews = useListViews({ objectApiName: 'Property', onViewChange: handleListViewChange });
 
   const handleSort = (columnId: string) => {
+    if (listViews.activeView.id === 'recently-viewed') return;
     const direction = listViews.sortFromColumn(columnId);
     setSortColumn(columnId);
     setSortDirection(direction);
@@ -370,7 +371,7 @@ export default function PropertiesPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const filteredProperties = applyListView(baseFilteredProperties, activeListView);
+  const filteredProperties = applyListView(baseFilteredProperties, activeListView, listViews.recentlyViewedAt);
 
   const toggleColumnVisibility = (columnId: string) => {
     const newVisibleColumns = visibleColumns.includes(columnId)

@@ -272,6 +272,7 @@ export default function InstallationsPage() {
   const listViews = useListViews({ objectApiName: 'Installation', onViewChange: handleListViewChange });
 
   const handleSort = (columnId: string) => {
+    if (listViews.activeView.id === 'recently-viewed') return;
     const direction = listViews.sortFromColumn(columnId);
     setSortColumn(columnId);
     setSortDirection(direction);
@@ -342,7 +343,7 @@ export default function InstallationsPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const filteredInstallations = applyListView(baseFilteredInstallations, activeListView);
+  const filteredInstallations = applyListView(baseFilteredInstallations, activeListView, listViews.recentlyViewedAt);
 
   const handleColumnDragStart = (index: number) => {
     setDraggedColumnIndex(index);

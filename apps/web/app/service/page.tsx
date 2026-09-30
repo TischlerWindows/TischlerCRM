@@ -244,6 +244,7 @@ export default function ServicePage() {
   const listViews = useListViews({ objectApiName: 'Service', onViewChange: handleListViewChange });
 
   const handleSort = (columnId: string) => {
+    if (listViews.activeView.id === 'recently-viewed') return;
     const direction = listViews.sortFromColumn(columnId);
     setSortColumn(columnId);
     setSortDirection(direction);
@@ -310,7 +311,7 @@ export default function ServicePage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const filteredServices = applyListView(baseFilteredServices, activeListView);
+  const filteredServices = applyListView(baseFilteredServices, activeListView, listViews.recentlyViewedAt);
 
   const handleColumnDragStart = (index: number) => {
     setDraggedColumnIndex(index);

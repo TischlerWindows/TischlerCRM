@@ -5,7 +5,7 @@ import { Search, Package, ChevronDown, ChevronRight } from 'lucide-react';
 import { getSetting } from '@/lib/preferences';
 import { getOptionsForType } from '@/lib/product-type-options';
 import { usePermissions } from '@/lib/permissions-context';
-import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
+import { applyListView, ListViewManager, markRecordRecentlyViewed, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 
 interface ProductLogDetail {
   summaryId: string;
@@ -229,7 +229,7 @@ export default function ProductsPage() {
     return result;
   }, [groups, filters, categoryFilter]);
 
-  const filtered = applyListView(baseFiltered, activeListView);
+  const filtered = applyListView(baseFiltered, activeListView, listViews.recentlyViewedAt);
 
   const totals = useMemo(() => ({
     qty: filtered.reduce((s, g) => s + g.totalQty, 0),
@@ -239,6 +239,10 @@ export default function ProductsPage() {
   }), [filtered]);
 
   const toggleExpand = (key: string) => {
+    if (!expandedKeys.has(key)) {
+      const [category, productType] = key.split('|||');
+      void markRecordRecentlyViewed('Product', `${category}::${productType}`);
+    }
     setExpandedKeys(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);

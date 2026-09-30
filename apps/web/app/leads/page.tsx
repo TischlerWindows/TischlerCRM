@@ -257,6 +257,7 @@ export default function LeadsPage() {
   const listViews = useListViews({ objectApiName: 'Lead', onViewChange: handleListViewChange });
 
   const handleSort = (columnId: string) => {
+    if (listViews.activeView.id === 'recently-viewed') return;
     const direction = listViews.sortFromColumn(columnId);
     setSortColumn(columnId);
     setSortDirection(direction);
@@ -330,7 +331,7 @@ export default function LeadsPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const filteredLeads = applyListView(baseFilteredLeads, activeListView);
+  const filteredLeads = applyListView(baseFilteredLeads, activeListView, listViews.recentlyViewedAt);
 
   const toggleColumnVisibility = (columnId: string) => {
     const newVisibleColumns = visibleColumns.includes(columnId)

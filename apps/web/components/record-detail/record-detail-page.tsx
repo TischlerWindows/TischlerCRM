@@ -26,6 +26,7 @@ import { InlineEditProvider, InlineEditToolbar, InlineEditBottomSpacer } from '.
 import { RecordActions } from './record-actions';
 import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { useEnabledWidgetIds } from '@/lib/use-widget-settings';
+import { markRecordRecentlyViewed } from '@/components/list-view-manager';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -210,6 +211,9 @@ export default function RecordDetailPage({
         const raw = await recordsService.getRecord(objectApiName, params?.id as string);
         if (raw) {
           setRawRecord(raw);
+          if (authUser?.id) {
+            void markRecordRecentlyViewed(objectApiName, String(raw.id ?? params.id));
+          }
           const flat = recordsService.flattenRecord(raw);
           console.log(`[RecordDetail] raw.data keys:`, Object.keys((raw as any).data ?? {}));
           console.log(`[RecordDetail] raw.data:`, (raw as any).data);
@@ -228,7 +232,7 @@ export default function RecordDetailPage({
     };
     if (params?.id) load();
     else setLoading(false);
-  }, [params?.id, objectApiName]);
+  }, [params?.id, objectApiName, authUser?.id]);
 
   // ── Resolve layout ───────────────────────────────────────────────────
   const [pageLayout, layoutError] = useMemo((): [PageLayout | null, string | null] => {

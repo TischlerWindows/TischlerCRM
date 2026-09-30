@@ -227,6 +227,7 @@ export default function WorkOrdersPage() {
   const listViews = useListViews({ objectApiName: 'WorkOrder', onViewChange: handleListViewChange });
 
   const handleSort = (columnId: string) => {
+    if (listViews.activeView.id === 'recently-viewed') return;
     const direction = listViews.sortFromColumn(columnId);
     setSortColumn(columnId);
     setSortDirection(direction);
@@ -285,7 +286,7 @@ export default function WorkOrdersPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const filteredWorkOrders = applyListView(baseFilteredWorkOrders, activeListView);
+  const filteredWorkOrders = applyListView(baseFilteredWorkOrders, activeListView, listViews.recentlyViewedAt);
 
   const handleColumnDragStart = (index: number) => { setDraggedColumnIndex(index); };
 

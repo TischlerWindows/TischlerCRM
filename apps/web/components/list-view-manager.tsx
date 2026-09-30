@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Save, Trash2, X } from 'lucide-react';
 import { getPreference, setPreference } from '@/lib/preferences';
+import { useAuth } from '@/lib/auth-context';
 
 export type ListViewOperator =
   | 'contains'
@@ -34,6 +35,7 @@ export interface ListViewDefinition {
 }
 
 interface StoredListViews {
+  version?: number;
   views: ListViewDefinition[];
   selectedViewId: string;
 }
@@ -51,23 +53,61 @@ const ALL_RECORDS_VIEW: ListViewDefinition = {
   sortDirection: 'asc',
 };
 
+const RECENTLY_VIEWED_VIEW: ListViewDefinition = {
+  id: 'recently-viewed',
+  name: 'Recently Viewed',
+  filters: [],
+  sortField: null,
+  sortDirection: 'desc',
+};
+
+const RECENTLY_VIEWED_LIMIT = 500;
+
 function preferenceKey(objectApiName: string): string {
   return `listViews_${objectApiName.toLowerCase()}`;
 }
 
+function recentlyViewedPreferenceKey(objectApiName: string): string {
+  return `recentlyViewed_${objectApiName.toLowerCase()}`;
+}
+
+export async function markRecordRecentlyViewed(objectApiName: string, recordId: string): Promise<void> {
+  if (!recordId) return;
+  const key = recentlyViewedPreferenceKey(objectApiName);
+  const recentRecords = await getPreference<Record<string, number>>(key, {});
+  const updated = { ...recentRecords, [recordId]: Date.now() };
+  const bounded = Object.fromEntries(
+    Object.entries(updated)
+      .sort(([, left], [, right]) => right - left)
+      .slice(0, RECENTLY_VIEWED_LIMIT),
+  );
+  await setPreference(key, bounded);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('crm:recent-record-viewed', {
+      detail: { objectApiName: objectApiName.toLowerCase(), recordId, viewedAt: updated[recordId] },
+    }));
+  }
+}
+
 export function useListViews({ objectApiName, onViewChange }: UseListViewsOptions) {
-  const [views, setViews] = useState<ListViewDefinition[]>([ALL_RECORDS_VIEW]);
-  const [selectedViewId, setSelectedViewId] = useState(ALL_RECORDS_VIEW.id);
+  const { user } = useAuth();
+  const [views, setViews] = useState<ListViewDefinition[]>([RECENTLY_VIEWED_VIEW, ALL_RECORDS_VIEW]);
+  const [selectedViewId, setSelectedViewId] = useState(RECENTLY_VIEWED_VIEW.id);
+  const [recentlyViewedAt, setRecentlyViewedAt] = useState<Record<string, number>>({});
   const [loaded, setLoaded] = useState(false);
   const activeView = views.find(view => view.id === selectedViewId) ?? ALL_RECORDS_VIEW;
   const key = preferenceKey(objectApiName);
+  const userId = user?.id ?? null;
 
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
-    setViews([ALL_RECORDS_VIEW]);
-    setSelectedViewId(ALL_RECORDS_VIEW.id);
-    getPreference<StoredListViews>(key).then(saved => {
+    setViews([RECENTLY_VIEWED_VIEW, ALL_RECORDS_VIEW]);
+    setSelectedViewId(RECENTLY_VIEWED_VIEW.id);
+    Promise.all([
+      getPreference<StoredListViews>(key),
+      getPreference<Record<string, number>>(recentlyViewedPreferenceKey(objectApiName), {}),
+    ]).then(([saved, recentRecords]) => {
       if (cancelled) return;
       const storedViews = Array.isArray(saved?.views)
         ? saved.views.filter(view => view && typeof view.id === 'string' && typeof view.name === 'string')
@@ -82,18 +122,36 @@ export function useListViews({ objectApiName, onViewChange }: UseListViewsOption
           }
         : ALL_RECORDS_VIEW;
       const nextViews = [
+        RECENTLY_VIEWED_VIEW,
         allRecordsView,
-        ...storedViews.filter(view => view.id !== ALL_RECORDS_VIEW.id),
+        ...storedViews.filter(view => view.id !== ALL_RECORDS_VIEW.id && view.id !== RECENTLY_VIEWED_VIEW.id),
       ];
-      const nextSelectedId = nextViews.some(view => view.id === saved?.selectedViewId)
-        ? saved!.selectedViewId
-        : ALL_RECORDS_VIEW.id;
+      const previousSelection = saved?.version === 2
+        ? saved.selectedViewId
+        : saved?.selectedViewId === ALL_RECORDS_VIEW.id
+          ? RECENTLY_VIEWED_VIEW.id
+          : saved?.selectedViewId;
+      const nextSelectedId = nextViews.some(view => view.id === previousSelection)
+        ? previousSelection!
+        : RECENTLY_VIEWED_VIEW.id;
       setViews(nextViews);
       setSelectedViewId(nextSelectedId);
+      setRecentlyViewedAt(recentRecords ?? {});
       setLoaded(true);
     });
     return () => { cancelled = true; };
-  }, [key]);
+  }, [key, objectApiName, userId]);
+
+  useEffect(() => {
+    const handleRecentlyViewed = (event: Event) => {
+      const detail = (event as CustomEvent<{ objectApiName: string; recordId: string; viewedAt: number }>).detail;
+      if (detail?.objectApiName === objectApiName.toLowerCase()) {
+        setRecentlyViewedAt(current => ({ ...current, [detail.recordId]: detail.viewedAt }));
+      }
+    };
+    window.addEventListener('crm:recent-record-viewed', handleRecentlyViewed);
+    return () => window.removeEventListener('crm:recent-record-viewed', handleRecentlyViewed);
+  }, [objectApiName]);
 
   useEffect(() => {
     if (loaded) onViewChange?.(activeView);
@@ -102,7 +160,7 @@ export function useListViews({ objectApiName, onViewChange }: UseListViewsOption
   const persist = (nextViews: ListViewDefinition[], nextSelectedId: string) => {
     setViews(nextViews);
     setSelectedViewId(nextSelectedId);
-    setPreference(key, { views: nextViews, selectedViewId: nextSelectedId });
+    setPreference(key, { version: 2, views: nextViews, selectedViewId: nextSelectedId });
   };
 
   const selectView = (id: string) => {
@@ -111,6 +169,7 @@ export function useListViews({ objectApiName, onViewChange }: UseListViewsOption
   };
 
   const saveView = (view: ListViewDefinition) => {
+    if (view.id === RECENTLY_VIEWED_VIEW.id) return;
     const existingIndex = views.findIndex(item => item.id === view.id);
     const nextViews = [...views];
     if (existingIndex >= 0) nextViews[existingIndex] = view;
@@ -119,12 +178,13 @@ export function useListViews({ objectApiName, onViewChange }: UseListViewsOption
   };
 
   const deleteView = (id: string) => {
-    if (id === ALL_RECORDS_VIEW.id) return;
+    if (id === ALL_RECORDS_VIEW.id || id === RECENTLY_VIEWED_VIEW.id) return;
     const nextViews = views.filter(view => view.id !== id);
     persist(nextViews, ALL_RECORDS_VIEW.id);
   };
 
   const sortFromColumn = (field: string): 'asc' | 'desc' => {
+    if (activeView.id === RECENTLY_VIEWED_VIEW.id) return 'desc';
     const direction = activeView.sortField === field && activeView.sortDirection === 'asc'
       ? 'desc'
       : 'asc';
@@ -132,7 +192,7 @@ export function useListViews({ objectApiName, onViewChange }: UseListViewsOption
     return direction;
   };
 
-  return { views, activeView, loaded, selectView, saveView, deleteView, sortFromColumn };
+  return { views, activeView, loaded, recentlyViewedAt, selectView, saveView, deleteView, sortFromColumn };
 }
 
 function comparableValue(value: unknown): string {
@@ -175,8 +235,22 @@ function matchesCondition(record: Record<string, unknown>, condition: ListViewCo
 export function applyListView<T extends object>(
   records: T[],
   view: ListViewDefinition | null,
+  recentlyViewedAt: Record<string, number> = {},
 ): T[] {
   if (!view) return records;
+  if (view.id === RECENTLY_VIEWED_VIEW.id) {
+    const recordKey = (record: T): string => {
+      const value = record as Record<string, unknown>;
+      if (typeof value.id === 'string') return value.id;
+      if (typeof value.category === 'string' && typeof value.productType === 'string') {
+        return `${value.category}::${value.productType}`;
+      }
+      return '';
+    };
+    return records
+      .filter(record => recentlyViewedAt[recordKey(record)] !== undefined)
+      .sort((left, right) => recentlyViewedAt[recordKey(right)] - recentlyViewedAt[recordKey(left)]);
+  }
   const filtered = records.filter(record => view.filters.every(condition =>
     matchesCondition(record as Record<string, unknown>, condition),
   ));
@@ -278,9 +352,9 @@ export function ListViewManager({
             <button type="button" onClick={openNew} className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
               <Plus className="h-4 w-4" /> New List View
             </button>
-            <button type="button" onClick={() => openEdit('filter')} className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Filter</button>
-            <button type="button" onClick={() => openEdit('sort')} className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Column Sort</button>
-            {activeView.id !== ALL_RECORDS_VIEW.id && (
+            {activeView.id !== RECENTLY_VIEWED_VIEW.id && <button type="button" onClick={() => openEdit('filter')} className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Filter</button>}
+            {activeView.id !== RECENTLY_VIEWED_VIEW.id && <button type="button" onClick={() => openEdit('sort')} className="rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Column Sort</button>}
+            {activeView.id !== ALL_RECORDS_VIEW.id && activeView.id !== RECENTLY_VIEWED_VIEW.id && (
               <button type="button" onClick={() => onDelete(activeView.id)} className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50">
                 <Trash2 className="h-4 w-4" /> Delete View
               </button>

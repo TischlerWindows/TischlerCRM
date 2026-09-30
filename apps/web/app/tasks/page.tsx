@@ -235,6 +235,7 @@ export default function TasksPage() {
   const listViews = useListViews({ objectApiName: 'Task', onViewChange: handleListViewChange });
 
   const handleSort = (columnId: string) => {
+    if (listViews.activeView.id === 'recently-viewed') return;
     const direction = listViews.sortFromColumn(columnId);
     setSortColumn(columnId);
     setSortDirection(direction);
@@ -325,7 +326,7 @@ export default function TasksPage() {
     });
   }, [tasks, searchTerm, sidebarFilter, filterConditions, sortColumn, sortDirection]);
 
-  const filteredTasks = applyListView(baseFilteredTasks, activeListView);
+  const filteredTasks = applyListView(baseFilteredTasks, activeListView, listViews.recentlyViewedAt);
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     const normalizedData: Record<string, any> = {};
