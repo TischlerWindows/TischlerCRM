@@ -291,8 +291,10 @@ export default function ProductsPage() {
         ]}
         views={listViews.views}
         activeView={listViews.activeView}
+        pinnedViewId={listViews.pinnedViewId}
         canManage={hasAppPermission('manageListViews')}
         onSelect={listViews.selectView}
+        onPin={listViews.pinView}
         onSave={listViews.saveView}
         onDelete={listViews.deleteView}
       />

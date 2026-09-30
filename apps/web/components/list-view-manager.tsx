@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Save, Trash2, X } from 'lucide-react';
+import { Pin, Plus, Save, Trash2, X } from 'lucide-react';
 import { getPreference, setPreference } from '@/lib/preferences';
 import { useAuth } from '@/lib/auth-context';
 
@@ -37,7 +37,7 @@ export interface ListViewDefinition {
 interface StoredListViews {
   version?: number;
   views: ListViewDefinition[];
-  selectedViewId: string;
+  pinnedViewId?: string | null;
 }
 
 interface UseListViewsOptions {
@@ -62,6 +62,12 @@ const RECENTLY_VIEWED_VIEW: ListViewDefinition = {
 };
 
 const RECENTLY_VIEWED_LIMIT = 500;
+
+export function getDefaultListViewId(views: ListViewDefinition[], pinnedViewId?: string | null): string {
+  return pinnedViewId && views.some(view => view.id === pinnedViewId)
+    ? pinnedViewId
+    : ALL_RECORDS_VIEW.id;
+}
 
 function preferenceKey(objectApiName: string): string {
   return `listViews_${objectApiName.toLowerCase()}`;
@@ -91,8 +97,9 @@ export async function markRecordRecentlyViewed(objectApiName: string, recordId: 
 
 export function useListViews({ objectApiName, onViewChange }: UseListViewsOptions) {
   const { user } = useAuth();
-  const [views, setViews] = useState<ListViewDefinition[]>([RECENTLY_VIEWED_VIEW, ALL_RECORDS_VIEW]);
-  const [selectedViewId, setSelectedViewId] = useState(RECENTLY_VIEWED_VIEW.id);
+  const [views, setViews] = useState<ListViewDefinition[]>([ALL_RECORDS_VIEW, RECENTLY_VIEWED_VIEW]);
+  const [selectedViewId, setSelectedViewId] = useState(ALL_RECORDS_VIEW.id);
+  const [pinnedViewId, setPinnedViewId] = useState<string | null>(null);
   const [recentlyViewedAt, setRecentlyViewedAt] = useState<Record<string, number>>({});
   const [loaded, setLoaded] = useState(false);
   const activeView = views.find(view => view.id === selectedViewId) ?? ALL_RECORDS_VIEW;
@@ -102,8 +109,8 @@ export function useListViews({ objectApiName, onViewChange }: UseListViewsOption
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
-    setViews([RECENTLY_VIEWED_VIEW, ALL_RECORDS_VIEW]);
-    setSelectedViewId(RECENTLY_VIEWED_VIEW.id);
+    setViews([ALL_RECORDS_VIEW, RECENTLY_VIEWED_VIEW]);
+    setSelectedViewId(ALL_RECORDS_VIEW.id);
     Promise.all([
       getPreference<StoredListViews>(key),
       getPreference<Record<string, number>>(recentlyViewedPreferenceKey(objectApiName), {}),
@@ -122,20 +129,16 @@ export function useListViews({ objectApiName, onViewChange }: UseListViewsOption
           }
         : ALL_RECORDS_VIEW;
       const nextViews = [
-        RECENTLY_VIEWED_VIEW,
         allRecordsView,
+        RECENTLY_VIEWED_VIEW,
         ...storedViews.filter(view => view.id !== ALL_RECORDS_VIEW.id && view.id !== RECENTLY_VIEWED_VIEW.id),
       ];
-      const previousSelection = saved?.version === 2
-        ? saved.selectedViewId
-        : saved?.selectedViewId === ALL_RECORDS_VIEW.id
-          ? RECENTLY_VIEWED_VIEW.id
-          : saved?.selectedViewId;
-      const nextSelectedId = nextViews.some(view => view.id === previousSelection)
-        ? previousSelection!
-        : RECENTLY_VIEWED_VIEW.id;
+      const nextPinnedId = nextViews.some(view => view.id === saved?.pinnedViewId)
+        ? saved!.pinnedViewId!
+        : null;
       setViews(nextViews);
-      setSelectedViewId(nextSelectedId);
+      setPinnedViewId(nextPinnedId);
+      setSelectedViewId(getDefaultListViewId(nextViews, nextPinnedId));
       setRecentlyViewedAt(recentRecords ?? {});
       setLoaded(true);
     });
@@ -157,15 +160,22 @@ export function useListViews({ objectApiName, onViewChange }: UseListViewsOption
     if (loaded) onViewChange?.(activeView);
   }, [activeView, loaded, onViewChange]);
 
-  const persist = (nextViews: ListViewDefinition[], nextSelectedId: string) => {
+  const persist = (nextViews: ListViewDefinition[], nextPinnedViewId = pinnedViewId) => {
     setViews(nextViews);
-    setSelectedViewId(nextSelectedId);
-    setPreference(key, { version: 2, views: nextViews, selectedViewId: nextSelectedId });
+    setPreference(key, { version: 3, views: nextViews, pinnedViewId: nextPinnedViewId });
   };
 
   const selectView = (id: string) => {
     if (!views.some(view => view.id === id)) return;
-    persist(views, id);
+    setSelectedViewId(id);
+  };
+
+  const pinView = (id: string) => {
+    if (!views.some(view => view.id === id)) return;
+    const nextPinnedId = pinnedViewId === id ? null : id;
+    setPinnedViewId(nextPinnedId);
+    setSelectedViewId(getDefaultListViewId(views, nextPinnedId));
+    setPreference(key, { version: 3, views, pinnedViewId: nextPinnedId });
   };
 
   const saveView = (view: ListViewDefinition) => {
@@ -174,13 +184,17 @@ export function useListViews({ objectApiName, onViewChange }: UseListViewsOption
     const nextViews = [...views];
     if (existingIndex >= 0) nextViews[existingIndex] = view;
     else nextViews.push(view);
-    persist(nextViews, view.id);
+    persist(nextViews);
+    setSelectedViewId(view.id);
   };
 
   const deleteView = (id: string) => {
     if (id === ALL_RECORDS_VIEW.id || id === RECENTLY_VIEWED_VIEW.id) return;
     const nextViews = views.filter(view => view.id !== id);
-    persist(nextViews, ALL_RECORDS_VIEW.id);
+    const nextPinnedId = pinnedViewId === id ? null : pinnedViewId;
+    setPinnedViewId(nextPinnedId);
+    persist(nextViews, nextPinnedId);
+    setSelectedViewId(getDefaultListViewId(nextViews, nextPinnedId));
   };
 
   const sortFromColumn = (field: string): 'asc' | 'desc' => {
@@ -192,7 +206,7 @@ export function useListViews({ objectApiName, onViewChange }: UseListViewsOption
     return direction;
   };
 
-  return { views, activeView, loaded, recentlyViewedAt, selectView, saveView, deleteView, sortFromColumn };
+  return { views, activeView, loaded, pinnedViewId, recentlyViewedAt, selectView, pinView, saveView, deleteView, sortFromColumn };
 }
 
 function comparableValue(value: unknown): string {
@@ -267,8 +281,10 @@ interface ListViewManagerProps {
   fields: ListViewField[];
   views: ListViewDefinition[];
   activeView: ListViewDefinition;
+  pinnedViewId: string | null;
   canManage: boolean;
   onSelect: (id: string) => void;
+  onPin: (id: string) => void;
   onSave: (view: ListViewDefinition) => void;
   onDelete: (id: string) => void;
 }
@@ -290,8 +306,10 @@ export function ListViewManager({
   fields,
   views,
   activeView,
+  pinnedViewId,
   canManage,
   onSelect,
+  onPin,
   onSave,
   onDelete,
 }: ListViewManagerProps) {
@@ -346,6 +364,15 @@ export function ListViewManager({
           >
             {views.map(view => <option key={view.id} value={view.id}>{view.name}</option>)}
           </select>
+          <button
+            type="button"
+            onClick={() => onPin(activeView.id)}
+            aria-label={pinnedViewId === activeView.id ? 'Unpin default list view' : 'Pin as default list view'}
+            title={pinnedViewId === activeView.id ? 'Unpin default list view' : 'Pin as default list view'}
+            className={`rounded border p-2 transition-colors ${pinnedViewId === activeView.id ? 'border-brand-navy bg-brand-navy text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+          >
+            <Pin className="h-4 w-4" />
+          </button>
         </div>
         {canManage && (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">

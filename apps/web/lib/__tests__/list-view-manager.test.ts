@@ -1,4 +1,4 @@
-import { applyListView, type ListViewDefinition } from '../../components/list-view-manager';
+import { applyListView, getDefaultListViewId, type ListViewDefinition } from '../../components/list-view-manager';
 
 const view: ListViewDefinition = {
   id: 'active-projects',
@@ -12,6 +12,17 @@ const view: ListViewDefinition = {
 };
 
 describe('list view evaluation', () => {
+  it('defaults to All Records unless a valid view is pinned', () => {
+    const views = [
+      { ...view, id: 'all-records', name: 'All Records' },
+      { ...view, id: 'recently-viewed', name: 'Recently Viewed' },
+    ];
+
+    expect(getDefaultListViewId(views)).toBe('all-records');
+    expect(getDefaultListViewId(views, 'recently-viewed')).toBe('recently-viewed');
+    expect(getDefaultListViewId(views, 'deleted-view')).toBe('all-records');
+  });
+
   it('applies all saved filters and sorts matching records', () => {
     const records = [
       { projectName: 'Road North', status: 'Planning', budget: 10 },

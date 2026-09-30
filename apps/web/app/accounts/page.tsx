@@ -732,8 +732,10 @@ export default function AccountsPage() {
           fields={AVAILABLE_COLUMNS_DYNAMIC.map(column => ({ id: column.id, label: column.label }))}
           views={listViews.views}
           activeView={listViews.activeView}
+          pinnedViewId={listViews.pinnedViewId}
           canManage={hasAppPermission('manageListViews')}
           onSelect={listViews.selectView}
+          onPin={listViews.pinView}
           onSave={listViews.saveView}
           onDelete={listViews.deleteView}
         />
