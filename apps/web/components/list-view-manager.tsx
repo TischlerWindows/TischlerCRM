@@ -316,6 +316,9 @@ export function ListViewManager({
   const [editingMode, setEditingMode] = useState<'new' | 'filter' | 'sort' | null>(null);
   const [draft, setDraft] = useState<ListViewDefinition>(activeView);
   const [error, setError] = useState('');
+  const sortedFields = [...fields].sort((left, right) =>
+    left.label.localeCompare(right.label, undefined, { sensitivity: 'base', numeric: true }),
+  );
 
   const openNew = () => {
     setDraft({ id: '', name: '', filters: [], sortField: null, sortDirection: 'asc' });
@@ -413,13 +416,13 @@ export function ListViewManager({
               {(editingMode === 'new' || editingMode === 'filter') && <section>
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-gray-800">Filters</h3>
-                  <button type="button" onClick={() => setDraft(current => ({ ...current, filters: [...current.filters, { field: fields[0]?.id ?? '', operator: 'contains', value: '' }] }))} disabled={fields.length === 0} className="inline-flex items-center gap-1 text-sm font-medium text-brand-navy disabled:opacity-50"><Plus className="h-4 w-4" /> Add Filter</button>
+                  <button type="button" onClick={() => setDraft(current => ({ ...current, filters: [...current.filters, { field: sortedFields[0]?.id ?? '', operator: 'contains', value: '' }] }))} disabled={fields.length === 0} className="inline-flex items-center gap-1 text-sm font-medium text-brand-navy disabled:opacity-50"><Plus className="h-4 w-4" /> Add Filter</button>
                 </div>
                 <div className="space-y-2">
                   {draft.filters.map((filter, index) => (
                     <div key={`${index}-${filter.field}`} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_1fr_auto]">
                       <select aria-label="Filter field" className={inputClass} value={filter.field} onChange={event => updateFilter(index, { field: event.target.value })}>
-                        {fields.map(field => <option key={field.id} value={field.id}>{field.label}</option>)}
+                        {sortedFields.map(field => <option key={field.id} value={field.id}>{field.label}</option>)}
                       </select>
                       <select aria-label="Filter operator" className={inputClass} value={filter.operator} onChange={event => updateFilter(index, { operator: event.target.value as ListViewOperator })}>
                         {OPERATORS.map(operator => <option key={operator.value} value={operator.value}>{operator.label}</option>)}
@@ -438,7 +441,7 @@ export function ListViewManager({
                   Sort by
                   <select className={`${inputClass} mt-1 block w-full`} value={draft.sortField ?? ''} onChange={event => setDraft(current => ({ ...current, sortField: event.target.value || null }))}>
                     <option value="">No list-view sort</option>
-                    {fields.map(field => <option key={field.id} value={field.id}>{field.label}</option>)}
+                    {sortedFields.map(field => <option key={field.id} value={field.id}>{field.label}</option>)}
                   </select>
                 </label>
                 <label className="text-sm font-medium text-gray-700">
