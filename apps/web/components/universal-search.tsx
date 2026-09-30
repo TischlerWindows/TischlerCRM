@@ -19,9 +19,11 @@ const DEDICATED_ROUTES: Record<string, string> = {
   Installation: '/installations',
   Quote: '/quotes',
   Service: '/service',
+  Task: '/tasks',
+  WorkOrder: '/workorders',
 };
 
-function getRecordUrl(objectApiName: string, recordId: string): string {
+export function getRecordUrl(objectApiName: string, recordId: string): string {
   const prefix = DEDICATED_ROUTES[objectApiName];
   if (prefix) return `${prefix}/${recordId}`;
   return `/objects/${objectApiName}/${recordId}`;
@@ -32,7 +34,7 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
   const [results, setResults] = useState<GlobalSearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -87,11 +89,17 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
+        setSelectedIndex(prev => (prev > 0 ? prev - 1 : -1));
         break;
       case 'Enter':
         e.preventDefault();
-        if (results[selectedIndex]) handleSelect(results[selectedIndex]);
+        if (selectedIndex >= 0 && results[selectedIndex]) {
+          handleSelect(results[selectedIndex]);
+        } else if (searchTerm.trim()) {
+          router.push(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
+          setIsOpen(false);
+          inputRef.current?.blur();
+        }
         break;
       case 'Escape':
         setIsOpen(false);
@@ -132,7 +140,7 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
           onChange={(e) => {
             setSearchTerm(e.target.value);
             setIsOpen(true);
-            setSelectedIndex(0);
+            setSelectedIndex(-1);
           }}
           onFocus={() => searchTerm && setIsOpen(true)}
           onKeyDown={handleKeyDown}
@@ -216,6 +224,17 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
                   </div>
                 );
               })}
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
+                  setIsOpen(false);
+                  inputRef.current?.blur();
+                }}
+                className="w-full border-t border-gray-200 px-3 py-2.5 text-left text-sm font-medium text-brand-navy hover:bg-gray-50"
+              >
+                View all results for &quot;{searchTerm.trim()}&quot;
+              </button>
             </div>
           )}
         </div>

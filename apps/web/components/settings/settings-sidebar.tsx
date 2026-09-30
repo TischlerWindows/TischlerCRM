@@ -29,6 +29,7 @@ import {
   Upload,
   ScrollText,
   FileImage,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -91,6 +92,12 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: 'Connected Apps', href: '/settings/integrations', icon: Plug },
       { name: 'Offline', href: '/settings/offline', icon: WifiOff, disabled: true },
+    ],
+  },
+  {
+    title: 'Search',
+    items: [
+      { name: 'Search Page Layouts', href: '/settings/search-layouts', icon: Search },
     ],
   },
   {

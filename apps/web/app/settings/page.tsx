@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Users, Shield, Building2, FileText, Trash2, Lock, Database,
-  Settings2, ArrowRight, Home, Plug, Zap, Bell, Puzzle, AlertTriangle,
+  Settings2, ArrowRight, Home, Plug, Zap, Bell, Puzzle, AlertTriangle, Search,
   LifeBuoy, Pin, PinOff, Upload, type LucideIcon,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
@@ -65,12 +65,13 @@ export default function SettingsPage() {
     { title: 'Notifications', icon: Bell, href: '/settings/notifications', description: 'Org-wide notification preferences', color: '#6366f1', group: 'Automation' },
     { title: 'Widgets', icon: Puzzle, href: '/settings/widgets', description: 'Reusable page widgets', color: '#7c3aed', group: 'Automation' },
     { title: 'Support Tickets', icon: LifeBuoy, href: '/settings/support-tickets', description: 'Manage the category list used on the submit form', color: '#0ea5e9', group: 'Support' },
+    { title: 'Search Page Layouts', icon: Search, href: '/settings/search-layouts', description: 'Choose search result objects and assign layouts to users', color: '#0f766e', group: 'Search' },
     { title: 'Connected Apps', icon: Plug, href: '/settings/integrations', description: 'Google Maps, Dropbox, Outlook, etc.', color: '#4285F4', group: 'Connections' },
     { title: 'Audit Log', icon: FileText, href: '/settings/audit-log', description: 'All system activity', color: '#7c3aed', group: 'Monitoring' },
     { title: 'Error Log', icon: AlertTriangle, href: '/settings/error-log', description: 'Client errors captured across the app', color: '#dc2626', group: 'Monitoring' },
   ];
 
-  const groupOrder = ['Company', 'Users & Access', 'Data Model', 'Automation', 'Support', 'Connections', 'Monitoring'];
+  const groupOrder = ['Company', 'Users & Access', 'Data Model', 'Automation', 'Support', 'Connections', 'Search', 'Monitoring'];
   const cardsByGroup: Record<string, Card[]> = {};
   for (const g of groupOrder) cardsByGroup[g] = [];
   for (const c of cards) cardsByGroup[c.group]!.push(c);

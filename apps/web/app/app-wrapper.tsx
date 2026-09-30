@@ -98,6 +98,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   };
   const filteredTabs = tabs.filter(canShowTab);
   const allowPageScroll = pathname === '/' || 
+    pathname?.startsWith('/search') ||
     pathname?.includes('/[id]') || 
     pathname?.includes('/new') ||
     pathname?.startsWith('/contacts') ||
