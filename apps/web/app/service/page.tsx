@@ -35,6 +35,7 @@ import { LayoutErrorDialog } from '@/components/layout-error-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import PageHeader from '@/components/page-header';
@@ -107,6 +108,7 @@ export default function ServicePage() {
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -234,16 +236,20 @@ export default function ServicePage() {
     })();
   }, [fetchServices]);
 
+  const handleListViewChange = useCallback((view: ListViewDefinition) => {
+    setActiveListView(view);
+    setSortColumn(view.sortField);
+    setSortDirection(view.sortDirection);
+  }, []);
+  const listViews = useListViews({ objectApiName: 'Service', onViewChange: handleListViewChange });
+
   const handleSort = (columnId: string) => {
-    if (sortColumn === columnId) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(columnId);
-      setSortDirection('asc');
-    }
+    const direction = listViews.sortFromColumn(columnId);
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
-  const filteredServices = services.filter(service => {
+  const baseFilteredServices = services.filter(service => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || Object.values(service).some(value => {
       if (value === null || value === undefined) return false;
@@ -303,6 +309,8 @@ export default function ServicePage() {
       ? aStr.localeCompare(bStr, undefined, { numeric: true })
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
+
+  const filteredServices = applyListView(baseFilteredServices, activeListView);
 
   const handleColumnDragStart = (index: number) => {
     setDraggedColumnIndex(index);
@@ -674,6 +682,8 @@ export default function ServicePage() {
               )}
           </div>
         </div>
+
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
 
         {/* Search */}
         <div className="mb-6">

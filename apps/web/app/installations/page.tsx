@@ -35,6 +35,7 @@ import { LayoutErrorDialog } from '@/components/layout-error-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import PageHeader from '@/components/page-header';
@@ -85,6 +86,7 @@ export default function InstallationsPage() {
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -262,16 +264,20 @@ export default function InstallationsPage() {
     return String(value);
   };
 
+  const handleListViewChange = useCallback((view: ListViewDefinition) => {
+    setActiveListView(view);
+    setSortColumn(view.sortField);
+    setSortDirection(view.sortDirection);
+  }, []);
+  const listViews = useListViews({ objectApiName: 'Installation', onViewChange: handleListViewChange });
+
   const handleSort = (columnId: string) => {
-    if (sortColumn === columnId) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(columnId);
-      setSortDirection('asc');
-    }
+    const direction = listViews.sortFromColumn(columnId);
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
-  const filteredInstallations = installations.filter(installation => {
+  const baseFilteredInstallations = installations.filter(installation => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || Object.values(installation).some(value => {
       if (value === null || value === undefined) return false;
@@ -335,6 +341,8 @@ export default function InstallationsPage() {
       ? aStr.localeCompare(bStr, undefined, { numeric: true })
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
+
+  const filteredInstallations = applyListView(baseFilteredInstallations, activeListView);
 
   const handleColumnDragStart = (index: number) => {
     setDraggedColumnIndex(index);
@@ -655,6 +663,8 @@ export default function InstallationsPage() {
               )}
           </div>
         </div>
+
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
 
         {/* Search */}
         <div className="mb-6">

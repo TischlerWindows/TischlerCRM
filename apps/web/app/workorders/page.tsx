@@ -35,6 +35,7 @@ import { LayoutErrorDialog } from '@/components/layout-error-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
@@ -104,6 +105,7 @@ export default function WorkOrdersPage() {
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -217,16 +219,20 @@ export default function WorkOrdersPage() {
     })();
   }, [fetchWorkOrders]);
 
+  const handleListViewChange = useCallback((view: ListViewDefinition) => {
+    setActiveListView(view);
+    setSortColumn(view.sortField);
+    setSortDirection(view.sortDirection);
+  }, []);
+  const listViews = useListViews({ objectApiName: 'WorkOrder', onViewChange: handleListViewChange });
+
   const handleSort = (columnId: string) => {
-    if (sortColumn === columnId) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(columnId);
-      setSortDirection('asc');
-    }
+    const direction = listViews.sortFromColumn(columnId);
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
-  const filteredWorkOrders = workOrders.filter(wo => {
+  const baseFilteredWorkOrders = workOrders.filter(wo => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || Object.values(wo).some(value => {
       if (value === null || value === undefined) return false;
@@ -278,6 +284,8 @@ export default function WorkOrdersPage() {
       ? aStr.localeCompare(bStr, undefined, { numeric: true })
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
+
+  const filteredWorkOrders = applyListView(baseFilteredWorkOrders, activeListView);
 
   const handleColumnDragStart = (index: number) => { setDraggedColumnIndex(index); };
 
@@ -598,6 +606,7 @@ export default function WorkOrdersPage() {
           </div>
         </div>
 
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
         <div className="mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />

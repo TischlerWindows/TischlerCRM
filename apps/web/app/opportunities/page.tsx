@@ -35,6 +35,7 @@ import { LayoutErrorDialog } from '@/components/layout-error-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import PageHeader from '@/components/page-header';
@@ -110,6 +111,7 @@ export default function OpportunitiesPage() {
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -323,16 +325,20 @@ export default function OpportunitiesPage() {
     })();
   }, [fetchOpportunities]);
 
+  const handleListViewChange = useCallback((view: ListViewDefinition) => {
+    setActiveListView(view);
+    setSortColumn(view.sortField);
+    setSortDirection(view.sortDirection);
+  }, []);
+  const listViews = useListViews({ objectApiName: 'Opportunity', onViewChange: handleListViewChange });
+
   const handleSort = (columnId: string) => {
-    if (sortColumn === columnId) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(columnId);
-      setSortDirection('asc');
-    }
+    const direction = listViews.sortFromColumn(columnId);
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
-  const filteredOpportunities = opportunities.filter(opp => {
+  const baseFilteredOpportunities = opportunities.filter(opp => {
     // Hide requote records from the main list
     if ((opp as any)._isRequote) return false;
 
@@ -400,6 +406,8 @@ export default function OpportunitiesPage() {
       ? aStr.localeCompare(bStr, undefined, { numeric: true })
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
+
+  const filteredOpportunities = applyListView(baseFilteredOpportunities, activeListView);
 
   const toggleColumnVisibility = (columnId: string) => {
     const newVisibleColumns = visibleColumns.includes(columnId)
@@ -808,6 +816,8 @@ export default function OpportunitiesPage() {
             )}
           </div>
         </div>
+
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
 
         {/* Search */}
         <div className="mb-6">

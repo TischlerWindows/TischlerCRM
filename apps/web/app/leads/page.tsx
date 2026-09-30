@@ -37,6 +37,7 @@ import { useAuth } from '@/lib/auth-context';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import { usePermissions } from '@/lib/permissions-context';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
@@ -103,6 +104,7 @@ export default function LeadsPage() {
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -247,16 +249,20 @@ export default function LeadsPage() {
     })();
   }, [fetchLeads]);
 
+  const handleListViewChange = useCallback((view: ListViewDefinition) => {
+    setActiveListView(view);
+    setSortColumn(view.sortField);
+    setSortDirection(view.sortDirection);
+  }, []);
+  const listViews = useListViews({ objectApiName: 'Lead', onViewChange: handleListViewChange });
+
   const handleSort = (columnId: string) => {
-    if (sortColumn === columnId) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(columnId);
-      setSortDirection('asc');
-    }
+    const direction = listViews.sortFromColumn(columnId);
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
-  const filteredLeads = leads.filter(lead => {
+  const baseFilteredLeads = leads.filter(lead => {
     // Generic search across all visible string fields
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || Object.entries(lead).some(([key, value]) => {
@@ -323,6 +329,8 @@ export default function LeadsPage() {
       ? aStr.localeCompare(bStr, undefined, { numeric: true })
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
+
+  const filteredLeads = applyListView(baseFilteredLeads, activeListView);
 
   const toggleColumnVisibility = (columnId: string) => {
     const newVisibleColumns = visibleColumns.includes(columnId)
@@ -717,6 +725,8 @@ export default function LeadsPage() {
             )}
           </div>
         </div>
+
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
 
         {/* Search */}
         <div className="mb-6">

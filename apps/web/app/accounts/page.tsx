@@ -38,6 +38,7 @@ import { useAuth } from '@/lib/auth-context';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import { usePermissions } from '@/lib/permissions-context';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
@@ -137,6 +138,7 @@ export default function AccountsPage() {
   const [columnSearchTerm, setColumnSearchTerm] = useState('');
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -199,6 +201,13 @@ export default function AccountsPage() {
       };
     });
   }, [accountObject]);
+
+  const handleListViewChange = useCallback((view: ListViewDefinition) => {
+    setActiveListView(view);
+    setSortColumn(view.sortField);
+    setSortDirection(view.sortDirection);
+  }, []);
+  const listViews = useListViews({ objectApiName: 'Account', onViewChange: handleListViewChange });
 
 
 
@@ -269,17 +278,12 @@ export default function AccountsPage() {
   }, [fetchAccounts]);
 
   const handleSort = (columnId: string) => {
-    if (sortColumn === columnId) {
-      // Toggle direction if clicking the same column
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      // Set new column and default to ascending
-      setSortColumn(columnId);
-      setSortDirection('asc');
-    }
+    const direction = listViews.sortFromColumn(columnId);
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
-  const filteredAccounts = accounts.filter(account => {
+  const baseFilteredAccounts = accounts.filter(account => {
     const trimmed = searchTerm.trim();
     const searchLower = trimmed.toLowerCase();
     const matchesSearch = !trimmed || Object.values(account).some(value => {
@@ -346,6 +350,8 @@ export default function AccountsPage() {
       ? aStr.localeCompare(bStr, undefined, { numeric: true })
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
+
+  const filteredAccounts = applyListView(baseFilteredAccounts, activeListView);
 
   const toggleColumnVisibility = (columnId: string) => {
     const newVisibleColumns = visibleColumns.includes(columnId)
@@ -720,6 +726,16 @@ export default function AccountsPage() {
               )}
           </div>
         </div>
+
+        <ListViewManager
+          fields={AVAILABLE_COLUMNS_DYNAMIC.map(column => ({ id: column.id, label: column.label }))}
+          views={listViews.views}
+          activeView={listViews.activeView}
+          canManage={hasAppPermission('manageListViews')}
+          onSelect={listViews.selectView}
+          onSave={listViews.saveView}
+          onDelete={listViews.deleteView}
+        />
 
         {/* Search */}
         <div className="mb-6">

@@ -45,6 +45,7 @@ const APP_PERMS: { key: string; label: string; desc: string }[] = [
   { key: 'importData',            label: 'Import Data',             desc: 'Bulk import records from file' },
   { key: 'viewReports',           label: 'View Reports',            desc: 'View report data and dashboards' },
   { key: 'manageReports',         label: 'Manage Reports',          desc: 'Create, edit, and share reports' },
+  { key: 'manageListViews',       label: 'List View',               desc: 'Create, edit, and delete saved object list views' },
   { key: 'manageDashboards',      label: 'Manage Dashboards',       desc: 'Create and configure dashboards' },
   { key: 'viewSummary',           label: 'View Summary',            desc: 'View pipeline and business summary' },
   { key: 'viewSetup',             label: 'View Setup',              desc: 'Access settings and configuration pages' },

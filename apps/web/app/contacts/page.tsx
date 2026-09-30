@@ -35,6 +35,7 @@ import { LayoutErrorDialog } from '@/components/layout-error-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import PageHeader from '@/components/page-header';
@@ -112,6 +113,7 @@ export default function ContactsPage() {
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -357,13 +359,17 @@ export default function ContactsPage() {
     return String(value);
   };
 
+  const handleListViewChange = useCallback((view: ListViewDefinition) => {
+    setActiveListView(view);
+    setSortColumn(view.sortField);
+    setSortDirection(view.sortDirection);
+  }, []);
+  const listViews = useListViews({ objectApiName: 'Contact', onViewChange: handleListViewChange });
+
   const handleSort = (columnId: string) => {
-    if (sortColumn === columnId) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(columnId);
-      setSortDirection('asc');
-    }
+    const direction = listViews.sortFromColumn(columnId);
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
   const handleApplyFilters = (conditions: FilterCondition[]) => {
@@ -376,7 +382,7 @@ export default function ContactsPage() {
 
 
 
-  const filteredContacts = useMemo(() => {
+  const baseFilteredContacts = useMemo(() => {
     // First apply search filter
     let result = contacts.filter(contact => {
       const trimmed = searchTerm.trim();
@@ -450,6 +456,8 @@ export default function ContactsPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
     });
   }, [contacts, searchTerm, sidebarFilter, filterConditions, sortColumn, sortDirection]);
+
+  const filteredContacts = applyListView(baseFilteredContacts, activeListView);
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     const existingNumbers = contacts.map(c => c.contactNumber).filter(num => num?.startsWith('C')).map(num => parseInt(num.replace(/^C-?/, ''), 10)).filter(num => !isNaN(num));
@@ -706,6 +714,7 @@ export default function ContactsPage() {
             )}
           </div>
         </div>
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
         <div className="mb-6 flex gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />

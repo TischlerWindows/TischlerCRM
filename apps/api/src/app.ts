@@ -481,7 +481,7 @@ export function buildApp() {
     const APP_KEYS = [
       'manageUsers','manageProfiles','manageDepartments','manageIntegrations','manageCompanySettings',
       'exportData','importData',
-      'viewReports','manageReports','manageDashboards',
+      'viewReports','manageReports','manageListViews','manageDashboards',
       'viewSummary','viewSetup','viewAuditLog',
       'customizeApplication','viewAllData','modifyAllData',
       'manageSupportTickets',

@@ -8,7 +8,7 @@ const OBJECTS = ['leads','opportunities','projects','service','quotes','installa
 const APP_KEYS = [
   'manageUsers','viewAllUsers','manageProfiles','viewAllProfiles','manageDepartments','viewAllDepartments','manageIntegrations','manageCompanySettings',
   'exportData','importData',
-  'viewReports','manageReports','manageDashboards',
+  'viewReports','manageReports','manageListViews','manageDashboards',
   'viewSummary','viewSetup','viewAuditLog',
   'customizeApplication','viewAllData','modifyAllData',
 ] as const;

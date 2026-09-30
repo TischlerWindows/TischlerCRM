@@ -33,6 +33,7 @@ import { LayoutErrorDialog } from '@/components/layout-error-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import AdvancedFilters, { FilterCondition } from '@/components/advanced-filters';
 import { applyFilters, describeCondition } from '@/lib/filter-utils';
@@ -75,6 +76,7 @@ export default function TasksPage() {
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
   const [sidebarFilter, setSidebarFilter] = useState<'all' | 'open' | 'my-tasks' | 'overdue' | 'completed'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -225,13 +227,17 @@ export default function TasksPage() {
     return String(value);
   };
 
+  const handleListViewChange = useCallback((view: ListViewDefinition) => {
+    setActiveListView(view);
+    setSortColumn(view.sortField);
+    setSortDirection(view.sortDirection);
+  }, []);
+  const listViews = useListViews({ objectApiName: 'Task', onViewChange: handleListViewChange });
+
   const handleSort = (columnId: string) => {
-    if (sortColumn === columnId) {
-      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(columnId);
-      setSortDirection('asc');
-    }
+    const direction = listViews.sortFromColumn(columnId);
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
   const toggleSelectTask = (id: string) => {
@@ -257,7 +263,7 @@ export default function TasksPage() {
     await fetchTasks();
   };
 
-  const filteredTasks = useMemo(() => {
+  const baseFilteredTasks = useMemo(() => {
     let result = tasks.filter(task => {
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = !searchTerm || Object.values(task).some(value => {
@@ -318,6 +324,8 @@ export default function TasksPage() {
       return sortDirection === 'asc' ? aStr.localeCompare(bStr, undefined, { numeric: true }) : bStr.localeCompare(aStr, undefined, { numeric: true });
     });
   }, [tasks, searchTerm, sidebarFilter, filterConditions, sortColumn, sortDirection]);
+
+  const filteredTasks = applyListView(baseFilteredTasks, activeListView);
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     const normalizedData: Record<string, any> = {};
@@ -537,6 +545,7 @@ export default function TasksPage() {
             </div>
           </div>
 
+          <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
           <div className="mb-6 flex gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />

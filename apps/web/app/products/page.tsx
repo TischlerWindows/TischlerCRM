@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Search, Package, ChevronDown, ChevronRight } from 'lucide-react';
 import { getSetting } from '@/lib/preferences';
 import { getOptionsForType } from '@/lib/product-type-options';
+import { usePermissions } from '@/lib/permissions-context';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 
 interface ProductLogDetail {
   summaryId: string;
@@ -154,12 +156,17 @@ const FILTER_FIELDS: { key: keyof FieldFilters; label: string; detailKey?: keyof
 ];
 
 export default function ProductsPage() {
+  const { hasAppPermission } = usePermissions();
   const [groups, setGroups] = useState<ProductLogGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FieldFilters>(EMPTY_FILTERS);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
+
+  const handleListViewChange = useCallback((view: ListViewDefinition) => setActiveListView(view), []);
+  const listViews = useListViews({ objectApiName: 'Product', onViewChange: handleListViewChange });
 
   const setFilter = (field: keyof FieldFilters, value: string) =>
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -173,7 +180,7 @@ export default function ProductsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = useMemo(() => {
+  const baseFiltered = useMemo(() => {
     const fPT    = filters.productType.trim();
     const fJob   = filters.job.toLowerCase().trim();
     const fGlass = filters.glassType.trim();
@@ -222,6 +229,8 @@ export default function ProductsPage() {
     return result;
   }, [groups, filters, categoryFilter]);
 
+  const filtered = applyListView(baseFiltered, activeListView);
+
   const totals = useMemo(() => ({
     qty: filtered.reduce((s, g) => s + g.totalQty, 0),
     fields: filtered.reduce((s, g) => s + g.totalFields, 0),
@@ -266,6 +275,23 @@ export default function ProductsPage() {
           <p className="text-sm text-gray-500">Products grouped by type across all summary sheets · click a row to expand</p>
         </div>
       </div>
+
+      <ListViewManager
+        fields={[
+          { id: 'productType', label: 'Product Type' },
+          { id: 'category', label: 'Category' },
+          { id: 'totalQty', label: 'Quantity' },
+          { id: 'totalFields', label: 'Fields' },
+          { id: 'totalSqFeet', label: 'Square Feet' },
+          { id: 'totalNetEuro', label: 'Net Euro' },
+        ]}
+        views={listViews.views}
+        activeView={listViews.activeView}
+        canManage={hasAppPermission('manageListViews')}
+        onSelect={listViews.selectView}
+        onSave={listViews.saveView}
+        onDelete={listViews.deleteView}
+      />
 
       {/* Filters */}
       <div className="mb-5 space-y-3">

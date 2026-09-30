@@ -49,6 +49,7 @@ import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 
 interface Project {
   id: string;
@@ -117,6 +118,7 @@ export default function ProjectsPage() {
   const [prefillLookupQueries, setPrefillLookupQueries] = useState<Record<string, string> | undefined>(undefined);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [draftVisibleColumns, setDraftVisibleColumns] = useState<string[]>([]);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -189,6 +191,13 @@ export default function ProjectsPage() {
       };
     });
   }, [projectObject]);
+
+  const handleListViewChange = useCallback((view: ListViewDefinition) => {
+    setActiveListView(view);
+    setSortColumn(view.sortField);
+    setSortDirection(view.sortDirection);
+  }, []);
+  const listViews = useListViews({ objectApiName: 'Project', onViewChange: handleListViewChange });
 
 
 
@@ -351,15 +360,12 @@ export default function ProjectsPage() {
   };
 
   const handleSort = (columnId: string) => {
-    if (sortColumn === columnId) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(columnId);
-      setSortDirection('asc');
-    }
+    const direction = listViews.sortFromColumn(columnId);
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
-  const filteredProjects = projects.filter(project => {
+  const baseFilteredProjects = projects.filter(project => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || Object.values(project).some(value => {
       if (value === null || value === undefined) return false;
@@ -423,6 +429,8 @@ export default function ProjectsPage() {
       ? aStr.localeCompare(bStr, undefined, { numeric: true })
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
+
+  const filteredProjects = applyListView(baseFilteredProjects, activeListView);
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     try {
@@ -819,6 +827,16 @@ export default function ProjectsPage() {
               )}
           </div>
         </div>
+
+        <ListViewManager
+          fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))}
+          views={listViews.views}
+          activeView={listViews.activeView}
+          canManage={hasAppPermission('manageListViews')}
+          onSelect={listViews.selectView}
+          onSave={listViews.saveView}
+          onDelete={listViews.deleteView}
+        />
 
         {/* Search */}
         <div className="mb-6">

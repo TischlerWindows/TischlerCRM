@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useIsMobileViewport, useIsLandscapeMobile } from '@/lib/use-is-mobile-viewport';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -38,6 +38,7 @@ import { apiClient } from '@/lib/api-client';
 import { formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
+import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 
 interface CustomRecord {
   id: string;
@@ -71,6 +72,7 @@ export default function CustomObjectRecordsPage() {
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [activeListView, setActiveListView] = useState<ListViewDefinition | null>(null);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isMobile = useIsMobileViewport();
@@ -138,6 +140,16 @@ export default function CustomObjectRecordsPage() {
       };
     });
   }, [objectDef]);
+
+  const handleListViewChange = useCallback((view: ListViewDefinition) => {
+    setActiveListView(view);
+    setSortColumn(view.sortField);
+    setSortDirection(view.sortDirection);
+  }, []);
+  const listViews = useListViews({
+    objectApiName: objectDef?.apiName ?? slug,
+    onViewChange: handleListViewChange,
+  });
 
   // Load schema on mount
   useEffect(() => {
@@ -374,16 +386,13 @@ export default function CustomObjectRecordsPage() {
   };
 
   const handleSort = (columnId: string) => {
-    if (sortColumn === columnId) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(columnId);
-      setSortDirection('asc');
-    }
+    const direction = listViews.sortFromColumn(columnId);
+    setSortColumn(columnId);
+    setSortDirection(direction);
   };
 
   // Filter and sort records
-  const filteredRecords = useMemo(() => {
+  const baseFilteredRecords = useMemo(() => {
     let result = [...records];
     
     // Apply search filter
@@ -424,6 +433,8 @@ export default function CustomObjectRecordsPage() {
     
     return result;
   }, [records, searchTerm, sidebarFilter, sortColumn, sortDirection, user]);
+
+  const filteredRecords = applyListView(baseFilteredRecords, activeListView);
 
   const handleColumnDragStart = (index: number) => {
     setDraggedColumnIndex(index);
@@ -635,6 +646,8 @@ export default function CustomObjectRecordsPage() {
               </button>}
           </div>
         </div>
+
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
 
         {/* Search */}
         <div className="mb-6">

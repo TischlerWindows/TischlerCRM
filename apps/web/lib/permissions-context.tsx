@@ -26,6 +26,7 @@ export interface AppPermissions {
   exportData: boolean;
   importData: boolean;
   manageReports: boolean;
+  manageListViews: boolean;
   manageDashboards: boolean;
   viewSummary: boolean;
   viewSetup: boolean;
@@ -140,7 +141,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (user?.role === 'ADMIN') return true;
       if (loading) return true;
       if (!permissions) return false;
-      return !!(permissions.appPermissions as Record<string, unknown>)?.[perm];
+      return !!permissions.appPermissions?.[perm];
     },
     [permissions, loading, user],
   );
