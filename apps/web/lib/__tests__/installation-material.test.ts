@@ -2,6 +2,7 @@ import {
   calculateMaterialTotal,
   INSTALLATION_MATERIAL_ROW_COUNT,
   parseInstallationMaterial,
+  parseInstallationMaterialWorkbook,
 } from '../installation-material'
 
 describe('installation material form', () => {
@@ -22,5 +23,26 @@ describe('installation material form', () => {
     expect(material.template).toBe('US Supplied Inst.')
     expect(material.orderedFrom).toEqual(['Korn', 'FL Warehouse'])
     expect(calculateMaterialTotal(material.rows[0]!)).toBe(7.5)
+  })
+
+  it('keeps three worksheet forms independent and migrates a legacy single form', () => {
+    const workbook = parseInstallationMaterialWorkbook({
+      version: 1,
+      activeTemplate: 'US Supplied Inst.',
+      sheets: {
+        ACQ: { template: 'ACQ', rows: [{ qty: '1', units: 'box', description: 'ACQ item' }] },
+        'Non-ACQ': { template: 'Non-ACQ', rows: [{ qty: '2', units: 'box', description: 'Non-ACQ item' }] },
+        'US Supplied Inst.': { template: 'US Supplied Inst.', rows: [{ qty: '3', units: 'box', description: 'US item' }] },
+      },
+    })
+    expect(workbook.activeTemplate).toBe('US Supplied Inst.')
+    expect(workbook.sheets.ACQ.rows[0]?.description).toBe('ACQ item')
+    expect(workbook.sheets['Non-ACQ'].rows[0]?.description).toBe('Non-ACQ item')
+    expect(workbook.sheets['US Supplied Inst.'].rows[0]?.description).toBe('US item')
+
+    const migrated = parseInstallationMaterialWorkbook({ template: 'Non-ACQ', rows: [{ description: 'Old entry' }] })
+    expect(migrated.activeTemplate).toBe('Non-ACQ')
+    expect(migrated.sheets['Non-ACQ'].rows[0]?.description).toBe('Old entry')
+    expect(migrated.sheets.ACQ.rows[0]?.description).toBe('')
   })
 })

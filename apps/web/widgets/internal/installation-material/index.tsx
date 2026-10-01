@@ -8,11 +8,30 @@ import { recordsService } from '@/lib/records-service'
 import { getRecordName } from '../shared/recordName'
 import {
   calculateMaterialTotal, formatMaterialTotal, INSTALLATION_MATERIAL_TEMPLATES,
-  INSTALLATION_METHODS, MATERIAL_SOURCES, parseInstallationMaterial,
-  type InstallationMaterial, type InstallationMaterialRow,
+  INSTALLATION_METHODS, MATERIAL_SOURCES, parseInstallationMaterialWorkbook,
+  type InstallationMaterial, type InstallationMaterialRow, type InstallationMaterialWorkbook,
 } from '@/lib/installation-material'
 
 const inputClass = 'w-full min-w-0 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 focus:border-brand-navy focus:outline-none'
+
+function hydrateWorkbook(
+  value: InstallationMaterialWorkbook,
+  defaults: { factory: string; location: string; projectManager: string; attn: string },
+): InstallationMaterialWorkbook {
+  return {
+    ...value,
+    sheets: Object.fromEntries(INSTALLATION_MATERIAL_TEMPLATES.map(template => {
+      const sheet = value.sheets[template]
+      return [template, {
+        ...sheet,
+        factory: sheet.factory || defaults.factory,
+        location: sheet.location || defaults.location,
+        projectManager: sheet.projectManager || defaults.projectManager,
+        attn: sheet.attn || defaults.attn,
+      }]
+    })) as InstallationMaterialWorkbook['sheets'],
+  }
+}
 
 export default function InstallationMaterialWidget({ record, object, onRecordChange }: WidgetProps) {
   const projectId = record?.id ? String(record.id) : ''
@@ -23,16 +42,12 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   const location = String(recordData.location ?? recordData.Project__location ?? '')
   const manager = String(recordData.projectManager ?? recordData.Project__projectManager ?? '')
   const attn = String(recordData.attn ?? recordData.Project__attn ?? '')
-  const [form, setForm] = useState<InstallationMaterial>(() => {
-    const initial = parseInstallationMaterial(raw, projectName)
-    return {
-      ...initial,
-      factory: initial.factory || factory,
-      location: initial.location || location,
-      projectManager: initial.projectManager || manager,
-      attn: initial.attn || attn,
-    }
-  })
+  const [workbook, setWorkbook] = useState<InstallationMaterialWorkbook>(() =>
+    hydrateWorkbook(parseInstallationMaterialWorkbook(raw, projectName), {
+      factory, location, projectManager: manager, attn,
+    }),
+  )
+  const form = workbook.sheets[workbook.activeTemplate]
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
@@ -40,20 +55,27 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const loaded = parseInstallationMaterial(raw, projectName)
-    setForm({
-      ...loaded,
-      factory: loaded.factory || factory,
-      location: loaded.location || location,
-      projectManager: loaded.projectManager || manager,
-      attn: loaded.attn || attn,
-    })
+    setWorkbook(hydrateWorkbook(parseInstallationMaterialWorkbook(raw, projectName), {
+      factory, location, projectManager: manager, attn,
+    }))
     setDirty(false)
     setSaved(false)
   }, [projectId, raw, projectName, factory, location, manager, attn])
 
   const update = (patch: Partial<InstallationMaterial>) => {
-    setForm(current => ({ ...current, ...patch }))
+    setWorkbook(current => ({
+      ...current,
+      sheets: {
+        ...current.sheets,
+        [current.activeTemplate]: { ...current.sheets[current.activeTemplate], ...patch },
+      },
+    }))
+    setDirty(true)
+    setSaved(false)
+  }
+
+  const selectSheet = (template: typeof INSTALLATION_MATERIAL_TEMPLATES[number]) => {
+    setWorkbook(current => ({ ...current, activeTemplate: template }))
     setDirty(true)
     setSaved(false)
   }
@@ -67,7 +89,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     setSaving(true)
     setError(null)
     try {
-      const value = JSON.stringify(form)
+      const value = JSON.stringify(workbook)
       await recordsService.updateRecord('Project', projectId, { data: { installationMaterialForm: value } })
       onRecordChange?.({ installationMaterialForm: value })
       setDirty(false)
@@ -138,13 +160,26 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
       </div>
       {error && <div role="alert" className="flex items-center gap-2 border border-red-200 bg-red-50 p-2 text-red-700"><AlertCircle className="h-4 w-4" />{error}</div>}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="space-y-4">
+        <div role="tablist" aria-label="Installation Material sheets" className="flex overflow-x-auto border-b border-gray-300">
+          {INSTALLATION_MATERIAL_TEMPLATES.map(template => (
+            <button
+              key={template}
+              id={`installation-material-tab-${template}`}
+              type="button"
+              role="tab"
+              aria-selected={workbook.activeTemplate === template}
+              onClick={() => selectSheet(template)}
+              className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold ${workbook.activeTemplate === template ? 'border-brand-navy text-brand-navy' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+            >
+              {template}
+            </button>
+          ))}
+        </div>
+
+      <div role="tabpanel" aria-labelledby={`installation-material-tab-${workbook.activeTemplate}`} className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-2">
         <section className="space-y-3 rounded border border-gray-200 p-3">
-          <label className="block text-xs font-semibold uppercase text-gray-600">Material Template
-            <select className={`${inputClass} mt-1`} value={form.template} onChange={event => update({ template: event.target.value })}>
-              {INSTALLATION_MATERIAL_TEMPLATES.map(template => <option key={template} value={template}>{template}</option>)}
-            </select>
-          </label>
           <label className="block text-xs font-semibold uppercase text-gray-600">Date
             <input type="date" className={`${inputClass} mt-1`} value={form.date} onChange={event => update({ date: event.target.value })} />
           </label>
@@ -181,7 +216,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
             </div>
           </fieldset>
         </section>
-      </div>
+        </div>
 
       <section className="overflow-x-auto border border-gray-300">
         <table className="w-full min-w-[1000px] border-collapse text-left text-xs">
@@ -217,6 +252,8 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
         <label className="text-xs font-semibold uppercase text-gray-600">Date
           <input type="date" className={`${inputClass} mt-1`} value={form.signatureDate} onChange={event => update({ signatureDate: event.target.value })} />
         </label>
+      </div>
+      </div>
       </div>
     </div>
   )

@@ -12,7 +12,7 @@ export interface InstallationMaterialRow {
 }
 
 export interface InstallationMaterial {
-  template: string
+  template: typeof INSTALLATION_MATERIAL_TEMPLATES[number]
   date: string
   factory: string
   project: string
@@ -24,6 +24,12 @@ export interface InstallationMaterial {
   rows: InstallationMaterialRow[]
   signature: string
   signatureDate: string
+}
+
+export interface InstallationMaterialWorkbook {
+  version: 1
+  activeTemplate: typeof INSTALLATION_MATERIAL_TEMPLATES[number]
+  sheets: Record<typeof INSTALLATION_MATERIAL_TEMPLATES[number], InstallationMaterial>
 }
 
 function emptyRow(): InstallationMaterialRow {
@@ -50,7 +56,7 @@ export function parseInstallationMaterial(raw: unknown, projectName = ''): Insta
 
   return {
     template: INSTALLATION_MATERIAL_TEMPLATES.includes(data.template as typeof INSTALLATION_MATERIAL_TEMPLATES[number])
-      ? data.template as string : INSTALLATION_MATERIAL_TEMPLATES[0],
+      ? data.template as typeof INSTALLATION_MATERIAL_TEMPLATES[number] : INSTALLATION_MATERIAL_TEMPLATES[0],
     date: text(data.date), factory: text(data.factory), project: text(data.project) || projectName,
     location: text(data.location), projectManager: text(data.projectManager), attn: text(data.attn),
     installationBy: selected(data.installationBy, INSTALLATION_METHODS),
@@ -58,6 +64,36 @@ export function parseInstallationMaterial(raw: unknown, projectName = ''): Insta
     rows: rows.length ? rows : Array.from({ length: INSTALLATION_MATERIAL_ROW_COUNT }, emptyRow),
     signature: text(data.signature), signatureDate: text(data.signatureDate),
   }
+}
+
+export function parseInstallationMaterialWorkbook(raw: unknown, projectName = ''): InstallationMaterialWorkbook {
+  let data: Record<string, unknown> = {}
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) data = parsed as Record<string, unknown>
+  } catch { /* Invalid stored data starts with three blank sheets. */ }
+
+  const rawSheets = data.sheets && typeof data.sheets === 'object' && !Array.isArray(data.sheets)
+    ? data.sheets as Record<string, unknown>
+    : null
+
+  let sheets = Object.fromEntries(INSTALLATION_MATERIAL_TEMPLATES.map(template => [
+    template,
+    parseInstallationMaterial(rawSheets?.[template] ?? { template }, projectName),
+  ])) as InstallationMaterialWorkbook['sheets']
+
+  if (!rawSheets) {
+    const legacy = parseInstallationMaterial(data, projectName)
+    sheets = { ...sheets, [legacy.template]: legacy }
+  }
+
+  const requestedActive = rawSheets && INSTALLATION_MATERIAL_TEMPLATES.includes(data.activeTemplate as typeof INSTALLATION_MATERIAL_TEMPLATES[number])
+    ? data.activeTemplate as typeof INSTALLATION_MATERIAL_TEMPLATES[number]
+    : !rawSheets
+      ? parseInstallationMaterial(data, projectName).template
+      : INSTALLATION_MATERIAL_TEMPLATES[0]
+
+  return { version: 1, activeTemplate: requestedActive, sheets }
 }
 
 export function calculateMaterialTotal(row: InstallationMaterialRow): number {
