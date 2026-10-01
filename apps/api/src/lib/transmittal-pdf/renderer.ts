@@ -26,6 +26,7 @@ const DESCRIPTION_WIDTH = 306;
 const CODE_WIDTH = WIDTH - QTY_WIDTH - DESCRIPTION_WIDTH;
 const TABLE_GRID = [LEFT, LEFT + QTY_WIDTH, LEFT + QTY_WIDTH + DESCRIPTION_WIDTH, RIGHT];
 const TABLE_HEADER_COLOR = '#1e3a5f';
+const CONTENT_OFFSET = 40;
 const SUBMITTED_FOR = ['Approval', 'Your Information', 'Your Action', 'Your Review', 'Return of Goods'];
 const DELIVERY_METHODS = ['Messenger', 'Overnight', '2nd Day Air', 'UPS Ground', 'U.S. Postal Service'];
 const ASSET_DIR = dirname(fileURLToPath(import.meta.url));
@@ -126,29 +127,29 @@ export function renderTransmittalPDF(data: TransmittalPdfData, projectName: stri
     });
     doc.on('error', reject);
 
-    doc.font('Times-Bold').fontSize(15).text('TRANSMITTAL', LEFT, 74, { width: 260 });
-    doc.font('Times-Roman').fontSize(10).text('DATE:', 420, 40, { width: 43 });
-    doc.text(data.date, 465, 40, { width: 75 });
-    rule(doc, 463, 54, RIGHT);
-    doc.font('Times-Bold').fontSize(10).text('SUBMITTED FOR:', 382, 70, { width: 158 });
-    SUBMITTED_FOR.forEach((option, index) => check(doc, option, data.submittedFor === option, 393, 88 + index * 17));
+    doc.font('Times-Bold').fontSize(15).text('TRANSMITTAL', LEFT, 74 + CONTENT_OFFSET, { width: 260 });
+    doc.font('Times-Roman').fontSize(10).text('DATE:', 420, 40 + CONTENT_OFFSET, { width: 43 });
+    doc.text(data.date, 465, 40 + CONTENT_OFFSET, { width: 75 });
+    rule(doc, 463, 54 + CONTENT_OFFSET, RIGHT);
+    doc.font('Times-Bold').fontSize(10).text('SUBMITTED FOR:', 382, 70 + CONTENT_OFFSET, { width: 158 });
+    SUBMITTED_FOR.forEach((option, index) => check(doc, option, data.submittedFor === option, 393, 88 + CONTENT_OFFSET + index * 17));
 
     doc.font('Times-Roman').fontSize(10);
     const toHeight = Math.max(36, doc.heightOfString(data.to, { width: 208 }) + 10);
-    let leftY = field(doc, 'To:', data.to, LEFT, 112, 290, toHeight);
+    let leftY = field(doc, 'To:', data.to, LEFT, 112 + CONTENT_OFFSET, 290, toHeight);
     leftY = field(doc, 'Attn:', data.attn, LEFT, leftY, 290);
     leftY = field(doc, 'Re:', data.re || projectName, LEFT, leftY, 290);
     leftY = field(doc, 'Submitted by:', data.submittedBy, LEFT, leftY, 290);
 
-    doc.font('Times-Bold').fontSize(10).text('Delivery Via:', 382, 190, { width: 155 });
+    doc.font('Times-Bold').fontSize(10).text('Delivery Via:', 382, 190 + CONTENT_OFFSET, { width: 155 });
     DELIVERY_METHODS.forEach((option, index) => {
       const selected = Array.isArray(data.deliveryVia)
         ? data.deliveryVia.includes(option)
         : data.deliveryVia === option;
-      check(doc, option, selected, 393, 207 + index * 17);
+      check(doc, option, selected, 393, 207 + CONTENT_OFFSET + index * 17);
     });
 
-    let y = tableHeader(doc, Math.max(305, leftY + 18));
+    let y = tableHeader(doc, Math.max(305 + CONTENT_OFFSET, leftY + 18));
     const rows = data.rows.length ? data.rows : [{ qty: '', description: '', code: '' }];
     rows.forEach(row => {
       const rowHeight = Math.min(120, Math.max(30, doc.font('Times-Roman').fontSize(10).heightOfString(row.description, { width: DESCRIPTION_WIDTH - 12 }) + 12));
