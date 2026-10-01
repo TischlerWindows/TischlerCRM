@@ -132,11 +132,27 @@ export default function TransmittalWidget({ record, object, onRecordChange }: Wi
             <input className={inputClass} value={form[field]} onChange={event => update({ [field]: event.target.value })} />
           </label>
         ))}
-        <label className="space-y-1 text-xs font-semibold uppercase text-gray-600">Delivery Via
-          <select className={inputClass} value={form.deliveryVia} onChange={event => update({ deliveryVia: event.target.value })}>
-            {DELIVERY_METHODS.map(option => <option key={option} value={option}>{option}</option>)}
-          </select>
-        </label>
+        <fieldset className="rounded border border-gray-300 px-3 py-2">
+          <legend className="px-1 text-xs font-semibold uppercase text-gray-600">Delivery Via</legend>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+            {DELIVERY_METHODS.map(option => {
+              const checked = form.deliveryVia.includes(option)
+              return (
+                <label key={option} className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => update({ deliveryVia: checked
+                      ? form.deliveryVia.filter(method => method !== option)
+                      : [...form.deliveryVia, option] })}
+                    className="h-4 w-4 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
+                  />
+                  {option}
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
       </div>
       <div className="overflow-x-auto border border-gray-200">
         <table className="w-full min-w-[480px] text-left">

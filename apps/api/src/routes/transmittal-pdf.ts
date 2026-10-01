@@ -7,7 +7,7 @@ const renderSchema = z.object({
   projectName: z.string().max(300),
   transmittal: z.object({
     date: text, submittedFor: text, to: text, attn: text, re: text,
-    submittedBy: text, deliveryVia: text,
+    submittedBy: text, deliveryVia: z.union([z.array(text).max(5), text]),
     rows: z.array(z.object({ qty: text, description: text, code: text })).min(1).max(30),
     approvalInstructions: text, remarks: text, copiesTo: text, signature: text,
   }),

@@ -7,7 +7,7 @@ interface TransmittalPdfData {
   attn: string;
   re: string;
   submittedBy: string;
-  deliveryVia: string;
+  deliveryVia: string | string[];
   rows: Array<{ qty: string; description: string; code: string }>;
   approvalInstructions: string;
   remarks: string;
@@ -81,7 +81,12 @@ export function renderTransmittalPDF(data: TransmittalPdfData, projectName: stri
     leftY = field(doc, 'Submitted by:', data.submittedBy, LEFT, leftY, 290);
 
     doc.font('Times-Bold').fontSize(10).text('Delivery Via:', 382, 190, { width: 155 });
-    DELIVERY_METHODS.forEach((option, index) => check(doc, option, data.deliveryVia === option, 393, 207 + index * 17));
+    DELIVERY_METHODS.forEach((option, index) => {
+      const selected = Array.isArray(data.deliveryVia)
+        ? data.deliveryVia.includes(option)
+        : data.deliveryVia === option;
+      check(doc, option, selected, 393, 207 + index * 17);
+    });
 
     let y = tableHeader(doc, Math.max(305, leftY + 18));
     const rows = data.rows.length ? data.rows : [{ qty: '', description: '', code: '' }];

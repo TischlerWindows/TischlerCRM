@@ -14,7 +14,7 @@ export interface Transmittal {
   attn: string
   re: string
   submittedBy: string
-  deliveryVia: string
+  deliveryVia: string[]
   rows: TransmittalRow[]
   approvalInstructions: string
   remarks: string
@@ -31,6 +31,13 @@ export function parseTransmittal(raw: unknown): Transmittal {
     if (value && typeof value === 'object' && !Array.isArray(value)) data = value as Record<string, unknown>
   } catch { /* An invalid saved document starts a fresh form. */ }
   const text = (value: unknown) => typeof value === 'string' ? value : ''
+  const deliveryVia = Array.isArray(data.deliveryVia)
+    ? data.deliveryVia.filter((value): value is typeof DELIVERY_METHODS[number] =>
+      typeof value === 'string' && DELIVERY_METHODS.includes(value as typeof DELIVERY_METHODS[number]),
+    )
+    : DELIVERY_METHODS.includes(text(data.deliveryVia) as typeof DELIVERY_METHODS[number])
+      ? [text(data.deliveryVia) as typeof DELIVERY_METHODS[number]]
+      : []
   const rows = Array.isArray(data.rows) ? data.rows.slice(0, 30).map((row: unknown) => {
     const value = row && typeof row === 'object' ? row as Record<string, unknown> : {}
     return { qty: text(value.qty), description: text(value.description), code: text(value.code) }
@@ -39,7 +46,7 @@ export function parseTransmittal(raw: unknown): Transmittal {
     date: text(data.date), submittedFor: text(data.submittedFor) || 'Approval',
     to: text(data.to), attn: text(data.attn), re: text(data.re),
     submittedBy: text(data.submittedBy),
-    deliveryVia: text(data.deliveryVia),
+    deliveryVia,
     rows: rows.length ? rows : Array.from({ length: 3 }, () => ({ qty: '', description: '', code: '' })),
     approvalInstructions: typeof data.approvalInstructions === 'string' ? data.approvalInstructions : DEFAULT_APPROVAL_INSTRUCTIONS,
     remarks: text(data.remarks), copiesTo: text(data.copiesTo), signature: text(data.signature),
