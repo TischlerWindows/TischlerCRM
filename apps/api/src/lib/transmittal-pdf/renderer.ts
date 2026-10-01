@@ -1,4 +1,7 @@
 import PDFDocument from 'pdfkit';
+import { existsSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
 interface TransmittalPdfData {
   date: string;
@@ -25,6 +28,17 @@ const TABLE_GRID = [LEFT, LEFT + QTY_WIDTH, LEFT + QTY_WIDTH + DESCRIPTION_WIDTH
 const TABLE_HEADER_COLOR = '#1e3a5f';
 const SUBMITTED_FOR = ['Approval', 'Your Information', 'Your Action', 'Your Review', 'Return of Goods'];
 const DELIVERY_METHODS = ['Messenger', 'Overnight', '2nd Day Air', 'UPS Ground', 'U.S. Postal Service'];
+const ASSET_DIR = dirname(fileURLToPath(import.meta.url));
+const LOGO_PATH = [
+  join(ASSET_DIR, 'factory-order-logo.png'),
+  join(ASSET_DIR, '../factory-order-spec-pdf/tischler-logo.png'),
+  join(ASSET_DIR, 'tischler-logo.png'),
+].find(existsSync);
+const T_MARK_PATH = [
+  join(ASSET_DIR, 'factory-order-t-logo.png'),
+  join(ASSET_DIR, '../factory-order-spec-pdf/tischler-t-logo.png'),
+  join(ASSET_DIR, 'tischler-t-logo.png'),
+].find(existsSync);
 
 function rule(doc: PDFKit.PDFDocument, x1: number, y: number, x2: number): void {
   doc.strokeColor('#444444').lineWidth(0.5).moveTo(x1, y).lineTo(x2, y).stroke();
@@ -58,18 +72,64 @@ function tableHeader(doc: PDFKit.PDFDocument, y: number): number {
   return y + height;
 }
 
+function drawBranding(doc: PDFKit.PDFDocument): void {
+  const range = doc.bufferedPageRange();
+  for (let index = 0; index < range.count; index++) {
+    doc.switchToPage(range.start + index);
+    const savedBottom = doc.page.margins.bottom;
+    const savedTop = doc.page.margins.top;
+    const savedX = doc.x;
+    const savedY = doc.y;
+    doc.page.margins.bottom = 0;
+    doc.page.margins.top = 0;
+
+    if (index === 0 && LOGO_PATH) {
+      doc.image(LOGO_PATH, (doc.page.width - 180) / 2, 12, {
+        fit: [180, 54], align: 'center', valign: 'center',
+      });
+    }
+    if (T_MARK_PATH) {
+      doc.image(T_MARK_PATH, 12, doc.page.height - 66, {
+        fit: [58, 58], valign: 'bottom',
+      });
+    }
+
+    const footerY = doc.page.height - 34;
+    doc.font('Helvetica').fontSize(6).fillColor('#6b7280')
+      .text('Tischler und Sohn  |  Confidential', LEFT, footerY, {
+        width: WIDTH, align: 'center', lineBreak: false,
+      });
+    doc.text(`Page ${index + 1} of ${range.count}`, doc.page.width - LEFT - 70, footerY, {
+      width: 70, align: 'right', lineBreak: false,
+    });
+
+    doc.page.margins.bottom = savedBottom;
+    doc.page.margins.top = savedTop;
+    doc.x = savedX;
+    doc.y = savedY;
+  }
+}
+
 export function renderTransmittalPDF(data: TransmittalPdfData, projectName: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'LETTER', margins: { top: 36, bottom: 36, left: LEFT, right: LEFT }, bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('end', () => {
+      const output = Buffer.allocUnsafe(chunks.reduce((size, chunk) => size + chunk.length, 0));
+      let offset = 0;
+      for (const chunk of chunks) {
+        output.set(chunk, offset);
+        offset += chunk.length;
+      }
+      resolve(output);
+    });
     doc.on('error', reject);
 
     doc.font('Times-Bold').fontSize(15).text('TRANSMITTAL', LEFT, 74, { width: 260 });
-    doc.font('Times-Roman').fontSize(10).text('DATE:', 382, 40, { width: 48 });
-    doc.text(data.date, 427, 40, { width: 113 });
-    rule(doc, 425, 54, RIGHT);
+    doc.font('Times-Roman').fontSize(10).text('DATE:', 420, 40, { width: 43 });
+    doc.text(data.date, 465, 40, { width: 75 });
+    rule(doc, 463, 54, RIGHT);
     doc.font('Times-Bold').fontSize(10).text('SUBMITTED FOR:', 382, 70, { width: 158 });
     SUBMITTED_FOR.forEach((option, index) => check(doc, option, data.submittedFor === option, 393, 88 + index * 17));
 
@@ -128,6 +188,7 @@ export function renderTransmittalPDF(data: TransmittalPdfData, projectName: stri
     doc.text('Thank you,', 397, y + 12, { width: 143 });
     doc.text(data.signature, 397, y + 33, { width: 143 });
 
+    drawBranding(doc);
     doc.end();
   });
 }
