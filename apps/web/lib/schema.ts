@@ -230,7 +230,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem' | 'AutoCad' | 'InstallProgressReport' | 'CadIndexList' | 'FactoryOrderSpec';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem' | 'AutoCad' | 'InstallProgressReport' | 'CadIndexList' | 'FactoryOrderSpec' | 'Transmittal';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -425,6 +425,10 @@ export interface FactoryOrderSpecConfig {
   type: 'FactoryOrderSpec';
 }
 
+export interface TransmittalConfig {
+  type: 'Transmittal';
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -448,7 +452,8 @@ export type WidgetConfig =
   | AutoCadConfig
   | InstallProgressReportConfig
   | CadIndexListConfig
-  | FactoryOrderSpecConfig;
+  | FactoryOrderSpecConfig
+  | TransmittalConfig;
 
 export interface PageWidget {
   id: string;

@@ -10,6 +10,7 @@ describe('widget enablement', () => {
       { widgetId: 'dropbox-browser', kind: 'external', enabled: true },
     ])
     expect(ids.has('factory-order-spec')).toBe(true)
+    expect(ids.has('transmittal')).toBe(true)
     expect(ids.has('cad-index-list')).toBe(false)
     expect(ids.has('dropbox-browser')).toBe(true)
     expect(ids.has('demo-widget')).toBe(false)
@@ -36,6 +37,7 @@ describe('getInternalRegistrationByType', () => {
     ['HeaderHighlights'],
     ['FileFolder'],
     ['RelatedList'],
+    ['Transmittal'],
   ])('returns a registration for type %s', (type) => {
     const reg = getInternalRegistrationByType(type)
     expect(reg).toBeDefined()

@@ -41,6 +41,7 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   InstallProgressReport: { type: 'InstallProgressReport' },
   CadIndexList: { type: 'CadIndexList' },
   FactoryOrderSpec: { type: 'FactoryOrderSpec' },
+  Transmittal: { type: 'Transmittal' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────
