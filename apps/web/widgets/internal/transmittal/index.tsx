@@ -123,9 +123,12 @@ export default function TransmittalWidget({ record, object, onRecordChange }: Wi
             {SUBMITTED_FOR.map(option => <option key={option} value={option}>{option}</option>)}
           </select>
         </label>
-        {(['to', 'attn', 're', 'submittedBy'] as const).map(field => (
+        <label className="space-y-1 text-xs font-semibold uppercase text-gray-600">To
+          <textarea rows={5} placeholder={'Company name\n\nStreet address\n\nCity, State ZIP'} className={inputClass} value={form.to} onChange={event => update({ to: event.target.value })} />
+        </label>
+        {(['attn', 're', 'submittedBy'] as const).map(field => (
           <label key={field} className="space-y-1 text-xs font-semibold uppercase text-gray-600">
-            {field === 'submittedBy' ? 'Submitted By' : field === 'attn' ? 'Attn' : field === 're' ? 'Re' : 'To'}
+            {field === 'submittedBy' ? 'Submitted By' : field === 'attn' ? 'Attn' : 'Re'}
             <input className={inputClass} value={form[field]} onChange={event => update({ [field]: event.target.value })} />
           </label>
         ))}

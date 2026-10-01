@@ -12,10 +12,11 @@ describe('transmittal form', () => {
 
   it('round-trips saved rows and handles invalid saved data', () => {
     const form = parseTransmittal(JSON.stringify({
-      to: 'Paint shop', rows: [{ qty: '2', description: 'Paint samples', code: 'P-1' }],
+      to: 'Mouw Associates\n\n601 N. Congress Ave, Suite 109\n\nDelray Beach, FL 33445',
+      rows: [{ qty: '2', description: 'Paint samples', code: 'P-1' }],
       remarks: 'Please review',
     }))
-    expect(form.to).toBe('Paint shop')
+    expect(form.to).toBe('Mouw Associates\n\n601 N. Congress Ave, Suite 109\n\nDelray Beach, FL 33445')
     expect(form.rows).toEqual([{ qty: '2', description: 'Paint samples', code: 'P-1' }])
     expect(parseTransmittal('{invalid').rows).toHaveLength(3)
   })

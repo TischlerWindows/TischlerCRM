@@ -25,10 +25,11 @@ function rule(doc: PDFKit.PDFDocument, x1: number, y: number, x2: number): void 
   doc.strokeColor('#444444').lineWidth(0.5).moveTo(x1, y).lineTo(x2, y).stroke();
 }
 
-function field(doc: PDFKit.PDFDocument, label: string, value: string, x: number, y: number, width: number): void {
+function field(doc: PDFKit.PDFDocument, label: string, value: string, x: number, y: number, width: number, height = 18): number {
   doc.font('Times-Bold').fontSize(10).text(label, x, y, { width: 82, lineBreak: false });
-  doc.font('Times-Roman').fontSize(10).text(value, x + 82, y, { width: width - 82, height: 28, ellipsis: true });
-  rule(doc, x + 80, y + 15, x + width);
+  doc.font('Times-Roman').fontSize(10).text(value, x + 82, y, { width: width - 82, height, ellipsis: true });
+  rule(doc, x + 80, y + height + 2, x + width);
+  return y + height + 8;
 }
 
 function check(doc: PDFKit.PDFDocument, text: string, selected: boolean, x: number, y: number): void {
@@ -62,15 +63,17 @@ export function renderTransmittalPDF(data: TransmittalPdfData, projectName: stri
     doc.font('Times-Bold').fontSize(10).text('SUBMITTED FOR:', 382, 70, { width: 158 });
     SUBMITTED_FOR.forEach((option, index) => check(doc, option, data.submittedFor === option, 393, 88 + index * 17));
 
-    field(doc, 'To:', data.to, LEFT, 112, 290);
-    field(doc, 'Attn:', data.attn, LEFT, 138, 290);
-    field(doc, 'Re:', data.re || projectName, LEFT, 164, 290);
-    field(doc, 'Submitted by:', data.submittedBy, LEFT, 190, 290);
+    doc.font('Times-Roman').fontSize(10);
+    const toHeight = Math.max(36, doc.heightOfString(data.to, { width: 208 }) + 10);
+    let leftY = field(doc, 'To:', data.to, LEFT, 112, 290, toHeight);
+    leftY = field(doc, 'Attn:', data.attn, LEFT, leftY, 290);
+    leftY = field(doc, 'Re:', data.re || projectName, LEFT, leftY, 290);
+    leftY = field(doc, 'Submitted by:', data.submittedBy, LEFT, leftY, 290);
 
     doc.font('Times-Bold').fontSize(10).text('Delivery Via:', 382, 190, { width: 155 });
     DELIVERY_METHODS.forEach((option, index) => check(doc, option, data.deliveryVia === option, 393, 207 + index * 17));
 
-    let y = tableHeader(doc, 305);
+    let y = tableHeader(doc, Math.max(305, leftY + 18));
     const rows = data.rows.length ? data.rows : [{ qty: '', description: '', code: '' }];
     rows.forEach(row => {
       const rowHeight = Math.max(28, doc.font('Times-Roman').fontSize(10).heightOfString(row.description, { width: 286 }) + 12);
