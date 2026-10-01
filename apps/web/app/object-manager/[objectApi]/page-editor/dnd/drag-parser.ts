@@ -76,6 +76,8 @@ const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'CadIndexList',
   'FactoryOrderSpec',
   'Transmittal',
+  'InstallationMaterial',
+  'InstallationMaterial',
 ]);
 
 export function isWidgetType(value: string): value is WidgetType {

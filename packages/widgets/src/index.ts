@@ -31,6 +31,7 @@ export const INTERNAL_WIDGET_IDS = [
   'cad-index-list',
   'factory-order-spec',
   'transmittal',
+  'installation-material',
 ] as const
 export type InternalWidgetId = (typeof INTERNAL_WIDGET_IDS)[number]
 

@@ -42,6 +42,8 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   CadIndexList: { type: 'CadIndexList' },
   FactoryOrderSpec: { type: 'FactoryOrderSpec' },
   Transmittal: { type: 'Transmittal' },
+  InstallationMaterial: { type: 'InstallationMaterial' },
+  InstallationMaterial: { type: 'InstallationMaterial' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────

@@ -230,7 +230,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem' | 'AutoCad' | 'InstallProgressReport' | 'CadIndexList' | 'FactoryOrderSpec' | 'Transmittal';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles' | 'ProjectList' | 'ProjectListVertical' | 'ClockIn' | 'PunchList' | 'PerDiem' | 'AutoCad' | 'InstallProgressReport' | 'CadIndexList' | 'FactoryOrderSpec' | 'Transmittal' | 'InstallationMaterial';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -429,6 +429,14 @@ export interface TransmittalConfig {
   type: 'Transmittal';
 }
 
+export interface InstallationMaterialConfig {
+  type: 'InstallationMaterial';
+}
+
+export interface InstallationMaterialConfig {
+  type: 'InstallationMaterial';
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -453,7 +461,8 @@ export type WidgetConfig =
   | InstallProgressReportConfig
   | CadIndexListConfig
   | FactoryOrderSpecConfig
-  | TransmittalConfig;
+  | TransmittalConfig
+  | InstallationMaterialConfig;
 
 export interface PageWidget {
   id: string;

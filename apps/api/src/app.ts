@@ -55,6 +55,7 @@ import { installProgressPdfRoutes } from './routes/install-progress-pdf.js';
 import { cadIndexPdfRoutes } from './routes/cad-index-pdf.js';
 import { factoryOrderSpecPdfRoutes } from './routes/factory-order-spec-pdf.js';
 import { transmittalPdfRoutes } from './routes/transmittal-pdf.js';
+import { installationMaterialPdfRoutes } from './routes/installation-material-pdf.js';
 import { autocadPdfRoutes } from './routes/autocad-pdf.js';
 import { masterContactSheetPdfRoutes } from './routes/master-contact-sheet-pdf.js';
 import { pdfEchoRoutes } from './routes/pdf-echo.js';
@@ -577,6 +578,7 @@ export function buildApp() {
   app.register(cadIndexPdfRoutes);
   app.register(factoryOrderSpecPdfRoutes);
   app.register(transmittalPdfRoutes);
+  app.register(installationMaterialPdfRoutes);
   app.register(autocadPdfRoutes);
   app.register(masterContactSheetPdfRoutes);
   app.register(pdfEchoRoutes);

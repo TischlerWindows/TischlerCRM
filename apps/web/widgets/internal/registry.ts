@@ -26,6 +26,7 @@ import { config as installProgressReportManifest } from './install-progress-repo
 import { config as cadIndexListManifest } from './cad-index-list/widget.config'
 import { config as factoryOrderSpecManifest } from './factory-order-spec/widget.config'
 import { config as transmittalManifest } from './transmittal/widget.config'
+import { config as installationMaterialManifest } from './installation-material/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
 import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
@@ -153,6 +154,11 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     manifest: transmittalManifest,
     widgetConfigType: 'Transmittal',
     Component: dynamic(() => import('./transmittal/index')),
+  },
+  {
+    manifest: installationMaterialManifest,
+    widgetConfigType: 'InstallationMaterial',
+    Component: dynamic(() => import('./installation-material/index')),
   },
 ]
 

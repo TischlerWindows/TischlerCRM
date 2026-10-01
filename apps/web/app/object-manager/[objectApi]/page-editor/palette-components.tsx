@@ -81,6 +81,8 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'cad-index-list': 'CadIndexList',
   'factory-order-spec': 'FactoryOrderSpec',
   'transmittal': 'Transmittal',
+  'installation-material': 'InstallationMaterial',
+  'installation-material': 'InstallationMaterial',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {
