@@ -6,6 +6,8 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
 import { recordsService } from '@/lib/records-service'
 import { getRecordName } from '../shared/recordName'
+import { readProjectField } from '@/lib/factory-order-spec'
+import { normalizeSingleLookupUserValue, type LookupUserIdentity } from '@/lib/user-lookup'
 import {
   calculateMaterialTotal, formatMaterialTotal, INSTALLATION_MATERIAL_TEMPLATES,
   INSTALLATION_METHODS, MATERIAL_SOURCES, parseInstallationMaterialWorkbook,
@@ -38,13 +40,12 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   const recordData = record as Record<string, unknown>
   const projectName = getRecordName(recordData)
   const raw = record?.installationMaterialForm ?? record?.Project__installationMaterialForm
-  const factory = String(recordData.factory ?? recordData.Project__factory ?? '')
   const location = String(recordData.location ?? recordData.Project__location ?? '')
-  const manager = String(recordData.projectManager ?? recordData.Project__projectManager ?? '')
+  const managerValue = readProjectField(recordData, 'internal_project_manager')
   const attn = String(recordData.attn ?? recordData.Project__attn ?? '')
   const [workbook, setWorkbook] = useState<InstallationMaterialWorkbook>(() =>
     hydrateWorkbook(parseInstallationMaterialWorkbook(raw, projectName), {
-      factory, location, projectManager: manager, attn,
+      factory: '', location, projectManager: '', attn,
     }),
   )
   const form = workbook.sheets[workbook.activeTemplate]
@@ -56,11 +57,33 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
 
   useEffect(() => {
     setWorkbook(hydrateWorkbook(parseInstallationMaterialWorkbook(raw, projectName), {
-      factory, location, projectManager: manager, attn,
+      factory: '', location, projectManager: '', attn,
     }))
     setDirty(false)
     setSaved(false)
-  }, [projectId, raw, projectName, factory, location, manager, attn])
+  }, [projectId, raw, projectName, location, attn])
+
+  useEffect(() => {
+    if (!managerValue) return
+    let cancelled = false
+    apiClient.get<LookupUserIdentity[]>('/users/lookup')
+      .then(users => {
+        if (cancelled) return
+        const managerId = normalizeSingleLookupUserValue(managerValue, users)
+        const selectedManager = users.find(user => user.id === managerId)
+        const managerName = selectedManager?.name || selectedManager?.email || ''
+        if (!managerName) return
+        setWorkbook(current => ({
+          ...current,
+          sheets: Object.fromEntries(INSTALLATION_MATERIAL_TEMPLATES.map(template => {
+            const sheet = current.sheets[template]
+            return [template, { ...sheet, projectManager: sheet.projectManager || managerName }]
+          })) as InstallationMaterialWorkbook['sheets'],
+        }))
+      })
+      .catch(() => { /* Keep the field blank when the internal manager lookup cannot resolve. */ })
+    return () => { cancelled = true }
+  }, [managerValue, projectId])
 
   const update = (patch: Partial<InstallationMaterial>) => {
     setWorkbook(current => ({
