@@ -33,7 +33,7 @@ function field(doc: PDFKit.PDFDocument, label: string, value: string, x: number,
 
 function check(doc: PDFKit.PDFDocument, text: string, selected: boolean, x: number, y: number): void {
   doc.rect(x, y + 1, 9, 9).strokeColor('#333333').lineWidth(0.6).stroke();
-  if (selected) doc.font('Times-Bold').fontSize(10).text('X', x + 1, y - 1, { lineBreak: false });
+  if (selected) doc.font('Times-Bold').fontSize(10).text('X', x + 1, y + 1, { lineBreak: false });
   doc.font('Times-Roman').fontSize(9).text(text, x + 15, y, { width: 125, lineBreak: false });
 }
 
