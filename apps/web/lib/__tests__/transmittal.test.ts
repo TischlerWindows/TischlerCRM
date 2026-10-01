@@ -4,8 +4,8 @@ describe('transmittal form', () => {
   it('starts with the paint template defaults', () => {
     const form = parseTransmittal(null)
     expect(form.submittedFor).toBe('Approval')
-    expect(form.deliveryVia).toBe('UPS Ground')
-    expect(form.submittedBy).toBe('Michel Marclay')
+    expect(form.deliveryVia).toBe('')
+    expect(form.submittedBy).toBe('')
     expect(form.rows).toHaveLength(3)
     expect(form.approvalInstructions).toBe(DEFAULT_APPROVAL_INSTRUCTIONS)
   })

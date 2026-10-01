@@ -38,8 +38,8 @@ export function parseTransmittal(raw: unknown): Transmittal {
   return {
     date: text(data.date), submittedFor: text(data.submittedFor) || 'Approval',
     to: text(data.to), attn: text(data.attn), re: text(data.re),
-    submittedBy: typeof data.submittedBy === 'string' ? data.submittedBy : 'Michel Marclay',
-    deliveryVia: text(data.deliveryVia) || 'UPS Ground',
+    submittedBy: text(data.submittedBy),
+    deliveryVia: text(data.deliveryVia),
     rows: rows.length ? rows : Array.from({ length: 3 }, () => ({ qty: '', description: '', code: '' })),
     approvalInstructions: typeof data.approvalInstructions === 'string' ? data.approvalInstructions : DEFAULT_APPROVAL_INSTRUCTIONS,
     remarks: text(data.remarks), copiesTo: text(data.copiesTo), signature: text(data.signature),
