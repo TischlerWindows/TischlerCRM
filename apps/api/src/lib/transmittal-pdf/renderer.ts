@@ -18,6 +18,11 @@ interface TransmittalPdfData {
 const LEFT = 72;
 const RIGHT = 540;
 const WIDTH = RIGHT - LEFT;
+const QTY_WIDTH = 56;
+const DESCRIPTION_WIDTH = 306;
+const CODE_WIDTH = WIDTH - QTY_WIDTH - DESCRIPTION_WIDTH;
+const TABLE_GRID = [LEFT, LEFT + QTY_WIDTH, LEFT + QTY_WIDTH + DESCRIPTION_WIDTH, RIGHT];
+const TABLE_HEADER_COLOR = '#1e3a5f';
 const SUBMITTED_FOR = ['Approval', 'Your Information', 'Your Action', 'Your Review', 'Return of Goods'];
 const DELIVERY_METHODS = ['Messenger', 'Overnight', '2nd Day Air', 'UPS Ground', 'U.S. Postal Service'];
 
@@ -39,13 +44,18 @@ function check(doc: PDFKit.PDFDocument, text: string, selected: boolean, x: numb
 }
 
 function tableHeader(doc: PDFKit.PDFDocument, y: number): number {
-  doc.font('Times-Bold').fontSize(10);
+  const height = 26;
+  doc.save().fillColor(TABLE_HEADER_COLOR).rect(LEFT, y, WIDTH, height).fill().restore();
+  doc.fillColor('#ffffff').font('Times-Bold').fontSize(10);
+  doc.text('Qty.', TABLE_GRID[0]! + 6, y + 8, { width: QTY_WIDTH - 12, lineBreak: false });
+  doc.text('Description', TABLE_GRID[1]! + 6, y + 8, { width: DESCRIPTION_WIDTH - 12, lineBreak: false });
+  doc.text('Code', TABLE_GRID[2]! + 6, y + 8, { width: CODE_WIDTH - 12, lineBreak: false });
+  doc.fillColor('#000000');
+  doc.strokeColor('#94a3b8').lineWidth(0.6);
+  TABLE_GRID.forEach(x => doc.moveTo(x, y).lineTo(x, y + height).stroke());
   rule(doc, LEFT, y, RIGHT);
-  doc.text('Qty.', LEFT + 6, y + 7, { width: 45 });
-  doc.text('Description', LEFT + 64, y + 7, { width: 297 });
-  doc.text('Code', RIGHT - 90, y + 7, { width: 84 });
-  rule(doc, LEFT, y + 25, RIGHT);
-  return y + 25;
+  rule(doc, LEFT, y + height, RIGHT);
+  return y + height;
 }
 
 export function renderTransmittalPDF(data: TransmittalPdfData, projectName: string): Promise<Buffer> {
@@ -76,17 +86,22 @@ export function renderTransmittalPDF(data: TransmittalPdfData, projectName: stri
     let y = tableHeader(doc, Math.max(305, leftY + 18));
     const rows = data.rows.length ? data.rows : [{ qty: '', description: '', code: '' }];
     rows.forEach(row => {
-      const rowHeight = Math.max(28, doc.font('Times-Roman').fontSize(10).heightOfString(row.description, { width: 286 }) + 12);
+      const rowHeight = Math.min(120, Math.max(30, doc.font('Times-Roman').fontSize(10).heightOfString(row.description, { width: DESCRIPTION_WIDTH - 12 }) + 12));
       if (y + rowHeight > 635) {
         doc.addPage();
         doc.font('Times-Bold').fontSize(11).text('TRANSMITTAL - continued', LEFT, 44, { width: WIDTH });
         y = tableHeader(doc, 76);
       }
-      doc.font('Times-Roman').fontSize(10).text(row.qty, LEFT + 6, y + 6, { width: 45, height: rowHeight - 8, ellipsis: true });
-      doc.text(row.description, LEFT + 64, y + 6, { width: 286, height: rowHeight - 8, ellipsis: true });
-      doc.text(row.code, RIGHT - 90, y + 6, { width: 84, height: rowHeight - 8, ellipsis: true });
+      doc.strokeColor('#cbd5e1').lineWidth(0.5);
+      TABLE_GRID.slice(0, -1).forEach((x, index) => {
+        const cellWidth = TABLE_GRID[index + 1]! - x;
+        doc.rect(x, y, cellWidth, rowHeight).stroke();
+      });
+      doc.font('Times-Roman').fontSize(10).fillColor('#111827');
+      doc.text(row.qty, TABLE_GRID[0]! + 6, y + 6, { width: QTY_WIDTH - 12, height: rowHeight - 8, ellipsis: true });
+      doc.text(row.description, TABLE_GRID[1]! + 6, y + 6, { width: DESCRIPTION_WIDTH - 12, height: rowHeight - 8, ellipsis: true });
+      doc.text(row.code, TABLE_GRID[2]! + 6, y + 6, { width: CODE_WIDTH - 12, height: rowHeight - 8, ellipsis: true });
       y += rowHeight;
-      rule(doc, LEFT, y, RIGHT);
     });
 
     const noteHeight = Math.max(28, doc.font('Times-Roman').fontSize(10).heightOfString(data.approvalInstructions, { width: WIDTH }) + 8);
