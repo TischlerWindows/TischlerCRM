@@ -162,7 +162,8 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
 
   const total = form.rows.reduce((sum, row) => sum + calculateMaterialTotal(row), 0)
   const lockFixedColumns = true
-  const currencySymbol = form.template === 'US Supplied Inst.' ? '$' : '€'
+  const isUsSupplied = form.template === 'US Supplied Inst.'
+  const currencySymbol = isUsSupplied ? '$' : '€'
   const toggleOption = (current: string[], option: string) => current.includes(option)
     ? current.filter(value => value !== option)
     : [...current, option]
@@ -245,12 +246,12 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
         </div>
 
       <section className="overflow-x-auto border border-gray-300">
-        <table className="w-full min-w-[1000px] border-collapse text-left text-xs">
+        <table className={`w-full ${isUsSupplied ? 'min-w-[920px]' : 'min-w-[1000px]'} border-collapse text-left text-xs`}>
           <thead className="bg-brand-navy text-white"><tr>
             <th className="w-16 border border-gray-400 px-2 py-2">Qty.</th>
-            <th className="w-20 border border-gray-400 px-2 py-2">Units</th>
+            <th className={`${isUsSupplied ? 'w-32' : 'w-20'} border border-gray-400 px-2 py-2`}>Units</th>
             <th className="border border-gray-400 px-2 py-2">Description</th>
-            <th className="w-32 border border-gray-400 px-2 py-2">US Screw Size</th>
+            {!isUsSupplied && <th className="w-32 border border-gray-400 px-2 py-2">US Screw Size</th>}
             <th className="w-32 border border-gray-400 px-2 py-2">Unit Price ({currencySymbol})</th>
             <th className="w-32 border border-gray-400 px-2 py-2">TOTAL ({currencySymbol})</th>
           </tr></thead>
@@ -261,13 +262,13 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
                 <td className="border border-gray-300 bg-yellow-100 p-1"><input aria-label={`Quantity row ${index + 1}`} className={inputClass} value={row.qty} onChange={event => updateRow(index, { qty: event.target.value })} /></td>
                 <td className="border border-gray-300 p-1"><input aria-label={`Units row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.units} onChange={event => updateRow(index, { units: event.target.value })} /></td>
                 <td className="border border-gray-300 p-1"><input aria-label={`Description row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.description} onChange={event => updateRow(index, { description: event.target.value })} /></td>
-                <td className="border border-gray-300 bg-gray-100 p-1"><input aria-label={`US screw size row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:text-gray-600`} value={row.screwSize} onChange={event => updateRow(index, { screwSize: event.target.value })} /></td>
+                {!isUsSupplied && <td className="border border-gray-300 bg-gray-100 p-1"><input aria-label={`US screw size row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:text-gray-600`} value={row.screwSize} onChange={event => updateRow(index, { screwSize: event.target.value })} /></td>}
                 <td className="border border-gray-300 p-1"><input aria-label={`Unit price row ${index + 1}`} disabled={lockFixedColumns} inputMode="decimal" className={`${inputClass} text-right disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.unitPrice} onChange={event => updateRow(index, { unitPrice: event.target.value })} /></td>
                 <td className="border border-gray-300 bg-rose-200 px-2 text-right font-medium">{rowTotal ? formatMaterialTotal(rowTotal) : ''}</td>
               </tr>
             })}
           </tbody>
-          <tfoot><tr className="font-semibold"><td colSpan={5} className="border border-gray-300 px-2 py-2 text-right">Grand Total ({currencySymbol})</td><td className="border border-gray-300 bg-rose-300 px-2 py-2 text-right">{formatMaterialTotal(total)}</td></tr></tfoot>
+          <tfoot><tr className="font-semibold"><td colSpan={isUsSupplied ? 4 : 5} className="border border-gray-300 px-2 py-2 text-right">Grand Total ({currencySymbol})</td><td className="border border-gray-300 bg-rose-300 px-2 py-2 text-right">{formatMaterialTotal(total)}</td></tr></tfoot>
         </table>
       </section>
 

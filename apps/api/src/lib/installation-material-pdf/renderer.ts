@@ -30,18 +30,11 @@ const PAGE_LEFT = 24;
 const PAGE_RIGHT = 588;
 const CONTENT_WIDTH = PAGE_RIGHT - PAGE_LEFT;
 const BOTTOM_LIMIT = 946;
-const COLS = [
-  { label: 'Qty.', width: 38 },
-  { label: 'Units', width: 42 },
-  { label: 'Description', width: 278 },
-  { label: 'US Screw Size', width: 80 },
-  { label: 'Unit Price (€)', width: 70 },
-  { label: 'TOTAL (€)', width: 56 },
-] as const;
-const COL_X = COLS.reduce<number[]>((xs, column, index) => {
-  xs.push(index === 0 ? PAGE_LEFT : xs[index - 1]! + COLS[index - 1]!.width);
-  return xs;
-}, []);
+interface MaterialColumn {
+  key: 'qty' | 'units' | 'description' | 'screwSize' | 'unitPrice' | 'total';
+  label: string;
+  width: number;
+}
 const NAVY = '#1e3a5f';
 const GRID = '#9ca3af';
 const ASSET_DIR = dirname(fileURLToPath(import.meta.url));
@@ -73,26 +66,54 @@ function drawCheckbox(doc: PDFKit.PDFDocument, label: string, selected: boolean,
   doc.font('Helvetica').fontSize(8).fillColor('#111827').text(label, x + 14, y - 1, { width: 140, lineBreak: false });
 }
 
-function drawTableHeader(doc: PDFKit.PDFDocument, y: number, currencySymbol: string): number {
+function columnsForTemplate(template: string, currencySymbol: string): MaterialColumn[] {
+  const columns: MaterialColumn[] = template === 'US Supplied Inst.'
+    ? [
+        { key: 'qty', label: 'Qty.', width: 38 },
+        { key: 'units', label: 'Units', width: 86 },
+        { key: 'description', label: 'Description', width: 314 },
+        { key: 'unitPrice', label: `Unit Price (${currencySymbol})`, width: 70 },
+        { key: 'total', label: `TOTAL (${currencySymbol})`, width: 56 },
+      ]
+    : [
+        { key: 'qty', label: 'Qty.', width: 38 },
+        { key: 'units', label: 'Units', width: 42 },
+        { key: 'description', label: 'Description', width: 278 },
+        { key: 'screwSize', label: 'US Screw Size', width: 80 },
+        { key: 'unitPrice', label: `Unit Price (${currencySymbol})`, width: 70 },
+        { key: 'total', label: `TOTAL (${currencySymbol})`, width: 56 },
+      ];
+  return columns;
+}
+
+function columnPositions(columns: MaterialColumn[]): number[] {
+  return columns.reduce<number[]>((positions, column, index) => {
+    positions.push(index === 0 ? PAGE_LEFT : positions[index - 1]! + columns[index - 1]!.width);
+    return positions;
+  }, []);
+}
+
+function drawTableHeader(doc: PDFKit.PDFDocument, y: number, columns: MaterialColumn[], positions: number[]): number {
   const height = 21;
-  COLS.forEach((column, index) => {
-    const x = COL_X[index]!;
+  columns.forEach((column, index) => {
+    const x = positions[index]!;
     doc.rect(x, y, column.width, height).lineWidth(0.5).fillAndStroke(NAVY, GRID);
-    const label = index === 4 ? `Unit Price (${currencySymbol})` : index === 5 ? `TOTAL (${currencySymbol})` : column.label;
     doc.font('Helvetica-Bold').fontSize(7).fillColor('#ffffff')
-      .text(label, x + 3, y + 7, { width: column.width - 6, lineBreak: false, align: index > 3 ? 'right' : 'left' });
+      .text(column.label, x + 3, y + 7, { width: column.width - 6, lineBreak: false, align: column.key === 'unitPrice' || column.key === 'total' ? 'right' : 'left' });
   });
   return y + height;
 }
 
-function drawRow(doc: PDFKit.PDFDocument, row: MaterialRow, y: number, height: number): void {
-  const values = [row.qty, row.units, row.description, row.screwSize, row.unitPrice, materialTotal(row) ? materialTotal(row).toFixed(2) : ''];
-  COLS.forEach((column, index) => {
-    const x = COL_X[index]!;
-    const background = index === 0 ? '#fff200' : index === 3 ? '#e5e7eb' : index === 5 ? '#f8c7ce' : '#ffffff';
+function drawRow(doc: PDFKit.PDFDocument, row: MaterialRow, y: number, height: number, columns: MaterialColumn[], positions: number[]): void {
+  columns.forEach((column, index) => {
+    const x = positions[index]!;
+    const value = column.key === 'total'
+      ? materialTotal(row) ? materialTotal(row).toFixed(2) : ''
+      : row[column.key];
+    const background = column.key === 'qty' ? '#fff200' : column.key === 'screwSize' ? '#e5e7eb' : column.key === 'total' ? '#f8c7ce' : '#ffffff';
     doc.rect(x, y, column.width, height).lineWidth(0.4).fillAndStroke(background, GRID);
     doc.font('Helvetica').fontSize(7).fillColor('#111827')
-      .text(values[index]!, x + 3, y + 4, { width: column.width - 6, height: height - 6, ellipsis: true, align: index > 3 ? 'right' : 'left' });
+      .text(value, x + 3, y + 4, { width: column.width - 6, height: height - 6, ellipsis: true, align: column.key === 'unitPrice' || column.key === 'total' ? 'right' : 'left' });
   });
 }
 
@@ -137,6 +158,8 @@ export function renderInstallationMaterialPDF(data: InstallationMaterialData, pr
 
     const title = `${data.template.toUpperCase()} INSTALLATION MATERIALS`;
     const currencySymbol = data.template === 'US Supplied Inst.' ? '$' : '€';
+    const columns = columnsForTemplate(data.template, currencySymbol);
+    const positions = columnPositions(columns);
     doc.rect(PAGE_LEFT, 16, CONTENT_WIDTH, 24).lineWidth(0.7).fillAndStroke('#ffffff', '#111827');
     doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text(title, PAGE_LEFT + 5, 22, { width: 330, lineBreak: false });
     doc.font('Helvetica-Bold').fontSize(9).text('Date:', 394, 23, { width: 30, lineBreak: false });
@@ -170,7 +193,7 @@ export function renderInstallationMaterialPDF(data: InstallationMaterialData, pr
     });
     if (LOGO_PATH) doc.image(LOGO_PATH, rightX + 3, boxY + 8, { fit: [rightWidth - 6, 94], align: 'center', valign: 'center' });
 
-    let y = drawTableHeader(doc, 174, currencySymbol);
+    let y = drawTableHeader(doc, 174, columns, positions);
     const sourceRows = data.rows.length ? data.rows : Array.from({ length: 44 }, () => ({ qty: '', units: '', description: '', screwSize: '', unitPrice: '' }));
     for (const row of sourceRows) {
       const rowHeight = 15;
@@ -179,9 +202,9 @@ export function renderInstallationMaterialPDF(data: InstallationMaterialData, pr
         y = 28;
         doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text(`${title} - continued`, PAGE_LEFT, y, { width: CONTENT_WIDTH });
         y += 21;
-        y = drawTableHeader(doc, y, currencySymbol);
+        y = drawTableHeader(doc, y, columns, positions);
       }
-      drawRow(doc, row, y, rowHeight);
+      drawRow(doc, row, y, rowHeight, columns, positions);
       y += rowHeight;
     }
 
