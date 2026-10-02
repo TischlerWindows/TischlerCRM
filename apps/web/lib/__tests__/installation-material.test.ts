@@ -1,6 +1,7 @@
 import {
   ACQ_FIXED_ROWS,
   calculateMaterialTotal,
+  generateInstallationMaterialQuantities,
   INSTALLATION_MATERIAL_ROW_COUNT,
   NON_ACQ_FIXED_ROWS,
   parseInstallationMaterial,
@@ -126,5 +127,22 @@ describe('installation material form', () => {
 
   it('migrates the former Korn source selection to Tischler Fensterwerk', () => {
     expect(parseInstallationMaterial({ orderedFrom: ['Korn'] }).orderedFrom).toEqual(['Tischler Fensterwerk'])
+  })
+
+  it('matches AutoCad fasteners to material sizes, aggregates repeats, and reports ambiguous items', () => {
+    const rows = parseInstallationMaterial({ template: 'Non-ACQ' }).rows
+    const result = generateInstallationMaterialQuantities(rows, [
+      { fastener: '4 x 35mm FH Phil Wood Screws', totalQty: 4 },
+      { fastener: '4 x 35mm FH Phil Wood Screws', totalQty: 6 },
+      { fastener: 'BTI Brackets', totalQty: 2 },
+      { fastener: 'Installation Clips', totalQty: 10 },
+      { fastener: 'Unknown fastener', totalQty: 3 },
+    ])
+
+    expect(result.rows[18]?.qty).toBe('10')
+    expect(result.rows[30]?.qty).toBe('2')
+    expect(result.ambiguousFasteners).toEqual(['Installation Clips'])
+    expect(result.unmatchedFasteners).toEqual(['Unknown fastener'])
+    expect(result.matchedFasteners).toBe(3)
   })
 })

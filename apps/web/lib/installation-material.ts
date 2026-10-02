@@ -268,3 +268,126 @@ export function calculateMaterialTotal(row: InstallationMaterialRow): number {
 export function formatMaterialTotal(value: number): string {
   return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+export interface AutoCadQuantityInput {
+  fastener: unknown
+  totalQty: unknown
+}
+
+export interface GeneratedMaterialQuantities {
+  rows: InstallationMaterialRow[]
+  matchedFasteners: number
+  unmatchedFasteners: string[]
+  ambiguousFasteners: string[]
+}
+
+function compact(value: string): string {
+  return value.toLowerCase().replace(/×/g, 'x').replace(/[^a-z0-9/.-]/g, '')
+}
+
+function sizeKey(value: string): string | null {
+  const normalized = compact(value)
+  const dimensions = normalized.match(/\d+(?:\/\d+)?(?:-\d+\/\d+)?x\d+(?:-\d+\/\d+)?(?:mm)?/g)
+  if (dimensions?.length) return dimensions[dimensions.length - 1]!
+  const length = normalized.match(/x\d+(?:-\d+\/\d+)?(?:mm)?/g)
+  return length?.length ? length[length.length - 1]! : null
+}
+
+function hasMatchingFamily(fastener: string, description: string): boolean {
+  const source = compact(fastener)
+  const target = compact(description)
+  const families: Array<[string[], string[]]> = [
+    [['toptec'], ['toptec']],
+    [['tapcon'], ['tapcon']],
+    [['selfdrilling'], ['selfdrilling', 'selfdrill']],
+    [['wood'], ['wood', 'screw']],
+    [['installationclips'], ['installationclips']],
+    [['aluminumangle', 'aluminiumangle'], ['aluminumangle', 'aluminiumangle']],
+    [['bti'], ['bti']],
+  ]
+  const present = families.filter(([sourceTerms]) => sourceTerms.some(term => source.includes(term)))
+  return present.length === 0 || present.some(([, targetTerms]) => targetTerms.some(term => target.includes(term)))
+}
+
+function fastenerMatchScore(fastener: string, description: string): number {
+  const source = compact(fastener)
+  const target = compact(description)
+  if (!hasMatchingFamily(fastener, description)) return Number.NEGATIVE_INFINITY
+  let score = 0
+  if (source.includes('panhead')) score += target.includes('panhead') ? 20 : -5
+  if (source.includes('fhphil')) {
+    if (target.includes('flathead')) score += 20
+    else if (target.includes('torx')) score -= 2
+  }
+  if (source.includes('hexhead')) score += target.includes('hexhead') ? 20 : -5
+  if (source.includes('selfdrilling')) score += target.includes('selfdrilling') || target.includes('selfdrill') ? 5 : 0
+  if (source.includes('torx')) score += target.includes('torx') ? 10 : -2
+  if (source.includes('bti')) score += target.includes('bti') ? 5 : 0
+  return score
+}
+
+function matchesNonDimensionalFamily(fastener: string, description: string): boolean {
+  const source = compact(fastener)
+  const target = compact(description)
+  if (source.includes('btibrackets')) return target.includes('btiperforatedplate')
+  if (source.includes('installationclips')) return target.includes('installationclips')
+  if (source.includes('aluminumangle') || source.includes('aluminiumangle')) {
+    return target.includes('aluminumangle') || target.includes('aluminiumangle')
+  }
+  return false
+}
+
+export function generateInstallationMaterialQuantities(
+  rows: InstallationMaterialRow[],
+  autocadRows: AutoCadQuantityInput[],
+): GeneratedMaterialQuantities {
+  const quantities = new Map<number, number>()
+  const unmatchedFasteners: string[] = []
+  const ambiguousFasteners: string[] = []
+  let matchedFasteners = 0
+
+  for (const item of autocadRows) {
+    const fastener = typeof item.fastener === 'string' ? item.fastener.trim() : ''
+    const quantity = Number(String(item.totalQty ?? '').replace(/,/g, ''))
+    if (!fastener || !Number.isFinite(quantity) || quantity === 0) continue
+
+    const normalizedFastener = compact(fastener)
+    const exactMatches = rows.flatMap((row, index) => {
+      const normalizedDescription = compact(row.description)
+      return normalizedDescription.includes(normalizedFastener) ? [index] : []
+    })
+    let matches = exactMatches
+    if (matches.length === 0) {
+      const key = sizeKey(fastener)
+      if (key) {
+        const scored = rows.flatMap((row, index) => {
+          const score = sizeKey(row.description) === key ? fastenerMatchScore(fastener, row.description) : Number.NEGATIVE_INFINITY
+          return Number.isFinite(score) ? [{ index, score }] : []
+        })
+        const bestScore = Math.max(...scored.map(candidate => candidate.score), Number.NEGATIVE_INFINITY)
+        matches = scored.filter(candidate => candidate.score === bestScore).map(candidate => candidate.index)
+      } else {
+        matches = rows.flatMap((row, index) => matchesNonDimensionalFamily(fastener, row.description) ? [index] : [])
+      }
+    }
+
+    if (matches.length === 1) {
+      const index = matches[0]!
+      quantities.set(index, (quantities.get(index) ?? 0) + quantity)
+      matchedFasteners++
+    } else if (matches.length > 1) {
+      ambiguousFasteners.push(fastener)
+    } else {
+      unmatchedFasteners.push(fastener)
+    }
+  }
+
+  return {
+    rows: rows.map((row, index) => quantities.has(index)
+      ? { ...row, qty: String(quantities.get(index)) }
+      : { ...row }),
+    matchedFasteners,
+    unmatchedFasteners,
+    ambiguousFasteners,
+  }
+}

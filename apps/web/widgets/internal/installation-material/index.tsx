@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, Check, FileText, Loader2, Save } from 'lucide-react'
+import { AlertCircle, Calculator, Check, FileText, Loader2, Save } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
 import { recordsService } from '@/lib/records-service'
@@ -9,7 +9,7 @@ import { getRecordName } from '../shared/recordName'
 import { readProjectField } from '@/lib/factory-order-spec'
 import { normalizeSingleLookupUserValue, type LookupUserIdentity } from '@/lib/user-lookup'
 import {
-  calculateMaterialTotal, formatMaterialTotal, INSTALLATION_MATERIAL_TEMPLATES,
+  calculateMaterialTotal, formatMaterialTotal, generateInstallationMaterialQuantities, INSTALLATION_MATERIAL_TEMPLATES,
   INSTALLATION_METHODS, MATERIAL_SOURCES, parseInstallationMaterialWorkbook,
   type InstallationMaterial, type InstallationMaterialRow, type InstallationMaterialWorkbook,
 } from '@/lib/installation-material'
@@ -52,8 +52,10 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
+  const [generatingQuantities, setGeneratingQuantities] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [quantityMessage, setQuantityMessage] = useState<string | null>(null)
 
   useEffect(() => {
     setWorkbook(hydrateWorkbook(parseInstallationMaterialWorkbook(raw, projectName), {
@@ -101,6 +103,31 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     setWorkbook(current => ({ ...current, activeTemplate: template }))
     setDirty(true)
     setSaved(false)
+  }
+
+  const generateQuantities = async () => {
+    if (!projectId || generatingQuantities) return
+    setGeneratingQuantities(true)
+    setError(null)
+    setQuantityMessage(null)
+    try {
+      const autocadRows = await recordsService.getRecords('AutoCad', { filter: { project: projectId } })
+      const generated = generateInstallationMaterialQuantities(form.rows, autocadRows.map(row => ({
+        fastener: row.data?.fastener,
+        totalQty: row.data?.totalQty,
+      })))
+      if (generated.matchedFasteners > 0) update({ rows: generated.rows })
+      const notes = [
+        `${generated.matchedFasteners} AutoCad item${generated.matchedFasteners === 1 ? '' : 's'} matched.`,
+        generated.ambiguousFasteners.length ? `${generated.ambiguousFasteners.length} ambiguous item${generated.ambiguousFasteners.length === 1 ? '' : 's'} skipped.` : '',
+        generated.unmatchedFasteners.length ? `${generated.unmatchedFasteners.length} unmatched item${generated.unmatchedFasteners.length === 1 ? '' : 's'} skipped.` : '',
+      ].filter(Boolean)
+      setQuantityMessage(notes.join(' '))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Failed to generate quantities from AutoCad')
+    } finally {
+      setGeneratingQuantities(false)
+    }
   }
 
   const updateRow = (index: number, patch: Partial<InstallationMaterialRow>) => {
@@ -177,6 +204,9 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
         </div>
         <div className="flex items-center gap-2">
           {saved && !dirty && <span role="status" className="inline-flex items-center gap-1 text-xs text-green-700"><Check className="h-4 w-4" /> Saved</span>}
+          <button type="button" onClick={() => void generateQuantities()} disabled={!projectId || generatingQuantities} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold hover:bg-gray-50 disabled:opacity-40">
+            {generatingQuantities ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}{generatingQuantities ? 'Generating' : 'Generate Quantities'}
+          </button>
           <button type="button" onClick={() => void previewPdf()} disabled={previewing} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold hover:bg-gray-50 disabled:opacity-40">
             {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}{previewing ? 'Preparing PDF' : 'Preview PDF'}
           </button>
@@ -186,6 +216,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
         </div>
       </div>
       {error && <div role="alert" className="flex items-center gap-2 border border-red-200 bg-red-50 p-2 text-red-700"><AlertCircle className="h-4 w-4" />{error}</div>}
+      {quantityMessage && <div role="status" className="border border-blue-200 bg-blue-50 p-2 text-xs text-blue-800">{quantityMessage}</div>}
 
       <div className="space-y-4">
         <div role="tablist" aria-label="Installation Material sheets" className="flex overflow-x-auto border-b border-gray-300">
