@@ -1,6 +1,6 @@
 import {
-  calculateMaterialTotal,
   ACQ_FIXED_ROWS,
+  calculateMaterialTotal,
   INSTALLATION_MATERIAL_ROW_COUNT,
   parseInstallationMaterial,
   parseInstallationMaterialWorkbook,
@@ -16,6 +16,24 @@ describe('installation material form', () => {
     expect(material.rows[0]?.qty).toBe('')
   })
 
+  it('matches the corrected ACQ screw and installation clip source rows', () => {
+    expect(ACQ_FIXED_ROWS.find(row => row.description.includes('4x35 mm'))).toMatchObject({
+      description: 'Qty. 500 - 4x35 mm Wood Screws SS Frames Torx 20 (NOT DC APPROVED)',
+      screwSize: '#8 x 1-3/8"',
+      unitPrice: '33.98',
+    })
+    expect(ACQ_FIXED_ROWS.find(row => row.description.includes('PZ2 (Pan Head)'))?.description)
+      .toBe('Qty. 200 - 4x40 mm Wood Screws SS, PZ2 (Pan Head) (Phillips)')
+    expect(ACQ_FIXED_ROWS.find(row => row.description.includes('Standard (Meesenburg)'))).toMatchObject({
+      description: 'Qty. 100 - Installation Clips (140x2x25) - Standard (Meesenburg)',
+      screwSize: '5-1/2" x 1/16" x 1"',
+    })
+    expect(ACQ_FIXED_ROWS.find(row => row.description.includes('Dade County (Meesenburg)'))).toMatchObject({
+      description: 'Qty. 100 - Installation Clips (140x2x20) - Dade County (Meesenburg)',
+      screwSize: '5-1/2" x 1/16" x 13/16"',
+    })
+  })
+
   it('round-trips template choices and computes line totals', () => {
     const material = parseInstallationMaterial(JSON.stringify({
       template: 'US Supplied Inst.',
@@ -26,6 +44,7 @@ describe('installation material form', () => {
     expect(material.template).toBe('US Supplied Inst.')
     expect(material.orderedFrom).toEqual(['Tischler Fensterwerk', 'FL Warehouse'])
     expect(calculateMaterialTotal(material.rows[0]!)).toBe(7.5)
+    expect(calculateMaterialTotal({ qty: '10', units: 'Box', description: 'Free item', screwSize: '', unitPrice: '0.00' })).toBe(0)
   })
 
   it('keeps three worksheet forms independent and migrates a legacy single form', () => {
