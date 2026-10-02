@@ -69,6 +69,17 @@ describe('installation material form', () => {
     expect(nonAcq.rows[40]?.description).toBe('Metal Counter Sink Drill Bit (Hexagonal Shaft)')
   })
 
+  it('restores locked ACQ and Non-ACQ columns while preserving quantities', () => {
+    const attemptedEdits = {
+      qty: '7', units: 'Custom', description: 'Edited text', screwSize: 'Custom size', unitPrice: '0.01',
+    }
+    const acq = parseInstallationMaterial({ template: 'ACQ', rows: [attemptedEdits] })
+    const nonAcq = parseInstallationMaterial({ template: 'Non-ACQ', rows: [attemptedEdits] })
+
+    expect(acq.rows[0]).toEqual({ ...ACQ_FIXED_ROWS[0], qty: '7' })
+    expect(nonAcq.rows[0]).toEqual({ ...NON_ACQ_FIXED_ROWS[0], qty: '7' })
+  })
+
   it('round-trips template choices and computes line totals', () => {
     const material = parseInstallationMaterial(JSON.stringify({
       template: 'US Supplied Inst.',
