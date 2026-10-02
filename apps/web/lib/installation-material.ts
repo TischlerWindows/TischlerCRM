@@ -1,6 +1,6 @@
 export const INSTALLATION_MATERIAL_TEMPLATES = ['ACQ', 'Non-ACQ', 'US Supplied Inst.'] as const
 export const INSTALLATION_METHODS = ['Installation by TuS', 'Installation by Others', 'Dade County installation'] as const
-export const MATERIAL_SOURCES = ['Korn', 'CT Warehouse', 'Other', 'FL Warehouse'] as const
+export const MATERIAL_SOURCES = ['Tischler Fensterwerk', 'CT Warehouse', 'Other', 'FL Warehouse'] as const
 export const INSTALLATION_MATERIAL_ROW_COUNT = 44
 
 export interface InstallationMaterialRow {
@@ -46,6 +46,9 @@ export function parseInstallationMaterial(raw: unknown, projectName = ''): Insta
   const selected = (value: unknown, options: readonly string[]) => Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string' && options.includes(item))
     : []
+  const orderedFromValues = Array.isArray(data.orderedFrom)
+    ? data.orderedFrom.map(value => value === 'Korn' ? 'Tischler Fensterwerk' : value)
+    : data.orderedFrom
   const rows = Array.isArray(data.rows) ? data.rows.slice(0, 100).map((row: unknown) => {
     const item = row && typeof row === 'object' ? row as Record<string, unknown> : {}
     return {
@@ -60,7 +63,7 @@ export function parseInstallationMaterial(raw: unknown, projectName = ''): Insta
     date: text(data.date), factory: text(data.factory), project: text(data.project) || projectName,
     location: text(data.location), projectManager: text(data.projectManager), attn: text(data.attn),
     installationBy: selected(data.installationBy, INSTALLATION_METHODS),
-    orderedFrom: selected(data.orderedFrom, MATERIAL_SOURCES),
+    orderedFrom: selected(orderedFromValues, MATERIAL_SOURCES),
     rows: rows.length ? rows : Array.from({ length: INSTALLATION_MATERIAL_ROW_COUNT }, emptyRow),
     signature: text(data.signature), signatureDate: text(data.signatureDate),
   }

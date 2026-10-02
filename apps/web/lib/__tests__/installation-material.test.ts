@@ -17,11 +17,11 @@ describe('installation material form', () => {
     const material = parseInstallationMaterial(JSON.stringify({
       template: 'US Supplied Inst.',
       installationBy: ['Installation by TuS'],
-      orderedFrom: ['Korn', 'FL Warehouse'],
+      orderedFrom: ['Tischler Fensterwerk', 'FL Warehouse'],
       rows: [{ qty: '3', units: 'box', description: 'Fasteners', screwSize: '#10', unitPrice: '2.50' }],
     }))
     expect(material.template).toBe('US Supplied Inst.')
-    expect(material.orderedFrom).toEqual(['Korn', 'FL Warehouse'])
+    expect(material.orderedFrom).toEqual(['Tischler Fensterwerk', 'FL Warehouse'])
     expect(calculateMaterialTotal(material.rows[0]!)).toBe(7.5)
   })
 
@@ -44,5 +44,9 @@ describe('installation material form', () => {
     expect(migrated.activeTemplate).toBe('Non-ACQ')
     expect(migrated.sheets['Non-ACQ'].rows[0]?.description).toBe('Old entry')
     expect(migrated.sheets.ACQ.rows[0]?.description).toBe('')
+  })
+
+  it('migrates the former Korn source selection to Tischler Fensterwerk', () => {
+    expect(parseInstallationMaterial({ orderedFrom: ['Korn'] }).orderedFrom).toEqual(['Tischler Fensterwerk'])
   })
 })

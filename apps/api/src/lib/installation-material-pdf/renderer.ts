@@ -162,7 +162,8 @@ export function renderInstallationMaterialPDF(data: InstallationMaterialData, pr
     doc.font('Helvetica-Bold').fontSize(8).text('To be ordered from:', centerX + 7, 126, { width: centerWidth - 14 });
     const sourcePositions = [[centerX + 12, 142], [centerX + 96, 142], [centerX + 12, 155], [centerX + 96, 155]] as const;
     data.orderedFrom.forEach(option => {
-      const index = ['Korn', 'CT Warehouse', 'Other', 'FL Warehouse'].indexOf(option);
+      const normalizedOption = option === 'Korn' ? 'Tischler Fensterwerk' : option;
+      const index = ['Tischler Fensterwerk', 'CT Warehouse', 'Other', 'FL Warehouse'].indexOf(normalizedOption);
       if (index >= 0) drawCheckbox(doc, option, true, sourcePositions[index]![0], sourcePositions[index]![1]);
     });
     if (LOGO_PATH) doc.image(LOGO_PATH, rightX + 3, boxY + 8, { fit: [rightWidth - 6, 94], align: 'center', valign: 'center' });
