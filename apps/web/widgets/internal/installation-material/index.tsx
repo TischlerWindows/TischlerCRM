@@ -103,10 +103,11 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     setWorkbook(current => ({ ...current, activeTemplate: template }))
     setDirty(true)
     setSaved(false)
+    setQuantityMessage(null)
   }
 
   const generateQuantities = async () => {
-    if (!projectId || generatingQuantities) return
+    if (!projectId || generatingQuantities || form.template === 'US Supplied Inst.') return
     setGeneratingQuantities(true)
     setError(null)
     setQuantityMessage(null)
@@ -190,6 +191,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   const total = form.rows.reduce((sum, row) => sum + calculateMaterialTotal(row), 0)
   const lockFixedColumns = true
   const isUsSupplied = form.template === 'US Supplied Inst.'
+  const canGenerateQuantities = form.template === 'ACQ' || form.template === 'Non-ACQ'
   const currencySymbol = isUsSupplied ? '$' : '€'
   const toggleOption = (current: string[], option: string) => current.includes(option)
     ? current.filter(value => value !== option)
@@ -204,9 +206,9 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
         </div>
         <div className="flex items-center gap-2">
           {saved && !dirty && <span role="status" className="inline-flex items-center gap-1 text-xs text-green-700"><Check className="h-4 w-4" /> Saved</span>}
-          <button type="button" onClick={() => void generateQuantities()} disabled={!projectId || generatingQuantities} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold hover:bg-gray-50 disabled:opacity-40">
+          {canGenerateQuantities && <button type="button" onClick={() => void generateQuantities()} disabled={!projectId || generatingQuantities} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold hover:bg-gray-50 disabled:opacity-40">
             {generatingQuantities ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}{generatingQuantities ? 'Generating' : 'Generate Quantities'}
-          </button>
+          </button>}
           <button type="button" onClick={() => void previewPdf()} disabled={previewing} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold hover:bg-gray-50 disabled:opacity-40">
             {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}{previewing ? 'Preparing PDF' : 'Preview PDF'}
           </button>

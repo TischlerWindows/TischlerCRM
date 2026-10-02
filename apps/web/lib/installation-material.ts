@@ -250,13 +250,7 @@ export function parseInstallationMaterialWorkbook(raw: unknown, projectName = ''
     sheets = { ...sheets, [legacy.template]: legacy }
   }
 
-  const requestedActive = rawSheets && INSTALLATION_MATERIAL_TEMPLATES.includes(data.activeTemplate as typeof INSTALLATION_MATERIAL_TEMPLATES[number])
-    ? data.activeTemplate as typeof INSTALLATION_MATERIAL_TEMPLATES[number]
-    : !rawSheets
-      ? parseInstallationMaterial(data, projectName).template
-      : INSTALLATION_MATERIAL_TEMPLATES[0]
-
-  return { version: 1, activeTemplate: requestedActive, sheets }
+  return { version: 1, activeTemplate: 'ACQ', sheets }
 }
 
 export function calculateMaterialTotal(row: InstallationMaterialRow): number {

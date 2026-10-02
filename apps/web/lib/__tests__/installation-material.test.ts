@@ -111,7 +111,7 @@ describe('installation material form', () => {
         'US Supplied Inst.': { template: 'US Supplied Inst.', rows: [{ qty: '3', units: 'Box (100)', description: 'US item' }] },
       },
     })
-    expect(workbook.activeTemplate).toBe('US Supplied Inst.')
+    expect(workbook.activeTemplate).toBe('ACQ')
     expect(workbook.sheets.ACQ.rows[0]?.description).toBe(ACQ_FIXED_ROWS[0]?.description)
     expect(workbook.sheets.ACQ.rows[0]?.qty).toBe('1')
     expect(workbook.sheets['Non-ACQ'].rows[0]?.description).toBe(NON_ACQ_FIXED_ROWS[0]?.description)
@@ -120,7 +120,7 @@ describe('installation material form', () => {
     expect(workbook.sheets['US Supplied Inst.'].rows[0]?.qty).toBe('3')
 
     const migrated = parseInstallationMaterialWorkbook({ template: 'Non-ACQ', rows: [{ description: 'Old entry' }] })
-    expect(migrated.activeTemplate).toBe('Non-ACQ')
+    expect(migrated.activeTemplate).toBe('ACQ')
     expect(migrated.sheets['Non-ACQ'].rows[0]?.description).toBe(NON_ACQ_FIXED_ROWS[0]?.description)
     expect(migrated.sheets.ACQ.rows[0]?.description).toBe(ACQ_FIXED_ROWS[0]?.description)
   })
