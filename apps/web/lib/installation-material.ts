@@ -281,7 +281,7 @@ function compact(value: string): string {
 }
 
 function sizeKey(value: string): string | null {
-  const normalized = compact(value)
+  const normalized = compact(value.replace(/^\s*qty\.?\s*[\d,]+\s*-\s*/i, ''))
   const dimensions = normalized.match(/\d+(?:\/\d+)?(?:-\d+\/\d+)?x\d+(?:-\d+\/\d+)?(?:mm)?/g)
   if (dimensions?.length) return dimensions[dimensions.length - 1]!
   const length = normalized.match(/x\d+(?:-\d+\/\d+)?(?:mm)?/g)
@@ -384,5 +384,35 @@ export function generateInstallationMaterialQuantities(
     matchedFasteners,
     unmatchedFasteners,
     ambiguousFasteners,
+  }
+}
+
+export interface GeneratedMaterialWorkbookQuantities {
+  sheets: InstallationMaterialWorkbook['sheets']
+  matchedFasteners: number
+  unmatchedFasteners: string[]
+  ambiguousFasteners: string[]
+}
+
+export function generateInstallationMaterialWorkbookQuantities(
+  sheets: InstallationMaterialWorkbook['sheets'],
+  autocadRows: AutoCadQuantityInput[],
+): GeneratedMaterialWorkbookQuantities {
+  const generated = Object.fromEntries(INSTALLATION_MATERIAL_TEMPLATES.map(template => [
+    template,
+    generateInstallationMaterialQuantities(sheets[template].rows, autocadRows),
+  ])) as Record<typeof INSTALLATION_MATERIAL_TEMPLATES[number], GeneratedMaterialQuantities>
+  const results = INSTALLATION_MATERIAL_TEMPLATES.map(template => generated[template])
+
+  return {
+    sheets: Object.fromEntries(INSTALLATION_MATERIAL_TEMPLATES.map(template => [
+      template,
+      { ...sheets[template], rows: generated[template].rows },
+    ])) as InstallationMaterialWorkbook['sheets'],
+    matchedFasteners: results.reduce((total, result) => total + result.matchedFasteners, 0),
+    unmatchedFasteners: results[0]!.unmatchedFasteners.filter(fastener =>
+      results.every(result => result.unmatchedFasteners.includes(fastener))),
+    ambiguousFasteners: INSTALLATION_MATERIAL_TEMPLATES.flatMap(template =>
+      generated[template].ambiguousFasteners.map(fastener => `${template}: ${fastener}`)),
   }
 }

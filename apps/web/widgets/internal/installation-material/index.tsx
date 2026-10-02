@@ -9,8 +9,8 @@ import { getRecordName } from '../shared/recordName'
 import { readProjectField } from '@/lib/factory-order-spec'
 import { normalizeSingleLookupUserValue, type LookupUserIdentity } from '@/lib/user-lookup'
 import {
-  calculateMaterialTotal, formatMaterialTotal, generateInstallationMaterialQuantities, INSTALLATION_MATERIAL_TEMPLATES,
-  INSTALLATION_METHODS, MATERIAL_SOURCES, parseInstallationMaterialWorkbook,
+  calculateMaterialTotal, formatMaterialTotal, generateInstallationMaterialWorkbookQuantities,
+  INSTALLATION_MATERIAL_TEMPLATES, INSTALLATION_METHODS, MATERIAL_SOURCES, parseInstallationMaterialWorkbook,
   type InstallationMaterial, type InstallationMaterialRow, type InstallationMaterialWorkbook,
 } from '@/lib/installation-material'
 
@@ -113,14 +113,24 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     setQuantityMessage(null)
     try {
       const autocadRows = await recordsService.getRecords('AutoCad', { filter: { project: projectId } })
-      const generated = generateInstallationMaterialQuantities(form.rows, autocadRows.map(row => ({
+      const generated = generateInstallationMaterialWorkbookQuantities(workbook.sheets, autocadRows.map(row => ({
         fastener: row.data?.fastener,
         totalQty: row.data?.totalQty,
       })))
-      if (generated.matchedFasteners > 0) update({ rows: generated.rows })
+      if (generated.matchedFasteners > 0) {
+        setWorkbook(current => ({
+          ...current,
+          sheets: generateInstallationMaterialWorkbookQuantities(current.sheets, autocadRows.map(row => ({
+            fastener: row.data?.fastener,
+            totalQty: row.data?.totalQty,
+          }))).sheets,
+        }))
+        setDirty(true)
+        setSaved(false)
+      }
       const notes = [
-        `${generated.matchedFasteners} AutoCad item${generated.matchedFasteners === 1 ? '' : 's'} matched.`,
-        generated.ambiguousFasteners.length ? `${generated.ambiguousFasteners.length} ambiguous item${generated.ambiguousFasteners.length === 1 ? '' : 's'} skipped.` : '',
+        `${generated.matchedFasteners} AutoCad worksheet match${generated.matchedFasteners === 1 ? '' : 'es'}.`,
+        generated.ambiguousFasteners.length ? `${generated.ambiguousFasteners.length} ambiguous sheet match${generated.ambiguousFasteners.length === 1 ? '' : 'es'} skipped.` : '',
         generated.unmatchedFasteners.length ? `${generated.unmatchedFasteners.length} unmatched item${generated.unmatchedFasteners.length === 1 ? '' : 's'} skipped.` : '',
       ].filter(Boolean)
       setQuantityMessage(notes.join(' '))

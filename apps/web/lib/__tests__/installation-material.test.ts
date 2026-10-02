@@ -2,6 +2,7 @@ import {
   ACQ_FIXED_ROWS,
   calculateMaterialTotal,
   generateInstallationMaterialQuantities,
+  generateInstallationMaterialWorkbookQuantities,
   INSTALLATION_MATERIAL_ROW_COUNT,
   NON_ACQ_FIXED_ROWS,
   parseInstallationMaterial,
@@ -156,5 +157,25 @@ describe('installation material form', () => {
 
     expect(result.rows[1]?.qty).toBe('12')
     expect(result.matchedFasteners).toBe(1)
+  })
+
+  it('matches one AutoCad fastener to every applicable worksheet', () => {
+    const workbook = parseInstallationMaterialWorkbook(null)
+    const result = generateInstallationMaterialWorkbookQuantities(workbook.sheets, [
+      { fastener: '6/10 x 80 mm Toptec', totalQty: 200 },
+    ])
+
+    expect(result.sheets.ACQ.rows[0]).toMatchObject({
+      description: 'Qty. 200 - 6/10 x 80 mm Toptec (Ruspert Finish)',
+      qty: '200',
+    })
+    expect(result.sheets['Non-ACQ'].rows[0]).toMatchObject({
+      description: 'Qty. 200 - 6/10 x 80 mm Zink Toptec Standard',
+      qty: '200',
+    })
+    expect(result.sheets['US Supplied Inst.'].rows.every(row => row.qty === '')).toBe(true)
+    expect(result.matchedFasteners).toBe(2)
+    expect(result.unmatchedFasteners).toEqual([])
+    expect(result.ambiguousFasteners).toEqual([])
   })
 })
