@@ -38,7 +38,7 @@ describe('installation material form', () => {
 
   it('loads the Non-ACQ catalog values from the supplied table', () => {
     const nonAcq = parseInstallationMaterial({ template: 'Non-ACQ' })
-    expect(nonAcq.rows).toHaveLength(INSTALLATION_MATERIAL_ROW_COUNT)
+    expect(nonAcq.rows).toHaveLength(NON_ACQ_FIXED_ROWS.length)
     expect(nonAcq.rows[0]).toMatchObject({
       units: 'Box',
       description: 'Qty. 200 - 6/10 x 80 mm Zink Toptec Standard',
@@ -91,7 +91,7 @@ describe('installation material form', () => {
     expect(material.template).toBe('US Supplied Inst.')
     expect(material.orderedFrom).toEqual(['Tischler Fensterwerk', 'FL Warehouse'])
     expect(US_SUPPLIED_FIXED_ROWS).toHaveLength(44)
-    expect(material.rows).toHaveLength(INSTALLATION_MATERIAL_ROW_COUNT)
+    expect(material.rows).toHaveLength(US_SUPPLIED_FIXED_ROWS.length)
     expect(material.rows[0]).toMatchObject({ ...US_SUPPLIED_FIXED_ROWS[0], qty: '3' })
     expect(calculateMaterialTotal(material.rows[0]!)).toBe(33.93)
     expect(calculateMaterialTotal({ qty: '10', units: 'Box', description: 'Free item', screwSize: '', unitPrice: '0.00' })).toBe(0)

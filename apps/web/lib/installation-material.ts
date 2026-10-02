@@ -211,8 +211,8 @@ export function parseInstallationMaterial(raw: unknown, projectName = ''): Insta
         ? US_SUPPLIED_FIXED_ROWS
         : null
   const normalizedRows = fixedRows
-    ? Array.from({ length: Math.max(INSTALLATION_MATERIAL_ROW_COUNT, fixedRows.length) }, (_, index) => ({
-      ...(fixedRows[index] ?? emptyRow()),
+    ? fixedRows.map((fixed, index) => ({
+      ...fixed,
       qty: rows[index]?.qty ?? '',
     }))
     : rows.length
