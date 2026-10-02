@@ -107,7 +107,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   }
 
   const generateQuantities = async () => {
-    if (!projectId || generatingQuantities || form.template === 'US Supplied Inst.') return
+    if (!projectId || generatingQuantities) return
     setGeneratingQuantities(true)
     setError(null)
     setQuantityMessage(null)
@@ -132,7 +132,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   }
 
   const updateRow = (index: number, patch: Partial<InstallationMaterialRow>) => {
-    if (form.template !== 'US Supplied Inst.' && Object.keys(patch).some(field => field !== 'qty')) return
+    if (Object.keys(patch).some(field => field !== 'qty' && field !== 'unitPrice')) return
     update({ rows: form.rows.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row) })
   }
 
@@ -191,7 +191,6 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   const total = form.rows.reduce((sum, row) => sum + calculateMaterialTotal(row), 0)
   const lockFixedColumns = true
   const isUsSupplied = form.template === 'US Supplied Inst.'
-  const canGenerateQuantities = form.template === 'ACQ' || form.template === 'Non-ACQ'
   const currencySymbol = isUsSupplied ? '$' : '€'
   const toggleOption = (current: string[], option: string) => current.includes(option)
     ? current.filter(value => value !== option)
@@ -206,9 +205,9 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
         </div>
         <div className="flex items-center gap-2">
           {saved && !dirty && <span role="status" className="inline-flex items-center gap-1 text-xs text-green-700"><Check className="h-4 w-4" /> Saved</span>}
-          {canGenerateQuantities && <button type="button" onClick={() => void generateQuantities()} disabled={!projectId || generatingQuantities} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold hover:bg-gray-50 disabled:opacity-40">
+          <button type="button" onClick={() => void generateQuantities()} disabled={!projectId || generatingQuantities} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold hover:bg-gray-50 disabled:opacity-40">
             {generatingQuantities ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}{generatingQuantities ? 'Generating' : 'Generate Quantities'}
-          </button>}
+          </button>
           <button type="button" onClick={() => void previewPdf()} disabled={previewing} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold hover:bg-gray-50 disabled:opacity-40">
             {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}{previewing ? 'Preparing PDF' : 'Preview PDF'}
           </button>
@@ -296,7 +295,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
                 <td className="border border-gray-300 p-1"><input aria-label={`Units row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.units} onChange={event => updateRow(index, { units: event.target.value })} /></td>
                 <td className="border border-gray-300 p-1"><input aria-label={`Description row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.description} onChange={event => updateRow(index, { description: event.target.value })} /></td>
                 {!isUsSupplied && <td className="border border-gray-300 bg-gray-100 p-1"><input aria-label={`US screw size row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:text-gray-600`} value={row.screwSize} onChange={event => updateRow(index, { screwSize: event.target.value })} /></td>}
-                <td className="border border-gray-300 p-1"><input aria-label={`Unit price row ${index + 1}`} disabled={lockFixedColumns} inputMode="decimal" className={`${inputClass} text-right disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.unitPrice} onChange={event => updateRow(index, { unitPrice: event.target.value })} /></td>
+                <td className="border border-gray-300 p-1"><input aria-label={`Unit price row ${index + 1}`} inputMode="decimal" className={`${inputClass} text-right`} value={row.unitPrice} onChange={event => updateRow(index, { unitPrice: event.target.value })} /></td>
                 <td className="border border-gray-300 bg-rose-200 px-2 text-right font-medium">{rowTotal ? formatMaterialTotal(rowTotal) : ''}</td>
               </tr>
             })}

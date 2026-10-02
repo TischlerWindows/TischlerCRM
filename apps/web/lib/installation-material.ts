@@ -214,6 +214,7 @@ export function parseInstallationMaterial(raw: unknown, projectName = ''): Insta
     ? fixedRows.map((fixed, index) => ({
       ...fixed,
       qty: rows[index]?.qty ?? '',
+      unitPrice: rows[index]?.unitPrice ?? fixed.unitPrice,
     }))
     : rows.length
       ? [...rows, ...Array.from({ length: Math.max(0, INSTALLATION_MATERIAL_ROW_COUNT - rows.length) }, emptyRow)]

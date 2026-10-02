@@ -77,9 +77,11 @@ describe('installation material form', () => {
     }
     const acq = parseInstallationMaterial({ template: 'ACQ', rows: [attemptedEdits] })
     const nonAcq = parseInstallationMaterial({ template: 'Non-ACQ', rows: [attemptedEdits] })
+    const usSupplied = parseInstallationMaterial({ template: 'US Supplied Inst.', rows: [attemptedEdits] })
 
-    expect(acq.rows[0]).toEqual({ ...ACQ_FIXED_ROWS[0], qty: '7' })
-    expect(nonAcq.rows[0]).toEqual({ ...NON_ACQ_FIXED_ROWS[0], qty: '7' })
+    expect(acq.rows[0]).toEqual({ ...ACQ_FIXED_ROWS[0], qty: '7', unitPrice: '0.01' })
+    expect(nonAcq.rows[0]).toEqual({ ...NON_ACQ_FIXED_ROWS[0], qty: '7', unitPrice: '0.01' })
+    expect(usSupplied.rows[0]).toEqual({ ...US_SUPPLIED_FIXED_ROWS[0], qty: '7', unitPrice: '0.01' })
   })
 
   it('round-trips template choices and computes line totals', () => {
@@ -93,8 +95,8 @@ describe('installation material form', () => {
     expect(material.orderedFrom).toEqual(['Tischler Fensterwerk', 'FL Warehouse'])
     expect(US_SUPPLIED_FIXED_ROWS).toHaveLength(44)
     expect(material.rows).toHaveLength(US_SUPPLIED_FIXED_ROWS.length)
-    expect(material.rows[0]).toMatchObject({ ...US_SUPPLIED_FIXED_ROWS[0], qty: '3' })
-    expect(calculateMaterialTotal(material.rows[0]!)).toBe(33.93)
+    expect(material.rows[0]).toMatchObject({ ...US_SUPPLIED_FIXED_ROWS[0], qty: '3', unitPrice: '2.50' })
+    expect(calculateMaterialTotal(material.rows[0]!)).toBe(7.5)
     expect(material.rows[34]?.description).toContain('4W Vario Foam')
     expect(material.rows[43]?.description).toBe('Metal Counter Sink Drill')
     expect(material.rows[43]?.unitPrice).toBe('')
@@ -144,5 +146,15 @@ describe('installation material form', () => {
     expect(result.ambiguousFasteners).toEqual(['Installation Clips'])
     expect(result.unmatchedFasteners).toEqual(['Unknown fastener'])
     expect(result.matchedFasteners).toBe(3)
+  })
+
+  it('generates matching AutoCad quantities on the US Supplied sheet', () => {
+    const usSupplied = parseInstallationMaterial({ template: 'US Supplied Inst.' })
+    const result = generateInstallationMaterialQuantities(usSupplied.rows, [
+      { fastener: '1/4" FH Tapcon Screws x 1-3/4"', totalQty: 12 },
+    ])
+
+    expect(result.rows[1]?.qty).toBe('12')
+    expect(result.matchedFasteners).toBe(1)
   })
 })
