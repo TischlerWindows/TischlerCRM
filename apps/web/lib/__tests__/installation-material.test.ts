@@ -94,6 +94,9 @@ describe('installation material form', () => {
     expect(material.rows).toHaveLength(US_SUPPLIED_FIXED_ROWS.length)
     expect(material.rows[0]).toMatchObject({ ...US_SUPPLIED_FIXED_ROWS[0], qty: '3' })
     expect(calculateMaterialTotal(material.rows[0]!)).toBe(33.93)
+    expect(material.rows[34]?.description).toContain('4W Vario Foam')
+    expect(material.rows[43]?.description).toBe('Metal Counter Sink Drill')
+    expect(material.rows[43]?.unitPrice).toBe('')
     expect(calculateMaterialTotal({ qty: '10', units: 'Box', description: 'Free item', screwSize: '', unitPrice: '0.00' })).toBe(0)
   })
 

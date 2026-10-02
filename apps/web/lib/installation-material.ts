@@ -168,7 +168,7 @@ export const US_SUPPLIED_FIXED_ROWS: Omit<InstallationMaterialRow, 'qty'>[] = [
   { units: 'Tube', description: 'Caulk - Sikaflex 1A - Specify color', screwSize: '', unitPrice: '5.20' },
   { units: 'Tube', description: 'Caulk - Dow Corning 795 Paintable. Specify color:', screwSize: '', unitPrice: '8.09' },
   { units: 'Tube', description: 'Caulk - Custom - BASF NP1 - Limestone color', screwSize: '', unitPrice: '' },
-  { units: 'EA', description: 'Qty. 1 Can of Installation Foam (4W Voary Foam)', screwSize: '', unitPrice: '10.20' },
+  { units: 'EA', description: 'Qty. 1 Can of Installation Foam (4W Vario Foam)', screwSize: '', unitPrice: '10.20' },
   { units: 'FT', description: 'Backer Rod (Closed cell foam on a roll) 1/4", 3/8", 1/2", 5/8"', screwSize: '', unitPrice: '5.50' },
   { units: 'Box (250)', description: 'Black Plastic Shims - 1/16"', screwSize: '', unitPrice: '12.50' },
   { units: 'Box (250)', description: 'Black Plastic Shims - 1/8"', screwSize: '', unitPrice: '25.00' },
@@ -177,7 +177,7 @@ export const US_SUPPLIED_FIXED_ROWS: Omit<InstallationMaterialRow, 'qty'>[] = [
   { units: 'Box (250)', description: 'Composed Shims', screwSize: '', unitPrice: '40.55' },
   { units: 'EA', description: 'Aluminum Angle pieces', screwSize: '', unitPrice: '1.80' },
   { units: 'EA', description: 'Insulating Tape for Aluminum Angles', screwSize: '', unitPrice: '13.28' },
-  { units: 'EA', description: 'Metal Counter Sink Drill', screwSize: '', unitPrice: '25.85' },
+  { units: 'EA', description: 'Metal Counter Sink Drill', screwSize: '', unitPrice: '' },
 ].map(row => ({ ...row, qty: '' }))
 
 export function parseInstallationMaterial(raw: unknown, projectName = ''): InstallationMaterial {
