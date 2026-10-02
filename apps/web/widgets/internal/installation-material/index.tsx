@@ -161,7 +161,8 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   if (object.apiName !== 'Project') return <p className="text-sm text-amber-700">Installation Material is available on Project records only.</p>
 
   const total = form.rows.reduce((sum, row) => sum + calculateMaterialTotal(row), 0)
-  const lockFixedColumns = form.template !== 'US Supplied Inst.'
+  const lockFixedColumns = true
+  const currencySymbol = form.template === 'US Supplied Inst.' ? '$' : '€'
   const toggleOption = (current: string[], option: string) => current.includes(option)
     ? current.filter(value => value !== option)
     : [...current, option]
@@ -250,8 +251,8 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
             <th className="w-20 border border-gray-400 px-2 py-2">Units</th>
             <th className="border border-gray-400 px-2 py-2">Description</th>
             <th className="w-32 border border-gray-400 px-2 py-2">US Screw Size</th>
-            <th className="w-32 border border-gray-400 px-2 py-2">Unit Price (€)</th>
-            <th className="w-32 border border-gray-400 px-2 py-2">TOTAL (€)</th>
+            <th className="w-32 border border-gray-400 px-2 py-2">Unit Price ({currencySymbol})</th>
+            <th className="w-32 border border-gray-400 px-2 py-2">TOTAL ({currencySymbol})</th>
           </tr></thead>
           <tbody>
             {form.rows.map((row, index) => {
@@ -266,7 +267,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
               </tr>
             })}
           </tbody>
-          <tfoot><tr className="font-semibold"><td colSpan={5} className="border border-gray-300 px-2 py-2 text-right">Grand Total (€)</td><td className="border border-gray-300 bg-rose-300 px-2 py-2 text-right">{formatMaterialTotal(total)}</td></tr></tfoot>
+          <tfoot><tr className="font-semibold"><td colSpan={5} className="border border-gray-300 px-2 py-2 text-right">Grand Total ({currencySymbol})</td><td className="border border-gray-300 bg-rose-300 px-2 py-2 text-right">{formatMaterialTotal(total)}</td></tr></tfoot>
         </table>
       </section>
 

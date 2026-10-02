@@ -133,6 +133,53 @@ export const NON_ACQ_FIXED_ROWS: Omit<InstallationMaterialRow, 'qty'>[] = [
   { units: 'EA', description: 'Metal Counter Sink Drill Bit (Hexagonal Shaft)', screwSize: '', unitPrice: '25.85' },
 ].map(row => ({ ...row, qty: '' }))
 
+export const US_SUPPLIED_FIXED_ROWS: Omit<InstallationMaterialRow, 'qty'>[] = [
+  { units: 'Box (100)', description: '1/4" FH Tapcon Screws x 1-1/4"', screwSize: '7 x 30 mm', unitPrice: '11.31' },
+  { units: 'Box (100)', description: '1/4" FH Tapcon Screws x 1-3/4"', screwSize: '7 x 44 mm', unitPrice: '12.83' },
+  { units: 'Box (100)', description: '1/4" FH Tapcon Screws x 2-1/4"', screwSize: '7 x 57 mm', unitPrice: '14.63' },
+  { units: 'Box (100)', description: '1/4" FH Tapcon Screws x 2-3/4"', screwSize: '7 x 70 mm', unitPrice: '16.78' },
+  { units: 'Box (100)', description: '1/4" FH Tapcon Screws x 3-1/4"', screwSize: '7 x 83 mm', unitPrice: '21.23' },
+  { units: 'Box (100)', description: '1/4" FH Tapcon Screws x 3-3/4"', screwSize: '7 x 95 mm', unitPrice: '41.79' },
+  { units: 'Box (100)', description: '1/4" FH Tapcon Screws x 4"', screwSize: '7 x 102 mm', unitPrice: '26.45' },
+  { units: 'Box (100)', description: '1/4" FH Tapcon Screws x 5" Low Carbon', screwSize: '7 x 127 mm', unitPrice: '51.27' },
+  { units: 'Box (100)', description: '1/4" FH Tapcon Screws x 6" Steel', screwSize: '7 x 152 mm', unitPrice: '65.22' },
+  { units: 'Box (100)', description: 'Tapcon Caps', screwSize: '', unitPrice: '2.79' },
+  { units: 'Box (100)', description: '1/4" Hex Head Tapcon Screws x 1-3/4" (angles)', screwSize: '7 x 45 mm', unitPrice: '13.00' },
+  { units: 'EA', description: '3/16" x 3-1/2" Drill Bit for 1/4" Tapcon Screws', screwSize: '5 x 89 mm', unitPrice: '2.40' },
+  { units: 'EA', description: '3/16" x 6-1/2" Drill Bit for 1/4" Tapcon Screws', screwSize: '5 x 165 mm', unitPrice: '3.30' },
+  { units: 'Box (100)', description: '1/4" Pan Head #410 SS Self Drilling (#14) x 1"', screwSize: '7 x 25 mm', unitPrice: '15.00' },
+  { units: 'Box (100)', description: '1/4" FH Phil #410 SS Self Drilling (#14) x 1-1/4"', screwSize: '7 x 30 mm', unitPrice: '15.50' },
+  { units: 'Box (100)', description: '1/4" FH Phil #410 SS Self Drilling (#14) x 1-1/2"', screwSize: '7 x 40 mm', unitPrice: '16.25' },
+  { units: 'Box (100)', description: '1/4" FH Phil #410 SS Self Drilling (#14) x 1-3/4"', screwSize: '7 x 45 mm', unitPrice: '25.80' },
+  { units: 'Box (100)', description: '1/4" FH Phil #410 SS Self Drilling (#14) x 2"', screwSize: '7 x 50 mm', unitPrice: '22.50' },
+  { units: 'Box (100)', description: '1/4" FH Phil #410 SS Self Drilling (#14) x 2-1/2"', screwSize: '7 x 60 mm', unitPrice: '26.00' },
+  { units: 'Box (100)', description: '1/4" FH Phil #410 SS Self Drilling (#14) x 3"', screwSize: '7 x 75 mm', unitPrice: '35.75' },
+  { units: 'Box (100)', description: '1/4" FH Phil #410 SS Self Drilling (#14) x 3-1/2"', screwSize: '7 x 90 mm', unitPrice: '46.00' },
+  { units: 'Box (100)', description: '1/4" FH Phil #410 SS Self Drilling (#14) x 4"', screwSize: '7 x 100 mm', unitPrice: '57.00' },
+  { units: 'Box (100)', description: '1/4" FH Phil SS Sheet Metal Screw (#14) x 1"', screwSize: '7 x 25 mm', unitPrice: '5.00' },
+  { units: 'Box (100)', description: '1/4" FH Phil SS SMS (#14) x 1-1/4"', screwSize: '7 x 30 mm', unitPrice: '5.50' },
+  { units: 'Box (100)', description: '1/4" FH Phil SS SMS (#14) x 1-1/2"', screwSize: '7 x 40 mm', unitPrice: '7.75' },
+  { units: 'Box (100)', description: '1/4" FH Phil SS SMS (#14) x 1-3/4"', screwSize: '7 x 45 mm', unitPrice: '9.50' },
+  { units: 'Box (100)', description: '1/4" FH Phil SS SMS (#14) x 2"', screwSize: '7 x 50 mm', unitPrice: '9.75' },
+  { units: 'Box (100)', description: '1/4" FH Phil SS SMS (#14) x 2-1/2"', screwSize: '7 x 60 mm', unitPrice: '10.00' },
+  { units: 'Box (100)', description: '1/4" FH Phil SS SMS (#14) x 3"', screwSize: '7 x 75 mm', unitPrice: '11.85' },
+  { units: 'Box (100)', description: '1/4" FH Phil SS SMS (#14) x 3-1/2"', screwSize: '7 x 90 mm', unitPrice: '13.35' },
+  { units: 'Box (100)', description: '1/4" FH Phil SS SMS (#14) x 4"', screwSize: '7 x 100 mm', unitPrice: '32.00' },
+  { units: 'Tube', description: 'Caulk - Sikaflex 1A - Specify color', screwSize: '', unitPrice: '5.20' },
+  { units: 'Tube', description: 'Caulk - Dow Corning 795 Paintable. Specify color:', screwSize: '', unitPrice: '8.09' },
+  { units: 'Tube', description: 'Caulk - Custom - BASF NP1 - Limestone color', screwSize: '', unitPrice: '' },
+  { units: 'EA', description: 'Qty. 1 Can of Installation Foam (4W Voary Foam)', screwSize: '', unitPrice: '10.20' },
+  { units: 'FT', description: 'Backer Rod (Closed cell foam on a roll) 1/4", 3/8", 1/2", 5/8"', screwSize: '', unitPrice: '5.50' },
+  { units: 'Box (250)', description: 'Black Plastic Shims - 1/16"', screwSize: '', unitPrice: '12.50' },
+  { units: 'Box (250)', description: 'Black Plastic Shims - 1/8"', screwSize: '', unitPrice: '25.00' },
+  { units: 'Box (250)', description: 'Black Plastic Shims - 1/4"', screwSize: '', unitPrice: '50.00' },
+  { units: 'Box (250)', description: 'Black Plastic Shims - 1/2" (3 x 3)', screwSize: '', unitPrice: '125.00' },
+  { units: 'Box (250)', description: 'Composed Shims', screwSize: '', unitPrice: '40.55' },
+  { units: 'EA', description: 'Aluminum Angle pieces', screwSize: '', unitPrice: '1.80' },
+  { units: 'EA', description: 'Insulating Tape for Aluminum Angles', screwSize: '', unitPrice: '13.28' },
+  { units: 'EA', description: 'Metal Counter Sink Drill', screwSize: '', unitPrice: '25.85' },
+].map(row => ({ ...row, qty: '' }))
+
 export function parseInstallationMaterial(raw: unknown, projectName = ''): InstallationMaterial {
   let data: Record<string, unknown> = {}
   try {
@@ -160,7 +207,9 @@ export function parseInstallationMaterial(raw: unknown, projectName = ''): Insta
     ? ACQ_FIXED_ROWS
     : template === 'Non-ACQ'
       ? NON_ACQ_FIXED_ROWS
-      : null
+      : template === 'US Supplied Inst.'
+        ? US_SUPPLIED_FIXED_ROWS
+        : null
   const normalizedRows = fixedRows
     ? Array.from({ length: Math.max(INSTALLATION_MATERIAL_ROW_COUNT, fixedRows.length) }, (_, index) => ({
       ...(fixedRows[index] ?? emptyRow()),

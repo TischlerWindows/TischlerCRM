@@ -73,13 +73,14 @@ function drawCheckbox(doc: PDFKit.PDFDocument, label: string, selected: boolean,
   doc.font('Helvetica').fontSize(8).fillColor('#111827').text(label, x + 14, y - 1, { width: 140, lineBreak: false });
 }
 
-function drawTableHeader(doc: PDFKit.PDFDocument, y: number): number {
+function drawTableHeader(doc: PDFKit.PDFDocument, y: number, currencySymbol: string): number {
   const height = 21;
   COLS.forEach((column, index) => {
     const x = COL_X[index]!;
     doc.rect(x, y, column.width, height).lineWidth(0.5).fillAndStroke(NAVY, GRID);
+    const label = index === 4 ? `Unit Price (${currencySymbol})` : index === 5 ? `TOTAL (${currencySymbol})` : column.label;
     doc.font('Helvetica-Bold').fontSize(7).fillColor('#ffffff')
-      .text(column.label, x + 3, y + 7, { width: column.width - 6, lineBreak: false, align: index > 3 ? 'right' : 'left' });
+      .text(label, x + 3, y + 7, { width: column.width - 6, lineBreak: false, align: index > 3 ? 'right' : 'left' });
   });
   return y + height;
 }
@@ -135,6 +136,7 @@ export function renderInstallationMaterialPDF(data: InstallationMaterialData, pr
     });
 
     const title = `${data.template.toUpperCase()} INSTALLATION MATERIALS`;
+    const currencySymbol = data.template === 'US Supplied Inst.' ? '$' : '€';
     doc.rect(PAGE_LEFT, 16, CONTENT_WIDTH, 24).lineWidth(0.7).fillAndStroke('#ffffff', '#111827');
     doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text(title, PAGE_LEFT + 5, 22, { width: 330, lineBreak: false });
     doc.font('Helvetica-Bold').fontSize(9).text('Date:', 394, 23, { width: 30, lineBreak: false });
@@ -168,7 +170,7 @@ export function renderInstallationMaterialPDF(data: InstallationMaterialData, pr
     });
     if (LOGO_PATH) doc.image(LOGO_PATH, rightX + 3, boxY + 8, { fit: [rightWidth - 6, 94], align: 'center', valign: 'center' });
 
-    let y = drawTableHeader(doc, 174);
+    let y = drawTableHeader(doc, 174, currencySymbol);
     const sourceRows = data.rows.length ? data.rows : Array.from({ length: 44 }, () => ({ qty: '', units: '', description: '', screwSize: '', unitPrice: '' }));
     for (const row of sourceRows) {
       const rowHeight = 15;
@@ -177,7 +179,7 @@ export function renderInstallationMaterialPDF(data: InstallationMaterialData, pr
         y = 28;
         doc.font('Helvetica-Bold').fontSize(10).fillColor('#111827').text(`${title} - continued`, PAGE_LEFT, y, { width: CONTENT_WIDTH });
         y += 21;
-        y = drawTableHeader(doc, y);
+        y = drawTableHeader(doc, y, currencySymbol);
       }
       drawRow(doc, row, y, rowHeight);
       y += rowHeight;
@@ -190,7 +192,7 @@ export function renderInstallationMaterialPDF(data: InstallationMaterialData, pr
       y += 22;
     }
     const total = sourceRows.reduce((sum, row) => sum + materialTotal(row), 0);
-    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111827').text(`TOTAL (€): ${total.toFixed(2)}`, PAGE_RIGHT - 150, y + 5, { width: 145, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#111827').text(`TOTAL (${currencySymbol}): ${total.toFixed(2)}`, PAGE_RIGHT - 150, y + 5, { width: 145, align: 'right' });
     doc.moveTo(PAGE_LEFT, y + 25).lineTo(PAGE_RIGHT, y + 25).strokeColor('#111827').lineWidth(0.7).stroke();
     doc.font('Helvetica-Bold').fontSize(9).text('Factory: Please fill out price list, sign below, and return via fax to confirm order.', PAGE_LEFT, y + 34, { width: CONTENT_WIDTH });
     doc.font('Helvetica-Bold').fontSize(9).text('Signature:', PAGE_LEFT, y + 58, { width: 60 });

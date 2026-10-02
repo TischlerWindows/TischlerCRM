@@ -5,6 +5,7 @@ import {
   NON_ACQ_FIXED_ROWS,
   parseInstallationMaterial,
   parseInstallationMaterialWorkbook,
+  US_SUPPLIED_FIXED_ROWS,
 } from '../installation-material'
 
 describe('installation material form', () => {
@@ -85,11 +86,14 @@ describe('installation material form', () => {
       template: 'US Supplied Inst.',
       installationBy: ['Installation by TuS'],
       orderedFrom: ['Tischler Fensterwerk', 'FL Warehouse'],
-      rows: [{ qty: '3', units: 'box', description: 'Fasteners', screwSize: '#10', unitPrice: '2.50' }],
+      rows: [{ qty: '3', units: 'Box (100)', description: 'Edited', screwSize: 'Edited', unitPrice: '2.50' }],
     }))
     expect(material.template).toBe('US Supplied Inst.')
     expect(material.orderedFrom).toEqual(['Tischler Fensterwerk', 'FL Warehouse'])
-    expect(calculateMaterialTotal(material.rows[0]!)).toBe(7.5)
+    expect(US_SUPPLIED_FIXED_ROWS).toHaveLength(44)
+    expect(material.rows).toHaveLength(INSTALLATION_MATERIAL_ROW_COUNT)
+    expect(material.rows[0]).toMatchObject({ ...US_SUPPLIED_FIXED_ROWS[0], qty: '3' })
+    expect(calculateMaterialTotal(material.rows[0]!)).toBe(33.93)
     expect(calculateMaterialTotal({ qty: '10', units: 'Box', description: 'Free item', screwSize: '', unitPrice: '0.00' })).toBe(0)
   })
 
@@ -100,7 +104,7 @@ describe('installation material form', () => {
       sheets: {
         ACQ: { template: 'ACQ', rows: [{ qty: '1', units: 'box', description: 'ACQ item' }] },
         'Non-ACQ': { template: 'Non-ACQ', rows: [{ qty: '2', units: 'box', description: 'Non-ACQ item' }] },
-        'US Supplied Inst.': { template: 'US Supplied Inst.', rows: [{ qty: '3', units: 'box', description: 'US item' }] },
+        'US Supplied Inst.': { template: 'US Supplied Inst.', rows: [{ qty: '3', units: 'Box (100)', description: 'US item' }] },
       },
     })
     expect(workbook.activeTemplate).toBe('US Supplied Inst.')
@@ -108,7 +112,8 @@ describe('installation material form', () => {
     expect(workbook.sheets.ACQ.rows[0]?.qty).toBe('1')
     expect(workbook.sheets['Non-ACQ'].rows[0]?.description).toBe(NON_ACQ_FIXED_ROWS[0]?.description)
     expect(workbook.sheets['Non-ACQ'].rows[0]?.qty).toBe('2')
-    expect(workbook.sheets['US Supplied Inst.'].rows[0]?.description).toBe('US item')
+    expect(workbook.sheets['US Supplied Inst.'].rows[0]?.description).toBe(US_SUPPLIED_FIXED_ROWS[0]?.description)
+    expect(workbook.sheets['US Supplied Inst.'].rows[0]?.qty).toBe('3')
 
     const migrated = parseInstallationMaterialWorkbook({ template: 'Non-ACQ', rows: [{ description: 'Old entry' }] })
     expect(migrated.activeTemplate).toBe('Non-ACQ')
