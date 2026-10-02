@@ -50,16 +50,23 @@ describe('installation material form', () => {
       screwSize: '#8 x 1-3/8"',
       unitPrice: '13.69',
     })
+    expect(nonAcq.rows[6]?.description).toBe('Qty. 100 - Toptec Nylon dowels (shields)')
+    expect(nonAcq.rows[20]).toMatchObject({
+      description: 'Qty. 200 - 6x40 mm Screws SPAX Substrate (Flat Head) (Phillips)',
+      screwSize: '#14 x 1-9/16"',
+    })
+    expect(nonAcq.rows[21]?.description).toBe('Qty. 200 - 6x70 mm Screws SPAX Substrate (Flat Head) (Phillips)')
     expect(nonAcq.rows[31]).toMatchObject({
-      description: 'Qty. 100 - Installation Clips (140x25) - Standard',
-      screwSize: '5-1/2" x 1/2" x 1/16" x 1"',
+      description: 'Qty. 100 - Installation Clips (140x2x25) - Standard',
+      screwSize: '5-1/2" x 1/16" x 1"',
       unitPrice: '29.70',
     })
     expect(nonAcq.rows[32]).toMatchObject({
-      description: 'Qty. 100 - Installation Clips (140x20) - Dade County',
-      screwSize: '5-1/2" x 1/2" x 1/16" x 13/16"',
+      description: 'Qty. 100 - Installation Clips (140x2x20) - Dade County',
+      screwSize: '5-1/2" x 1/16" x 13/16"',
       unitPrice: '18.73',
     })
+    expect(nonAcq.rows[40]?.description).toBe('Metal Counter Sink Drill Bit (Hexagonal Shaft)')
   })
 
   it('round-trips template choices and computes line totals', () => {
