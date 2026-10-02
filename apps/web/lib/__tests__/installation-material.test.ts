@@ -1,5 +1,6 @@
 import {
   calculateMaterialTotal,
+  ACQ_FIXED_ROWS,
   INSTALLATION_MATERIAL_ROW_COUNT,
   parseInstallationMaterial,
   parseInstallationMaterialWorkbook,
@@ -11,6 +12,8 @@ describe('installation material form', () => {
     expect(material.template).toBe('ACQ')
     expect(material.project).toBe('Sample Project')
     expect(material.rows).toHaveLength(INSTALLATION_MATERIAL_ROW_COUNT)
+    expect(material.rows[0]).toMatchObject(ACQ_FIXED_ROWS[0])
+    expect(material.rows[0]?.qty).toBe('')
   })
 
   it('round-trips template choices and computes line totals', () => {
@@ -36,14 +39,15 @@ describe('installation material form', () => {
       },
     })
     expect(workbook.activeTemplate).toBe('US Supplied Inst.')
-    expect(workbook.sheets.ACQ.rows[0]?.description).toBe('ACQ item')
+    expect(workbook.sheets.ACQ.rows[0]?.description).toBe(ACQ_FIXED_ROWS[0]?.description)
+    expect(workbook.sheets.ACQ.rows[0]?.qty).toBe('1')
     expect(workbook.sheets['Non-ACQ'].rows[0]?.description).toBe('Non-ACQ item')
     expect(workbook.sheets['US Supplied Inst.'].rows[0]?.description).toBe('US item')
 
     const migrated = parseInstallationMaterialWorkbook({ template: 'Non-ACQ', rows: [{ description: 'Old entry' }] })
     expect(migrated.activeTemplate).toBe('Non-ACQ')
     expect(migrated.sheets['Non-ACQ'].rows[0]?.description).toBe('Old entry')
-    expect(migrated.sheets.ACQ.rows[0]?.description).toBe('')
+    expect(migrated.sheets.ACQ.rows[0]?.description).toBe(ACQ_FIXED_ROWS[0]?.description)
   })
 
   it('migrates the former Korn source selection to Tischler Fensterwerk', () => {

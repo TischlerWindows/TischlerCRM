@@ -160,6 +160,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   if (object.apiName !== 'Project') return <p className="text-sm text-amber-700">Installation Material is available on Project records only.</p>
 
   const total = form.rows.reduce((sum, row) => sum + calculateMaterialTotal(row), 0)
+  const lockAcqColumns = form.template === 'ACQ'
   const toggleOption = (current: string[], option: string) => current.includes(option)
     ? current.filter(value => value !== option)
     : [...current, option]
@@ -256,10 +257,10 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
               const rowTotal = calculateMaterialTotal(row)
               return <tr key={index} className="h-9">
                 <td className="border border-gray-300 bg-yellow-100 p-1"><input aria-label={`Quantity row ${index + 1}`} className={inputClass} value={row.qty} onChange={event => updateRow(index, { qty: event.target.value })} /></td>
-                <td className="border border-gray-300 p-1"><input aria-label={`Units row ${index + 1}`} className={inputClass} value={row.units} onChange={event => updateRow(index, { units: event.target.value })} /></td>
-                <td className="border border-gray-300 p-1"><input aria-label={`Description row ${index + 1}`} className={inputClass} value={row.description} onChange={event => updateRow(index, { description: event.target.value })} /></td>
-                <td className="border border-gray-300 bg-gray-100 p-1"><input aria-label={`US screw size row ${index + 1}`} className={inputClass} value={row.screwSize} onChange={event => updateRow(index, { screwSize: event.target.value })} /></td>
-                <td className="border border-gray-300 p-1"><input aria-label={`Unit price row ${index + 1}`} inputMode="decimal" className={`${inputClass} text-right`} value={row.unitPrice} onChange={event => updateRow(index, { unitPrice: event.target.value })} /></td>
+                <td className="border border-gray-300 p-1"><input aria-label={`Units row ${index + 1}`} readOnly={lockAcqColumns} className={`${inputClass} ${lockAcqColumns ? 'bg-gray-100 text-gray-600' : ''}`} value={row.units} onChange={event => updateRow(index, { units: event.target.value })} /></td>
+                <td className="border border-gray-300 p-1"><input aria-label={`Description row ${index + 1}`} readOnly={lockAcqColumns} className={`${inputClass} ${lockAcqColumns ? 'bg-gray-100 text-gray-600' : ''}`} value={row.description} onChange={event => updateRow(index, { description: event.target.value })} /></td>
+                <td className="border border-gray-300 bg-gray-100 p-1"><input aria-label={`US screw size row ${index + 1}`} readOnly={lockAcqColumns} className={`${inputClass} ${lockAcqColumns ? 'text-gray-600' : ''}`} value={row.screwSize} onChange={event => updateRow(index, { screwSize: event.target.value })} /></td>
+                <td className="border border-gray-300 p-1"><input aria-label={`Unit price row ${index + 1}`} readOnly={lockAcqColumns} inputMode="decimal" className={`${inputClass} text-right ${lockAcqColumns ? 'bg-gray-100 text-gray-600' : ''}`} value={row.unitPrice} onChange={event => updateRow(index, { unitPrice: event.target.value })} /></td>
                 <td className="border border-gray-300 bg-rose-200 px-2 text-right font-medium">{rowTotal ? formatMaterialTotal(rowTotal) : ''}</td>
               </tr>
             })}
