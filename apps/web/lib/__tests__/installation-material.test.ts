@@ -2,6 +2,7 @@ import {
   ACQ_FIXED_ROWS,
   calculateMaterialTotal,
   INSTALLATION_MATERIAL_ROW_COUNT,
+  NON_ACQ_FIXED_ROWS,
   parseInstallationMaterial,
   parseInstallationMaterialWorkbook,
 } from '../installation-material'
@@ -34,6 +35,33 @@ describe('installation material form', () => {
     })
   })
 
+  it('loads the Non-ACQ catalog values from the supplied table', () => {
+    const nonAcq = parseInstallationMaterial({ template: 'Non-ACQ' })
+    expect(nonAcq.rows).toHaveLength(INSTALLATION_MATERIAL_ROW_COUNT)
+    expect(nonAcq.rows[0]).toMatchObject({
+      units: 'Box',
+      description: 'Qty. 200 - 6/10 x 80 mm Zink Toptec Standard',
+      screwSize: '1/4" x 3-1/8"',
+      unitPrice: '58.40',
+      qty: '',
+    })
+    expect(nonAcq.rows[18]).toMatchObject({
+      description: 'Qty. 500 - 4x35 mm Screws SPAX DH Frames (NOT DC APPROVED)',
+      screwSize: '#8 x 1-3/8"',
+      unitPrice: '13.69',
+    })
+    expect(nonAcq.rows[31]).toMatchObject({
+      description: 'Qty. 100 - Installation Clips (140x25) - Standard',
+      screwSize: '5-1/2" x 1/2" x 1/16" x 1"',
+      unitPrice: '29.70',
+    })
+    expect(nonAcq.rows[32]).toMatchObject({
+      description: 'Qty. 100 - Installation Clips (140x20) - Dade County',
+      screwSize: '5-1/2" x 1/2" x 1/16" x 13/16"',
+      unitPrice: '18.73',
+    })
+  })
+
   it('round-trips template choices and computes line totals', () => {
     const material = parseInstallationMaterial(JSON.stringify({
       template: 'US Supplied Inst.',
@@ -60,12 +88,13 @@ describe('installation material form', () => {
     expect(workbook.activeTemplate).toBe('US Supplied Inst.')
     expect(workbook.sheets.ACQ.rows[0]?.description).toBe(ACQ_FIXED_ROWS[0]?.description)
     expect(workbook.sheets.ACQ.rows[0]?.qty).toBe('1')
-    expect(workbook.sheets['Non-ACQ'].rows[0]?.description).toBe('Non-ACQ item')
+    expect(workbook.sheets['Non-ACQ'].rows[0]?.description).toBe(NON_ACQ_FIXED_ROWS[0]?.description)
+    expect(workbook.sheets['Non-ACQ'].rows[0]?.qty).toBe('2')
     expect(workbook.sheets['US Supplied Inst.'].rows[0]?.description).toBe('US item')
 
     const migrated = parseInstallationMaterialWorkbook({ template: 'Non-ACQ', rows: [{ description: 'Old entry' }] })
     expect(migrated.activeTemplate).toBe('Non-ACQ')
-    expect(migrated.sheets['Non-ACQ'].rows[0]?.description).toBe('Old entry')
+    expect(migrated.sheets['Non-ACQ'].rows[0]?.description).toBe(NON_ACQ_FIXED_ROWS[0]?.description)
     expect(migrated.sheets.ACQ.rows[0]?.description).toBe(ACQ_FIXED_ROWS[0]?.description)
   })
 

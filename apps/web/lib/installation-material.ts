@@ -89,6 +89,50 @@ export const ACQ_FIXED_ROWS: Omit<InstallationMaterialRow, 'qty'>[] = [
   { units: '', description: 'Exterior caulk for perimeter at brickmold - matching color of brickmold (if possible)', screwSize: '', unitPrice: '' },
 ].map(row => ({ ...row, qty: '' }))
 
+export const NON_ACQ_FIXED_ROWS: Omit<InstallationMaterialRow, 'qty'>[] = [
+  { units: 'Box', description: 'Qty. 200 - 6/10 x 80 mm Zink Toptec Standard', screwSize: '1/4" x 3-1/8"', unitPrice: '58.40' },
+  { units: 'Box', description: 'Qty. 200 - 6/10 x 100 mm Zink Toptec Standard', screwSize: '1/4" x 3-15/16"', unitPrice: '77.04' },
+  { units: 'Box', description: 'Qty. 100 - 6/10 x 120 mm Zink Toptec Standard', screwSize: '1/4" x 4-3/4"', unitPrice: '77.04' },
+  { units: 'Box', description: 'Qty. 100 - 6/10 x 135 mm Zink Toptec Standard', screwSize: '1/4" x 5-5/16"', unitPrice: '48.88' },
+  { units: 'Box', description: 'Qty. 100 - 6/10 x 150 mm Zink Toptec Standard', screwSize: '1/4" x 5-7/8"', unitPrice: '103.84' },
+  { units: 'EA', description: 'Qty. 1 - 8 mm x 165/235 Toptec Wood Auger Drill Bit f. shields', screwSize: '5/16"', unitPrice: '13.56' },
+  { units: 'Box', description: 'Qty. 100 - 8mm Toptec Nylon dowels (shields)', screwSize: '', unitPrice: '6.22' },
+  { units: 'EA', description: 'Qty. 1 - 8mm Toptec Drill Bit Supra f. stone', screwSize: '', unitPrice: '8.04' },
+  { units: 'Pack', description: 'Qty. 10 - Toptec TX 25 Torx bit', screwSize: '', unitPrice: '78.20' },
+  { units: 'Box', description: 'Qty. 50 - Toptec Inserts', screwSize: '', unitPrice: '4.99' },
+  { units: 'Box', description: 'Qty. 50 - Toptec Caps (Chocolate Brown-RAL8017)', screwSize: '', unitPrice: '4.76' },
+  { units: 'Box', description: 'Qty. 50 - Toptec Caps (Brown Beige-RAL1011)', screwSize: '', unitPrice: '4.76' },
+  { units: 'Box', description: 'Qty. 50 - Toptec Caps (Light Ivory-RAL1015)', screwSize: '', unitPrice: '4.76' },
+  { units: 'Box', description: 'Qty. 50 - Toptec Caps (Light Grey-RAL7035)', screwSize: '', unitPrice: '4.76' },
+  { units: 'Box', description: 'Qty. 50 - Toptec Caps (Anthracite Grey-RAL7016)', screwSize: '', unitPrice: '4.76' },
+  { units: 'Box', description: 'Qty. 50 - Toptec Caps (Traffic White-RAL9016)', screwSize: '', unitPrice: '4.76' },
+  { units: 'Box', description: 'Qty. 1000 - Toptec Caps (Custom RAL Color) *3-4 Week Lead Time', screwSize: '', unitPrice: '150.00' },
+  { units: 'Box', description: 'Qty. 1000 - 3x20 mm Wood Screws SPAX DH Frames (Flat Head) (Phillips)', screwSize: '#4 x 3/4"', unitPrice: '17.49' },
+  { units: 'Box', description: 'Qty. 500 - 4x35 mm Screws SPAX DH Frames (NOT DC APPROVED)', screwSize: '#8 x 1-3/8"', unitPrice: '13.69' },
+  { units: 'Box', description: 'Qty. 500 - 4x40 mm FH Wood Screws SPAX DH Frames (Flat Head) (Phillips)', screwSize: '#8 x 1-1/2"', unitPrice: '11.13' },
+  { units: 'Box', description: 'Qty. 200 - 6x40 mm Screws SPAX Substrate (Flat Head) (Phillips)', screwSize: '#8 x 1-9/16"', unitPrice: '11.56' },
+  { units: 'Box', description: 'Qty. 100 - 6x70 mm Screws SPAX Substrate (Flat Head) (Phillips)', screwSize: '#14 x 2-3/4"', unitPrice: '16.40' },
+  { units: 'Box', description: 'Qty. 100 - 6x80 mm Screws SPAX Substrate (Flat Head) (Phillips)', screwSize: '#14 x 3-1/8"', unitPrice: '25.44' },
+  { units: 'Box', description: 'Qty. 100 - 6x90 mm Screws SPAX Substrate (Flat Head) (Phillips)', screwSize: '#14 x 3-9/16"', unitPrice: '28.32' },
+  { units: 'Box', description: 'Qty. 100 - 6x100 mm Screws SPAX Substrate (Flat Head) (Phillips)', screwSize: '#14 x 3-15/16"', unitPrice: '32.45' },
+  { units: 'Box', description: 'Qty. 100 - 6x120 mm Screws SPAX Substrate (Flat Head) (Phillips)', screwSize: '#14 x 4-3/4"', unitPrice: '39.46' },
+  { units: 'Box', description: 'Qty. 100 - 6x140 mm Screws SPAX Substrate (Flat Head) (Phillips)', screwSize: '#14 x 5-1/2"', unitPrice: '54.86' },
+  { units: 'Box', description: 'Qty. 250 Self-Tapping Screw Hex Head SS 6.3 x 25 mm', screwSize: '1/4" x 1"', unitPrice: '38.00' },
+  { units: 'Box', description: 'Qty. 250 Self-Tapping Screw Hex Head SS 6.3 x 32 mm', screwSize: '1/4" x 1-1/4"', unitPrice: '38.00' },
+  { units: 'EA', description: 'Qty. 10 Drill Bit for Self-Tapping Screw w/ Hex Head 6.3 mm', screwSize: '1/4"', unitPrice: '32.60' },
+  { units: 'EA', description: 'Qty. 50 BTI perforated plate 140 x 60 x 2 mm', screwSize: '5-1/2" x 2-3/8" x 1/16"', unitPrice: '36.00' },
+  { units: 'Box', description: 'Qty. 100 - Installation Clips (140x25) - Standard', screwSize: '5-1/2" x 1/2" x 1/16" x 1"', unitPrice: '29.70' },
+  { units: 'Box', description: 'Qty. 100 - Installation Clips (140x20) - Dade County', screwSize: '5-1/2" x 1/2" x 1/16" x 13/16"', unitPrice: '18.73' },
+  { units: 'Case', description: 'Qty. 16 - Cans Insulation Foam (BTI Pistol Foam OZ-SR)', screwSize: '', unitPrice: '133.12' },
+  { units: 'EA', description: 'Qty. 1 - Foam Gun', screwSize: '', unitPrice: '52.00' },
+  { units: 'EA', description: 'Qty. 1 - Can Foam Gun Cleaner', screwSize: '', unitPrice: '11.00' },
+  { units: 'EA', description: 'Qty. 1 - BTI (Sausage Gun) S 600 # 9094301', screwSize: '', unitPrice: '68.00' },
+  { units: 'EA', description: 'Qty. 1 - Siegenia Adjustment Tool', screwSize: '', unitPrice: '14.20' },
+  { units: 'EA', description: '2.5 mm Allen Wrench with T-handle for friction brakes', screwSize: '', unitPrice: '4.00' },
+  { units: 'EA', description: 'KFV Church Plastic Key', screwSize: '', unitPrice: '9.00' },
+  { units: 'EA', description: 'BTI Metal Counter Sink Drill Bit (Hexagonal Shaft)', screwSize: '', unitPrice: '25.85' },
+].map(row => ({ ...row, qty: '' }))
+
 export function parseInstallationMaterial(raw: unknown, projectName = ''): InstallationMaterial {
   let data: Record<string, unknown> = {}
   try {
@@ -112,8 +156,16 @@ export function parseInstallationMaterial(raw: unknown, projectName = ''): Insta
 
   const template = INSTALLATION_MATERIAL_TEMPLATES.includes(data.template as typeof INSTALLATION_MATERIAL_TEMPLATES[number])
     ? data.template as typeof INSTALLATION_MATERIAL_TEMPLATES[number] : INSTALLATION_MATERIAL_TEMPLATES[0]
-  const normalizedRows = template === 'ACQ'
-    ? ACQ_FIXED_ROWS.map((fixed, index) => ({ ...fixed, qty: rows[index]?.qty ?? '' }))
+  const fixedRows = template === 'ACQ'
+    ? ACQ_FIXED_ROWS
+    : template === 'Non-ACQ'
+      ? NON_ACQ_FIXED_ROWS
+      : null
+  const normalizedRows = fixedRows
+    ? Array.from({ length: Math.max(INSTALLATION_MATERIAL_ROW_COUNT, fixedRows.length) }, (_, index) => ({
+      ...(fixedRows[index] ?? emptyRow()),
+      qty: rows[index]?.qty ?? '',
+    }))
     : rows.length
       ? [...rows, ...Array.from({ length: Math.max(0, INSTALLATION_MATERIAL_ROW_COUNT - rows.length) }, emptyRow)]
       : Array.from({ length: INSTALLATION_MATERIAL_ROW_COUNT }, emptyRow)
