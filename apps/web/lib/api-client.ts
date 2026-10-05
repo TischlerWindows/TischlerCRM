@@ -35,6 +35,11 @@ export interface UserDetail extends UserRow {
   lastModifiedAt: string | null;
 }
 
+export interface HourlyPayrate {
+  year: number;
+  hourlyRate: number;
+}
+
 export interface CreateUserInput {
   name: string;
   email: string;
@@ -331,6 +336,16 @@ class ApiClient {
 
   async getUser(id: string): Promise<UserDetail> {
     return this.get(`/admin/users/${id}`);
+  }
+
+  async getUserHourlyPayrates(id: string): Promise<HourlyPayrate[]> {
+    const result = await this.get<{ payrates: HourlyPayrate[] }>(`/admin/users/${id}/hourly-payrates`);
+    return result.payrates;
+  }
+
+  async setUserHourlyPayrates(id: string, payrates: HourlyPayrate[]): Promise<HourlyPayrate[]> {
+    const result = await this.put<{ payrates: HourlyPayrate[] }>(`/admin/users/${id}/hourly-payrates`, { payrates });
+    return result.payrates;
   }
 
   async createUser(data: CreateUserInput): Promise<{ user: UserRow; inviteUrl?: string; inviteSent: boolean }> {
@@ -871,6 +886,7 @@ class ApiClient {
       connectedAt: string | null;
     }>('/dropbox/status');
   }
+
 
   async disconnectDropbox() {
     return this.request<void>('/dropbox/disconnect', { method: 'DELETE' });

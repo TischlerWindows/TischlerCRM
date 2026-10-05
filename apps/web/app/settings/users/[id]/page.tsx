@@ -6,9 +6,9 @@ import Link from 'next/link';
 import {
   ChevronLeft, User, Phone, Building2,
   Lock, Unlock, Trash2, RefreshCw, Send, Save, X, Mail,
-  Clock, AlertCircle, CheckCircle,
+  Clock, AlertCircle, CheckCircle, DollarSign, Plus,
 } from 'lucide-react';
-import { apiClient, type UserDetail, type LoginEventRow, type UpdateUserInput, type Profile, type UserRow } from '@/lib/api-client';
+import { apiClient, type HourlyPayrate, type UserDetail, type LoginEventRow, type UpdateUserInput, type Profile, type UserRow } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { PasswordVisibilityInput } from '@/components/password-visibility-input';
 
@@ -30,6 +30,7 @@ const LOCALES = [
 ];
 
 type Tab = 'details' | 'login-history';
+interface HourlyPayrateFormRow { year: string; hourlyRate: string }
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -84,6 +85,11 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
   const [formProfileId, setFormProfileId] = useState('');
   const [formDepartmentId, setFormDepartmentId] = useState('');
   const [formManagerId, setFormManagerId] = useState('');
+  const [hourlyPayrates, setHourlyPayrates] = useState<HourlyPayrateFormRow[]>([]);
+  const [payratesLoading, setPayratesLoading] = useState(false);
+  const [payratesSaving, setPayratesSaving] = useState(false);
+  const [payratesDirty, setPayratesDirty] = useState(false);
+  const [payratesError, setPayratesError] = useState<string | null>(null);
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
@@ -145,6 +151,31 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
     if (tab === 'login-history' && isAdmin) loadHistory();
   }, [tab, isAdmin, loadHistory]);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    setPayratesLoading(true);
+    setPayratesError(null);
+    setHourlyPayrates([]);
+    setPayratesDirty(false);
+    apiClient.getUserHourlyPayrates(id)
+      .then(rates => {
+        if (cancelled) return;
+        setHourlyPayrates(rates.map(rate => ({
+          year: String(rate.year),
+          hourlyRate: rate.hourlyRate.toFixed(2),
+        })).sort((a, b) => Number(b.year) - Number(a.year)));
+        setPayratesDirty(false);
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) setPayratesError(cause instanceof Error ? cause.message : 'Failed to load payrates');
+      })
+      .finally(() => {
+        if (!cancelled) setPayratesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [id, isAdmin]);
+
   const markDirty = () => setDirty(true);
 
   const handleSave = async () => {
@@ -173,6 +204,51 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSavePayrates = async () => {
+    setPayratesError(null);
+    const parsedRates: HourlyPayrate[] = [];
+    const seenYears = new Set<number>();
+    for (const payrate of hourlyPayrates) {
+      const year = Number(payrate.year);
+      const hourlyRate = Number(payrate.hourlyRate);
+      if (!Number.isInteger(year) || year < 1900 || year > 3000) {
+        setPayratesError('Enter a valid year between 1900 and 3000.');
+        return;
+      }
+      if (!payrate.hourlyRate.trim() || !Number.isFinite(hourlyRate) || hourlyRate < 0) {
+        setPayratesError(`Enter a valid hourly payrate for ${year}.`);
+        return;
+      }
+      if (seenYears.has(year)) {
+        setPayratesError(`A payrate for ${year} already exists.`);
+        return;
+      }
+      seenYears.add(year);
+      parsedRates.push({ year, hourlyRate });
+    }
+
+    setPayratesSaving(true);
+    try {
+      const saved = await apiClient.setUserHourlyPayrates(id, parsedRates);
+      setHourlyPayrates(saved.map(rate => ({ year: String(rate.year), hourlyRate: rate.hourlyRate.toFixed(2) })));
+      setPayratesDirty(false);
+      setSuccess('Payrates saved');
+    } catch (cause: unknown) {
+      setPayratesError(cause instanceof Error ? cause.message : 'Failed to save payrates');
+    } finally {
+      setPayratesSaving(false);
+    }
+  };
+
+  const addHourlyPayrate = () => {
+    const existingYears = new Set(hourlyPayrates.map(payrate => payrate.year));
+    let year = new Date().getFullYear();
+    while (existingYears.has(String(year))) year -= 1;
+    setHourlyPayrates(current => [...current, { year: String(year), hourlyRate: '' }].sort((a, b) => Number(b.year) - Number(a.year)));
+    setPayratesDirty(true);
+    setPayratesError(null);
   };
 
   const handleFreeze = async () => {
@@ -463,6 +539,107 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
                   </Field>
                 </div>
               </div>
+
+              {isAdmin && (
+                <section className="bg-white rounded-xl border border-gray-200 p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                    <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-gray-400" /> Payrate
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={handleSavePayrates}
+                      disabled={payratesLoading || payratesSaving || !payratesDirty}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#151f6d] px-3 py-2 text-xs font-medium text-white hover:bg-[#1c2b99] disabled:opacity-40"
+                    >
+                      {payratesSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                      {payratesSaving ? 'Saving…' : 'Save Payrates'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-4">Hourly rate in USD, recorded separately for each calendar year.</p>
+
+                  {payratesError && (
+                    <div role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      {payratesError}
+                    </div>
+                  )}
+
+                  {payratesLoading ? (
+                    <div className="flex items-center gap-2 py-4 text-xs text-gray-400">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading payrates…
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-[minmax(7rem,0.7fr)_minmax(12rem,1fr)_2.5rem] gap-3 border-b border-gray-100 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        <span>Year</span>
+                        <span>Hourly Payrate</span>
+                        <span />
+                      </div>
+                      {hourlyPayrates.length === 0 && (
+                        <p className="py-4 text-sm text-gray-400">No annual payrates entered.</p>
+                      )}
+                      <div className="divide-y divide-gray-100">
+                        {hourlyPayrates.map((payrate, index) => (
+                          <div key={index} className="grid grid-cols-[minmax(7rem,0.7fr)_minmax(12rem,1fr)_2.5rem] items-center gap-3 py-2">
+                            <input
+                              type="number"
+                              min="1900"
+                              max="3000"
+                              step="1"
+                              aria-label={`Payrate year row ${index + 1}`}
+                              value={payrate.year}
+                              onChange={event => {
+                                setHourlyPayrates(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, year: event.target.value } : row));
+                                setPayratesDirty(true);
+                                setPayratesError(null);
+                              }}
+                              className={inputCls}
+                            />
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                inputMode="decimal"
+                                aria-label={`Hourly payrate row ${index + 1}`}
+                                value={payrate.hourlyRate}
+                                onChange={event => {
+                                  setHourlyPayrates(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, hourlyRate: event.target.value } : row));
+                                  setPayratesDirty(true);
+                                  setPayratesError(null);
+                                }}
+                                className={`${inputCls} pl-7`}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHourlyPayrates(current => current.filter((_, rowIndex) => rowIndex !== index));
+                                setPayratesDirty(true);
+                                setPayratesError(null);
+                              }}
+                              aria-label={`Remove payrate for ${payrate.year || `row ${index + 1}`}`}
+                              title="Remove payrate"
+                              className="flex h-9 w-9 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addHourlyPayrate}
+                        disabled={payratesLoading || payratesSaving}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Year
+                      </button>
+                    </>
+                  )}
+                </section>
+              )}
 
               {/* Locale */}
               <div className="bg-white rounded-xl border border-gray-200 p-5">

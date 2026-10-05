@@ -3,6 +3,19 @@ import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 
+const hourlyPayratesSchema = z.array(z.object({
+  year: z.number().int().min(1900).max(3000),
+  hourlyRate: z.number().finite().nonnegative().max(1_000_000),
+}).strict()).max(200).superRefine((payrates, context) => {
+  const years = new Set<number>();
+  payrates.forEach((payrate, index) => {
+    if (years.has(payrate.year)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: [index, 'year'], message: 'Year must be unique' });
+    }
+    years.add(payrate.year);
+  });
+});
+
 export async function preferenceRoutes(app: FastifyInstance) {
   // Get all preferences for current user
   app.get('/user/preferences', async (req, reply) => {
@@ -125,5 +138,51 @@ export async function preferenceRoutes(app: FastifyInstance) {
     });
 
     reply.send({ key: pref.key, value: pref.value });
+  });
+
+  app.get('/admin/users/:userId/hourly-payrates', async (req, reply) => {
+    const adminId = (req as any).user?.sub;
+    if (!adminId) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const requester = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } });
+    if (requester?.role !== 'ADMIN') return reply.code(403).send({ error: 'Admin access required' });
+
+    const { userId } = req.params as { userId: string };
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!targetUser) return reply.code(404).send({ error: 'User not found' });
+
+    const preference = await prisma.userPreference.findUnique({
+      where: { userId_key: { userId, key: 'hourlyPayrates' } },
+    });
+    const parsed = hourlyPayratesSchema.safeParse(preference?.value ?? []);
+    return reply.send({ payrates: parsed.success ? parsed.data : [] });
+  });
+
+  app.put('/admin/users/:userId/hourly-payrates', async (req, reply) => {
+    const adminId = (req as any).user?.sub;
+    if (!adminId) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const requester = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } });
+    if (requester?.role !== 'ADMIN') return reply.code(403).send({ error: 'Admin access required' });
+
+    const { userId } = req.params as { userId: string };
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!targetUser) return reply.code(404).send({ error: 'User not found' });
+
+    const parsed = z.object({ payrates: hourlyPayratesSchema }).strict().safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid hourly payrates', details: parsed.error.flatten() });
+
+    const preference = await prisma.userPreference.upsert({
+      where: { userId_key: { userId, key: 'hourlyPayrates' } },
+      create: {
+        id: generateId('UserPreference'),
+        userId,
+        key: 'hourlyPayrates',
+        value: parsed.data.payrates,
+      },
+      update: { value: parsed.data.payrates },
+    });
+    const saved = hourlyPayratesSchema.safeParse(preference.value);
+    return reply.send({ payrates: saved.success ? saved.data : [] });
   });
 }
