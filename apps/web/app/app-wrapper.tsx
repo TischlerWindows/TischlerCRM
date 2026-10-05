@@ -29,7 +29,8 @@ import { apiClient } from '@/lib/api-client';
 import { usePermissions, type AppPermissions } from '@/lib/permissions-context';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSetting, setSetting } from '@/lib/preferences';
-import { PROFILE_PICTURE_KEY, resizeProfilePicture } from '@/lib/profile-picture';
+import { PROFILE_PICTURE_KEY } from '@/lib/profile-picture';
+import ProfilePicturePicker, { type ProfilePicturePickerHandle } from '@/components/profile-picture-picker';
 import { RecordSetupProvider, useRecordSetupContext } from '@/lib/record-setup-context';
 import { resolveListViewObjectSetup } from '@/lib/list-view-object-setup';
 import { installGlobalErrorHandler } from '@/lib/error-reporter';
@@ -62,7 +63,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const [profilePictureError, setProfilePictureError] = useState<string | null>(null);
   const [savingProfilePicture, setSavingProfilePicture] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
-  const profilePictureInputRef = useRef<HTMLInputElement>(null);
+  const profilePicturePickerRef = useRef<ProfilePicturePickerHandle>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,19 +107,18 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     };
   }, [showProfileMenu]);
 
-  const handleProfilePictureChange = async (file?: File) => {
-    if (!file || savingProfilePicture) return;
+  const handleSaveProfilePicture = async (picture: string) => {
+    if (savingProfilePicture) return;
     setSavingProfilePicture(true);
     setProfilePictureError(null);
     try {
-      const image = await resizeProfilePicture(file);
-      await apiClient.setPreference(PROFILE_PICTURE_KEY, image);
-      setProfilePicture(image);
+      await apiClient.setPreference(PROFILE_PICTURE_KEY, picture);
+      setProfilePicture(picture);
     } catch (cause) {
       setProfilePictureError(cause instanceof Error ? cause.message : 'Could not save profile picture.');
+      throw cause;
     } finally {
       setSavingProfilePicture(false);
-      if (profilePictureInputRef.current) profilePictureInputRef.current.value = '';
     }
   };
 
@@ -577,28 +577,14 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
           {/* User Menu */}
           {user && (
             <div ref={profileMenuRef} className="relative flex items-center ml-2 pl-2 border-l border-white/20">
-              <input
-                ref={profilePictureInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={event => { void handleProfilePictureChange(event.target.files?.[0]); }}
-              />
-              <button
-                type="button"
-                onClick={() => profilePictureInputRef.current?.click()}
+              <ProfilePicturePicker
+                ref={profilePicturePickerRef}
+                picture={profilePicture}
+                initials={(user.name || user.email || '?').charAt(0).toUpperCase()}
                 disabled={savingProfilePicture}
-                aria-label="Change profile picture"
-                title="Change profile picture"
-                className="group relative mr-1 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-red text-xs font-bold text-white ring-1 ring-white/20 hover:ring-2 hover:ring-white/70 disabled:opacity-60"
-              >
-                {profilePicture
-                  ? <Image src={profilePicture} alt="" width={32} height={32} unoptimized className="h-full w-full object-cover" />
-                  : (user.name || user.email || '?').charAt(0).toUpperCase()}
-                <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                  <Camera className="h-4 w-4" aria-hidden="true" />
-                </span>
-              </button>
+                onSave={handleSaveProfilePicture}
+                buttonClassName="group relative mr-1 h-8 w-8 rounded-full bg-brand-red text-xs font-bold text-white ring-1 ring-white/20 hover:ring-2 hover:ring-white/70"
+              />
               <button
                 type="button"
                 onClick={() => {
@@ -641,7 +627,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                   <div className="p-3">
                     <button
                       type="button"
-                      onClick={() => profilePictureInputRef.current?.click()}
+                      onClick={() => profilePicturePickerRef.current?.open()}
                       disabled={savingProfilePicture}
                       className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
                     >

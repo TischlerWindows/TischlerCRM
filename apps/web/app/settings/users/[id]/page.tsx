@@ -1,18 +1,18 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
   ChevronLeft, User, Phone, Building2,
   Lock, Unlock, Trash2, RefreshCw, Send, Save, X, Mail,
-  Clock, AlertCircle, CheckCircle, DollarSign, Plus, Camera,
+  Clock, AlertCircle, CheckCircle, DollarSign, Plus,
 } from 'lucide-react';
 import { apiClient, type HourlyPayrate, type UserDetail, type LoginEventRow, type UpdateUserInput, type Profile, type UserRow } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { PasswordVisibilityInput } from '@/components/password-visibility-input';
-import { resizeProfilePicture } from '@/lib/profile-picture';
+import ProfilePicturePicker from '@/components/profile-picture-picker';
 
 const TIMEZONES = [
   'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -96,7 +96,6 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [profilePictureSaving, setProfilePictureSaving] = useState(false);
   const [profilePictureError, setProfilePictureError] = useState<string | null>(null);
-  const profilePictureInputRef = useRef<HTMLInputElement>(null);
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
@@ -277,20 +276,19 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
     setPayratesError(null);
   };
 
-  const handleProfilePictureChange = async (file?: File) => {
-    if (!file || profilePictureSaving) return;
+  const handleSaveProfilePicture = async (picture: string) => {
+    if (profilePictureSaving) return;
     setProfilePictureSaving(true);
     setProfilePictureError(null);
     try {
-      const picture = await resizeProfilePicture(file);
       await apiClient.setUserProfilePicture(id, picture);
       setProfilePicture(picture);
       window.dispatchEvent(new CustomEvent('profile-picture-updated', { detail: { userId: id, picture } }));
     } catch (cause) {
       setProfilePictureError(cause instanceof Error ? cause.message : 'Could not save profile picture.');
+      throw cause;
     } finally {
       setProfilePictureSaving(false);
-      if (profilePictureInputRef.current) profilePictureInputRef.current.value = '';
     }
   };
 
@@ -405,31 +403,14 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
           >
             <ChevronLeft className="w-3 h-3" /> All Users
           </Link>
-          {isAdmin && (
-            <input
-              ref={profilePictureInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={event => { void handleProfilePictureChange(event.target.files?.[0]); }}
-            />
-          )}
           {isAdmin ? (
-            <button
-              type="button"
-              onClick={() => profilePictureInputRef.current?.click()}
+            <ProfilePicturePicker
+              picture={profilePicture}
+              initials={initials}
               disabled={profilePictureSaving}
-              aria-label="Change profile picture"
-              title="Change profile picture"
-              className="group relative mb-3 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[#151f6d] text-base font-bold text-white ring-1 ring-gray-200 hover:ring-2 hover:ring-[#151f6d] disabled:opacity-60"
-            >
-              {profilePicture
-                ? <Image src={profilePicture} alt="" width={48} height={48} unoptimized className="h-full w-full object-cover" />
-                : initials}
-              <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                <Camera className="h-4 w-4" aria-hidden="true" />
-              </span>
-            </button>
+              onSave={handleSaveProfilePicture}
+              buttonClassName="mb-3 h-12 w-12 rounded-full bg-[#151f6d] text-base font-bold text-white ring-1 ring-gray-200 hover:ring-2 hover:ring-[#151f6d]"
+            />
           ) : (
             <div className="mb-3 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[#151f6d] text-base font-bold text-white">
               {profilePicture
