@@ -48,7 +48,10 @@ async function checkObjectPermission(
     WorkOrder:    'workorders',
   };
   const profilePerms = (user.profile?.permissions as any) || {};
-  const storageKey = API_TO_STORAGE[objectApiName] ?? objectApiName.toLowerCase();
+  // AutoCad rows are required child records of a Project and are not a
+  // separately configurable object in profile permissions.
+  const permissionObject = objectApiName === 'AutoCad' ? 'Project' : objectApiName;
+  const storageKey = API_TO_STORAGE[permissionObject] ?? permissionObject.toLowerCase();
   const objPerms = profilePerms?.objects?.[storageKey] ?? profilePerms?.objects?.[objectApiName];
   if (objPerms?.[action]) return true;
 
