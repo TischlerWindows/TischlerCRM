@@ -18,12 +18,28 @@ interface FieldDef {
   type: FieldType
 }
 
+interface FillDrag {
+  rowIndex: number
+  colIndex: number
+  colKey: string
+  value: unknown
+  targetRowIndex: number
+}
+
 const FIELDS: FieldDef[] = [
   { key: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'user' },
   { key: 'perDiemAmount', label: 'Per Diem Amount', type: 'currency' },
   { key: 'perDiemNotes', label: 'Per Diem Notes', type: 'textarea' },
   { key: 'perDiemStartDate', label: 'Per Diem Start Date', type: 'date' },
   { key: 'perDiemEndDate', label: 'Per Diem End Date', type: 'date' },
+]
+
+const MOBILE_FIELDS: Array<FieldDef & { width: string }> = [
+  { key: 'serviceTechPerDiem', label: 'Tech', type: 'text', width: 'w-28' },
+  { key: 'perDiemStartDate', label: 'Start Date', type: 'date', width: 'w-28' },
+  { key: 'perDiemEndDate', label: 'End Date', type: 'date', width: 'w-28' },
+  { key: 'perDiemAmount', label: 'Amount', type: 'currency', width: 'w-24' },
+  { key: 'perDiemNotes', label: 'Notes', type: 'textarea', width: 'min-w-[14rem] flex-1' },
 ]
 
 function dateValue(value: unknown): string {
@@ -372,6 +388,8 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
   // Which grid cell (`${rowId}:${fieldKey}`) is currently in edit mode — lifted
   // here so keyboard navigation can move editing to the next cell.
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
+  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
+  const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
 
   const handleNavigate = (el: HTMLElement, direction: NavDirection) => {
     const td = el.closest('td')
@@ -393,11 +411,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
 
   useEffect(() => { void load() }, [load])
 
-  if (object?.apiName && object.apiName !== 'WorkOrder') {
-    return <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">The Per Diem widget can only be placed on the Work Order object&rsquo;s layout.</div>
-  }
-
-  const handleCommit = async (rowId: string, key: string, value: unknown) => {
+  const handleCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
     setSavingRowId(rowId)
     setError(null)
     try {
@@ -408,6 +422,39 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     } finally {
       setSavingRowId(null)
     }
+  }, [])
+
+  useEffect(() => {
+    if (!fillDrag) return
+    const onMouseUp = () => {
+      const drag = fillDrag
+      setFillDrag(null)
+      const lo = Math.min(drag.rowIndex, drag.targetRowIndex)
+      const hi = Math.max(drag.rowIndex, drag.targetRowIndex)
+      for (let rowIndex = lo; rowIndex <= hi; rowIndex++) {
+        if (rowIndex === drag.rowIndex) continue
+        const row = rows[rowIndex]
+        if (row) void handleCommit(row.id, drag.colKey, drag.value)
+      }
+    }
+    window.addEventListener('mouseup', onMouseUp)
+    return () => window.removeEventListener('mouseup', onMouseUp)
+  }, [fillDrag, rows, handleCommit])
+
+  const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
+    setFillDrag((previous) => previous && previous.colIndex === colIndex
+      ? { ...previous, targetRowIndex: rowIndex }
+      : previous)
+  }
+
+  const isCellInFillRange = (rowIndex: number, colIndex: number) => {
+    if (!fillDrag || colIndex !== fillDrag.colIndex) return false
+    return rowIndex >= Math.min(fillDrag.rowIndex, fillDrag.targetRowIndex)
+      && rowIndex <= Math.max(fillDrag.rowIndex, fillDrag.targetRowIndex)
+  }
+
+  if (object?.apiName && object.apiName !== 'WorkOrder') {
+    return <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">The Per Diem widget can only be placed on the Work Order object&rsquo;s layout.</div>
   }
 
   const handleCreate = async (values: Record<string, unknown>) => {
@@ -544,7 +591,28 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
             <tbody>
               {rows.map((row, index) => (
                 <tr key={row.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  {FIELDS.map((field) => <td key={field.key} className="border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words"><EditableCell cellId={`${row.id}:${field.key}`} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:${field.key}`} onStartEdit={() => setEditingCellId(`${row.id}:${field.key}`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} onNavigate={handleNavigate} /></td>)}
+                  {FIELDS.map((field, colIndex) => {
+                    const cellId = `${row.id}:${field.key}`
+                    return <td
+                      key={field.key}
+                      onMouseEnter={() => { handleFillDragEnter(index, colIndex); setHoveredCellId(cellId) }}
+                      onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
+                      className={`relative border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words ${isCellInFillRange(index, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                    >
+                      <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} onStartEdit={() => setEditingCellId(cellId)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} onNavigate={handleNavigate} />
+                      {hoveredCellId === cellId && editingCellId !== cellId && (
+                        <span
+                          onMouseDown={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            setFillDrag({ rowIndex: index, colIndex, colKey: field.key, value: row.data?.[field.key], targetRowIndex: index })
+                          }}
+                          aria-hidden="true"
+                          className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
+                        />
+                      )}
+                    </td>
+                  })}
                   <td className="w-8 border-b border-gray-100 px-1 py-1.5 align-top"><button type="button" onClick={() => void handleDelete(row)} disabled={deletingRowId === row.id || savingRowId === row.id} aria-label="Delete per diem record" title="Delete per diem record" className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">{deletingRowId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}</button></td>
                 </tr>
               ))}
@@ -555,28 +623,31 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
 
       {!loading && rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-gray-200 md:hidden">
-          {rows.map((row) => (
+          {rows.map((row, rowIndex) => (
             <article key={row.id} className="flex min-w-[36rem] items-center gap-3 border-b border-gray-100 bg-white px-2 py-2 last:border-b-0">
-              <div className="w-28 shrink-0">
-                <p className="text-[9px] font-semibold uppercase text-gray-400">Tech</p>
-                <EditableCell cellId={`${row.id}:serviceTechPerDiem`} value={row.data?.serviceTechPerDiem} type="text" saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:serviceTechPerDiem`} onStartEdit={() => setEditingCellId(`${row.id}:serviceTechPerDiem`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, 'serviceTechPerDiem', value)} />
-              </div>
-              <div className="w-28 shrink-0">
-                <p className="text-[9px] font-semibold uppercase text-gray-400">Start Date</p>
-                <EditableCell cellId={`${row.id}:perDiemStartDate`} value={row.data?.perDiemStartDate} type="date" saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:perDiemStartDate`} onStartEdit={() => setEditingCellId(`${row.id}:perDiemStartDate`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, 'perDiemStartDate', value)} />
-              </div>
-              <div className="w-28 shrink-0">
-                <p className="text-[9px] font-semibold uppercase text-gray-400">End Date</p>
-                <EditableCell cellId={`${row.id}:perDiemEndDate`} value={row.data?.perDiemEndDate} type="date" saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:perDiemEndDate`} onStartEdit={() => setEditingCellId(`${row.id}:perDiemEndDate`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, 'perDiemEndDate', value)} />
-              </div>
-              <div className="w-24 shrink-0">
-                <p className="text-[9px] font-semibold uppercase text-gray-400">Amount</p>
-                <EditableCell cellId={`${row.id}:perDiemAmount`} value={row.data?.perDiemAmount} type="currency" saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:perDiemAmount`} onStartEdit={() => setEditingCellId(`${row.id}:perDiemAmount`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, 'perDiemAmount', value)} />
-              </div>
-              <div className="min-w-[14rem] flex-1">
-                <p className="text-[9px] font-semibold uppercase text-gray-400">Notes</p>
-                <EditableCell cellId={`${row.id}:perDiemNotes`} value={row.data?.perDiemNotes} type="textarea" saving={savingRowId === row.id} isEditing={editingCellId === `${row.id}:perDiemNotes`} onStartEdit={() => setEditingCellId(`${row.id}:perDiemNotes`)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, 'perDiemNotes', value)} />
-              </div>
+              {MOBILE_FIELDS.map((field, colIndex) => {
+                const cellId = `${row.id}:${field.key}`
+                return <div
+                  key={field.key}
+                  onMouseEnter={() => { handleFillDragEnter(rowIndex, colIndex); setHoveredCellId(cellId) }}
+                  onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
+                  className={`relative shrink-0 ${field.width} ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                >
+                  <p className="text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
+                  <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} onStartEdit={() => setEditingCellId(cellId)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} />
+                  {hoveredCellId === cellId && editingCellId !== cellId && (
+                    <span
+                      onMouseDown={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        setFillDrag({ rowIndex, colIndex, colKey: field.key, value: row.data?.[field.key], targetRowIndex: rowIndex })
+                      }}
+                      aria-hidden="true"
+                      className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
+                    />
+                  )}
+                </div>
+              })}
               <button type="button" onClick={() => void handleDelete(row)} disabled={deletingRowId === row.id || savingRowId === row.id} aria-label="Delete per diem record" className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">
                 {deletingRowId === row.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               </button>
