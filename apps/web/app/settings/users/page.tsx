@@ -177,7 +177,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-h-full flex-col">
       <SettingsPageHeader
         icon={Users}
         title="Users"
