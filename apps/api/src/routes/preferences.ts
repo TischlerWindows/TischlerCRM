@@ -247,6 +247,16 @@ export async function preferenceRoutes(app: FastifyInstance) {
     const requesterId = (req as any).user?.sub;
     if (!requesterId) return reply.code(401).send({ error: 'Unauthorized' });
 
+    const requester = await prisma.user.findUnique({
+      where: { id: requesterId },
+      select: { role: true, profile: { select: { permissions: true } } },
+    });
+    const appPermissions = requester?.profile?.permissions as { app?: { manageUsers?: boolean; viewAllUsers?: boolean } } | null;
+    const canViewUsers = requester?.role === 'ADMIN'
+      || appPermissions?.app?.manageUsers === true
+      || appPermissions?.app?.viewAllUsers === true;
+    if (!canViewUsers) return reply.code(403).send({ error: 'User list access required' });
+
     const query = z.object({ ids: z.string().min(1).max(20_000) }).safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: 'Provide user IDs to look up' });
     const userIds = [...new Set(query.data.ids.split(',').filter(Boolean))];

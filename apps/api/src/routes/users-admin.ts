@@ -45,6 +45,20 @@ const listQuerySchema = z.object({ includeDeleted: z.enum(['true', 'false']).opt
 
 const profileSelect = { select: { id: true, name: true, label: true } } as const;
 
+async function getUserManagementAccess(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, profile: { select: { permissions: true } } },
+  });
+  const appPermissions = user?.profile?.permissions as { app?: { manageUsers?: boolean; viewAllUsers?: boolean } } | null;
+  return {
+    canManageUsers: user?.role === 'ADMIN' || appPermissions?.app?.manageUsers === true,
+    canViewUsers: user?.role === 'ADMIN'
+      || appPermissions?.app?.manageUsers === true
+      || appPermissions?.app?.viewAllUsers === true,
+  };
+}
+
 async function resolveSystemRole(profileId: string | null | undefined): Promise<'ADMIN' | 'USER'> {
   if (!profileId) return 'USER';
   const profile = await prisma.profile.findUnique({
@@ -135,8 +149,16 @@ export async function usersAdminRoutes(app: FastifyInstance) {
 
   // ── List users ──────────────────────────────────────────────────────────
   app.get('/admin/users', async (req, reply) => {
+    const requesterId = req.user?.sub;
+    if (!requesterId) return reply.code(401).send({ error: 'Unauthorized' });
+    const access = await getUserManagementAccess(requesterId);
+    if (!access.canViewUsers) return reply.code(403).send({ error: 'User list access required' });
+
     const qParsed = listQuerySchema.safeParse(req.query);
     const includeDeleted = qParsed.success && qParsed.data.includeDeleted === 'true';
+    if (includeDeleted && !access.canManageUsers) {
+      return reply.code(403).send({ error: 'Manage Users access required to view deleted users' });
+    }
     // The "Deleted User" system placeholder (see audit.ts) is never a real,
     // manageable account — hide it from this list regardless of includeDeleted.
     const where = {

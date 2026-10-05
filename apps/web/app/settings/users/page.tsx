@@ -302,12 +302,16 @@ export default function UsersPage() {
                             buttonStyle={{ backgroundColor: color }}
                           />
                           <div>
-                            <Link
-                              href={`/settings/users/${user.id}`}
-                              className="font-semibold text-[#151f6d] hover:underline text-sm"
-                            >
-                              {user.name ?? 'Unnamed'}
-                            </Link>
+                            {canManage ? (
+                              <Link
+                                href={`/settings/users/${user.id}`}
+                                className="font-semibold text-[#151f6d] hover:underline text-sm"
+                              >
+                                {user.name ?? 'Unnamed'}
+                              </Link>
+                            ) : (
+                              <span className="font-semibold text-[#151f6d] text-sm">{user.name ?? 'Unnamed'}</span>
+                            )}
                             <div className="text-xs text-gray-400">{user.email}</div>
                           </div>
                         </div>
@@ -339,13 +343,15 @@ export default function UsersPage() {
                       </td>
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-1 justify-end">
-                          <Link
-                            href={`/settings/users/${user.id}`}
-                            className="p-1.5 text-gray-400 hover:text-[#151f6d] rounded-md hover:bg-[#f0eeff] transition-colors"
-                            title="Open record"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </Link>
+                          {canManage && (
+                            <Link
+                              href={`/settings/users/${user.id}`}
+                              className="p-1.5 text-gray-400 hover:text-[#151f6d] rounded-md hover:bg-[#f0eeff] transition-colors"
+                              title="Open record"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </Link>
+                          )}
                           {currentUser?.role === 'ADMIN' && user.id !== currentUser.id && user.isActive && (
                             <button
                               onClick={() => handleImpersonate(user.id)}

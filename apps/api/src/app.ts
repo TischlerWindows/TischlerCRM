@@ -531,11 +531,17 @@ export function buildApp() {
 
   // ── Admin route guard ─────────────────────────────────────────────────────
   app.addHook('onRequest', async (req, reply) => {
-    if (!req.routeOptions?.url?.startsWith('/admin')) return;
-    if (req.routeOptions?.url === '/admin/backup/scheduled' && req.headers['x-cron-secret']) {
+    const routeUrl = req.routeOptions?.url;
+    if (!routeUrl?.startsWith('/admin')) return;
+    if (routeUrl === '/admin/backup/scheduled' && req.headers['x-cron-secret']) {
       const env = loadEnv();
       if (env.BACKUP_CRON_SECRET && req.headers['x-cron-secret'] === env.BACKUP_CRON_SECRET) return;
     }
+    if (req.method === 'GET' && (routeUrl === '/admin/users' || routeUrl === '/admin/users/profile-pictures')) return;
+    if (
+      routeUrl === '/admin/users/:userId/profile-picture'
+      && (req.method === 'GET' || req.method === 'PUT')
+    ) return;
     if (!req.user || req.user.role !== 'ADMIN') {
       return reply.code(403).send({ error: 'Insufficient permissions.' });
     }
