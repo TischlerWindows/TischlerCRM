@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -18,11 +18,14 @@ import {
   LifeBuoy,
   Inbox,
   Users,
+  Camera,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UniversalSearch from '@/components/universal-search';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { useAuth } from '@/lib/auth-context';
+import { apiClient } from '@/lib/api-client';
 import { usePermissions, type AppPermissions } from '@/lib/permissions-context';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSetting, setSetting } from '@/lib/preferences';
@@ -34,6 +37,41 @@ import { MyTicketsDrawer } from '@/components/support/my-tickets-drawer';
 import { BellPanel } from '@/components/notifications/bell-panel';
 
 const defaultTabs = DEFAULT_TAB_ORDER;
+const PROFILE_PICTURE_KEY = 'profilePicture';
+const MAX_PROFILE_PICTURE_FILE_SIZE = 10 * 1024 * 1024;
+const PROFILE_PICTURE_MAX_DIMENSION = 384;
+
+async function resizeProfilePicture(file: File): Promise<string> {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    throw new Error('Choose a JPG, PNG, or WebP image.');
+  }
+  if (file.size > MAX_PROFILE_PICTURE_FILE_SIZE) {
+    throw new Error('Image must be 10 MB or smaller.');
+  }
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, PROFILE_PICTURE_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not process the selected image.');
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(result => result ? resolve(result) : reject(new Error('Could not encode the selected image.')), 'image/webp', 0.82);
+    });
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Could not read the processed image.'));
+      reader.onerror = () => reject(new Error('Could not read the processed image.'));
+      reader.readAsDataURL(blob);
+    });
+  } finally {
+    bitmap.close();
+  }
+}
 
 function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const { value: recordSetup } = useRecordSetupContext();
@@ -53,6 +91,74 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const [showSetupMenu, setShowSetupMenu] = useState(false);
   const [showSubmitTicket, setShowSubmitTicket] = useState(false);
   const [showMyTickets, setShowMyTickets] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [profilePictureError, setProfilePictureError] = useState<string | null>(null);
+  const [savingProfilePicture, setSavingProfilePicture] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const profilePictureInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProfilePicture(null);
+    if (!user?.id) return () => { cancelled = true; };
+    apiClient.getPreferences()
+      .then(preferences => {
+        if (cancelled) return;
+        const value = preferences[PROFILE_PICTURE_KEY];
+        setProfilePicture(typeof value === 'string' && /^data:image\/(?:webp|png|jpeg);base64,/.test(value) ? value : null);
+      })
+      .catch(() => {
+        if (!cancelled) setProfilePicture(null);
+      });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!showProfileMenu) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!profileMenuRef.current?.contains(event.target as Node)) setShowProfileMenu(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowProfileMenu(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showProfileMenu]);
+
+  const handleProfilePictureChange = async (file?: File) => {
+    if (!file || savingProfilePicture) return;
+    setSavingProfilePicture(true);
+    setProfilePictureError(null);
+    try {
+      const image = await resizeProfilePicture(file);
+      await apiClient.setPreference(PROFILE_PICTURE_KEY, image);
+      setProfilePicture(image);
+    } catch (cause) {
+      setProfilePictureError(cause instanceof Error ? cause.message : 'Could not save profile picture.');
+    } finally {
+      setSavingProfilePicture(false);
+      if (profilePictureInputRef.current) profilePictureInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveProfilePicture = async () => {
+    if (savingProfilePicture) return;
+    setSavingProfilePicture(true);
+    setProfilePictureError(null);
+    try {
+      await apiClient.deletePreference(PROFILE_PICTURE_KEY);
+      setProfilePicture(null);
+    } catch (cause) {
+      setProfilePictureError(cause instanceof Error ? cause.message : 'Could not remove profile picture.');
+    } finally {
+      setSavingProfilePicture(false);
+    }
+  };
 
   // Map tab hrefs to CRM object apiNames for permission filtering
   const hrefToObjectMap: Record<string, string> = {
@@ -494,13 +600,27 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
 
           {/* User Menu */}
           {user && (
-            <div className="flex items-center ml-2 pl-2 border-l border-white/20">
-              <div className="w-7 h-7 rounded-full bg-brand-red flex items-center justify-center text-white text-xs font-bold mr-2">
-                {(user.name || user.email || '?').charAt(0).toUpperCase()}
-              </div>
-              <span className="text-white/90 text-xs font-medium mr-1 hidden md:inline max-w-[120px] truncate">
-                {user.name || user.email}
-              </span>
+            <div ref={profileMenuRef} className="relative flex items-center ml-2 pl-2 border-l border-white/20">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileMenu(open => !open);
+                  setShowHelp(false);
+                  setShowSetupMenu(false);
+                }}
+                aria-label="Open user profile menu"
+                aria-expanded={showProfileMenu}
+                className="flex min-w-0 items-center rounded-md p-1 hover:bg-white/10 transition-colors"
+              >
+                <span className="mr-2 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-red text-xs font-bold text-white">
+                  {profilePicture
+                    ? <Image src={profilePicture} alt="Profile" width={28} height={28} unoptimized className="h-full w-full object-cover" />
+                    : (user.name || user.email || '?').charAt(0).toUpperCase()}
+                </span>
+                <span className="text-white/90 text-xs font-medium mr-1 hidden md:inline max-w-[120px] truncate">
+                  {user.name || user.email}
+                </span>
+              </button>
               <button
                 onClick={() => {
                   logout();
@@ -511,6 +631,56 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
               >
                 <LogOut className="w-4 h-4 text-white/80" />
               </button>
+
+              {showProfileMenu && (
+                <div className="absolute right-0 top-full z-[60] mt-2 w-72 overflow-hidden rounded-lg border border-gray-200 bg-white text-gray-800 shadow-xl">
+                  <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-3">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-red text-base font-bold text-white">
+                      {profilePicture
+                        ? <Image src={profilePicture} alt="Profile" width={48} height={48} unoptimized className="h-full w-full object-cover" />
+                        : (user.name || user.email || '?').charAt(0).toUpperCase()}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold">{user.name || user.email}</span>
+                      <span className="block truncate text-xs text-gray-500">{user.email}</span>
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <input
+                      ref={profilePictureInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={event => { void handleProfilePictureChange(event.target.files?.[0]); }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => profilePictureInputRef.current?.click()}
+                      disabled={savingProfilePicture}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <Camera className="h-4 w-4 text-gray-500" />
+                      {savingProfilePicture ? 'Saving picture…' : profilePicture ? 'Change profile picture' : 'Set profile picture'}
+                    </button>
+                    {profilePicture && (
+                      <button
+                        type="button"
+                        onClick={() => { void handleRemoveProfilePicture(); }}
+                        disabled={savingProfilePicture}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" /> Remove profile picture
+                      </button>
+                    )}
+                    <p className="px-3 pt-2 text-[10px] text-gray-400">JPG, PNG, or WebP. Images are resized before saving.</p>
+                    {profilePictureError && (
+                      <p role="alert" className="mx-1 mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700">
+                        {profilePictureError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
