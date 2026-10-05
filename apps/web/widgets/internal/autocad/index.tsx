@@ -25,6 +25,14 @@ interface FieldDef {
   options?: string[]
 }
 
+interface FillDrag {
+  rowIndex: number
+  colIndex: number
+  colKey: string
+  value: unknown
+  targetRowIndex: number
+}
+
 /** Full fastener catalog — a single searchable dropdown (replaces the old
  * independent width/name/length columns). */
 const FASTENER_OPTIONS = [
@@ -175,7 +183,7 @@ function FastenerComboBox({
   )
 }
 
-function displayValue(value: unknown, type: FieldType): string {
+function displayValue(value: unknown): string {
   if (value === undefined || value === null || value === '') return '-'
   return String(value)
 }
@@ -317,6 +325,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   // Which grid cell (`${rowId}:${fieldKey}`) is currently in edit mode —
   // lifted here so keyboard navigation can move editing to the next cell.
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
+  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
+  const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
 
   const handleNavigate = (el: HTMLElement, direction: NavDirection) => {
     const td = el.closest('td')
@@ -338,15 +348,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
 
   useEffect(() => { void load() }, [load])
 
-  if (object?.apiName && object.apiName !== 'Project') {
-    return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
-        The AutoCad widget can only be placed on the Project object&rsquo;s layout.
-      </div>
-    )
-  }
-
-  const handleCellCommit = async (rowId: string, key: string, value: unknown) => {
+  const handleCellCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
     setSavingRowId(rowId)
     setError(null)
     try {
@@ -357,6 +359,43 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     } finally {
       setSavingRowId(null)
     }
+  }, [])
+
+  useEffect(() => {
+    if (!fillDrag) return
+    const onMouseUp = () => {
+      const drag = fillDrag
+      setFillDrag(null)
+      const lo = Math.min(drag.rowIndex, drag.targetRowIndex)
+      const hi = Math.max(drag.rowIndex, drag.targetRowIndex)
+      for (let rowIndex = lo; rowIndex <= hi; rowIndex++) {
+        if (rowIndex === drag.rowIndex) continue
+        const row = rows[rowIndex]
+        if (row) void handleCellCommit(row.id, drag.colKey, drag.value)
+      }
+    }
+    window.addEventListener('mouseup', onMouseUp)
+    return () => window.removeEventListener('mouseup', onMouseUp)
+  }, [fillDrag, rows, handleCellCommit])
+
+  const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
+    setFillDrag((previous) => previous && previous.colIndex === colIndex
+      ? { ...previous, targetRowIndex: rowIndex }
+      : previous)
+  }
+
+  const isCellInFillRange = (rowIndex: number, colIndex: number) => {
+    if (!fillDrag || colIndex !== fillDrag.colIndex) return false
+    return rowIndex >= Math.min(fillDrag.rowIndex, fillDrag.targetRowIndex)
+      && rowIndex <= Math.max(fillDrag.rowIndex, fillDrag.targetRowIndex)
+  }
+
+  if (object?.apiName && object.apiName !== 'Project') {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+        The AutoCad widget can only be placed on the Project object&rsquo;s layout.
+      </div>
+    )
   }
 
   const handleAddBlankRow = async () => {
@@ -535,22 +574,39 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
             <tbody>
               {rows.map((row, i) => (
                 <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  {ALL_FIELDS.map((f) => (
-                    <td key={f.key} className="px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words">
+                  {ALL_FIELDS.map((f, colIndex) => {
+                    const cellId = `${row.id}:${f.key}`
+                    return <td
+                      key={f.key}
+                      onMouseEnter={() => { handleFillDragEnter(i, colIndex); setHoveredCellId(cellId) }}
+                      onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
+                      className={`relative px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${isCellInFillRange(i, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                    >
                       <EditableCell
-                        cellId={`${row.id}:${f.key}`}
+                        cellId={cellId}
                         value={row.data?.[f.key]}
                         type={f.type}
                         saving={savingRowId === row.id}
                         options={f.options}
-                        isEditing={editingCellId === `${row.id}:${f.key}`}
-                        onStartEdit={() => setEditingCellId(`${row.id}:${f.key}`)}
+                        isEditing={editingCellId === cellId}
+                        onStartEdit={() => setEditingCellId(cellId)}
                         onStopEdit={() => setEditingCellId(null)}
                         onCommit={(value) => handleCellCommit(row.id, f.key, value)}
                         onNavigate={handleNavigate}
                       />
+                      {hoveredCellId === cellId && editingCellId !== cellId && (
+                        <span
+                          onMouseDown={(event) => {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            setFillDrag({ rowIndex: i, colIndex, colKey: f.key, value: row.data?.[f.key], targetRowIndex: i })
+                          }}
+                          aria-hidden="true"
+                          className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
+                        />
+                      )}
                     </td>
-                  ))}
+                  })}
                   <td className="w-8 px-1 py-1 border-b border-gray-100 align-top">
                     <button
                       type="button"
@@ -576,22 +632,40 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
         <div className="overflow-x-auto rounded-lg border border-gray-200 md:hidden">
           {rows.map((row) => (
             <article key={row.id} className="flex min-w-[48rem] items-center gap-2 border-b border-gray-100 bg-white px-2 py-2 last:border-b-0">
-              {ALL_FIELDS.map((field) => (
-                <div key={field.key} className={`${getMobileRowWidthClass(field)} shrink-0`}>
+              {ALL_FIELDS.map((field, colIndex) => {
+                const cellId = `${row.id}:${field.key}`
+                const rowIndex = rows.indexOf(row)
+                return <div
+                  key={field.key}
+                  onMouseEnter={() => { handleFillDragEnter(rowIndex, colIndex); setHoveredCellId(cellId) }}
+                  onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
+                  className={`${getMobileRowWidthClass(field)} relative shrink-0 ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                >
                   <p className="truncate text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
                   <EditableCell
-                    cellId={`${row.id}:${field.key}`}
+                    cellId={cellId}
                     value={row.data?.[field.key]}
                     type={field.type}
                     saving={savingRowId === row.id}
                     options={field.options}
-                    isEditing={editingCellId === `${row.id}:${field.key}`}
-                    onStartEdit={() => setEditingCellId(`${row.id}:${field.key}`)}
+                    isEditing={editingCellId === cellId}
+                    onStartEdit={() => setEditingCellId(cellId)}
                     onStopEdit={() => setEditingCellId(null)}
                     onCommit={(value) => handleCellCommit(row.id, field.key, value)}
                   />
+                  {hoveredCellId === cellId && editingCellId !== cellId && (
+                    <span
+                      onMouseDown={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        setFillDrag({ rowIndex, colIndex, colKey: field.key, value: row.data?.[field.key], targetRowIndex: rowIndex })
+                      }}
+                      aria-hidden="true"
+                      className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
+                    />
+                  )}
                 </div>
-              ))}
+              })}
               <button
                 type="button"
                 onClick={() => void handleDelete(row)}

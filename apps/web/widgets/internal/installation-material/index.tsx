@@ -16,6 +16,13 @@ import {
 
 const inputClass = 'w-full min-w-0 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 focus:border-brand-navy focus:outline-none'
 
+interface QuantityFillDrag {
+  template: InstallationMaterialWorkbook['activeTemplate']
+  rowIndex: number
+  targetRowIndex: number
+  value: string
+}
+
 function hydrateWorkbook(
   value: InstallationMaterialWorkbook,
   defaults: { factory: string; location: string; projectManager: string; attn: string },
@@ -56,6 +63,37 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [quantityMessage, setQuantityMessage] = useState<string | null>(null)
+  const [hoveredQtyIndex, setHoveredQtyIndex] = useState<number | null>(null)
+  const [focusedQtyIndex, setFocusedQtyIndex] = useState<number | null>(null)
+  const [quantityFillDrag, setQuantityFillDrag] = useState<QuantityFillDrag | null>(null)
+
+  useEffect(() => {
+    if (!quantityFillDrag) return
+    const onMouseUp = () => {
+      const drag = quantityFillDrag
+      setQuantityFillDrag(null)
+      setWorkbook(current => ({
+        ...current,
+        sheets: {
+          ...current.sheets,
+          [drag.template]: {
+            ...current.sheets[drag.template],
+            rows: current.sheets[drag.template].rows.map((row, index) => (
+              index !== drag.rowIndex
+                && index >= Math.min(drag.rowIndex, drag.targetRowIndex)
+                && index <= Math.max(drag.rowIndex, drag.targetRowIndex)
+                ? { ...row, qty: drag.value }
+                : row
+            )),
+          },
+        },
+      }))
+      setDirty(true)
+      setSaved(false)
+    }
+    window.addEventListener('mouseup', onMouseUp)
+    return () => window.removeEventListener('mouseup', onMouseUp)
+  }, [quantityFillDrag])
 
   useEffect(() => {
     setWorkbook(hydrateWorkbook(parseInstallationMaterialWorkbook(raw, projectName), {
@@ -301,7 +339,34 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
             {form.rows.map((row, index) => {
               const rowTotal = calculateMaterialTotal(row)
               return <tr key={index} className="h-9">
-                <td className="border border-gray-300 bg-yellow-100 p-1"><input aria-label={`Quantity row ${index + 1}`} className={inputClass} value={row.qty} onChange={event => updateRow(index, { qty: event.target.value })} /></td>
+                <td
+                  onMouseEnter={() => {
+                    setHoveredQtyIndex(index)
+                    setQuantityFillDrag(current => current ? { ...current, targetRowIndex: index } : current)
+                  }}
+                  onMouseLeave={() => setHoveredQtyIndex(current => current === index ? null : current)}
+                  className={`relative border border-gray-300 bg-yellow-100 p-1 ${quantityFillDrag && index >= Math.min(quantityFillDrag.rowIndex, quantityFillDrag.targetRowIndex) && index <= Math.max(quantityFillDrag.rowIndex, quantityFillDrag.targetRowIndex) ? 'outline outline-1 outline-green-500' : ''}`}
+                >
+                  <input
+                    aria-label={`Quantity row ${index + 1}`}
+                    className={inputClass}
+                    value={row.qty}
+                    onFocus={() => setFocusedQtyIndex(index)}
+                    onBlur={() => setFocusedQtyIndex(current => current === index ? null : current)}
+                    onChange={event => updateRow(index, { qty: event.target.value })}
+                  />
+                  {hoveredQtyIndex === index && focusedQtyIndex !== index && (
+                    <span
+                      onMouseDown={event => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        setQuantityFillDrag({ template: workbook.activeTemplate, rowIndex: index, targetRowIndex: index, value: row.qty })
+                      }}
+                      aria-hidden="true"
+                      className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
+                    />
+                  )}
+                </td>
                 <td className="border border-gray-300 p-1"><input aria-label={`Units row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.units} onChange={event => updateRow(index, { units: event.target.value })} /></td>
                 <td className="border border-gray-300 p-1"><input aria-label={`Description row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.description} onChange={event => updateRow(index, { description: event.target.value })} /></td>
                 {!isUsSupplied && <td className="border border-gray-300 bg-gray-100 p-1"><input aria-label={`US screw size row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:text-gray-600`} value={row.screwSize} onChange={event => updateRow(index, { screwSize: event.target.value })} /></td>}
