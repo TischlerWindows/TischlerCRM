@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { createPortal } from 'react-dom'
 import Cropper, { type Area } from 'react-easy-crop'
 import Image from 'next/image'
-import { Camera, Check, Loader2, RotateCcw, X } from 'lucide-react'
+import { Camera, Check, Eye, Loader2, RotateCcw, Trash2, X } from 'lucide-react'
 import { createCroppedProfilePicture } from '@/lib/profile-picture'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -17,7 +17,10 @@ interface ProfilePicturePickerProps {
   picture: string | null
   initials: string
   buttonClassName: string
+  buttonStyle?: React.CSSProperties
   onSave: (picture: string) => Promise<void>
+  canEdit?: boolean
+  onRemove?: () => Promise<void>
   disabled?: boolean
 }
 
@@ -25,13 +28,17 @@ const ProfilePicturePicker = forwardRef<ProfilePicturePickerHandle, ProfilePictu
   picture,
   initials,
   buttonClassName,
+  buttonStyle,
   onSave,
+  canEdit = true,
+  onRemove,
   disabled = false,
 }, ref) {
   const inputRef = useRef<HTMLInputElement>(null)
   const imageSourceRef = useRef<string | null>(null)
   const [imageSource, setImageSource] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [croppedArea, setCroppedArea] = useState<Area | null>(null)
@@ -39,7 +46,7 @@ const ProfilePicturePicker = forwardRef<ProfilePicturePickerHandle, ProfilePictu
   const [saving, setSaving] = useState(false)
 
   const open = () => {
-    if (!disabled && !saving) inputRef.current?.click()
+    if (!saving) setIsPreviewOpen(true)
   }
 
   useImperativeHandle(ref, () => ({ open }))
@@ -66,6 +73,26 @@ const ProfilePicturePicker = forwardRef<ProfilePicturePickerHandle, ProfilePictu
     setCroppedArea(null)
     setCrop({ x: 0, y: 0 })
     setZoom(1)
+  }
+
+  const closePreview = () => setIsPreviewOpen(false)
+
+  const choosePicture = () => {
+    if (!disabled && !saving && canEdit) inputRef.current?.click()
+  }
+
+  const removePicture = async () => {
+    if (disabled || saving || !canEdit || !picture || !onRemove) return
+    setSaving(true)
+    setError(null)
+    try {
+      await onRemove()
+      closePreview()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not remove profile picture.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,17 +152,60 @@ const ProfilePicturePicker = forwardRef<ProfilePicturePickerHandle, ProfilePictu
         type="button"
         onClick={open}
         disabled={disabled || saving}
-        aria-label="Change profile picture"
-        title="Change profile picture"
+        aria-label="View profile picture"
+        title="View profile picture"
+        style={buttonStyle}
         className={`group relative flex shrink-0 items-center justify-center overflow-hidden ${buttonClassName} disabled:opacity-60`}
       >
         {picture
           ? <Image src={picture} alt="" fill unoptimized sizes="48px" className="object-cover" />
           : initials}
         <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-          <Camera className="h-4 w-4" aria-hidden="true" />
+          <Eye className="h-4 w-4" aria-hidden="true" />
         </span>
       </button>
+
+      {isPreviewOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4"
+          onMouseDown={event => { if (event.target === event.currentTarget && !saving) closePreview() }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label="Profile picture preview"
+            className="w-full max-w-sm overflow-hidden rounded-lg bg-white shadow-2xl"
+          >
+            <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+              <h2 className="text-sm font-semibold text-gray-900">Profile picture</h2>
+              <button type="button" onClick={closePreview} aria-label="Close profile picture preview" className="rounded p-1 text-gray-500 hover:bg-gray-100">
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+            <div className="flex min-h-72 items-center justify-center bg-gray-50 p-6">
+              <div className={`relative flex h-64 w-64 items-center justify-center overflow-hidden rounded-full bg-brand-navy text-6xl font-bold text-white ${picture ? '' : 'ring-1 ring-gray-200'}`}>
+                {picture
+                  ? <Image src={picture} alt="Profile" fill unoptimized sizes="256px" className="object-cover" />
+                  : initials}
+              </div>
+            </div>
+            {error && <p role="alert" className="mx-4 mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+            {canEdit && (
+              <footer className="flex flex-wrap justify-end gap-2 border-t border-gray-200 px-4 py-3">
+                <button type="button" onClick={choosePicture} disabled={disabled || saving} className="inline-flex items-center gap-1.5 rounded bg-[#151f6d] px-3 py-2 text-xs font-medium text-white hover:bg-[#1c2b99] disabled:opacity-50">
+                  <Camera className="h-3.5 w-3.5" /> {picture ? 'Change picture' : 'Add picture'}
+                </button>
+                {picture && onRemove && (
+                  <button type="button" onClick={() => { void removePicture() }} disabled={disabled || saving} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">
+                    {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Remove
+                  </button>
+                )}
+              </footer>
+            )}
+          </section>
+        </div>,
+        document.body,
+      )}
 
       {isOpen && typeof document !== 'undefined' && createPortal(
         <div

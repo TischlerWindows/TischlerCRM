@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Users, Plus, RefreshCw, Trash2, Ban, Send, ExternalLink, KeyRound, LogIn } from 'lucide-react';
 import { apiClient, UserRow, CreateUserInput, InviteStatus } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
+import ProfilePicturePicker from '@/components/profile-picture-picker';
+import { PROFILE_PICTURE_KEY } from '@/lib/profile-picture';
 import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 import { SettingsFilterBar } from '@/components/settings/settings-filter-bar';
 import { SettingsContentCard } from '@/components/settings/settings-content-card';
@@ -55,8 +56,9 @@ interface ConfirmAction {
 
 export default function UsersPage() {
   const { user: currentUser, impersonate } = useAuth();
-  const { hasAppPermission } = usePermissions();
+  const { hasAppPermission, loading: permissionsLoading } = usePermissions();
   const canManage = currentUser?.role === 'ADMIN' || hasAppPermission('manageUsers');
+  const canManagePictures = currentUser?.role === 'ADMIN' || (!permissionsLoading && hasAppPermission('manageUsers'));
   const [users, setUsers] = useState<UserRow[]>([]);
   const [profilePictures, setProfilePictures] = useState<Record<string, string>>({});
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -87,11 +89,19 @@ export default function UsersPage() {
       setUsers(u);
       setDepartments(d);
       setProfilePictures({});
-      if (canManage && u.length > 0) {
+      if (u.length > 0) {
         try {
           setProfilePictures(await apiClient.getUserProfilePictures(u.map(user => user.id)));
         } catch {
-          setProfilePictures({});
+          if (currentUser?.id) {
+            try {
+              const preferences = await apiClient.getPreferences();
+              const ownPicture = preferences[PROFILE_PICTURE_KEY];
+              if (typeof ownPicture === 'string') setProfilePictures({ [currentUser.id]: ownPicture });
+            } catch {
+              setProfilePictures({});
+            }
+          }
         }
       }
     } catch (e: any) {
@@ -99,7 +109,22 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [canManage]);
+  }, [currentUser?.id]);
+
+  const saveUserProfilePicture = async (userId: string, picture: string | null) => {
+    await apiClient.setUserProfilePicture(userId, picture);
+    setProfilePictures(current => {
+      if (picture === null) {
+        const next = { ...current };
+        delete next[userId];
+        return next;
+      }
+      return { ...current, [userId]: picture };
+    });
+    if (userId === currentUser?.id) {
+      window.dispatchEvent(new CustomEvent('profile-picture-updated', { detail: { userId, picture } }));
+    }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -267,14 +292,15 @@ export default function UsersPage() {
                     <tr key={user.id} className="border-b border-[#f5f3fb] hover:bg-[#faf9fc] transition-colors">
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-3">
-                          <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden text-white text-xs font-bold flex-shrink-0"
-                            style={{ backgroundColor: color }}
-                          >
-                            {profilePictures[user.id]
-                              ? <Image src={profilePictures[user.id]!} alt="" width={32} height={32} unoptimized className="h-full w-full object-cover" />
-                              : initials}
-                          </div>
+                          <ProfilePicturePicker
+                            picture={profilePictures[user.id] ?? null}
+                            initials={initials}
+                            canEdit={canManagePictures || currentUser?.id === user.id}
+                            onSave={picture => saveUserProfilePicture(user.id, picture)}
+                            onRemove={() => saveUserProfilePicture(user.id, null)}
+                            buttonClassName="h-8 w-8 rounded-lg text-xs font-bold text-white"
+                            buttonStyle={{ backgroundColor: color }}
+                          />
                           <div>
                             <Link
                               href={`/settings/users/${user.id}`}

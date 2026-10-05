@@ -190,11 +190,8 @@ export async function preferenceRoutes(app: FastifyInstance) {
   });
 
   app.get('/admin/users/:userId/profile-picture', async (req, reply) => {
-    const adminId = (req as any).user?.sub;
-    if (!adminId) return reply.code(401).send({ error: 'Unauthorized' });
-
-    const requester = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } });
-    if (requester?.role !== 'ADMIN') return reply.code(403).send({ error: 'Admin access required' });
+    const requesterId = (req as any).user?.sub;
+    if (!requesterId) return reply.code(401).send({ error: 'Unauthorized' });
 
     const { userId } = req.params as { userId: string };
     const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
@@ -210,15 +207,20 @@ export async function preferenceRoutes(app: FastifyInstance) {
   });
 
   app.put('/admin/users/:userId/profile-picture', async (req, reply) => {
-    const adminId = (req as any).user?.sub;
-    if (!adminId) return reply.code(401).send({ error: 'Unauthorized' });
+    const requesterId = (req as any).user?.sub;
+    if (!requesterId) return reply.code(401).send({ error: 'Unauthorized' });
 
-    const requester = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } });
-    if (requester?.role !== 'ADMIN') return reply.code(403).send({ error: 'Admin access required' });
+    const requester = await prisma.user.findUnique({
+      where: { id: requesterId },
+      select: { role: true, profile: { select: { permissions: true } } },
+    });
+    const permissions = requester?.profile?.permissions as { app?: { manageUsers?: boolean } } | null;
+    const canManageUsers = requester?.role === 'ADMIN' || permissions?.app?.manageUsers === true;
 
     const { userId } = req.params as { userId: string };
     const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!targetUser) return reply.code(404).send({ error: 'User not found' });
+    if (!canManageUsers && requesterId !== userId) return reply.code(403).send({ error: 'User picture edit denied' });
 
     const parsed = z.object({ picture: profilePictureSchema.nullable() }).strict().safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid profile picture', details: parsed.error.flatten() });
@@ -244,15 +246,6 @@ export async function preferenceRoutes(app: FastifyInstance) {
   app.get('/admin/users/profile-pictures', async (req, reply) => {
     const requesterId = (req as any).user?.sub;
     if (!requesterId) return reply.code(401).send({ error: 'Unauthorized' });
-
-    const requester = await prisma.user.findUnique({
-      where: { id: requesterId },
-      select: { role: true, profile: { select: { permissions: true } } },
-    });
-    const permissions = requester?.profile?.permissions as { app?: { manageUsers?: boolean } } | null;
-    if (requester?.role !== 'ADMIN' && permissions?.app?.manageUsers !== true) {
-      return reply.code(403).send({ error: 'User management access required' });
-    }
 
     const query = z.object({ ids: z.string().min(1).max(20_000) }).safeParse(req.query);
     if (!query.success) return reply.code(400).send({ error: 'Provide user IDs to look up' });

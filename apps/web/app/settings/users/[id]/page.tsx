@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   ChevronLeft, User, Phone, Building2,
   Lock, Unlock, Trash2, RefreshCw, Send, Save, X, Mail,
@@ -11,6 +10,7 @@ import {
 } from 'lucide-react';
 import { apiClient, type HourlyPayrate, type UserDetail, type LoginEventRow, type UpdateUserInput, type Profile, type UserRow } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import { PasswordVisibilityInput } from '@/components/password-visibility-input';
 import ProfilePicturePicker from '@/components/profile-picture-picker';
 
@@ -56,7 +56,10 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
   const { user: currentUser } = useAuth();
+  const { hasAppPermission, loading: permissionsLoading } = usePermissions();
   const isAdmin = currentUser?.role === 'ADMIN';
+  const canManageUsers = isAdmin || (!permissionsLoading && hasAppPermission('manageUsers'));
+  const canEditProfilePicture = canManageUsers || currentUser?.id === id;
 
   const [user, setUser] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,7 +186,6 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
   }, [id, isAdmin]);
 
   useEffect(() => {
-    if (!isAdmin) return;
     let cancelled = false;
     setProfilePicture(null);
     setProfilePictureError(null);
@@ -193,7 +195,7 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
         if (!cancelled) setProfilePictureError(cause instanceof Error ? cause.message : 'Failed to load profile picture');
       });
     return () => { cancelled = true; };
-  }, [id, isAdmin]);
+  }, [id]);
 
   const markDirty = () => setDirty(true);
 
@@ -302,6 +304,7 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
       window.dispatchEvent(new CustomEvent('profile-picture-updated', { detail: { userId: id, picture: null } }));
     } catch (cause) {
       setProfilePictureError(cause instanceof Error ? cause.message : 'Could not remove profile picture.');
+      throw cause;
     } finally {
       setProfilePictureSaving(false);
     }
@@ -403,33 +406,17 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
           >
             <ChevronLeft className="w-3 h-3" /> All Users
           </Link>
-          {isAdmin ? (
-            <ProfilePicturePicker
-              picture={profilePicture}
-              initials={initials}
-              disabled={profilePictureSaving}
-              onSave={handleSaveProfilePicture}
-              buttonClassName="mb-3 h-12 w-12 rounded-full bg-[#151f6d] text-base font-bold text-white ring-1 ring-gray-200 hover:ring-2 hover:ring-[#151f6d]"
-            />
-          ) : (
-            <div className="mb-3 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[#151f6d] text-base font-bold text-white">
-              {profilePicture
-                ? <Image src={profilePicture} alt="Profile" width={48} height={48} unoptimized className="h-full w-full object-cover" />
-                : initials}
-            </div>
-          )}
+          <ProfilePicturePicker
+            picture={profilePicture}
+            initials={initials}
+            disabled={profilePictureSaving}
+            canEdit={canEditProfilePicture}
+            onSave={handleSaveProfilePicture}
+            onRemove={handleRemoveProfilePicture}
+            buttonClassName="mb-3 h-12 w-12 rounded-full bg-[#151f6d] text-base font-bold text-white ring-1 ring-gray-200 hover:ring-2 hover:ring-[#151f6d]"
+          />
           {profilePictureSaving && <p className="mb-2 text-[10px] text-gray-400">Saving picture…</p>}
           {profilePictureError && <p role="alert" className="mb-2 max-w-[180px] text-[10px] text-red-600">{profilePictureError}</p>}
-          {isAdmin && profilePicture && (
-            <button
-              type="button"
-              onClick={() => { void handleRemoveProfilePicture(); }}
-              disabled={profilePictureSaving}
-              className="mb-2 inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-red-600 disabled:opacity-50"
-            >
-              <Trash2 className="h-3 w-3" /> Remove photo
-            </button>
-          )}
           <h2 className="text-sm font-bold text-gray-900 leading-tight">{user.name ?? '(no name)'}</h2>
           <p className="text-[11px] text-gray-400 mt-0.5">{user.email}</p>
           <div className="flex flex-wrap gap-1 mt-2">
