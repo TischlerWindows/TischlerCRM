@@ -15,6 +15,9 @@ const hourlyPayratesSchema = z.array(z.object({
     years.add(payrate.year);
   });
 });
+const profilePictureSchema = z.string()
+  .max(1_000_000)
+  .regex(/^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/);
 
 export async function preferenceRoutes(app: FastifyInstance) {
   // Get all preferences for current user
@@ -184,5 +187,57 @@ export async function preferenceRoutes(app: FastifyInstance) {
     });
     const saved = hourlyPayratesSchema.safeParse(preference.value);
     return reply.send({ payrates: saved.success ? saved.data : [] });
+  });
+
+  app.get('/admin/users/:userId/profile-picture', async (req, reply) => {
+    const adminId = (req as any).user?.sub;
+    if (!adminId) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const requester = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } });
+    if (requester?.role !== 'ADMIN') return reply.code(403).send({ error: 'Admin access required' });
+
+    const { userId } = req.params as { userId: string };
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!targetUser) return reply.code(404).send({ error: 'User not found' });
+
+    const preference = await prisma.userPreference.findUnique({
+      where: { userId_key: { userId, key: 'profilePicture' } },
+    });
+    const picture = typeof preference?.value === 'string' && profilePictureSchema.safeParse(preference.value).success
+      ? preference.value
+      : null;
+    return reply.send({ picture });
+  });
+
+  app.put('/admin/users/:userId/profile-picture', async (req, reply) => {
+    const adminId = (req as any).user?.sub;
+    if (!adminId) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const requester = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } });
+    if (requester?.role !== 'ADMIN') return reply.code(403).send({ error: 'Admin access required' });
+
+    const { userId } = req.params as { userId: string };
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!targetUser) return reply.code(404).send({ error: 'User not found' });
+
+    const parsed = z.object({ picture: profilePictureSchema.nullable() }).strict().safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid profile picture', details: parsed.error.flatten() });
+
+    if (parsed.data.picture === null) {
+      await prisma.userPreference.deleteMany({ where: { userId, key: 'profilePicture' } });
+      return reply.send({ picture: null });
+    }
+
+    await prisma.userPreference.upsert({
+      where: { userId_key: { userId, key: 'profilePicture' } },
+      create: {
+        id: generateId('UserPreference'),
+        userId,
+        key: 'profilePicture',
+        value: parsed.data.picture,
+      },
+      update: { value: parsed.data.picture },
+    });
+    return reply.send({ picture: parsed.data.picture });
   });
 }

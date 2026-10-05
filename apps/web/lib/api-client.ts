@@ -348,6 +348,15 @@ class ApiClient {
     return result.payrates;
   }
 
+  async getUserProfilePicture(id: string): Promise<string | null> {
+    const result = await this.get<{ picture: string | null }>(`/admin/users/${id}/profile-picture`);
+    return result.picture;
+  }
+
+  async setUserProfilePicture(id: string, picture: string | null): Promise<void> {
+    await this.put(`/admin/users/${id}/profile-picture`, { picture });
+  }
+
   async createUser(data: CreateUserInput): Promise<{ user: UserRow; inviteUrl?: string; inviteSent: boolean }> {
     return this.post('/admin/users', data);
   }

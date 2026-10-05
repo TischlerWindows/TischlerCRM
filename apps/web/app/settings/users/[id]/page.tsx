@@ -1,16 +1,18 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ChevronLeft, User, Phone, Building2,
   Lock, Unlock, Trash2, RefreshCw, Send, Save, X, Mail,
-  Clock, AlertCircle, CheckCircle, DollarSign, Plus,
+  Clock, AlertCircle, CheckCircle, DollarSign, Plus, Camera,
 } from 'lucide-react';
 import { apiClient, type HourlyPayrate, type UserDetail, type LoginEventRow, type UpdateUserInput, type Profile, type UserRow } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { PasswordVisibilityInput } from '@/components/password-visibility-input';
+import { resizeProfilePicture } from '@/lib/profile-picture';
 
 const TIMEZONES = [
   'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -91,6 +93,10 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
   const [payratesSaving, setPayratesSaving] = useState(false);
   const [payratesDirty, setPayratesDirty] = useState(false);
   const [payratesError, setPayratesError] = useState<string | null>(null);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [profilePictureSaving, setProfilePictureSaving] = useState(false);
+  const [profilePictureError, setProfilePictureError] = useState<string | null>(null);
+  const profilePictureInputRef = useRef<HTMLInputElement>(null);
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
@@ -177,6 +183,19 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
     return () => { cancelled = true; };
   }, [id, isAdmin]);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    setProfilePicture(null);
+    setProfilePictureError(null);
+    apiClient.getUserProfilePicture(id)
+      .then(picture => { if (!cancelled) setProfilePicture(picture); })
+      .catch((cause: unknown) => {
+        if (!cancelled) setProfilePictureError(cause instanceof Error ? cause.message : 'Failed to load profile picture');
+      });
+    return () => { cancelled = true; };
+  }, [id, isAdmin]);
+
   const markDirty = () => setDirty(true);
 
   const handleSave = async () => {
@@ -256,6 +275,38 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
     setHourlyPayrates(current => [...current, { year: String(year), hourlyRate: '' }].sort((a, b) => Number(b.year) - Number(a.year)));
     setPayratesDirty(true);
     setPayratesError(null);
+  };
+
+  const handleProfilePictureChange = async (file?: File) => {
+    if (!file || profilePictureSaving) return;
+    setProfilePictureSaving(true);
+    setProfilePictureError(null);
+    try {
+      const picture = await resizeProfilePicture(file);
+      await apiClient.setUserProfilePicture(id, picture);
+      setProfilePicture(picture);
+      window.dispatchEvent(new CustomEvent('profile-picture-updated', { detail: { userId: id, picture } }));
+    } catch (cause) {
+      setProfilePictureError(cause instanceof Error ? cause.message : 'Could not save profile picture.');
+    } finally {
+      setProfilePictureSaving(false);
+      if (profilePictureInputRef.current) profilePictureInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveProfilePicture = async () => {
+    if (profilePictureSaving) return;
+    setProfilePictureSaving(true);
+    setProfilePictureError(null);
+    try {
+      await apiClient.setUserProfilePicture(id, null);
+      setProfilePicture(null);
+      window.dispatchEvent(new CustomEvent('profile-picture-updated', { detail: { userId: id, picture: null } }));
+    } catch (cause) {
+      setProfilePictureError(cause instanceof Error ? cause.message : 'Could not remove profile picture.');
+    } finally {
+      setProfilePictureSaving(false);
+    }
   };
 
   const handleFreeze = async () => {
@@ -354,9 +405,50 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
           >
             <ChevronLeft className="w-3 h-3" /> All Users
           </Link>
-          <div className="w-12 h-12 rounded-full bg-[#151f6d] flex items-center justify-center text-white font-bold text-base mb-3">
-            {initials}
-          </div>
+          {isAdmin && (
+            <input
+              ref={profilePictureInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={event => { void handleProfilePictureChange(event.target.files?.[0]); }}
+            />
+          )}
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={() => profilePictureInputRef.current?.click()}
+              disabled={profilePictureSaving}
+              aria-label="Change profile picture"
+              title="Change profile picture"
+              className="group relative mb-3 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[#151f6d] text-base font-bold text-white ring-1 ring-gray-200 hover:ring-2 hover:ring-[#151f6d] disabled:opacity-60"
+            >
+              {profilePicture
+                ? <Image src={profilePicture} alt="" width={48} height={48} unoptimized className="h-full w-full object-cover" />
+                : initials}
+              <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                <Camera className="h-4 w-4" aria-hidden="true" />
+              </span>
+            </button>
+          ) : (
+            <div className="mb-3 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[#151f6d] text-base font-bold text-white">
+              {profilePicture
+                ? <Image src={profilePicture} alt="Profile" width={48} height={48} unoptimized className="h-full w-full object-cover" />
+                : initials}
+            </div>
+          )}
+          {profilePictureSaving && <p className="mb-2 text-[10px] text-gray-400">Saving picture…</p>}
+          {profilePictureError && <p role="alert" className="mb-2 max-w-[180px] text-[10px] text-red-600">{profilePictureError}</p>}
+          {isAdmin && profilePicture && (
+            <button
+              type="button"
+              onClick={() => { void handleRemoveProfilePicture(); }}
+              disabled={profilePictureSaving}
+              className="mb-2 inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-red-600 disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" /> Remove photo
+            </button>
+          )}
           <h2 className="text-sm font-bold text-gray-900 leading-tight">{user.name ?? '(no name)'}</h2>
           <p className="text-[11px] text-gray-400 mt-0.5">{user.email}</p>
           <div className="flex flex-wrap gap-1 mt-2">
