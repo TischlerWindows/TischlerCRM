@@ -601,6 +601,28 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
           {/* User Menu */}
           {user && (
             <div ref={profileMenuRef} className="relative flex items-center ml-2 pl-2 border-l border-white/20">
+              <input
+                ref={profilePictureInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={event => { void handleProfilePictureChange(event.target.files?.[0]); }}
+              />
+              <button
+                type="button"
+                onClick={() => profilePictureInputRef.current?.click()}
+                disabled={savingProfilePicture}
+                aria-label="Change profile picture"
+                title="Change profile picture"
+                className="group relative mr-1 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-red text-xs font-bold text-white ring-1 ring-white/20 hover:ring-2 hover:ring-white/70 disabled:opacity-60"
+              >
+                {profilePicture
+                  ? <Image src={profilePicture} alt="" width={32} height={32} unoptimized className="h-full w-full object-cover" />
+                  : (user.name || user.email || '?').charAt(0).toUpperCase()}
+                <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <Camera className="h-4 w-4" aria-hidden="true" />
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -610,14 +632,9 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                 }}
                 aria-label="Open user profile menu"
                 aria-expanded={showProfileMenu}
-                className="flex min-w-0 items-center rounded-md p-1 hover:bg-white/10 transition-colors"
+                className="min-w-0 rounded-md px-1 py-1 text-left hover:bg-white/10 transition-colors"
               >
-                <span className="mr-2 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-red text-xs font-bold text-white">
-                  {profilePicture
-                    ? <Image src={profilePicture} alt="Profile" width={28} height={28} unoptimized className="h-full w-full object-cover" />
-                    : (user.name || user.email || '?').charAt(0).toUpperCase()}
-                </span>
-                <span className="text-white/90 text-xs font-medium mr-1 hidden md:inline max-w-[120px] truncate">
+                <span className="text-white/90 text-xs font-medium hidden md:inline max-w-[120px] truncate">
                   {user.name || user.email}
                 </span>
               </button>
@@ -646,13 +663,6 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                     </span>
                   </div>
                   <div className="p-3">
-                    <input
-                      ref={profilePictureInputRef}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="hidden"
-                      onChange={event => { void handleProfilePictureChange(event.target.files?.[0]); }}
-                    />
                     <button
                       type="button"
                       onClick={() => profilePictureInputRef.current?.click()}
