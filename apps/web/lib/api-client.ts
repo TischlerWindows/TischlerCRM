@@ -357,6 +357,12 @@ class ApiClient {
     await this.put(`/admin/users/${id}/profile-picture`, { picture });
   }
 
+  async getUserProfilePictures(ids: string[]): Promise<Record<string, string>> {
+    const query = new URLSearchParams({ ids: ids.join(',') });
+    const result = await this.get<{ pictures: Record<string, string> }>(`/admin/users/profile-pictures?${query}`);
+    return result.pictures;
+  }
+
   async createUser(data: CreateUserInput): Promise<{ user: UserRow; inviteUrl?: string; inviteSent: boolean }> {
     return this.post('/admin/users', data);
   }

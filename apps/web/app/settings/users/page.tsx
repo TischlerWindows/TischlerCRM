@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Users, Plus, RefreshCw, Trash2, Ban, Send, ExternalLink, KeyRound, LogIn } from 'lucide-react';
 import { apiClient, UserRow, CreateUserInput, InviteStatus } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
@@ -57,6 +58,7 @@ export default function UsersPage() {
   const { hasAppPermission } = usePermissions();
   const canManage = currentUser?.role === 'ADMIN' || hasAppPermission('manageUsers');
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [profilePictures, setProfilePictures] = useState<Record<string, string>>({});
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,12 +86,20 @@ export default function UsersPage() {
       ]);
       setUsers(u);
       setDepartments(d);
+      setProfilePictures({});
+      if (canManage && u.length > 0) {
+        try {
+          setProfilePictures(await apiClient.getUserProfilePictures(u.map(user => user.id)));
+        } catch {
+          setProfilePictures({});
+        }
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canManage]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -258,10 +268,12 @@ export default function UsersPage() {
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-3">
                           <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden text-white text-xs font-bold flex-shrink-0"
                             style={{ backgroundColor: color }}
                           >
-                            {initials}
+                            {profilePictures[user.id]
+                              ? <Image src={profilePictures[user.id]!} alt="" width={32} height={32} unoptimized className="h-full w-full object-cover" />
+                              : initials}
                           </div>
                           <div>
                             <Link

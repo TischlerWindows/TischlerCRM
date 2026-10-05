@@ -240,4 +240,36 @@ export async function preferenceRoutes(app: FastifyInstance) {
     });
     return reply.send({ picture: parsed.data.picture });
   });
+
+  app.get('/admin/users/profile-pictures', async (req, reply) => {
+    const requesterId = (req as any).user?.sub;
+    if (!requesterId) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const requester = await prisma.user.findUnique({
+      where: { id: requesterId },
+      select: { role: true, profile: { select: { permissions: true } } },
+    });
+    const permissions = requester?.profile?.permissions as { app?: { manageUsers?: boolean } } | null;
+    if (requester?.role !== 'ADMIN' && permissions?.app?.manageUsers !== true) {
+      return reply.code(403).send({ error: 'User management access required' });
+    }
+
+    const query = z.object({ ids: z.string().min(1).max(20_000) }).safeParse(req.query);
+    if (!query.success) return reply.code(400).send({ error: 'Provide user IDs to look up' });
+    const userIds = [...new Set(query.data.ids.split(',').filter(Boolean))];
+    if (userIds.length === 0 || userIds.length > 200) {
+      return reply.code(400).send({ error: 'Request between 1 and 200 user IDs' });
+    }
+
+    const preferences = await prisma.userPreference.findMany({
+      where: { userId: { in: userIds }, key: 'profilePicture' },
+      select: { userId: true, value: true },
+    });
+    const pictures = Object.fromEntries(preferences.flatMap(preference => (
+      typeof preference.value === 'string' && profilePictureSchema.safeParse(preference.value).success
+        ? [[preference.userId, preference.value]]
+        : []
+    )));
+    return reply.send({ pictures });
+  });
 }
