@@ -9,6 +9,8 @@ import { runTriggers } from '../lib/triggers/trigger-engine.js';
 import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
+const PROJECT_CHILD_OBJECTS = new Set(['AutoCad', 'CadIndexItem', 'InstallProgressItem']);
+
 async function checkObjectPermission(
   userId: string,
   userRole: string,
@@ -48,9 +50,9 @@ async function checkObjectPermission(
     WorkOrder:    'workorders',
   };
   const profilePerms = (user.profile?.permissions as any) || {};
-  // AutoCad rows are required child records of a Project and are not a
-  // separately configurable object in profile permissions.
-  const permissionObject = objectApiName === 'AutoCad' ? 'Project' : objectApiName;
+  // Project widget rows are required child records and are not separately
+  // configurable in profile permissions.
+  const permissionObject = PROJECT_CHILD_OBJECTS.has(objectApiName) ? 'Project' : objectApiName;
   const storageKey = API_TO_STORAGE[permissionObject] ?? permissionObject.toLowerCase();
   const objPerms = profilePerms?.objects?.[storageKey] ?? profilePerms?.objects?.[objectApiName];
   if (objPerms?.[action]) return true;
