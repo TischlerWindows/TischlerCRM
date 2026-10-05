@@ -31,6 +31,7 @@ const LOCALES = [
 
 type Tab = 'details' | 'login-history';
 interface HourlyPayrateFormRow { year: string; hourlyRate: string }
+const PAYRATE_YEARS = Array.from({ length: 31 }, (_, index) => 2030 - index);
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return '—';
@@ -213,8 +214,8 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
     for (const payrate of hourlyPayrates) {
       const year = Number(payrate.year);
       const hourlyRate = Number(payrate.hourlyRate);
-      if (!Number.isInteger(year) || year < 1900 || year > 3000) {
-        setPayratesError('Enter a valid year between 1900 and 3000.');
+      if (!Number.isInteger(year) || year < 2000 || year > 2030) {
+        setPayratesError('Select a year between 2000 and 2030.');
         return;
       }
       if (!payrate.hourlyRate.trim() || !Number.isFinite(hourlyRate) || hourlyRate < 0) {
@@ -244,8 +245,14 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
 
   const addHourlyPayrate = () => {
     const existingYears = new Set(hourlyPayrates.map(payrate => payrate.year));
-    let year = new Date().getFullYear();
-    while (existingYears.has(String(year))) year -= 1;
+    const currentYear = new Date().getFullYear();
+    const year = [...PAYRATE_YEARS]
+      .sort((left, right) => Math.abs(left - currentYear) - Math.abs(right - currentYear) || right - left)
+      .find(candidate => !existingYears.has(String(candidate)));
+    if (year === undefined) {
+      setPayratesError('All available years already have a payrate.');
+      return;
+    }
     setHourlyPayrates(current => [...current, { year: String(year), hourlyRate: '' }].sort((a, b) => Number(b.year) - Number(a.year)));
     setPayratesDirty(true);
     setPayratesError(null);
@@ -581,11 +588,7 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
                       <div className="divide-y divide-gray-100">
                         {hourlyPayrates.map((payrate, index) => (
                           <div key={index} className="grid grid-cols-[minmax(7rem,0.7fr)_minmax(12rem,1fr)_2.5rem] items-center gap-3 py-2">
-                            <input
-                              type="number"
-                              min="1900"
-                              max="3000"
-                              step="1"
+                            <select
                               aria-label={`Payrate year row ${index + 1}`}
                               value={payrate.year}
                               onChange={event => {
@@ -594,7 +597,9 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
                                 setPayratesError(null);
                               }}
                               className={inputCls}
-                            />
+                            >
+                              {PAYRATE_YEARS.map(year => <option key={year} value={year}>{year}</option>)}
+                            </select>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
                               <input

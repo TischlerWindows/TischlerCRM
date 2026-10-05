@@ -4,7 +4,7 @@ import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 
 const hourlyPayratesSchema = z.array(z.object({
-  year: z.number().int().min(1900).max(3000),
+  year: z.number().int().min(2000).max(2030),
   hourlyRate: z.number().finite().nonnegative().max(1_000_000),
 }).strict()).max(200).superRefine((payrates, context) => {
   const years = new Set<number>();
