@@ -995,7 +995,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                           >
                             <option value="">-- Select Object --</option>
                             {schema?.objects
-                              .filter(o => o.apiName !== objectApiName && (selectedType !== 'Connection' || o.apiName === 'Contact' || o.apiName === 'Account'))
+                              .filter(o => o.apiName !== objectApiName)
                               .sort((a, b) => a.label.localeCompare(b.label))
                               .map(o => (
                                 <option key={o.apiName} value={o.apiName}>{o.label}</option>
