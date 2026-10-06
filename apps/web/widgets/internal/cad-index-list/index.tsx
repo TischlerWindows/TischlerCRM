@@ -27,9 +27,11 @@ import {
   parseGridCellValue,
   parseGridClipboard,
   serializeGridClipboard,
+  spreadsheetColumnLabel,
   type GridCoordinate,
   type GridSelection,
 } from '@/lib/cad-index-grid'
+import { GridRangeDecoration, GridRangeStyles } from '../shared/grid-range-decoration'
 
 type ColumnType = 'text' | 'number' | 'checkbox'
 
@@ -58,17 +60,6 @@ const REPORT_TYPES = [
 ] as const
 
 type ReportType = typeof REPORT_TYPES[number]
-
-function spreadsheetColumnLabel(index: number): string {
-  let value = index + 1
-  let label = ''
-  while (value > 0) {
-    value -= 1
-    label = String.fromCharCode(65 + (value % 26)) + label
-    value = Math.floor(value / 26)
-  }
-  return label
-}
 
 const BASE_UNIT_COLUMNS: ColumnDef[] = [
   { key: 'unit', label: 'Unit', type: 'text' },
@@ -901,10 +892,6 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                   <th scope="row" className="sticky left-0 z-10 w-9 border-b border-r border-gray-100 bg-gray-50 px-1 py-1 text-center font-normal tabular-nums text-gray-400">{rowIndex + 1}</th>
                   {columns.map((col, colIndex) => {
                     const cellId = `${row.id}:${col.key}`
-                    const selectedBounds = selection ? getGridSelectionBounds(selection) : null
-                    const copiedBounds = copiedSelection ? getGridSelectionBounds(copiedSelection) : null
-                    const isCopied = !!copiedBounds && rowIndex >= copiedBounds.top && rowIndex <= copiedBounds.bottom
-                      && colIndex >= copiedBounds.left && colIndex <= copiedBounds.right
                     return (
                       <td
                         key={col.key}
@@ -939,25 +926,8 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                             ? 'bg-[#e2f0d9]'
                             : ''
                         } ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
-                        style={selectedBounds && isInGridSelection(rowIndex, colIndex, selection!) ? {
-                          borderTop: rowIndex === selectedBounds.top ? '2px solid #217346' : undefined,
-                          borderBottom: rowIndex === selectedBounds.bottom ? '2px solid #217346' : undefined,
-                          borderLeft: colIndex === selectedBounds.left ? '2px solid #217346' : undefined,
-                          borderRight: colIndex === selectedBounds.right ? '2px solid #217346' : undefined,
-                        } : undefined}
                       >
-                        {isCopied && copiedBounds && rowIndex === copiedBounds.top && (
-                          <span aria-hidden="true" className="cad-copy-edge cad-copy-horizontal absolute -top-px left-0 right-0 z-20 h-[2px]" />
-                        )}
-                        {isCopied && copiedBounds && rowIndex === copiedBounds.bottom && (
-                          <span aria-hidden="true" className="cad-copy-edge cad-copy-horizontal absolute -bottom-px left-0 right-0 z-20 h-[2px]" />
-                        )}
-                        {isCopied && copiedBounds && colIndex === copiedBounds.left && (
-                          <span aria-hidden="true" className="cad-copy-edge cad-copy-vertical absolute bottom-0 left-0 top-0 z-20 w-[2px]" />
-                        )}
-                        {isCopied && copiedBounds && colIndex === copiedBounds.right && (
-                          <span aria-hidden="true" className="cad-copy-edge cad-copy-vertical absolute bottom-0 right-0 top-0 z-20 w-[2px]" />
-                        )}
+                        <GridRangeDecoration row={rowIndex} column={colIndex} selection={selection} copiedSelection={copiedSelection} />
                         {col.type === 'checkbox' ? (
                           <div className="flex items-center justify-center">
                             <input
@@ -1053,31 +1023,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
           />
         </label>
       )}
-      <style jsx>{`
-        @keyframes cad-index-march-horizontal {
-          to { background-position: 6px 0; }
-        }
-        @keyframes cad-index-march-vertical {
-          to { background-position: 0 6px; }
-        }
-        .cad-copy-edge {
-          pointer-events: none;
-          display: block;
-        }
-        .cad-copy-horizontal {
-          background-image: repeating-linear-gradient(90deg, #fff 0 3px, #217346 3px 6px);
-          background-size: 6px 2px;
-          animation: cad-index-march-horizontal 0.35s linear infinite;
-        }
-        .cad-copy-vertical {
-          background-image: repeating-linear-gradient(180deg, #fff 0 3px, #217346 3px 6px);
-          background-size: 2px 6px;
-          animation: cad-index-march-vertical 0.35s linear infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .cad-copy-edge { animation: none; }
-        }
-      `}</style>
+      <GridRangeStyles />
     </div>
   )
 }

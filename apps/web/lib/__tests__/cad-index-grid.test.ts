@@ -3,6 +3,7 @@ import {
   isInGridSelection,
   parseGridCellValue,
   parseGridClipboard,
+  spreadsheetColumnLabel,
   serializeGridClipboard,
 } from '../cad-index-grid'
 
@@ -12,6 +13,10 @@ describe('CAD Index List spreadsheet grid helpers', () => {
     expect(getGridSelectionBounds(selection)).toEqual({ top: 1, bottom: 3, left: 2, right: 4 })
     expect(isInGridSelection(2, 3, selection)).toBe(true)
     expect(isInGridSelection(0, 3, selection)).toBe(false)
+  })
+
+  it('converts zero-based grid columns to spreadsheet labels', () => {
+    expect([0, 25, 26, 27, 701].map(spreadsheetColumnLabel)).toEqual(['A', 'Z', 'AA', 'AB', 'ZZ'])
   })
 
   it('round-trips tabular clipboard data including tabs, quotes, and line breaks', () => {

@@ -11,9 +11,19 @@ import { AlertCircle, FileText, Loader2, Plus, Trash2, Wrench } from 'lucide-rea
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
-import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
+import type { NavDirection } from '@/lib/cell-navigation'
 import { readProjectField } from '@/lib/factory-order-spec'
 import { userLookupIds, type LookupUserIdentity } from '@/lib/user-lookup'
+import {
+  getGridSelectionBounds,
+  parseGridCellValue,
+  parseGridClipboard,
+  serializeGridClipboard,
+  spreadsheetColumnLabel,
+  type GridCoordinate,
+  type GridSelection,
+} from '@/lib/cad-index-grid'
+import { GridRangeDecoration, GridRangeStyles } from '../shared/grid-range-decoration'
 import { getRecordName } from '../shared/recordName'
 
 type FieldType = 'combobox' | 'number'
@@ -305,7 +315,7 @@ function EditableCell({
     <button
       type="button"
       data-cell-id={dataCellId}
-      onClick={startEdit}
+      onDoubleClick={startEdit}
       disabled={saving}
       onKeyDown={(e) => {
         if (!onNavigate) return
@@ -334,10 +344,158 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
   const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
+  const [selection, setSelection] = useState<GridSelection | null>(null)
+  const [copiedSelection, setCopiedSelection] = useState<GridSelection | null>(null)
+  const gridRootRef = useRef<HTMLDivElement>(null)
+  const selectingCellsRef = useRef(false)
+
+  const focusGridCell = (coordinate: GridCoordinate) => {
+    requestAnimationFrame(() => {
+      const cells = gridRootRef.current?.querySelectorAll<HTMLElement>(
+        `[data-grid-row="${coordinate.row}"][data-grid-column="${coordinate.column}"]`,
+      )
+      const visibleCell = Array.from(cells ?? []).find((cell) => cell.getClientRects().length > 0)
+      visibleCell?.focus()
+    })
+  }
+
+  const selectGridCell = (coordinate: GridCoordinate, extend = false) => {
+    setSelection((current) => extend && current
+      ? { ...current, focus: coordinate }
+      : { anchor: coordinate, focus: coordinate })
+    focusGridCell(coordinate)
+  }
+
+  const navigateGrid = (row: number, column: number, direction: NavDirection, extend = false) => {
+    let nextRow = row + (direction === 'down' ? 1 : direction === 'up' ? -1 : 0)
+    let nextColumn = column + (direction === 'right' ? 1 : direction === 'left' ? -1 : 0)
+    if (nextColumn < 0) { nextColumn = ALL_FIELDS.length - 1; nextRow -= 1 }
+    if (nextColumn >= ALL_FIELDS.length) { nextColumn = 0; nextRow += 1 }
+    nextRow = Math.max(0, Math.min(nextRow, rows.length - 1))
+    nextColumn = Math.max(0, Math.min(nextColumn, ALL_FIELDS.length - 1))
+    selectGridCell({ row: nextRow, column: nextColumn }, extend)
+  }
 
   const handleNavigate = (el: HTMLElement, direction: NavDirection) => {
-    const td = el.closest('td')
-    setEditingCellId(td ? findAdjacentCellId(td, direction) : null)
+    const cell = el.closest<HTMLElement>('[data-grid-row][data-grid-column]')
+    const row = Number(cell?.dataset.gridRow)
+    const column = Number(cell?.dataset.gridColumn)
+    if (!cell || !Number.isInteger(row) || !Number.isInteger(column)) return
+    setEditingCellId(null)
+    navigateGrid(row, column, direction)
+  }
+
+  const applyClipboardMatrix = async (start: GridCoordinate, matrix: string[][]) => {
+    if (!recordId || !matrix.length) return
+    setError(null)
+    setCreating(true)
+    const targetRows = [...rows]
+    try {
+      while (targetRows.length < start.row + matrix.length) {
+        const created = await recordsService.createRecord('AutoCad', { data: { project: recordId } })
+        if (!created) throw new Error('Failed to add a row for pasted cells')
+        targetRows.push(created)
+        setRows((previous) => [...previous, created])
+      }
+
+      const patches = new Map<number, Record<string, unknown>>()
+      let invalidCount = 0
+      matrix.forEach((clipboardRow, rowOffset) => clipboardRow.forEach((rawValue, columnOffset) => {
+        const targetColumn = ALL_FIELDS[start.column + columnOffset]
+        if (!targetColumn) return
+        const parsed = parseGridCellValue(rawValue, targetColumn.type === 'number' ? 'number' : 'text')
+        if (!parsed.valid) { invalidCount += 1; return }
+        const targetRow = start.row + rowOffset
+        const patch = patches.get(targetRow) ?? {}
+        patch[targetColumn.key] = parsed.value
+        patches.set(targetRow, patch)
+      }))
+
+      for (const [rowIndex, patch] of patches) {
+        const targetRow = targetRows[rowIndex]
+        if (!targetRow) continue
+        setSavingRowId(targetRow.id)
+        const updated = await recordsService.updateRecord('AutoCad', targetRow.id, { data: patch })
+        if (updated) {
+          targetRows[rowIndex] = updated
+          setRows((previous) => previous.map((row) => row.id === targetRow.id ? updated : row))
+        }
+      }
+      const lastRow = Math.min(targetRows.length - 1, start.row + matrix.length - 1)
+      const lastColumn = Math.min(ALL_FIELDS.length - 1, start.column + Math.max(...matrix.map((row) => row.length)) - 1)
+      setSelection({ anchor: { row: lastRow, column: lastColumn }, focus: start })
+      focusGridCell(start)
+      if (invalidCount) setError(`${invalidCount} pasted value${invalidCount === 1 ? '' : 's'} skipped because they were not valid numbers`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to paste AutoCad cells')
+    } finally {
+      setSavingRowId(null)
+      setCreating(false)
+    }
+  }
+
+  const getClipboardMatrix = (range: GridSelection): unknown[][] => {
+    const bounds = getGridSelectionBounds(range)
+    return rows.slice(bounds.top, bounds.bottom + 1).map((row) =>
+      ALL_FIELDS.slice(bounds.left, bounds.right + 1).map((field) => row.data?.[field.key]),
+    )
+  }
+
+  const handleGridCopy = (event: React.ClipboardEvent<HTMLDivElement>, cut = false) => {
+    if (!selection || editingCellId) return
+    event.clipboardData.setData('text/plain', serializeGridClipboard(getClipboardMatrix(selection)))
+    event.preventDefault()
+    setCopiedSelection(selection)
+    if (cut) {
+      const bounds = getGridSelectionBounds(selection)
+      void applyClipboardMatrix({ row: bounds.top, column: bounds.left }, Array.from(
+        { length: bounds.bottom - bounds.top + 1 },
+        () => Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+      ))
+    }
+  }
+
+  const handleGridPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!selection || editingCellId) return
+    event.preventDefault()
+    setCopiedSelection(null)
+    void applyClipboardMatrix(selection.focus, parseGridClipboard(event.clipboardData.getData('text/plain')))
+  }
+
+  const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {
+    if (event.target instanceof HTMLInputElement) return
+    if (event.key === 'Escape' && copiedSelection) { setCopiedSelection(null); return }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+      event.preventDefault()
+      if (rows.length) setSelection({ anchor: { row: rows.length - 1, column: ALL_FIELDS.length - 1 }, focus: { row: 0, column: 0 } })
+      return
+    }
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault()
+      navigateGrid(row, column, event.key.slice(5).toLowerCase() as NavDirection, event.shiftKey)
+      return
+    }
+    if (event.key === 'Tab' || event.key === 'Enter') {
+      event.preventDefault()
+      navigateGrid(row, column, event.key === 'Enter' ? 'down' : event.shiftKey ? 'left' : 'right')
+      return
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      if (selection) {
+        const bounds = getGridSelectionBounds(selection)
+        void applyClipboardMatrix({ row: bounds.top, column: bounds.left }, Array.from(
+          { length: bounds.bottom - bounds.top + 1 },
+          () => Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+        ))
+      }
+      return
+    }
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1) {
+      const rowData = rows[row]
+      const field = ALL_FIELDS[column]
+      if (rowData && field) setEditingCellId(`${rowData.id}:${field.key}`)
+    }
   }
 
   const load = useCallback(async () => {
@@ -354,6 +512,10 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   }, [recordId])
 
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (!selection && rows.length) setSelection({ anchor: { row: 0, column: 0 }, focus: { row: 0, column: 0 } })
+  }, [rows.length, selection])
 
   const handleCellCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
     setSavingRowId(rowId)
@@ -426,6 +588,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     try {
       await recordsService.deleteRecord('AutoCad', row.id)
       setRows((prev) => prev.filter((item) => item.id !== row.id))
+      setSelection(null)
+      setCopiedSelection(null)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to delete AutoCad item')
     } finally {
@@ -497,7 +661,15 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div
+      ref={gridRootRef}
+      className="space-y-3"
+      onMouseUp={() => { selectingCellsRef.current = false; if (selection) focusGridCell(selection.focus) }}
+      onMouseLeave={() => { selectingCellsRef.current = false }}
+      onCopy={(event) => handleGridCopy(event)}
+      onCut={(event) => handleGridCopy(event, true)}
+      onPaste={handleGridPaste}
+    >
       <div className="hidden items-center justify-between border-b border-gray-200 pb-3 md:flex">
         <div className="flex items-center gap-2">
           <Wrench className="w-5 h-5 text-brand-navy" />
@@ -573,7 +745,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
         <div className="py-8 text-center text-sm text-gray-400">No AutoCad items yet.</div>
       ) : (
         <div className="hidden overflow-x-auto rounded-lg border border-gray-200 md:block">
-          <table className="w-full table-fixed text-sm border-collapse">
+          <table role="grid" aria-label="AutoCad fastener spreadsheet" aria-multiselectable="true" className="w-full table-fixed text-sm border-collapse">
             <colgroup>
               {ALL_FIELDS.map((f) => (
                 <col key={f.key} style={{ width: getColWidthRem(f.key) }} />
@@ -582,6 +754,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
             </colgroup>
             <thead className="bg-gray-100">
               <tr>
+                <th scope="col" className="sticky left-0 z-20 w-9 border-b border-r border-gray-200 bg-gray-100 px-1 py-1 text-center font-medium text-gray-400">#</th>
                 {ALL_FIELDS.map((f) => (
                   <th key={f.key} className="px-1.5 py-1 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-normal break-words">
                     {f.label}
@@ -593,14 +766,32 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
             <tbody>
               {rows.map((row, i) => (
                 <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <th scope="row" className="sticky left-0 z-10 w-9 border-b border-r border-gray-100 bg-gray-50 px-1 py-1 text-center font-normal tabular-nums text-gray-400">{i + 1}</th>
                   {ALL_FIELDS.map((f, colIndex) => {
                     const cellId = `${row.id}:${f.key}`
                     return <td
                       key={f.key}
+                      data-grid-row={i}
+                      data-grid-column={colIndex}
+                      tabIndex={selection?.focus.row === i && selection.focus.column === colIndex ? 0 : -1}
+                      aria-selected={selection ? isInGridSelection(i, colIndex, selection) : false}
+                      onMouseDown={(event) => {
+                        if (event.button !== 0) return
+                        const coordinate = { row: i, column: colIndex }
+                        setSelection((current) => event.shiftKey && current ? { ...current, focus: coordinate } : { anchor: coordinate, focus: coordinate })
+                        selectingCellsRef.current = true
+                      }}
                       onMouseEnter={() => { handleFillDragEnter(i, colIndex); setHoveredCellId(cellId) }}
+                      onMouseEnterCapture={() => {
+                        if (selectingCellsRef.current) setSelection((current) => current
+                          ? { ...current, focus: { row: i, column: colIndex } }
+                          : { anchor: { row: i, column: colIndex }, focus: { row: i, column: colIndex } })
+                      }}
                       onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
-                      className={`relative px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${isCellInFillRange(i, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                      onKeyDown={(event) => handleGridKeyDown(event, i, colIndex)}
+                      className={`relative px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${selection && isInGridSelection(i, colIndex, selection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(i, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
                     >
+                      <GridRangeDecoration row={i} column={colIndex} selection={selection} copiedSelection={copiedSelection} />
                       <EditableCell
                         cellId={cellId}
                         value={row.data?.[f.key]}
@@ -649,17 +840,35 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
 
       {!loading && rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-gray-200 md:hidden">
-          {rows.map((row) => (
+              {rows.map((row, rowIndex) => (
             <article key={row.id} className="flex min-w-[48rem] items-center gap-2 border-b border-gray-100 bg-white px-2 py-2 last:border-b-0">
+              <span className="w-8 shrink-0 text-center text-xs tabular-nums text-gray-400">{rowIndex + 1}</span>
               {ALL_FIELDS.map((field, colIndex) => {
                 const cellId = `${row.id}:${field.key}`
                 const rowIndex = rows.indexOf(row)
                 return <div
                   key={field.key}
+                  data-grid-row={rowIndex}
+                  data-grid-column={colIndex}
+                  tabIndex={selection?.focus.row === rowIndex && selection.focus.column === colIndex ? 0 : -1}
+                  aria-selected={selection ? isInGridSelection(rowIndex, colIndex, selection) : false}
+                  onMouseDown={(event) => {
+                    if (event.button !== 0) return
+                    const coordinate = { row: rowIndex, column: colIndex }
+                    setSelection((current) => event.shiftKey && current ? { ...current, focus: coordinate } : { anchor: coordinate, focus: coordinate })
+                    selectingCellsRef.current = true
+                  }}
                   onMouseEnter={() => { handleFillDragEnter(rowIndex, colIndex); setHoveredCellId(cellId) }}
+                  onMouseEnterCapture={() => {
+                    if (selectingCellsRef.current) setSelection((current) => current
+                      ? { ...current, focus: { row: rowIndex, column: colIndex } }
+                      : { anchor: { row: rowIndex, column: colIndex }, focus: { row: rowIndex, column: colIndex } })
+                  }}
                   onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
-                  className={`${getMobileRowWidthClass(field)} relative shrink-0 ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                  onKeyDown={(event) => handleGridKeyDown(event, rowIndex, colIndex)}
+                  className={`${getMobileRowWidthClass(field)} relative shrink-0 ${selection && isInGridSelection(rowIndex, colIndex, selection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
                 >
+                  <GridRangeDecoration row={rowIndex} column={colIndex} selection={selection} copiedSelection={copiedSelection} />
                   <p className="truncate text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
                   <EditableCell
                     cellId={cellId}
@@ -698,6 +907,12 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
           ))}
         </div>
       )}
+      <div className="flex min-h-7 items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+        <span className="font-mono font-medium text-gray-700">{selection ? `${spreadsheetColumnLabel(selection.focus.column)}${selection.focus.row + 1}` : ' '}</span>
+        <span>{selection ? `${(Math.abs(selection.focus.row - selection.anchor.row) + 1) * (Math.abs(selection.focus.column - selection.anchor.column) + 1)} cells selected` : ''}</span>
+        <span>{savingRowId ? 'Saving…' : ' '}</span>
+      </div>
+      <GridRangeStyles />
     </div>
   )
 }

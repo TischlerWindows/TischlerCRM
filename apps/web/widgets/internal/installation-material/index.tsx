@@ -6,6 +6,16 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
 import { recordsService } from '@/lib/records-service'
 import { getRecordName } from '../shared/recordName'
+import {
+  getGridSelectionBounds,
+  isInGridSelection,
+  parseGridClipboard,
+  serializeGridClipboard,
+  spreadsheetColumnLabel,
+  type GridCoordinate,
+  type GridSelection,
+} from '@/lib/cad-index-grid'
+import { GridRangeDecoration, GridRangeStyles } from '../shared/grid-range-decoration'
 import { readProjectField } from '@/lib/factory-order-spec'
 import { normalizeSingleLookupUserValue, type LookupUserIdentity } from '@/lib/user-lookup'
 import {
@@ -66,6 +76,10 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState<number | null>(null)
   const [focusedQtyIndex, setFocusedQtyIndex] = useState<number | null>(null)
   const [quantityFillDrag, setQuantityFillDrag] = useState<QuantityFillDrag | null>(null)
+  const [gridSelection, setGridSelection] = useState<GridSelection | null>(null)
+  const [copiedGridSelection, setCopiedGridSelection] = useState<GridSelection | null>(null)
+  const gridTableRef = useRef<HTMLTableElement>(null)
+  const selectingGridRef = useRef(false)
 
   useEffect(() => {
     if (!quantityFillDrag) return
@@ -102,6 +116,11 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     setDirty(false)
     setSaved(false)
   }, [projectId, raw, projectName, location, attn])
+
+  useEffect(() => {
+    setGridSelection(null)
+    setCopiedGridSelection(null)
+  }, [workbook.activeTemplate])
 
   useEffect(() => {
     if (!managerValue) return
@@ -234,8 +253,6 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     }
   }
 
-  if (object.apiName !== 'Project') return <p className="text-sm text-amber-700">Installation Material is available on Project records only.</p>
-
   const total = form.rows.reduce((sum, row) => sum + calculateMaterialTotal(row), 0)
   const lockFixedColumns = true
   const isUsSupplied = form.template === 'US Supplied Inst.'
@@ -243,6 +260,177 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   const toggleOption = (current: string[], option: string) => current.includes(option)
     ? current.filter(value => value !== option)
     : [...current, option]
+
+  const materialGridColumns = isUsSupplied
+    ? ['qty', 'units', 'description', 'unitPrice', 'total']
+    : ['qty', 'units', 'description', 'screwSize', 'unitPrice', 'total']
+
+  useEffect(() => {
+    if (!gridSelection && form.rows.length) setGridSelection({ anchor: { row: 0, column: 0 }, focus: { row: 0, column: 0 } })
+  }, [form.rows.length, gridSelection, workbook.activeTemplate])
+
+  const focusMaterialCell = (coordinate: GridCoordinate) => {
+    requestAnimationFrame(() => {
+      const cell = gridTableRef.current?.querySelector<HTMLElement>(`[data-grid-row="${coordinate.row}"][data-grid-column="${coordinate.column}"]`)
+      const input = cell?.querySelector<HTMLInputElement>('input:not([disabled])')
+      ;(input ?? cell)?.focus()
+    })
+  }
+
+  const selectMaterialCell = (coordinate: GridCoordinate, extend = false) => {
+    setGridSelection(current => extend && current ? { ...current, focus: coordinate } : { anchor: coordinate, focus: coordinate })
+    focusMaterialCell(coordinate)
+  }
+
+  const navigateMaterialGrid = (row: number, column: number, direction: 'left' | 'right' | 'up' | 'down', extend = false) => {
+    let nextRow = row + (direction === 'down' ? 1 : direction === 'up' ? -1 : 0)
+    let nextColumn = column + (direction === 'right' ? 1 : direction === 'left' ? -1 : 0)
+    if (nextColumn < 0) { nextColumn = materialGridColumns.length - 1; nextRow -= 1 }
+    if (nextColumn >= materialGridColumns.length) { nextColumn = 0; nextRow += 1 }
+    nextRow = Math.max(0, Math.min(nextRow, form.rows.length - 1))
+    nextColumn = Math.max(0, Math.min(nextColumn, materialGridColumns.length - 1))
+    selectMaterialCell({ row: nextRow, column: nextColumn }, extend)
+  }
+
+  const materialCellValue = (row: InstallationMaterialRow, column: string): string => {
+    if (column === 'total') {
+      const rowTotal = calculateMaterialTotal(row)
+      return rowTotal ? formatMaterialTotal(rowTotal) : ''
+    }
+    return row[column as keyof InstallationMaterialRow] ?? ''
+  }
+
+  const applyMaterialClipboard = (start: GridCoordinate, matrix: string[][]) => {
+    const template = workbook.activeTemplate
+    let skippedCount = 0
+    let changed = false
+    const nextRows = form.rows.map((row, rowIndex) => {
+      const rowOffset = rowIndex - start.row
+      if (rowOffset < 0 || rowOffset >= matrix.length) return row
+      let nextRow = row
+      matrix[rowOffset]?.forEach((value, columnOffset) => {
+        const column = materialGridColumns[start.column + columnOffset]
+        if (column === 'qty' || column === 'unitPrice') {
+          if (nextRow[column] !== value) {
+            nextRow = { ...nextRow, [column]: value }
+            changed = true
+          }
+        } else if (column) {
+          skippedCount += 1
+        }
+      })
+      return nextRow
+    })
+
+    matrix.forEach((row, rowOffset) => {
+      if (start.row + rowOffset >= form.rows.length) skippedCount += row.length
+    })
+
+    if (changed) {
+      setWorkbook(current => ({
+        ...current,
+        sheets: { ...current.sheets, [template]: { ...current.sheets[template], rows: nextRows } },
+      }))
+      setDirty(true)
+      setSaved(false)
+    }
+    const lastRow = Math.min(form.rows.length - 1, start.row + matrix.length - 1)
+    const lastColumn = Math.min(materialGridColumns.length - 1, start.column + Math.max(...matrix.map(row => row.length)) - 1)
+    setGridSelection({ anchor: { row: lastRow, column: lastColumn }, focus: start })
+    focusMaterialCell(start)
+    if (skippedCount) setError(`${skippedCount} pasted cell${skippedCount === 1 ? '' : 's'} skipped because the column is read-only or outside this sheet`)
+  }
+
+  const materialClipboardMatrix = (selection: GridSelection): unknown[][] => {
+    const bounds = getGridSelectionBounds(selection)
+    return form.rows.slice(bounds.top, bounds.bottom + 1).map(row =>
+      materialGridColumns.slice(bounds.left, bounds.right + 1).map(column => materialCellValue(row, column)),
+    )
+  }
+
+  const handleMaterialCopy = (event: React.ClipboardEvent<HTMLTableElement>, cut = false) => {
+    if (!gridSelection) return
+    event.clipboardData.setData('text/plain', serializeGridClipboard(materialClipboardMatrix(gridSelection)))
+    event.preventDefault()
+    setCopiedGridSelection(gridSelection)
+    if (cut) {
+      const bounds = getGridSelectionBounds(gridSelection)
+      applyMaterialClipboard({ row: bounds.top, column: bounds.left }, Array.from(
+        { length: bounds.bottom - bounds.top + 1 },
+        () => Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+      ))
+    }
+  }
+
+  const handleMaterialPaste = (event: React.ClipboardEvent<HTMLTableElement>) => {
+    if (!gridSelection) return
+    event.preventDefault()
+    setCopiedGridSelection(null)
+    applyMaterialClipboard(gridSelection.focus, parseGridClipboard(event.clipboardData.getData('text/plain')))
+  }
+
+  const handleMaterialGridKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>, row: number, column: number) => {
+    if (event.key === 'Escape' && copiedGridSelection) { setCopiedGridSelection(null); return }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+      event.preventDefault()
+      if (form.rows.length) setGridSelection({ anchor: { row: form.rows.length - 1, column: materialGridColumns.length - 1 }, focus: { row: 0, column: 0 } })
+      return
+    }
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      const input = event.target instanceof HTMLInputElement ? event.target : null
+      const atEdge = !input || event.key === 'ArrowUp' || event.key === 'ArrowDown'
+        || (event.key === 'ArrowLeft' && input.selectionStart === 0)
+        || (event.key === 'ArrowRight' && input.selectionEnd === input.value.length)
+      if (event.shiftKey || atEdge) {
+        event.preventDefault()
+        navigateMaterialGrid(row, column, event.key.slice(5).toLowerCase() as 'left' | 'right' | 'up' | 'down', event.shiftKey)
+      }
+      return
+    }
+    if (event.key === 'Tab' || event.key === 'Enter') {
+      event.preventDefault()
+      navigateMaterialGrid(row, column, event.key === 'Enter' ? 'down' : event.shiftKey ? 'left' : 'right')
+      return
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      if (gridSelection) {
+        const bounds = getGridSelectionBounds(gridSelection)
+        applyMaterialClipboard({ row: bounds.top, column: bounds.left }, Array.from(
+          { length: bounds.bottom - bounds.top + 1 },
+          () => Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+        ))
+      }
+    }
+  }
+
+  const gridCellProps = (row: number, column: number): React.TdHTMLAttributes<HTMLTableCellElement> => ({
+    role: 'gridcell',
+    'data-grid-row': row,
+    'data-grid-column': column,
+    tabIndex: gridSelection?.focus.row === row && gridSelection.focus.column === column ? 0 : -1,
+    'aria-selected': gridSelection ? isInGridSelection(row, column, gridSelection) : false,
+    onMouseDown: event => {
+      if (event.button !== 0) return
+      const coordinate = { row, column }
+      setGridSelection(current => event.shiftKey && current ? { ...current, focus: coordinate } : { anchor: coordinate, focus: coordinate })
+      selectingGridRef.current = true
+      if (!(event.target instanceof HTMLInputElement)) event.currentTarget.focus()
+    },
+    onMouseEnter: () => {
+      if (selectingGridRef.current) setGridSelection(current => current
+        ? { ...current, focus: { row, column } }
+        : { anchor: { row, column }, focus: { row, column } })
+      if (column === 0) setHoveredQtyIndex(row)
+      setQuantityFillDrag(current => current ? { ...current, targetRowIndex: row } : current)
+    },
+    onMouseLeave: () => {
+      if (column === 0) setHoveredQtyIndex(current => current === row ? null : current)
+    },
+    onKeyDown: event => handleMaterialGridKeyDown(event, row, column),
+  })
+
+  if (object.apiName !== 'Project') return <p className="text-sm text-amber-700">Installation Material is available on Project records only.</p>
 
   return (
     <div className="space-y-4 text-sm text-gray-800">
@@ -325,9 +513,23 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
         </section>
         </div>
 
-      <section className="overflow-x-auto border border-gray-300">
-        <table className={`w-full ${isUsSupplied ? 'min-w-[920px]' : 'min-w-[1000px]'} border-collapse text-left text-xs`}>
+      <section
+        className="overflow-x-auto border border-gray-300"
+        onMouseUp={() => { selectingGridRef.current = false }}
+        onMouseLeave={() => { selectingGridRef.current = false }}
+      >
+        <table
+          ref={gridTableRef}
+          role="grid"
+          aria-label={`${workbook.activeTemplate} installation materials spreadsheet`}
+          aria-multiselectable="true"
+          onCopy={event => handleMaterialCopy(event)}
+          onCut={event => handleMaterialCopy(event, true)}
+          onPaste={handleMaterialPaste}
+          className={`w-full ${isUsSupplied ? 'min-w-[920px]' : 'min-w-[1000px]'} border-collapse text-left text-xs`}
+        >
           <thead className="bg-brand-navy text-white"><tr>
+            <th className="sticky left-0 z-20 w-9 border border-gray-400 bg-brand-navy px-1 py-2 text-center">#</th>
             <th className="w-16 border border-gray-400 px-2 py-2">Qty.</th>
             <th className={`${isUsSupplied ? 'w-32' : 'w-20'} border border-gray-400 px-2 py-2`}>Units</th>
             <th className="border border-gray-400 px-2 py-2">Description</th>
@@ -339,14 +541,12 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
             {form.rows.map((row, index) => {
               const rowTotal = calculateMaterialTotal(row)
               return <tr key={index} className="h-9">
+                <th scope="row" className="sticky left-0 z-10 border border-gray-300 bg-gray-50 px-1 text-center font-normal tabular-nums text-gray-500">{index + 1}</th>
                 <td
-                  onMouseEnter={() => {
-                    setHoveredQtyIndex(index)
-                    setQuantityFillDrag(current => current ? { ...current, targetRowIndex: index } : current)
-                  }}
-                  onMouseLeave={() => setHoveredQtyIndex(current => current === index ? null : current)}
-                  className={`relative border border-gray-300 bg-yellow-100 p-1 ${quantityFillDrag && index >= Math.min(quantityFillDrag.rowIndex, quantityFillDrag.targetRowIndex) && index <= Math.max(quantityFillDrag.rowIndex, quantityFillDrag.targetRowIndex) ? 'outline outline-1 outline-green-500' : ''}`}
+                  {...gridCellProps(index, 0)}
+                  className={`relative border border-gray-300 bg-yellow-100 p-1 ${gridSelection && isInGridSelection(index, 0, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${quantityFillDrag && index >= Math.min(quantityFillDrag.rowIndex, quantityFillDrag.targetRowIndex) && index <= Math.max(quantityFillDrag.rowIndex, quantityFillDrag.targetRowIndex) ? 'outline outline-1 outline-green-500' : ''}`}
                 >
+                  <GridRangeDecoration row={index} column={0} selection={gridSelection} copiedSelection={copiedGridSelection} />
                   <input
                     aria-label={`Quantity row ${index + 1}`}
                     className={inputClass}
@@ -367,17 +567,23 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
                     />
                   )}
                 </td>
-                <td className="border border-gray-300 p-1"><input aria-label={`Units row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.units} onChange={event => updateRow(index, { units: event.target.value })} /></td>
-                <td className="border border-gray-300 p-1"><input aria-label={`Description row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.description} onChange={event => updateRow(index, { description: event.target.value })} /></td>
-                {!isUsSupplied && <td className="border border-gray-300 bg-gray-100 p-1"><input aria-label={`US screw size row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:text-gray-600`} value={row.screwSize} onChange={event => updateRow(index, { screwSize: event.target.value })} /></td>}
-                <td className="border border-gray-300 p-1"><input aria-label={`Unit price row ${index + 1}`} inputMode="decimal" className={`${inputClass} text-right`} value={row.unitPrice} onChange={event => updateRow(index, { unitPrice: event.target.value })} /></td>
-                <td className="border border-gray-300 bg-rose-200 px-2 text-right font-medium">{rowTotal ? formatMaterialTotal(rowTotal) : ''}</td>
+                <td {...gridCellProps(index, 1)} className={`relative border border-gray-300 p-1 ${gridSelection && isInGridSelection(index, 1, gridSelection) ? 'bg-[#e2f0d9]' : ''}`}><GridRangeDecoration row={index} column={1} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`Units row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.units} onChange={event => updateRow(index, { units: event.target.value })} /></td>
+                <td {...gridCellProps(index, 2)} className={`relative border border-gray-300 p-1 ${gridSelection && isInGridSelection(index, 2, gridSelection) ? 'bg-[#e2f0d9]' : ''}`}><GridRangeDecoration row={index} column={2} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`Description row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.description} onChange={event => updateRow(index, { description: event.target.value })} /></td>
+                {!isUsSupplied && <td {...gridCellProps(index, 3)} className={`relative border border-gray-300 bg-gray-100 p-1 ${gridSelection && isInGridSelection(index, 3, gridSelection) ? 'bg-[#e2f0d9]' : ''}`}><GridRangeDecoration row={index} column={3} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`US screw size row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:text-gray-600`} value={row.screwSize} onChange={event => updateRow(index, { screwSize: event.target.value })} /></td>}
+                <td {...gridCellProps(index, isUsSupplied ? 3 : 4)} className={`relative border border-gray-300 p-1 ${gridSelection && isInGridSelection(index, isUsSupplied ? 3 : 4, gridSelection) ? 'bg-[#e2f0d9]' : ''}`}><GridRangeDecoration row={index} column={isUsSupplied ? 3 : 4} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`Unit price row ${index + 1}`} inputMode="decimal" className={`${inputClass} text-right`} value={row.unitPrice} onChange={event => updateRow(index, { unitPrice: event.target.value })} /></td>
+                <td {...gridCellProps(index, isUsSupplied ? 4 : 5)} className={`relative border border-gray-300 bg-rose-200 px-2 text-right font-medium ${gridSelection && isInGridSelection(index, isUsSupplied ? 4 : 5, gridSelection) ? 'bg-[#e2f0d9]' : ''}`}><GridRangeDecoration row={index} column={isUsSupplied ? 4 : 5} selection={gridSelection} copiedSelection={copiedGridSelection} />{rowTotal ? formatMaterialTotal(rowTotal) : ''}</td>
               </tr>
             })}
           </tbody>
-          <tfoot><tr className="font-semibold"><td colSpan={isUsSupplied ? 4 : 5} className="border border-gray-300 px-2 py-2 text-right">Grand Total ({currencySymbol})</td><td className="border border-gray-300 bg-rose-300 px-2 py-2 text-right">{formatMaterialTotal(total)}</td></tr></tfoot>
+          <tfoot><tr className="font-semibold"><td colSpan={isUsSupplied ? 5 : 6} className="border border-gray-300 px-2 py-2 text-right">Grand Total ({currencySymbol})</td><td className="border border-gray-300 bg-rose-300 px-2 py-2 text-right">{formatMaterialTotal(total)}</td></tr></tfoot>
         </table>
       </section>
+      <div className="flex min-h-7 items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+        <span className="font-mono font-medium text-gray-700">{gridSelection ? `${spreadsheetColumnLabel(gridSelection.focus.column)}${gridSelection.focus.row + 1}` : ' '}</span>
+        <span>{gridSelection ? `${(Math.abs(gridSelection.focus.row - gridSelection.anchor.row) + 1) * (Math.abs(gridSelection.focus.column - gridSelection.anchor.column) + 1)} cells selected` : ''}</span>
+        <span>{dirty ? 'Unsaved changes' : saved ? 'Saved' : ' '}</span>
+      </div>
+      <GridRangeStyles />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-xs font-semibold uppercase text-gray-600">Signature
