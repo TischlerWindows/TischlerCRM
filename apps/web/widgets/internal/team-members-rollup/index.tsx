@@ -530,16 +530,32 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       // Contact or Account. Adapt it to the existing merge shape without
       // inventing a TeamMember row, so it remains read-only here.
       if (record && connectionFields.length > 0) {
-        const rawRecord = record.data && typeof record.data === 'object'
-          ? record.data as Record<string, unknown>
-          : record as Record<string, unknown>
+        let currentRecord = record as Record<string, unknown>
+        try {
+          currentRecord = await apiClient.get<Record<string, unknown>>(
+            `/objects/${encodeURIComponent(objectApiName)}/records/${encodeURIComponent(recordId)}`,
+          )
+        } catch {
+          // Keep displaying the current page snapshot if the refresh read fails.
+        }
+        const rawRecord = currentRecord.data && typeof currentRecord.data === 'object'
+          ? currentRecord.data as Record<string, unknown>
+          : currentRecord
         const connectionRows = connectionFields.flatMap(field => {
           const bareApiName = field.apiName.replace(/^[A-Za-z]+__/, '')
-          const rawValue = rawRecord[field.apiName] ?? rawRecord[bareApiName]
+          const rawValue = currentRecord[field.apiName]
+            ?? currentRecord[bareApiName]
+            ?? rawRecord[field.apiName]
+            ?? rawRecord[bareApiName]
           const lookupId = typeof rawValue === 'string'
             ? rawValue
             : rawValue && typeof rawValue === 'object'
-              ? String((rawValue as Record<string, unknown>).id ?? (rawValue as Record<string, unknown>).lookup ?? '')
+              ? String(
+                (rawValue as Record<string, unknown>).id
+                ?? (rawValue as Record<string, unknown>).lookup
+                ?? (rawValue as Record<string, unknown>).value
+                ?? '',
+              )
               : ''
           if (!lookupId) return []
           const linkField = field.lookupObject === 'Contact' ? 'contact' : 'account'
