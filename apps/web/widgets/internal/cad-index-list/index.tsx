@@ -13,7 +13,7 @@
  * apps/api/src/lib/cad-index-pdf/renderer.ts — one generic column-driven
  * renderer shared by all reports, not one hardcoded layout per report).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, ChevronLeft, ChevronRight, FileText, GripVertical, ListChecks, Loader2, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
@@ -187,6 +187,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const [newColumnType, setNewColumnType] = useState<ColumnType>('text')
   const [comments, setComments] = useState<Record<string, string>>(() => parseCadIndexComments(record?.cadIndexComments))
   const [savingComments, setSavingComments] = useState(false)
+  const autoAddedRows = useRef(new Set<string>())
 
   useEffect(() => { setColumnOrder(record?.cadIndexColumnOrder) }, [projectId, record?.cadIndexColumnOrder])
   useEffect(() => { setComments(parseCadIndexComments(record?.cadIndexComments)) }, [projectId, record?.cadIndexComments])
@@ -306,12 +307,27 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     try {
       const updated = await recordsService.updateRecord('CadIndexItem', rowId, { data: { [key]: value } })
       if (updated) setRows((prev) => prev.map((r) => (r.id === rowId ? updated : r)))
+
+      const lastActiveRow = activeRows[activeRows.length - 1]
+      if (key === 'unit' && String(value).trim() && lastActiveRow?.id === rowId && !autoAddedRows.current.has(rowId)) {
+        autoAddedRows.current.add(rowId)
+        setCreating(true)
+        try {
+          const created = await recordsService.createRecord('CadIndexItem', { data: { project: projectId, reportType: activeReportType } })
+          if (created) setRows((prev) => [...prev, created])
+        } catch (err: unknown) {
+          autoAddedRows.current.delete(rowId)
+          setError(err instanceof Error ? err.message : 'Failed to add row')
+        } finally {
+          setCreating(false)
+        }
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save change')
     } finally {
       setSavingRowId(null)
     }
-  }, [])
+  }, [activeReportType, activeRows, projectId])
 
   // Commit the fill-handle drag on mouseup, wherever the pointer is released —
   // re-registered on every fillDrag update so the closure always sees the

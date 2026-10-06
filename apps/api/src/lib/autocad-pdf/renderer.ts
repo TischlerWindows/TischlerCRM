@@ -76,22 +76,26 @@ function measuredTextHeight(doc: PDFKit.PDFDocument, text: string, width: number
 function drawHeaderBlock(doc: PDFKit.PDFDocument, projectName: string, projectManager: string): number {
   const { left, top, right } = doc.page.margins;
   const usableWidth = doc.page.width - left - right;
+  let headerBottom = top + HEADER_BLOCK_HEIGHT;
 
-  let logoWidth = 0;
   if (existsSync(LOGO_PATH)) {
-    logoWidth = 90;
-    doc.image(LOGO_PATH, left, top, { width: logoWidth });
+    doc.image(LOGO_PATH, left, top, { width: 90 });
   }
 
   if (projectManager) {
     doc.font('Helvetica-Bold').fontSize(9).fillColor(TITLE_COLOR);
-    doc.text(`Project Mgr: ${projectManager}`, left, top + 42, { width: 220 });
+    const managerText = `Project Mgr: ${projectManager}`;
+    const managerY = top + 42;
+    const managerWidth = Math.min(usableWidth, 300);
+    const managerHeight = doc.heightOfString(managerText, { width: managerWidth });
+    doc.text(managerText, left, managerY, { width: managerWidth });
+    headerBottom = Math.max(headerBottom, managerY + managerHeight + 4);
   }
 
   doc.font('Helvetica-Bold').fontSize(11).fillColor(TITLE_COLOR);
   doc.text(`Project Name: ${projectName}`, left, top, { width: usableWidth, align: 'right' });
 
-  return top + HEADER_BLOCK_HEIGHT;
+  return headerBottom;
 }
 
 function drawTitle(doc: PDFKit.PDFDocument, y: number, rowCount: number): number {
