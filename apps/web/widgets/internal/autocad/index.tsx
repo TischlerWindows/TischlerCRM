@@ -11,8 +11,9 @@ import { AlertCircle, FileText, Loader2, Plus, Trash2, Wrench } from 'lucide-rea
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
-import { resolveLookupDisplayName } from '@/lib/utils'
 import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
+import { readProjectField } from '@/lib/factory-order-spec'
+import { userLookupIds, type LookupUserIdentity } from '@/lib/user-lookup'
 import { getRecordName } from '../shared/recordName'
 
 type FieldType = 'combobox' | 'number'
@@ -23,6 +24,12 @@ interface FieldDef {
   type: FieldType
   /** Searchable dropdown options — only used when type is 'combobox'. */
   options?: string[]
+}
+
+function isLikelyUserId(value: string): boolean {
+  return /^\d+$/.test(value)
+    || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+    || /^[0-9a-zA-Z]{20,}$/.test(value)
 }
 
 interface FillDrag {
@@ -436,10 +443,22 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     try {
       const projectName = (typeof record?.projectName === 'string' && record.projectName)
         || (record ? getRecordName(record as Record<string, unknown>) : 'Project')
-      const pmRaw = record?.internal_project_manager ?? record?.Project__internal_project_manager
-      const projectManager = pmRaw
-        ? String(pmRaw).split(';').map((id) => id.trim()).filter(Boolean).map((id) => resolveLookupDisplayName(id, 'User')).join(', ')
-        : ''
+      const pmRaw = readProjectField(record as Record<string, unknown>, 'internal_project_manager')
+      let projectManager = ''
+      if (pmRaw) {
+        const managerIds = userLookupIds(pmRaw)
+        try {
+          const users = await apiClient.get<LookupUserIdentity[]>('/users/lookup')
+          const usersById = new Map(users.map((user) => [String(user.id), user]))
+          projectManager = managerIds.map((id) => {
+            const user = usersById.get(id)
+            if (user) return user.name || user.email || ''
+            return isLikelyUserId(id) ? '' : id
+          }).filter(Boolean).join(', ')
+        } catch {
+          projectManager = managerIds.filter((id) => !isLikelyUserId(id)).join(', ')
+        }
+      }
       const payloadRows = rows.map((row) => ({
         fastener: row.data?.fastener,
         totalQty: row.data?.totalQty,
