@@ -21,6 +21,15 @@ import { apiClient } from '@/lib/api-client'
 import { getRecordName } from '../shared/recordName'
 import { orderedColumns } from '@/lib/cad-index-column-order'
 import { parseCadIndexComments } from '@/lib/cad-index-comments'
+import {
+  getGridSelectionBounds,
+  isInGridSelection,
+  parseGridCellValue,
+  parseGridClipboard,
+  serializeGridClipboard,
+  type GridCoordinate,
+  type GridSelection,
+} from '@/lib/cad-index-grid'
 
 type ColumnType = 'text' | 'number' | 'checkbox'
 
@@ -49,6 +58,17 @@ const REPORT_TYPES = [
 ] as const
 
 type ReportType = typeof REPORT_TYPES[number]
+
+function spreadsheetColumnLabel(index: number): string {
+  let value = index + 1
+  let label = ''
+  while (value > 0) {
+    value -= 1
+    label = String.fromCharCode(65 + (value % 26)) + label
+    value = Math.floor(value / 26)
+  }
+  return label
+}
 
 const BASE_UNIT_COLUMNS: ColumnDef[] = [
   { key: 'unit', label: 'Unit', type: 'text' },
@@ -93,75 +113,101 @@ function TextCell({
   type,
   multiline,
   saving,
+  editing,
+  editSeed,
+  onStartEdit,
   onCommit,
-  onEditingChange,
+  onCancel,
+  onNavigate,
 }: {
   value: unknown
   type: 'text' | 'number'
   multiline?: boolean
   saving: boolean
+  editing: boolean
+  editSeed: string | null
+  onStartEdit: () => void
   onCommit: (value: string) => void
-  onEditingChange?: (editing: boolean) => void
+  onCancel: () => void
+  onNavigate: (direction: 'left' | 'right' | 'up' | 'down') => void
 }) {
-  const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const cancelBlurRef = useRef(false)
 
-  const setEditingState = (next: boolean) => {
-    setEditing(next)
-    onEditingChange?.(next)
-  }
-
-  const startEdit = () => {
-    if (saving) return
-    setDraft(typeof value === 'string' || typeof value === 'number' ? String(value) : '')
-    setEditingState(true)
-  }
+  useEffect(() => {
+    if (!editing) return
+    setDraft(editSeed ?? (typeof value === 'string' || typeof value === 'number' ? String(value) : ''))
+    requestAnimationFrame(() => (multiline ? textareaRef.current : inputRef.current)?.focus())
+  }, [editing, editSeed, multiline, value])
 
   const commit = (next: string) => {
-    setEditingState(false)
-    if (next !== (value ?? '')) onCommit(next)
+    if (!saving && next !== String(value ?? '')) onCommit(next)
+  }
+
+  const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      cancelBlurRef.current = true
+      onCancel()
+      return
+    }
+    if (event.key === 'Enter' && (!multiline || !event.shiftKey)) {
+      event.preventDefault()
+      commit(draft)
+      onNavigate('down')
+      return
+    }
+    if (event.key === 'Tab') {
+      event.preventDefault()
+      commit(draft)
+      onNavigate(event.shiftKey ? 'left' : 'right')
+      return
+    }
+
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+    const input = event.currentTarget
+    const isNumber = type === 'number'
+    const isTextEditor = input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement
+    const atStart = isTextEditor && (isNumber || input.selectionStart === 0)
+    const atEnd = isTextEditor && (isNumber || input.selectionEnd === input.value.length)
+    if ((!multiline && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) ||
+      (event.key === 'ArrowLeft' && atStart) || (event.key === 'ArrowRight' && atEnd)) {
+      event.preventDefault()
+      commit(draft)
+      onNavigate(event.key.slice(5).toLowerCase() as 'left' | 'right' | 'up' | 'down')
+    }
   }
 
   if (editing) {
-    if (multiline) {
-      return (
-        <textarea
-          autoFocus
-          rows={2}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => commit(draft)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setEditingState(false) }}
-          className="w-full resize-none rounded border border-brand-navy/40 px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
-        />
-      )
+    const editorProps = {
+      value: draft,
+      onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(event.target.value),
+      onBlur: () => {
+        if (cancelBlurRef.current) {
+          cancelBlurRef.current = false
+          return
+        }
+        commit(draft)
+        onCancel()
+      },
+      onKeyDown: handleEditorKeyDown,
+      className: 'w-full rounded border border-brand-navy/50 bg-white px-1 py-0.5 text-xs outline-none ring-1 ring-[#217346]',
     }
-    return (
-      <input
-        autoFocus
-        type={type}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => commit(draft)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); commit(draft) }
-          else if (e.key === 'Escape') setEditingState(false)
-        }}
-        className="w-full rounded border border-brand-navy/40 px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-navy"
-      />
-    )
+    return multiline
+      ? <textarea {...editorProps} ref={textareaRef} rows={2} />
+      : <input {...editorProps} ref={inputRef} type={type} disabled={saving} />
   }
 
   const display = value === undefined || value === null || value === '' ? '\u2014' : String(value)
   return (
-    <button
-      type="button"
-      onClick={startEdit}
-      disabled={saving}
-      className="w-full rounded px-1 py-0.5 text-left text-xs hover:bg-brand-navy/5 disabled:opacity-50 whitespace-normal break-words"
+    <div
+      onDoubleClick={() => { if (!saving) onStartEdit() }}
+      className="min-h-5 whitespace-normal break-words px-1 py-0.5 text-xs"
     >
       {display}
-    </button>
+    </div>
   )
 }
 
@@ -188,6 +234,10 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const [comments, setComments] = useState<Record<string, string>>(() => parseCadIndexComments(record?.cadIndexComments))
   const [savingComments, setSavingComments] = useState(false)
   const autoAddedRows = useRef(new Set<string>())
+  const gridTableRef = useRef<HTMLTableElement>(null)
+  const selectingCellsRef = useRef(false)
+  const [selection, setSelection] = useState<GridSelection | null>(null)
+  const [editSeed, setEditSeed] = useState<string | null>(null)
 
   useEffect(() => { setColumnOrder(record?.cadIndexColumnOrder) }, [projectId, record?.cadIndexColumnOrder])
   useEffect(() => { setComments(parseCadIndexComments(record?.cadIndexComments)) }, [projectId, record?.cadIndexComments])
@@ -212,6 +262,55 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     () => rows.filter((r) => r.data?.reportType === activeReportType),
     [rows, activeReportType],
   )
+
+  useEffect(() => {
+    setSelection(null)
+    setEditingCellId(null)
+  }, [activeReportType])
+
+  useEffect(() => {
+    if (!selection && activeRows.length > 0 && columns.length > 0) {
+      setSelection({ anchor: { row: 0, column: 0 }, focus: { row: 0, column: 0 } })
+    }
+  }, [activeRows.length, columns.length, selection])
+
+  const focusGridCell = (coordinate: GridCoordinate) => {
+    requestAnimationFrame(() => {
+      gridTableRef.current
+        ?.querySelector<HTMLElement>(`[data-grid-row="${coordinate.row}"][data-grid-column="${coordinate.column}"]`)
+        ?.focus()
+    })
+  }
+
+  const selectGridCell = (coordinate: GridCoordinate, extend = false, focus = true) => {
+    setSelection((current) => extend && current
+      ? { ...current, focus: coordinate }
+      : { anchor: coordinate, focus: coordinate })
+    if (focus) focusGridCell(coordinate)
+  }
+
+  const navigateGrid = (row: number, column: number, direction: 'left' | 'right' | 'up' | 'down', extend = false) => {
+    let nextRow = row
+    let nextColumn = column
+    if (direction === 'left') nextColumn -= 1
+    if (direction === 'right') nextColumn += 1
+    if (direction === 'up') nextRow -= 1
+    if (direction === 'down') nextRow += 1
+    if (nextColumn < 0) { nextColumn = columns.length - 1; nextRow -= 1 }
+    if (nextColumn >= columns.length) { nextColumn = 0; nextRow += 1 }
+    nextRow = Math.max(0, Math.min(nextRow, activeRows.length - 1))
+    nextColumn = Math.max(0, Math.min(nextColumn, columns.length - 1))
+    selectGridCell({ row: nextRow, column: nextColumn }, extend)
+  }
+
+  const beginCellEdit = (row: number, column: number, seed: string | null = null) => {
+    const cell = activeRows[row]
+    const field = columns[column]
+    if (!cell || !field || field.type === 'checkbox' || savingRowId === cell.id) return
+    selectGridCell({ row, column }, false, false)
+    setEditSeed(seed)
+    setEditingCellId(`${cell.id}:${field.key}`)
+  }
 
   const persistColumnOrder = async (nextColumns?: ColumnDef[]) => {
     if (!projectId || savingColumns) return
@@ -246,6 +345,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     if (fromIndex < 0 || toIndex < 0 || fromIndex >= columns.length || toIndex >= columns.length || fromIndex === toIndex) return
     const next = [...columns]
     const [moved] = next.splice(fromIndex, 1)
+    if (!moved) return
     next.splice(toIndex, 0, moved)
     void persistColumnOrder(next)
   }
@@ -329,6 +429,159 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     }
   }, [activeReportType, activeRows, projectId])
 
+  const applyClipboardMatrix = async (start: GridCoordinate, matrix: string[][]) => {
+    if (!projectId || !matrix.length || !columns.length) return
+    setError(null)
+    setCreating(true)
+    const targetRows = [...activeRows]
+    const requiredRows = start.row + matrix.length
+    try {
+      while (targetRows.length < requiredRows) {
+        const created = await recordsService.createRecord('CadIndexItem', {
+          data: { project: projectId, reportType: activeReportType },
+        })
+        if (!created) throw new Error('Failed to add a row for pasted cells')
+        targetRows.push(created)
+        setRows((previous) => [...previous, created])
+      }
+
+      const updates = new Map<number, Record<string, unknown>>()
+      let invalidCount = 0
+      matrix.forEach((clipboardRow, rowOffset) => {
+        clipboardRow.forEach((rawValue, columnOffset) => {
+          const rowIndex = start.row + rowOffset
+          const column = columns[start.column + columnOffset]
+          if (!column || rowIndex >= targetRows.length) return
+          const parsed = parseGridCellValue(rawValue, column.type)
+          if (!parsed.valid) { invalidCount += 1; return }
+          const patch = updates.get(rowIndex) ?? {}
+          patch[column.key] = parsed.value
+          updates.set(rowIndex, patch)
+        })
+      })
+
+      for (const [rowIndex, patch] of updates) {
+        const row = targetRows[rowIndex]
+        if (!row) continue
+        setSavingRowId(row.id)
+        const updated = await recordsService.updateRecord('CadIndexItem', row.id, { data: patch })
+        if (updated) {
+          targetRows[rowIndex] = updated
+          setRows((previous) => previous.map((item) => item.id === row.id ? updated : item))
+        }
+      }
+
+      const lastRow = targetRows[targetRows.length - 1]
+      const unitColumn = columns.find((column) => column.key === 'unit')
+      const lastUnit = lastRow && updates.get(targetRows.length - 1)?.unit !== undefined
+        ? updates.get(targetRows.length - 1)?.unit
+        : lastRow?.data?.unit
+      if (unitColumn && lastRow && String(lastUnit ?? '').trim() && !autoAddedRows.current.has(lastRow.id)) {
+        autoAddedRows.current.add(lastRow.id)
+        try {
+          const created = await recordsService.createRecord('CadIndexItem', {
+            data: { project: projectId, reportType: activeReportType },
+          })
+          if (created) setRows((previous) => [...previous, created])
+          else throw new Error('Failed to add a row after the pasted Unit value')
+        } catch (err) {
+          autoAddedRows.current.delete(lastRow.id)
+          throw err
+        }
+      }
+
+      const lastRowIndex = Math.min(targetRows.length - 1, start.row + matrix.length - 1)
+      const lastColumnIndex = Math.min(columns.length - 1, start.column + Math.max(...matrix.map((row) => row.length)) - 1)
+      setSelection({ anchor: { row: lastRowIndex, column: lastColumnIndex }, focus: start })
+      focusGridCell(start)
+      if (invalidCount) setError(`${invalidCount} pasted cell${invalidCount === 1 ? '' : 's'} skipped because the value did not match its column type`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to paste cells')
+    } finally {
+      setSavingRowId(null)
+      setCreating(false)
+    }
+  }
+
+  const selectedClipboardMatrix = (range: GridSelection): unknown[][] => {
+    const bounds = getGridSelectionBounds(range)
+    return activeRows.slice(bounds.top, bounds.bottom + 1).map((row) =>
+      columns.slice(bounds.left, bounds.right + 1).map((column) => row.data?.[column.key]),
+    )
+  }
+
+  const handleGridCopy = (event: React.ClipboardEvent<HTMLTableElement>, cut = false) => {
+    const target = event.target
+    if (!selection || (target instanceof HTMLInputElement && target.type !== 'checkbox') || target instanceof HTMLTextAreaElement) return
+    event.clipboardData.setData('text/plain', serializeGridClipboard(selectedClipboardMatrix(selection)))
+    event.preventDefault()
+    if (cut) {
+      const bounds = getGridSelectionBounds(selection)
+      const clear = Array.from({ length: bounds.bottom - bounds.top + 1 }, () =>
+        Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+      )
+      void applyClipboardMatrix({ row: bounds.top, column: bounds.left }, clear)
+    }
+  }
+
+  const handleGridPaste = (event: React.ClipboardEvent<HTMLTableElement>) => {
+    const target = event.target
+    if (!selection || (target instanceof HTMLInputElement && target.type !== 'checkbox') || target instanceof HTMLTextAreaElement) return
+    event.preventDefault()
+    void applyClipboardMatrix(selection.focus, parseGridClipboard(event.clipboardData.getData('text/plain')))
+  }
+
+  const handleGridKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>, row: number, column: number) => {
+    const target = event.target
+    if ((target instanceof HTMLInputElement && target.type !== 'checkbox') || target instanceof HTMLTextAreaElement) return
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+      event.preventDefault()
+      if (activeRows.length && columns.length) {
+        setSelection({ anchor: { row: activeRows.length - 1, column: columns.length - 1 }, focus: { row: 0, column: 0 } })
+      }
+      return
+    }
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      event.preventDefault()
+      navigateGrid(row, column, event.key.slice(5).toLowerCase() as 'left' | 'right' | 'up' | 'down', event.shiftKey)
+      return
+    }
+    if (event.key === 'Tab' || event.key === 'Enter') {
+      event.preventDefault()
+      navigateGrid(row, column, event.key === 'Enter' ? 'down' : event.shiftKey ? 'left' : 'right')
+      return
+    }
+    if (event.key === 'F2') {
+      event.preventDefault()
+      beginCellEdit(row, column)
+      return
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      if (selection) {
+        const bounds = getGridSelectionBounds(selection)
+        const clear = Array.from({ length: bounds.bottom - bounds.top + 1 }, () =>
+          Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+        )
+        void applyClipboardMatrix({ row: bounds.top, column: bounds.left }, clear)
+      }
+      return
+    }
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1) {
+      const activeColumn = columns[column]
+      if (activeColumn?.type === 'checkbox') {
+        if (event.key === ' ') {
+          event.preventDefault()
+          const rowData = activeRows[row]
+          if (rowData) void handleCellCommit(rowData.id, activeColumn.key, !rowData.data?.[activeColumn.key])
+        }
+        return
+      }
+      event.preventDefault()
+      beginCellEdit(row, column, event.key)
+    }
+  }
+
   // Commit the fill-handle drag on mouseup, wherever the pointer is released —
   // re-registered on every fillDrag update so the closure always sees the
   // latest dragged-over range.
@@ -397,6 +650,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     try {
       await recordsService.deleteRecord('CadIndexItem', row.id)
       setRows((prev) => prev.filter((r) => r.id !== row.id))
+      setSelection(null)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to delete row')
     } finally {
@@ -552,10 +806,27 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
           <Loader2 className="h-5 w-5 animate-spin text-brand-navy" />
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full border-collapse text-xs">
+        <div
+          className="overflow-x-auto rounded-lg border border-gray-200"
+          onMouseUp={() => {
+            selectingCellsRef.current = false
+            if (selection) focusGridCell(selection.focus)
+          }}
+          onMouseLeave={() => { selectingCellsRef.current = false }}
+        >
+          <table
+            ref={gridTableRef}
+            role="grid"
+            aria-label={`${activeReportType} spreadsheet`}
+            aria-multiselectable="true"
+            onCopy={(event) => handleGridCopy(event)}
+            onCut={(event) => handleGridCopy(event, true)}
+            onPaste={handleGridPaste}
+            className="w-full border-collapse text-xs"
+          >
             <thead className="bg-gray-100">
               <tr>
+                <th scope="col" className="sticky left-0 z-20 w-9 border-b border-r border-gray-200 bg-gray-100 px-1 py-1 text-center font-medium text-gray-400">#</th>
                 {columns.map((col, colIndex) => (
                   <th
                     key={col.key}
@@ -614,19 +885,50 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
             <tbody>
               {activeRows.length === 0 && (
                 <tr>
-                  <td colSpan={columns.length + 1} className="py-8 text-center text-sm text-gray-400">No rows yet for this report.</td>
+                  <td colSpan={columns.length + 2} className="py-8 text-center text-sm text-gray-400">No rows yet for this report.</td>
                 </tr>
               )}
               {activeRows.map((row, rowIndex) => (
                 <tr key={row.id} className="hover:bg-brand-navy/5">
+                  <th scope="row" className="sticky left-0 z-10 w-9 border-b border-r border-gray-100 bg-gray-50 px-1 py-1 text-center font-normal tabular-nums text-gray-400">{rowIndex + 1}</th>
                   {columns.map((col, colIndex) => {
                     const cellId = `${row.id}:${col.key}`
                     return (
                       <td
                         key={col.key}
-                        onMouseEnter={() => { handleFillDragEnter(rowIndex, colIndex); if (col.type !== 'checkbox') setHoveredCellId(cellId) }}
+                        role="gridcell"
+                        data-grid-row={rowIndex}
+                        data-grid-column={colIndex}
+                        tabIndex={selection?.focus.row === rowIndex && selection.focus.column === colIndex ? 0 : -1}
+                        aria-selected={selection ? isInGridSelection(rowIndex, colIndex, selection) : false}
+                        onMouseDown={(event) => {
+                          if (event.button !== 0) return
+                          const coordinate = { row: rowIndex, column: colIndex }
+                          setSelection((current) => event.shiftKey && current
+                            ? { ...current, focus: coordinate }
+                            : { anchor: coordinate, focus: coordinate })
+                          selectingCellsRef.current = true
+                          if (!(event.target instanceof HTMLInputElement)) {
+                            event.preventDefault()
+                            event.currentTarget.focus()
+                          }
+                        }}
+                        onMouseEnter={() => {
+                          handleFillDragEnter(rowIndex, colIndex)
+                          if (selectingCellsRef.current) setSelection((current) => current
+                            ? { ...current, focus: { row: rowIndex, column: colIndex } }
+                            : { anchor: { row: rowIndex, column: colIndex }, focus: { row: rowIndex, column: colIndex } })
+                          if (col.type !== 'checkbox') setHoveredCellId(cellId)
+                        }}
                         onMouseLeave={() => setHoveredCellId((prev) => (prev === cellId ? null : prev))}
-                        className={`relative border-b border-gray-100 px-1.5 py-1 align-top ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                        onKeyDown={(event) => handleGridKeyDown(event, rowIndex, colIndex)}
+                        className={`relative border-b border-gray-100 px-1.5 py-1 align-top outline-none ${
+                          selection && isInGridSelection(rowIndex, colIndex, selection)
+                            ? selection.focus.row === rowIndex && selection.focus.column === colIndex
+                              ? 'z-10 outline outline-2 outline-[#217346] outline-offset-[-2px]'
+                              : 'bg-[#e2f0d9]'
+                            : ''
+                        } ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
                       >
                         {col.type === 'checkbox' ? (
                           <div className="flex items-center justify-center">
@@ -635,6 +937,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                               checked={!!row.data?.[col.key]}
                               disabled={savingRowId === row.id}
                               onChange={(e) => void handleCellCommit(row.id, col.key, e.target.checked)}
+                              aria-label={`${col.label}, row ${rowIndex + 1}`}
                               className="h-4 w-4 rounded border-gray-300 text-brand-navy focus:ring-brand-navy disabled:opacity-60"
                             />
                           </div>
@@ -645,8 +948,16 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                               type={col.type}
                               multiline={col.multiline}
                               saving={savingRowId === row.id}
+                              editing={editingCellId === cellId}
+                              editSeed={editingCellId === cellId ? editSeed : null}
+                              onStartEdit={() => beginCellEdit(rowIndex, colIndex)}
                               onCommit={(value) => void handleCellCommit(row.id, col.key, col.type === 'number' ? (value === '' ? '' : Number(value)) : value)}
-                              onEditingChange={(editing) => setEditingCellId(editing ? cellId : null)}
+                              onCancel={() => { setEditingCellId(null); setEditSeed(null) }}
+                              onNavigate={(direction) => {
+                                setEditingCellId(null)
+                                setEditSeed(null)
+                                navigateGrid(rowIndex, colIndex, direction)
+                              }}
                             />
                             {/* Excel-style fill handle — only shown while hovering the cell, and not while typing in it. Drag down/up to copy its value into that column's other rows. */}
                             {hoveredCellId === cellId && editingCellId !== cellId && (
@@ -677,6 +988,24 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
               ))}
             </tbody>
           </table>
+          <div className="flex min-h-7 items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+            <span className="font-mono font-medium text-gray-700">
+              {selection
+                ? (() => {
+                    const bounds = getGridSelectionBounds(selection)
+                    const first = `${spreadsheetColumnLabel(bounds.left)}${bounds.top + 1}`
+                    const last = `${spreadsheetColumnLabel(bounds.right)}${bounds.bottom + 1}`
+                    return first === last ? first : `${first}:${last}`
+                  })()
+                : ' '}
+            </span>
+            <span>
+              {selection
+                ? `${(Math.abs(selection.focus.row - selection.anchor.row) + 1) * (Math.abs(selection.focus.column - selection.anchor.column) + 1)} cells selected`
+                : ''}
+            </span>
+            <span>{savingRowId ? 'Saving…' : ' '}</span>
+          </div>
         </div>
       )}
       {!loading && (
