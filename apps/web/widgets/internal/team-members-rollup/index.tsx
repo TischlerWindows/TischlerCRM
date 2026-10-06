@@ -229,6 +229,34 @@ async function resolveNames(objectApiName: string, ids: string[]): Promise<NameM
   return names
 }
 
+function getPrimaryContactDetails(record: Record<string, unknown>): { email: string; phone: string } {
+  const data = record.data && typeof record.data === 'object'
+    ? record.data as Record<string, unknown>
+    : record
+  const read = (primaryKey: string, fallbackKey: string): string => {
+    const lookup = (key: string) => {
+      const bareKey = key.replace(/^[A-Za-z]+__/, '')
+      const value = data[key] ?? data[bareKey] ?? data[`Contact__${bareKey}`] ?? data[`Account__${bareKey}`]
+      return typeof value === 'string' ? value.trim() : ''
+    }
+    return lookup(primaryKey) || lookup(fallbackKey) || '—'
+  }
+  return {
+    email: read('primaryEmail', 'email'),
+    phone: read('primaryPhone', 'phone'),
+  }
+}
+
+function PrimaryContactDetails({ record }: { record: Record<string, unknown> }) {
+  const { email, phone } = getPrimaryContactDetails(record)
+  return (
+    <div className="mt-1 space-y-0.5 text-[10px] text-brand-gray">
+      <div><span className="mr-1.5 text-gray-400">Primary Email</span><span>{email}</span></div>
+      <div><span className="mr-1.5 text-gray-400">Primary Phone</span><span>{phone}</span></div>
+    </div>
+  )
+}
+
 /** Fetch records of `objectType` linked to `parentId` via any field variant
  *  for `parentObjectType`.  Tries plain, prefixed, and auto-lookup names,
  *  deduplicates by ID. */
@@ -1196,6 +1224,7 @@ function ContactTile({
           >
             {contact.contactName}
           </Link>
+          <PrimaryContactDetails record={contact.contactData} />
           {contact.accountName && (
             <Link
               href={recordUrl('Account', contact.accountId!)}
@@ -1346,6 +1375,7 @@ function AccountTile({
           >
             {account.accountName}
           </Link>
+          <PrimaryContactDetails record={account.accountData} />
           {displayFields.length > 0 && (
             <FieldDisplay data={account.accountData} fields={displayFields} />
           )}
