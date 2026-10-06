@@ -229,6 +229,47 @@ async function resolveNames(objectApiName: string, ids: string[]): Promise<NameM
   return names
 }
 
+function connectionMembersForRecord(
+  sourceApiName: string,
+  sourceRecord: Record<string, unknown>,
+  fields: FieldDef[],
+): TeamMemberRecord[] {
+  const sourceId = String(sourceRecord.id ?? '')
+  if (!sourceId) return []
+  const data = sourceRecord.data && typeof sourceRecord.data === 'object'
+    ? sourceRecord.data as Record<string, unknown>
+    : sourceRecord
+  const parentField = OBJECT_TO_FIELD[sourceApiName]
+
+  return fields.flatMap(field => {
+    const bareApiName = field.apiName.replace(/^[A-Za-z]+__/, '')
+    const rawValue = sourceRecord[field.apiName]
+      ?? sourceRecord[bareApiName]
+      ?? data[field.apiName]
+      ?? data[bareApiName]
+    const lookupId = typeof rawValue === 'string'
+      ? rawValue.trim()
+      : rawValue && typeof rawValue === 'object'
+        ? String(
+          (rawValue as Record<string, unknown>).id
+          ?? (rawValue as Record<string, unknown>).lookup
+          ?? (rawValue as Record<string, unknown>).value
+          ?? '',
+        ).trim()
+        : ''
+    if (!lookupId) return []
+    const linkField = field.lookupObject === 'Contact' ? 'contact' : 'account'
+    return [{
+      id: `connection:${sourceApiName}:${sourceId}:${field.apiName}`,
+      data: {
+        [linkField]: lookupId,
+        role: field.label,
+        ...(parentField ? { [parentField]: sourceId } : {}),
+      },
+    }]
+  })
+}
+
 function getPrimaryContactDetails(record: Record<string, unknown>): { email: string; phone: string } {
   const data = record.data && typeof record.data === 'object'
     ? record.data as Record<string, unknown>
@@ -337,10 +378,18 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const recordId = record?.id ? String(record.id) : null
   const isSupported = SUPPORTED_OBJECTS.includes(objectApiName)
   const schema = useSchemaStore(state => state.schema)
-  const connectionFields = useMemo(() => (
-    schema?.objects.find(schemaObject => schemaObject.apiName === objectApiName)?.fields
-      .filter((field: FieldDef) => field.type === 'Connection' && ['Contact', 'Account'].includes(field.lookupObject ?? '')) ?? []
-  ), [schema, objectApiName])
+  const connectionFieldsByObject = useMemo(() => new Map(
+    (schema?.objects ?? []).map(schemaObject => [
+      schemaObject.apiName,
+      schemaObject.fields.filter((field: FieldDef) =>
+        field.type === 'Connection' && ['Contact', 'Account'].includes(field.lookupObject ?? ''),
+      ),
+    ]),
+  ), [schema])
+  const connectionFields = useMemo(
+    () => connectionFieldsByObject.get(objectApiName) ?? [],
+    [connectionFieldsByObject, objectApiName],
+  )
 
   // ── Cache-aware state init ──
   const _cacheKey = recordId ? cacheKey(objectApiName, recordId, !!rollupFromProperty) : null
@@ -456,6 +505,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
     try {
       let members: TeamMemberRecord[] = []
+      let rollupChildRecordsByType: Record<string, Record<string, unknown>[]> = {}
 
       if (!rollupFromProperty) {
         // Self-only mode — try plain, prefixed, and auto-lookup field names
@@ -494,6 +544,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           await Promise.all(CHILD_OBJECT_TYPES.map(async type => {
             childRecordsByType[type] = await fetchLinkedRecords<Record<string, unknown>>(type, 'Property', propertyId)
           }))
+          rollupChildRecordsByType = childRecordsByType
 
           // Phase 2: fetch team members in parallel
           const propertyMembersPromise = fetchLinkedRecords<TeamMemberRecord>('TeamMember', 'Property', propertyId)
@@ -529,6 +580,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       // A Connection field on this record is a direct relationship to a
       // Contact or Account. Adapt it to the existing merge shape without
       // inventing a TeamMember row, so it remains read-only here.
+      const connectionRows: TeamMemberRecord[] = []
       if (record && connectionFields.length > 0) {
         let currentRecord = record as Record<string, unknown>
         try {
@@ -538,34 +590,21 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         } catch {
           // Keep displaying the current page snapshot if the refresh read fails.
         }
-        const rawRecord = currentRecord.data && typeof currentRecord.data === 'object'
-          ? currentRecord.data as Record<string, unknown>
-          : currentRecord
-        const connectionRows = connectionFields.flatMap(field => {
-          const bareApiName = field.apiName.replace(/^[A-Za-z]+__/, '')
-          const rawValue = currentRecord[field.apiName]
-            ?? currentRecord[bareApiName]
-            ?? rawRecord[field.apiName]
-            ?? rawRecord[bareApiName]
-          const lookupId = typeof rawValue === 'string'
-            ? rawValue
-            : rawValue && typeof rawValue === 'object'
-              ? String(
-                (rawValue as Record<string, unknown>).id
-                ?? (rawValue as Record<string, unknown>).lookup
-                ?? (rawValue as Record<string, unknown>).value
-                ?? '',
-              )
-              : ''
-          if (!lookupId) return []
-          const linkField = field.lookupObject === 'Contact' ? 'contact' : 'account'
-          return [{
-            id: `connection:${field.apiName}:${lookupId}`,
-            data: { [linkField]: lookupId, role: field.label },
-          } as TeamMemberRecord]
-        })
-        const seen = new Set(members.map(member => String(member.id)))
-        members.push(...connectionRows.filter(member => !seen.has(member.id)))
+        connectionRows.push(...connectionMembersForRecord(objectApiName, currentRecord, connectionFields))
+      }
+      if (rollupFromProperty) {
+        for (const [sourceApiName, childRecords] of Object.entries(rollupChildRecordsByType)) {
+          const fields = connectionFieldsByObject.get(sourceApiName) ?? []
+          for (const childRecord of childRecords) {
+            connectionRows.push(...connectionMembersForRecord(sourceApiName, childRecord, fields))
+          }
+        }
+      }
+      const seenConnectionIds = new Set(members.map(member => String(member.id)))
+      for (const connectionRow of connectionRows) {
+        if (seenConnectionIds.has(connectionRow.id)) continue
+        seenConnectionIds.add(connectionRow.id)
+        members.push(connectionRow)
       }
 
       // ── Resolve contact/account/parent names ──
@@ -634,7 +673,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     } finally {
       setLoading(false)
     }
-  }, [recordId, objectApiName, rollupFromProperty, record, isSupported, connectionFields])
+  }, [recordId, objectApiName, rollupFromProperty, record, isSupported, connectionFields, connectionFieldsByObject])
 
   useEffect(() => {
     fetchTeamMembers()
