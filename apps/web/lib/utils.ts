@@ -228,7 +228,7 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
  * MultiLookupUser, a semicolon-joined list of ids) rather than display text.
  * Excludes 'LookupFields' — that type is a layout-only display config, not a
  * stored value on the record. */
-const FORMULA_LOOKUP_FIELD_TYPES = new Set(['Lookup', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup']);
+const FORMULA_LOOKUP_FIELD_TYPES = new Set(['Lookup', 'Connection', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup']);
 
 /**
  * Resolves a lookup-type field's raw stored value (id, or semicolon-joined
@@ -651,7 +651,7 @@ export function evaluateFormulaForRecord(
       });
       if (!lookupFieldDef) continue;
 
-      const lookupTypes = ['Lookup', 'ExternalLookup', 'LookupUser', 'PicklistLookup'];
+      const lookupTypes = ['Lookup', 'Connection', 'ExternalLookup', 'LookupUser', 'PicklistLookup'];
       if (!lookupTypes.includes(lookupFieldDef.type)) continue;
 
       const lookupObject = lookupFieldDef.lookupObject || (lookupFieldDef.type === 'LookupUser' ? 'User' : undefined);

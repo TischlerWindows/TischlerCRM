@@ -261,7 +261,7 @@ export default function CustomObjectRecordsPage() {
     }
 
     // Check if this is a regular Lookup field and resolve via field definition
-    if (fieldDef && (fieldDef.type === 'Lookup' || fieldDef.type === 'ExternalLookup') && fieldDef.lookupObject && typeof value === 'string') {
+    if (fieldDef && (fieldDef.type === 'Lookup' || fieldDef.type === 'Connection' || fieldDef.type === 'ExternalLookup') && fieldDef.lookupObject && typeof value === 'string') {
       return resolveLookupDisplayName(value, fieldDef.lookupObject);
     }
     
@@ -311,7 +311,7 @@ export default function CustomObjectRecordsPage() {
         try {
           for (const field of objectDef.fields) {
             const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
-            if (!isSystemField && field.type !== 'Lookup' && field.type !== 'ExternalLookup') {
+            if (!isSystemField && field.type !== 'Lookup' && field.type !== 'Connection' && field.type !== 'ExternalLookup') {
               await apiClient.createField(objectDef.apiName, {
                 apiName: field.apiName,
                 label: field.label,

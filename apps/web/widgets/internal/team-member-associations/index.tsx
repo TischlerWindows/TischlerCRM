@@ -8,8 +8,9 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
-import type { TeamMemberAssociationsConfig } from '@/lib/schema'
+import type { FieldDef, TeamMemberAssociationsConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
+import { useSchemaStore } from '@/lib/schema-store'
 import { FieldDisplay, getFieldValue } from '../shared/FieldDisplay'
 import { ConnectionBadges } from '../shared/ConnectionBadges'
 import { InlineConnectToRecordRow } from '../shared/InlineConnectToRecordRow'
@@ -32,6 +33,7 @@ interface AssociationRow {
   isPrimary: boolean
   isContractHolder: boolean
   isQuoteRecipient: boolean
+  isLookupConnection?: boolean
 }
 
 interface PropertyGroup {
@@ -368,7 +370,7 @@ function AssocRow({
           )}
         </div>
 
-        {!isEditing && (
+        {!isEditing && !assoc.isLookupConnection && (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
@@ -512,7 +514,7 @@ function FlatTile({
           )}
         </div>
 
-        {!isEditing && (
+        {!isEditing && !assoc.isLookupConnection && (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
@@ -546,6 +548,12 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   const objectApiName = object.apiName
   const recordId = record?.id ? String(record.id) : null
   const isSupported = SUPPORTED_OBJECTS.includes(objectApiName)
+  const schema = useSchemaStore(state => state.schema)
+  const connectionFields = useMemo(() => (schema?.objects ?? []).flatMap(sourceObject => (
+    sourceObject.fields
+      .filter((field: FieldDef) => field.type === 'Connection' && field.lookupObject === objectApiName)
+      .map((field: FieldDef) => ({ sourceApiName: sourceObject.apiName, field }))
+  )), [schema, objectApiName])
 
   // ── State ──
   const [propertyGroups, setPropertyGroups] = useState<PropertyGroup[]>([])
@@ -618,6 +626,23 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
         if (!seen.has(String(m.id))) { seen.add(String(m.id)); members.push(m) }
       }
 
+      // Connection fields are single lookups on other objects that point at
+      // this Contact/Account. Surface each referencing record as a read-only
+      // connection alongside the existing editable TeamMember associations.
+      const connectionRecordResults = await Promise.allSettled(connectionFields.map(async ({ sourceApiName, field }) => {
+        const query = new URLSearchParams({
+          [`filter[${field.apiName}]`]: recordId,
+          limit: '200',
+        })
+        const records = await apiClient.get<TeamMemberRecord[]>(
+          `/objects/${encodeURIComponent(sourceApiName)}/records?${query.toString()}`,
+        )
+        return records.map(connectedRecord => ({ sourceApiName, field, connectedRecord }))
+      }))
+      const lookupConnections = connectionRecordResults.flatMap(result => (
+        result.status === 'fulfilled' ? result.value : []
+      ))
+
       // ── Phase 2: Resolve child records to find their parent Property ──
       type DirectEntry = { member: TeamMemberRecord; propertyId: string }
       type ChildEntry  = {
@@ -676,6 +701,12 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
       for (const { propertyId } of directEntries) propertyIds.add(propertyId)
       for (const meta of childMeta.values()) {
         if (meta.propertyId) propertyIds.add(meta.propertyId)
+      }
+      const lookupConnectionPropertyIds = lookupConnections.map(({ sourceApiName, connectedRecord }) =>
+        resolvePropertyId(connectedRecord as unknown as Record<string, unknown>, sourceApiName)
+      )
+      for (const propertyId of lookupConnectionPropertyIds) {
+        if (propertyId) propertyIds.add(propertyId)
       }
 
       const propertyNames = new Map<string, string>()
@@ -753,6 +784,27 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
         }
       }
 
+      for (const [index, { sourceApiName, field, connectedRecord }] of lookupConnections.entries()) {
+        const recordData = connectedRecord.data && typeof connectedRecord.data === 'object'
+          ? connectedRecord.data
+          : connectedRecord as unknown as Record<string, unknown>
+        const propertyId = lookupConnectionPropertyIds[index] ?? ''
+        const row: AssociationRow = {
+          memberId: `connection:${sourceApiName}:${field.apiName}:${connectedRecord.id}`,
+          objectApiName: sourceApiName,
+          parentRecordId: String(connectedRecord.id),
+          parentRecordName: getRecordName(connectedRecord as unknown as Record<string, unknown>),
+          parentRecordData: recordData,
+          role: field.label,
+          isPrimary: false,
+          isContractHolder: false,
+          isQuoteRecipient: false,
+          isLookupConnection: true,
+        }
+        if (propertyId) getOrCreate(propertyId).children.push(row)
+        else newFlatTiles.push(row)
+      }
+
       // Sort groups alphabetically by property name
       const sorted = Array.from(groupMap.values()).sort((a, b) =>
         a.propertyName.localeCompare(b.propertyName)
@@ -765,7 +817,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     } finally {
       setLoading(false)
     }
-  }, [recordId, objectApiName, isSupported])
+  }, [recordId, objectApiName, isSupported, connectionFields])
 
   useEffect(() => {
     fetchAssociations()

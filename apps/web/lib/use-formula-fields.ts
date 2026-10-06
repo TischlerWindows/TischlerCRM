@@ -10,7 +10,7 @@ import { getRecordName } from '../widgets/internal/shared/recordName';
 
 /** Field types whose stored record value is a raw lookup id (or, for
  * MultiLookupUser, a semicolon-joined list of ids) rather than display text. */
-const LOOKUP_FIELD_TYPES = new Set(['Lookup', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup']);
+const LOOKUP_FIELD_TYPES = new Set(['Lookup', 'Connection', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup']);
 
 /** Display name for a related record fetched via fetchRelatedRecord — Users
  * are plain `{name, email, ...}` objects (not wrapped record data), so they
@@ -151,7 +151,7 @@ export function useFormulaFields(
       if (!lookupFieldDef) continue;
 
       // Must be a lookup-type field
-      const lookupTypes = ['Lookup', 'ExternalLookup', 'LookupUser', 'PicklistLookup'];
+      const lookupTypes = ['Lookup', 'Connection', 'ExternalLookup', 'LookupUser', 'PicklistLookup'];
       if (!lookupTypes.includes(lookupFieldDef.type)) continue;
 
       const lookupObject = lookupFieldDef.lookupObject || (lookupFieldDef.type === 'LookupUser' ? 'User' : undefined);

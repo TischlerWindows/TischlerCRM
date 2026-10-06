@@ -4,7 +4,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 
 /**
  * Hook that preloads lookup records for an object definition's
- * Lookup / PicklistLookup / ExternalLookup / LookupUser fields,
+ * Lookup / Connection / PicklistLookup / ExternalLookup / LookupUser fields,
  * then flips a boolean so the component re-renders with resolved labels.
  *
  * Usage:
@@ -36,7 +36,7 @@ export function useLookupPreloader(
     for (const field of objectDef.fields) {
       const t = field.type;
       if (
-        (t === 'Lookup' || t === 'ExternalLookup' || t === 'LookupUser' || t === 'MultiLookupUser' || t === 'PicklistLookup') &&
+        (t === 'Lookup' || t === 'Connection' || t === 'ExternalLookup' || t === 'LookupUser' || t === 'MultiLookupUser' || t === 'PicklistLookup') &&
         field.lookupObject &&
         knownObjects.has(field.lookupObject)
       ) {

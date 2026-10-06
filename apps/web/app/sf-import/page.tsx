@@ -225,7 +225,7 @@ function autoMap(
 function getLookupFields(objectDef: ObjectDef, objectApiName: string): Record<string, string> {
   const result: Record<string, string> = {};
   for (const f of objectDef.fields) {
-    if ((f.type === 'Lookup' || f.type === 'ExternalLookup') && f.lookupObject) {
+    if ((f.type === 'Lookup' || f.type === 'Connection' || f.type === 'ExternalLookup') && f.lookupObject) {
       const stripped = f.apiName.replace(`${objectApiName}__`, '');
       result[stripped] = f.lookupObject;
     }
@@ -828,7 +828,7 @@ export default function SalesforceImportPage() {
                         const mapped = activeEntry.columnMapping[header] ?? '';
                         const isSfIdCol = header === activeEntry.sfIdColumn;
                         const targetField = activeTargetFields.find((f) => f.apiName === mapped);
-                        const isLookup = targetField?.type === 'Lookup' || targetField?.type === 'ExternalLookup';
+                        const isLookup = targetField?.type === 'Lookup' || targetField?.type === 'Connection' || targetField?.type === 'ExternalLookup';
 
                         return (
                           <tr key={header} className={isSfIdCol ? 'bg-amber-50' : 'hover:bg-gray-50'}>

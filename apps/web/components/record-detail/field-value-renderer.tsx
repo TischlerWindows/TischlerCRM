@@ -249,7 +249,7 @@ export function renderValue(
   }
 
   // Lookup → clickable link showing resolved label (not raw UUID)
-  if (fieldType === 'Lookup' && fieldDef?.lookupObject) {
+  if ((fieldType === 'Lookup' || fieldType === 'Connection') && fieldDef?.lookupObject) {
     const lookupTarget = fieldDef.lookupObject;
     const route = LOOKUP_ROUTE_MAP[lookupTarget];
     const displayLabel = resolveLookupDisplayName(value, lookupTarget);

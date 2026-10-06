@@ -95,7 +95,7 @@ function readRecordValue(
 
 function formatPdfValue(value: unknown, field: FieldDef): string {
   if (field.type === 'EncryptedText' && value) return '********';
-  if (value && (field.type === 'Lookup' || field.type === 'ExternalLookup' || field.type === 'LookupUser')) {
+  if (value && (field.type === 'Lookup' || field.type === 'Connection' || field.type === 'ExternalLookup' || field.type === 'LookupUser')) {
     const lookupObject = field.lookupObject || (field.type === 'LookupUser' ? 'User' : undefined);
     if (lookupObject) {
       const resolved = resolveLookupDisplayName(value, lookupObject);

@@ -7,8 +7,9 @@ import {
   Phone, Mail,
 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
-import type { TeamMembersRollupConfig } from '@/lib/schema'
+import type { FieldDef, TeamMembersRollupConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
+import { useSchemaStore } from '@/lib/schema-store'
 import { FieldDisplay } from '../shared/FieldDisplay'
 import { ConnectionBadges } from '../shared/ConnectionBadges'
 import { InlineAddConnectionRow, type InlineAddConnectionPayload } from '../shared/InlineAddConnectionRow'
@@ -307,6 +308,11 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const objectApiName = object.apiName
   const recordId = record?.id ? String(record.id) : null
   const isSupported = SUPPORTED_OBJECTS.includes(objectApiName)
+  const schema = useSchemaStore(state => state.schema)
+  const connectionFields = useMemo(() => (
+    schema?.objects.find(schemaObject => schemaObject.apiName === objectApiName)?.fields
+      .filter((field: FieldDef) => field.type === 'Connection' && ['Contact', 'Account'].includes(field.lookupObject ?? '')) ?? []
+  ), [schema, objectApiName])
 
   // ── Cache-aware state init ──
   const _cacheKey = recordId ? cacheKey(objectApiName, recordId, !!rollupFromProperty) : null
@@ -492,6 +498,32 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         }
       }
 
+      // A Connection field on this record is a direct relationship to a
+      // Contact or Account. Adapt it to the existing merge shape without
+      // inventing a TeamMember row, so it remains read-only here.
+      if (record && connectionFields.length > 0) {
+        const rawRecord = record.data && typeof record.data === 'object'
+          ? record.data as Record<string, unknown>
+          : record as Record<string, unknown>
+        const connectionRows = connectionFields.flatMap(field => {
+          const bareApiName = field.apiName.replace(/^[A-Za-z]+__/, '')
+          const rawValue = rawRecord[field.apiName] ?? rawRecord[bareApiName]
+          const lookupId = typeof rawValue === 'string'
+            ? rawValue
+            : rawValue && typeof rawValue === 'object'
+              ? String((rawValue as Record<string, unknown>).id ?? (rawValue as Record<string, unknown>).lookup ?? '')
+              : ''
+          if (!lookupId) return []
+          const linkField = field.lookupObject === 'Contact' ? 'contact' : 'account'
+          return [{
+            id: `connection:${field.apiName}:${lookupId}`,
+            data: { [linkField]: lookupId, role: field.label },
+          } as TeamMemberRecord]
+        })
+        const seen = new Set(members.map(member => String(member.id)))
+        members.push(...connectionRows.filter(member => !seen.has(member.id)))
+      }
+
       // ── Resolve contact/account/parent names ──
       const contactIds = new Set<string>()
       const accountIds = new Set<string>()
@@ -558,7 +590,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     } finally {
       setLoading(false)
     }
-  }, [recordId, objectApiName, rollupFromProperty, record, isSupported])
+  }, [recordId, objectApiName, rollupFromProperty, record, isSupported, connectionFields])
 
   useEffect(() => {
     fetchTeamMembers()

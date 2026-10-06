@@ -240,7 +240,7 @@ export default function DynamicForm({
     const obj = schema?.objects.find((o) => o.apiName === objectApiName);
     if (!obj) return seed;
     for (const field of obj.fields) {
-      if (field.type !== 'Lookup' && field.type !== 'ExternalLookup') continue;
+      if (field.type !== 'Lookup' && field.type !== 'Connection' && field.type !== 'ExternalLookup') continue;
       if (!field.lookupObject) continue;
       const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
       const val = recordData[stripped] ?? recordData[field.apiName];
@@ -273,7 +273,7 @@ export default function DynamicForm({
     setLookupQueries((prev) => {
       const updates: Record<string, string> = {};
       for (const field of object.fields) {
-        if (field.type !== 'Lookup' && field.type !== 'ExternalLookup') continue;
+        if (field.type !== 'Lookup' && field.type !== 'Connection' && field.type !== 'ExternalLookup') continue;
         if (!field.lookupObject) continue;
         const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
         const val = recordData[stripped] ?? recordData[field.apiName];
@@ -434,6 +434,7 @@ export default function DynamicForm({
               hasLookupUser = true;
             } else if (
               fieldType === 'Lookup' ||
+              fieldType === 'Connection' ||
               fieldType === 'ExternalLookup' ||
               fieldType === 'PicklistLookup'
             ) {
@@ -1009,6 +1010,7 @@ export default function DynamicForm({
         if (Array.isArray(val)) return val.join(', ');
         return String(val);
       case 'Lookup':
+      case 'Connection':
       case 'ExternalLookup':
       case 'LookupUser': {
         const lookupLabel = lookupQueries[fieldDef.apiName];

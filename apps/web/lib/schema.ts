@@ -2,7 +2,7 @@
 
 export type FieldType =
   | "AutoNumber" | "Formula" | "RollupSummary"
-  | "Lookup" | "ExternalLookup" | "LookupFields"
+  | "Lookup" | "Connection" | "ExternalLookup" | "LookupFields"
   | "Checkbox" | "Currency" | "Date" | "DateTime" | "Email"
   | "Geolocation" | "Number" | "Percent" | "Phone" | "PhoneWithPrefix"
   | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText" | "PicklistLookup"
@@ -23,6 +23,7 @@ export function normalizeFieldType(raw: string): FieldType {
     formula: 'Formula',
     rollupsummary: 'RollupSummary',
     lookup: 'Lookup',
+    connection: 'Connection',
     externallookup: 'ExternalLookup',
     lookupfields: 'LookupFields',
     checkbox: 'Checkbox',
@@ -997,6 +998,7 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'Formula', value: 'Formula', type: 'Formula' },
   { label: 'Roll-Up Summary', value: 'RollupSummary', type: 'RollupSummary' },
   { label: 'Lookup Relationship', value: 'Lookup', type: 'Lookup' },
+  { label: 'Connection', value: 'Connection', type: 'Connection' },
   { label: 'External Lookup', value: 'ExternalLookup', type: 'ExternalLookup' },
   { label: 'Lookup Fields Display', value: 'LookupFields', type: 'LookupFields' },
   { label: 'Checkbox', value: 'Checkbox', type: 'Checkbox' },
@@ -1030,7 +1032,7 @@ export const FIELD_TYPES: FieldOption[] = [
 // Helper to get field type categories
 export const getFieldTypeCategory = (type: FieldType): string => {
   if (["AutoNumber", "Formula", "RollupSummary"].includes(type)) return "Advanced";
-  if (["Lookup", "ExternalLookup", "LookupFields", "LookupUser", "MultiLookupUser", "PicklistLookup"].includes(type)) return "Relationship";
+  if (["Lookup", "Connection", "ExternalLookup", "LookupFields", "LookupUser", "MultiLookupUser", "PicklistLookup"].includes(type)) return "Relationship";
   if (["Text", "TextArea", "LongTextArea", "RichTextArea", "EncryptedText"].includes(type)) return "Text";
   if (["Number", "Currency", "Percent"].includes(type)) return "Number";
   if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";

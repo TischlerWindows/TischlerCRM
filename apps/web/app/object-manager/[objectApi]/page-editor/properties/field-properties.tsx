@@ -102,7 +102,7 @@ function DisplayFieldsSection({
     const obj = schema.objects.find((o) => o.apiName === objectApiName)
     if (!obj) return []
     const SYSTEM_FIELDS = new Set(['id', 'createdAt', 'updatedAt', 'createdBy', 'modifiedBy', 'ownerId'])
-    const EXCLUDED_TYPES = new Set(['Lookup', 'ExternalLookup', 'LookupFields', 'LookupUser', 'MultiLookupUser', 'PicklistLookup', 'AutoNumber', 'Formula', 'RollupSummary', 'AutoUser'])
+    const EXCLUDED_TYPES = new Set(['Lookup', 'Connection', 'ExternalLookup', 'LookupFields', 'LookupUser', 'MultiLookupUser', 'PicklistLookup', 'AutoNumber', 'Formula', 'RollupSummary', 'AutoUser'])
     return obj.fields.filter(
       (f) => !SYSTEM_FIELDS.has(f.apiName) && !EXCLUDED_TYPES.has(f.type),
     )
@@ -221,7 +221,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
   // All lookup-type fields on the current object
   const lookupTypeFields = useMemo(() => {
     return currentObjectFields.filter((f) =>
-      f.type === 'Lookup' || f.type === 'ExternalLookup' || f.type === 'LookupUser' || f.type === 'PicklistLookup',
+      f.type === 'Lookup' || f.type === 'Connection' || f.type === 'ExternalLookup' || f.type === 'LookupUser' || f.type === 'PicklistLookup',
     );
   }, [currentObjectFields]);
 

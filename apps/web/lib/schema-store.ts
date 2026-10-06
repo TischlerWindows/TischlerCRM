@@ -117,7 +117,7 @@ function hasRelationshipField(fields: FieldDef[], targetApi: string): boolean {
   return fields.some((field) => {
     const relatedObject = (field as any).relatedObject as string | undefined;
     return (
-      (field.type === 'Lookup' || field.type === 'ExternalLookup') &&
+      (field.type === 'Lookup' || field.type === 'Connection' || field.type === 'ExternalLookup') &&
       ((field.lookupObject && field.lookupObject === targetApi) || (relatedObject && relatedObject === targetApi))
     ) || field.apiName === `${targetApi}Id`;
   });
@@ -243,7 +243,7 @@ export const useSchemaStore = create<SchemaStore>()(
           // Sync fields to the database so the records API can validate them
           const fieldsToSync = (newObject.fields || []).filter((f) => {
             const isSystem = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(f.apiName);
-            const isLookup = f.type === 'Lookup' || f.type === 'ExternalLookup';
+            const isLookup = f.type === 'Lookup' || f.type === 'Connection' || f.type === 'ExternalLookup';
             return !isSystem && !isLookup;
           });
           for (const field of fieldsToSync) {

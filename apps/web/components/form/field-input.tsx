@@ -740,6 +740,7 @@ export function FieldInput({
 
     // ── Lookup / ExternalLookup ──────────────────────────────
     case 'Lookup':
+    case 'Connection':
     case 'ExternalLookup': {
       const targetApi = getLookupTargetApi(
         fieldDef,

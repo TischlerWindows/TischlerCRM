@@ -34,7 +34,7 @@ const INLINE_EDITABLE_TYPES = new Set<string>([
   'Date', 'DateTime', 'Time',
   'Checkbox',
   'Picklist', 'MultiPicklist', 'MultiSelectPicklist', 'PicklistText', 'DropdownWithCustom',
-  'Lookup', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup',
+  'Lookup', 'Connection', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup',
   'Address', 'CompositeText',
 ]);
 
@@ -81,7 +81,7 @@ export function InlineEditableField({ fieldDef, value, children, formData }: Inl
     const handleKeyDown = (e: React.KeyboardEvent) => {
       const isMultilineOrComplex = [
         'TextArea', 'LongTextArea', 'RichTextArea', 'Address', 'CompositeText',
-        'Lookup', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup',
+        'Lookup', 'Connection', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup',
       ].includes(fieldDef.type);
       if (e.key === 'Enter' && !isMultilineOrComplex) {
         e.preventDefault();
@@ -196,6 +196,7 @@ function FieldEditor({
       );
 
     case 'Lookup':
+    case 'Connection':
     case 'ExternalLookup':
       return <InlineLookupEditor fieldDef={fieldDef} value={draft} onChange={setDraft} />;
     case 'LookupUser':
