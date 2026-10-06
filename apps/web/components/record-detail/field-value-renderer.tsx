@@ -259,6 +259,35 @@ export function renderValue(
       </Link>
     ) : displayLabel;
 
+    if (fieldType === 'Connection' && (lookupTarget === 'Contact' || lookupTarget === 'Account')) {
+      const connectedRecord = getLookupCachedRecord(lookupTarget, String(value)) as Record<string, unknown> | null;
+      const data = connectedRecord?.data && typeof connectedRecord.data === 'object'
+        ? connectedRecord.data as Record<string, unknown>
+        : connectedRecord ?? {};
+      const read = (primaryKey: string, fallbackKey: string) => {
+        const find = (key: string) => {
+          const bareKey = key.replace(/^[A-Za-z]+__/, '');
+          const fieldValue = data[key] ?? data[bareKey] ?? data[`${lookupTarget}__${bareKey}`];
+          return typeof fieldValue === 'string' ? fieldValue.trim() : '';
+        };
+        return find(primaryKey) || find(fallbackKey) || '—';
+      };
+
+      return (
+        <div className="min-w-0">
+          {route ? (
+            <Link href={`/${route}/${value}`} className="text-brand-navy hover:underline underline-offset-2">
+              {displayLabel}
+            </Link>
+          ) : displayLabel}
+          <div className="mt-0.5 space-y-0.5 text-xs text-gray-500">
+            <div><span className="mr-1.5 text-gray-400">Primary Email:</span>{read('primaryEmail', 'email')}</div>
+            <div><span className="mr-1.5 text-gray-400">Primary Phone:</span>{read('primaryPhone', 'phone')}</div>
+          </div>
+        </div>
+      );
+    }
+
     // For Property lookups, show the property address as text and a map preview when available
     if (lookupTarget === 'Property' && !compact) {
       const propRecord = getLookupCachedRecord('Property', String(value));
