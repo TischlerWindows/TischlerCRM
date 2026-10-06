@@ -16,6 +16,7 @@ import { readProjectField } from '@/lib/factory-order-spec'
 import { userLookupIds, type LookupUserIdentity } from '@/lib/user-lookup'
 import {
   getGridSelectionBounds,
+  isInGridSelection,
   parseGridCellValue,
   parseGridClipboard,
   serializeGridClipboard,
