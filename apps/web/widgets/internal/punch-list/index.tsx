@@ -21,6 +21,18 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { useAuth } from '@/lib/auth-context'
 import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
+import {
+  getGridSelectionBounds,
+  getGridSelectionOrigin,
+  isInGridSelection,
+  parseGridCellValue,
+  parseGridClipboard,
+  serializeGridClipboard,
+  spreadsheetColumnLabel,
+  type GridCoordinate,
+  type GridSelection,
+} from '@/lib/cad-index-grid'
+import { GridRangeDecoration, GridRangeStyles } from '../shared/grid-range-decoration'
 import { generatePunchListPdf } from './pdf'
 
 type FieldType = 'text' | 'textarea' | 'checkbox' | 'number' | 'date'
@@ -338,13 +350,7 @@ function EditableCell({
     <button
       type="button"
       data-cell-id={dataCellId}
-      onClick={startEdit}
-      onKeyDown={(e) => {
-        if (!onNavigate) return
-        const dir: NavDirection | undefined =
-          e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : undefined
-        if (dir) { e.preventDefault(); onNavigate(e.currentTarget, dir) }
-      }}
+      onDoubleClick={startEdit}
       disabled={saving}
       className="w-full text-left rounded px-1 py-0.5 -mx-1 hover:bg-brand-navy/5 disabled:opacity-50 whitespace-normal break-words"
       title={type === 'textarea' ? display : undefined}
@@ -541,11 +547,183 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
   const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
+  const [gridSelection, setGridSelection] = useState<GridSelection | null>(null)
+  const [copiedGridSelection, setCopiedGridSelection] = useState<GridSelection | null>(null)
+  const gridRootRef = useRef<HTMLDivElement>(null)
+  const selectingGridRef = useRef(false)
 
   const handleNavigate = (el: HTMLElement, direction: NavDirection) => {
     const td = el.closest('td')
-    setEditingCellId(td ? findAdjacentCellId(td, direction) : null)
+    const nextCellId = td ? findAdjacentCellId(td, direction) : null
+    setEditingCellId(nextCellId)
+    const nextCell = nextCellId ? document.querySelector<HTMLElement>(`[data-cell-id="${nextCellId}"]`) : null
+    const position = nextCell?.closest<HTMLElement>('[data-grid-row][data-grid-column]')
+    if (position) {
+      const coordinate = { row: Number(position.dataset.gridRow), column: Number(position.dataset.gridColumn) }
+      setGridSelection({ anchor: coordinate, focus: coordinate })
+    }
   }
+
+  const focusGridCell = (coordinate: GridCoordinate) => {
+    requestAnimationFrame(() => {
+      const cells = gridRootRef.current?.querySelectorAll<HTMLElement>(`[data-grid-row="${coordinate.row}"][data-grid-column="${coordinate.column}"]`)
+      Array.from(cells ?? []).find(cell => cell.getClientRects().length > 0)?.focus()
+    })
+  }
+
+  const navigateGrid = (row: number, column: number, direction: NavDirection, extend = false) => {
+    let nextRow = row + (direction === 'down' ? 1 : direction === 'up' ? -1 : 0)
+    let nextColumn = column + (direction === 'right' ? 1 : direction === 'left' ? -1 : 0)
+    if (nextColumn < 0) { nextColumn = ALL_FIELDS.length - 1; nextRow -= 1 }
+    if (nextColumn >= ALL_FIELDS.length) { nextColumn = 0; nextRow += 1 }
+    nextRow = Math.max(0, Math.min(nextRow, rows.length - 1))
+    nextColumn = Math.max(0, Math.min(nextColumn, ALL_FIELDS.length - 1))
+    const focus = { row: nextRow, column: nextColumn }
+    setGridSelection(current => extend && current ? { ...current, focus } : { anchor: focus, focus })
+    setEditingCellId(null)
+    focusGridCell(focus)
+  }
+
+  const applyGridClipboard = async (start: GridCoordinate, matrix: string[][]) => {
+    if (!recordId || !matrix.length) return
+    setError(null)
+    setCreating(true)
+    const targetRows = [...rows]
+    try {
+      while (targetRows.length < start.row + matrix.length) {
+        const created = await recordsService.createRecord('PunchList', {
+          data: { workOrder: recordId, serviceDate: serviceDate || undefined, totalEstimateOfHours: 0 },
+        })
+        if (!created) throw new Error('Failed to add a row for pasted cells')
+        targetRows.push(created)
+        setRows(current => [...current, created])
+      }
+
+      let skippedCount = 0
+      for (let rowOffset = 0; rowOffset < matrix.length; rowOffset++) {
+        const row = targetRows[start.row + rowOffset]
+        if (!row) continue
+        const patch: Record<string, unknown> = {}
+        matrix[rowOffset]?.forEach((rawValue, columnOffset) => {
+          const field = ALL_FIELDS[start.column + columnOffset]
+          if (!field || field.computed) { skippedCount += 1; return }
+          const valueType = field.type === 'checkbox' ? 'checkbox' : field.type === 'number' ? 'number' : 'text'
+          const parsed = parseGridCellValue(rawValue, valueType)
+          if (!parsed.valid) { skippedCount += 1; return }
+          patch[field.key] = parsed.value
+        })
+        if (!Object.keys(patch).length) continue
+        const merged = { ...(row.data ?? {}), ...patch }
+        if ('estimateOfMen' in patch || 'estimateOfIndividualHours' in patch) {
+          patch.totalEstimateOfHours = computeTotalHours(merged)
+        }
+        setSavingRowId(row.id)
+        const updated = await recordsService.updateRecord('PunchList', row.id, { data: patch })
+        if (updated) {
+          targetRows[start.row + rowOffset] = updated
+          setRows(current => current.map(item => item.id === row.id ? updated : item))
+        }
+      }
+      const lastRow = Math.min(targetRows.length - 1, start.row + matrix.length - 1)
+      const lastColumn = Math.min(ALL_FIELDS.length - 1, start.column + Math.max(...matrix.map(row => row.length)) - 1)
+      setGridSelection({ anchor: { row: lastRow, column: lastColumn }, focus: start })
+      focusGridCell(start)
+      if (skippedCount) setError(`${skippedCount} pasted cell${skippedCount === 1 ? '' : 's'} skipped because the column is calculated or the value is invalid`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to paste punch list cells')
+    } finally {
+      setSavingRowId(null)
+      setCreating(false)
+    }
+  }
+
+  const gridClipboardMatrix = (selection: GridSelection): unknown[][] => {
+    const bounds = getGridSelectionBounds(selection)
+    return rows.slice(bounds.top, bounds.bottom + 1).map(row =>
+      ALL_FIELDS.slice(bounds.left, bounds.right + 1).map(field => row.data?.[field.key]),
+    )
+  }
+
+  const handleGridCopy = (event: React.ClipboardEvent<HTMLDivElement>, cut = false) => {
+    if (!gridSelection || editingCellId) return
+    event.clipboardData.setData('text/plain', serializeGridClipboard(gridClipboardMatrix(gridSelection)))
+    event.preventDefault()
+    setCopiedGridSelection(gridSelection)
+    if (cut) {
+      const bounds = getGridSelectionBounds(gridSelection)
+      void applyGridClipboard(getGridSelectionOrigin(gridSelection), Array.from(
+        { length: bounds.bottom - bounds.top + 1 },
+        () => Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+      ))
+    }
+  }
+
+  const handleGridPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!gridSelection || editingCellId) return
+    event.preventDefault()
+    setCopiedGridSelection(null)
+    void applyGridClipboard(getGridSelectionOrigin(gridSelection), parseGridClipboard(event.clipboardData.getData('text/plain')))
+  }
+
+  const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {
+    if (event.defaultPrevented) return
+    if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return
+    if (event.key === 'Escape' && copiedGridSelection) { setCopiedGridSelection(null); return }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+      event.preventDefault()
+      if (rows.length) setGridSelection({ anchor: { row: rows.length - 1, column: ALL_FIELDS.length - 1 }, focus: { row: 0, column: 0 } })
+      return
+    }
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault()
+      navigateGrid(row, column, event.key.slice(5).toLowerCase() as NavDirection, event.shiftKey)
+      return
+    }
+    if (event.key === 'Tab' || event.key === 'Enter') {
+      event.preventDefault()
+      navigateGrid(row, column, event.key === 'Enter' ? 'down' : event.shiftKey ? 'left' : 'right')
+      return
+    }
+    if (event.key === 'F2') {
+      event.preventDefault()
+      const rowData = rows[row]
+      const field = ALL_FIELDS[column]
+      if (rowData && field && !field.computed) setEditingCellId(`${rowData.id}:${field.key}`)
+      return
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      if (gridSelection) {
+        const bounds = getGridSelectionBounds(gridSelection)
+        void applyGridClipboard(getGridSelectionOrigin(gridSelection), Array.from(
+          { length: bounds.bottom - bounds.top + 1 },
+          () => Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+        ))
+      }
+    }
+  }
+
+  const handleGridCellMouseDown = (event: React.MouseEvent<HTMLElement>, row: number, column: number) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('[data-grid-ignore-selection]')) return
+    const coordinate = { row, column }
+    setGridSelection(current => event.shiftKey && current
+      ? { ...current, focus: coordinate }
+      : { anchor: coordinate, focus: coordinate })
+    selectingGridRef.current = true
+    if (!(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
+      event.preventDefault()
+      event.currentTarget.focus()
+    }
+  }
+
+  const handleGridCellMouseEnter = (row: number, column: number) => {
+    if (!selectingGridRef.current) return
+    const coordinate = { row, column }
+    setGridSelection(current => current ? { ...current, focus: coordinate } : { anchor: coordinate, focus: coordinate })
+  }
+
+  const gridCellClassName = (row: number, column: number, extra = '') =>
+    `${extra} ${gridSelection && isInGridSelection(row, column, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(row, column) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`
 
   const load = useCallback(async () => {
     if (!recordId) return
@@ -735,7 +913,16 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   }
 
   return (
-    <div className="space-y-3">
+    <div
+      ref={gridRootRef}
+      className="space-y-3"
+      onMouseUp={() => { selectingGridRef.current = false }}
+      onMouseLeave={() => { selectingGridRef.current = false }}
+      onCopy={(event) => handleGridCopy(event)}
+      onCut={(event) => handleGridCopy(event, true)}
+      onPaste={handleGridPaste}
+    >
+      <GridRangeStyles />
       <div className="hidden items-center justify-between border-b border-gray-200 pb-3 md:flex">
         <div className="flex items-center gap-2">
           <ListChecks className="w-5 h-5 text-brand-navy" />
@@ -919,13 +1106,21 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                     const canFill = f.type !== 'checkbox' && f.computed !== true
                     return <td
                       key={f.key}
+                      data-grid-row={i}
+                      data-grid-column={colIndex}
+                      tabIndex={gridSelection?.focus.row === i && gridSelection.focus.column === colIndex ? 0 : -1}
+                      aria-selected={gridSelection ? isInGridSelection(i, colIndex, gridSelection) : false}
+                      onMouseDown={(event) => handleGridCellMouseDown(event, i, colIndex)}
                       onMouseEnter={() => {
                         handleFillDragEnter(i, colIndex)
+                        handleGridCellMouseEnter(i, colIndex)
                         if (canFill) setHoveredCellId(cellId)
                       }}
                       onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
-                      className={`relative px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${isCellInFillRange(i, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                      onKeyDown={(event) => handleGridKeyDown(event, i, colIndex)}
+                      className={gridCellClassName(i, colIndex, 'relative px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words')}
                     >
+                      <GridRangeDecoration row={i} column={colIndex} selection={gridSelection} copiedSelection={copiedGridSelection} />
                       <EditableCell
                         cellId={cellId}
                         value={row.data?.[f.key]}
@@ -974,20 +1169,28 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
 
       {!loading && rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-gray-200 md:hidden">
-          {rows.map((row, index) => (
+              {rows.map((row, index) => (
             <article key={row.id} className={`flex min-w-[72rem] items-center gap-2 border-b border-gray-100 px-2 py-2 last:border-b-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
               {ALL_FIELDS.map((field, colIndex) => {
                 const cellId = `${row.id}:${field.key}`
                 const canFill = field.type !== 'checkbox' && field.computed !== true
                 return <div
                   key={field.key}
+                  data-grid-row={index}
+                  data-grid-column={colIndex}
+                  tabIndex={gridSelection?.focus.row === index && gridSelection.focus.column === colIndex ? 0 : -1}
+                  aria-selected={gridSelection ? isInGridSelection(index, colIndex, gridSelection) : false}
+                  onMouseDown={(event) => handleGridCellMouseDown(event, index, colIndex)}
                   onMouseEnter={() => {
                     handleFillDragEnter(index, colIndex)
+                    handleGridCellMouseEnter(index, colIndex)
                     if (canFill) setHoveredCellId(cellId)
                   }}
                   onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
-                  className={`${getMobileRowWidthClass(field)} relative shrink-0 ${isCellInFillRange(index, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                  onKeyDown={(event) => handleGridKeyDown(event, index, colIndex)}
+                  className={gridCellClassName(index, colIndex, `${getMobileRowWidthClass(field)} relative shrink-0`)}
                 >
+                  <GridRangeDecoration row={index} column={colIndex} selection={gridSelection} copiedSelection={copiedGridSelection} />
                   <p className="truncate text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
                   <EditableCell
                     cellId={cellId}
@@ -1036,6 +1239,20 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
           onSubmit={handleCreate}
         />
       )}
+      <div className="flex min-h-7 items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+        <span className="font-mono font-medium text-gray-700">
+          {gridSelection ? (() => {
+            const bounds = getGridSelectionBounds(gridSelection)
+            const first = `${spreadsheetColumnLabel(bounds.left)}${bounds.top + 1}`
+            const last = `${spreadsheetColumnLabel(bounds.right)}${bounds.bottom + 1}`
+            return first === last ? first : `${first}:${last}`
+          })() : ' '}
+        </span>
+        <span>{gridSelection
+          ? `${(Math.abs(gridSelection.focus.row - gridSelection.anchor.row) + 1) * (Math.abs(gridSelection.focus.column - gridSelection.anchor.column) + 1)} cells selected`
+          : ''}</span>
+        <span>{savingRowId ? 'Saving…' : ' '}</span>
+      </div>
     </div>
   )
 }

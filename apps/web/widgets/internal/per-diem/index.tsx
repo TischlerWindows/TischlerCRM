@@ -1,3 +1,4 @@
+type PerDiemGridSelection = GridSelection & { view: 'desktop' | 'mobile' }
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -8,6 +9,17 @@ import { apiClient } from '@/lib/api-client'
 import { resolveLookupDisplayName } from '@/lib/utils'
 import { MultiLookupUserSearch } from '@/components/form/lookup-search'
 import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
+import {
+  getGridSelectionBounds,
+  getGridSelectionOrigin,
+  isInGridSelection,
+  parseGridClipboard,
+  serializeGridClipboard,
+  spreadsheetColumnLabel,
+  type GridCoordinate,
+  type GridSelection,
+} from '@/lib/cad-index-grid'
+import { GridRangeDecoration, GridRangeStyles } from '../shared/grid-range-decoration'
 import { generatePerDiemPdf } from './pdf'
 
 type FieldType = 'text' | 'textarea' | 'currency' | 'date' | 'user'
@@ -303,14 +315,8 @@ function EditableCell({
     <button
       type="button"
       data-cell-id={dataCellId}
-      onClick={startEditing}
+      onDoubleClick={startEditing}
       disabled={saving}
-      onKeyDown={(event) => {
-        if (!onNavigate) return
-        const dir: NavDirection | undefined =
-          event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : event.key === 'ArrowUp' ? 'up' : event.key === 'ArrowDown' ? 'down' : undefined
-        if (dir) { event.preventDefault(); onNavigate(event.currentTarget, dir) }
-      }}
       className="w-full rounded px-1 py-0.5 text-left hover:bg-brand-navy/5 disabled:opacity-50"
       title={type === 'textarea' ? displayValue(value, type) : undefined}
     >
@@ -392,10 +398,185 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
   const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
+  const [gridSelection, setGridSelection] = useState<PerDiemGridSelection | null>(null)
+  const [copiedGridSelection, setCopiedGridSelection] = useState<PerDiemGridSelection | null>(null)
+  const gridRootRef = useRef<HTMLDivElement>(null)
+  const selectingGridRef = useRef(false)
 
   const handleNavigate = (el: HTMLElement, direction: NavDirection) => {
     const td = el.closest('td')
-    setEditingCellId(td ? findAdjacentCellId(td, direction) : null)
+    const nextCellId = td ? findAdjacentCellId(td, direction) : null
+    setEditingCellId(nextCellId)
+    const nextCell = nextCellId ? document.querySelector<HTMLElement>(`[data-cell-id="${nextCellId}"]`) : null
+    const gridCell = nextCell?.closest<HTMLElement>('[data-grid-row][data-grid-column]')
+    const table = gridCell?.closest<HTMLElement>('[data-per-diem-grid]')
+    if (gridCell && table?.dataset.perDiemGrid) {
+      const coordinate = { row: Number(gridCell.dataset.gridRow), column: Number(gridCell.dataset.gridColumn) }
+      setGridSelection({ view: table.dataset.perDiemGrid as 'desktop' | 'mobile', anchor: coordinate, focus: coordinate })
+    }
+  }
+
+  const focusGridCell = (coordinate: GridCoordinate, view: 'desktop' | 'mobile') => {
+    requestAnimationFrame(() => {
+      const cells = gridRootRef.current?.querySelectorAll<HTMLElement>(`[data-grid-view="${view}"][data-grid-row="${coordinate.row}"][data-grid-column="${coordinate.column}"]`)
+      Array.from(cells ?? []).find(cell => cell.getClientRects().length > 0)?.focus()
+    })
+  }
+
+  const navigateGrid = (row: number, column: number, direction: NavDirection, view: 'desktop' | 'mobile', extend = false) => {
+    const fields = gridFieldsForView(view)
+    let nextRow = row + (direction === 'down' ? 1 : direction === 'up' ? -1 : 0)
+    let nextColumn = column + (direction === 'right' ? 1 : direction === 'left' ? -1 : 0)
+    if (nextColumn < 0) { nextColumn = fields.length - 1; nextRow -= 1 }
+    if (nextColumn >= fields.length) { nextColumn = 0; nextRow += 1 }
+    nextRow = Math.max(0, Math.min(nextRow, rows.length - 1))
+    nextColumn = Math.max(0, Math.min(nextColumn, fields.length - 1))
+    const focus = { row: nextRow, column: nextColumn }
+    setGridSelection(current => extend && current?.view === view
+      ? { ...current, focus }
+      : { view, anchor: focus, focus })
+    setEditingCellId(null)
+    focusGridCell(focus, view)
+  }
+
+  const applyGridClipboard = async (start: GridCoordinate, view: 'desktop' | 'mobile', matrix: string[][]) => {
+    if (!recordId || !matrix.length) return
+    setError(null)
+    setSaving(true)
+    const targetRows = [...rows]
+    try {
+      while (targetRows.length < start.row + matrix.length) {
+        const created = await recordsService.createRecord('PerDiem', { data: { workOrder: recordId } })
+        if (!created) throw new Error('Failed to add a row for pasted cells')
+        targetRows.push(created)
+        setRows(current => [...current, created])
+      }
+      let invalidCount = 0
+      const fields = gridFieldsForView(view)
+      for (let rowOffset = 0; rowOffset < matrix.length; rowOffset++) {
+        const row = targetRows[start.row + rowOffset]
+        if (!row) continue
+        const patch: Record<string, unknown> = {}
+        matrix[rowOffset]?.forEach((rawValue, columnOffset) => {
+          const field = fields[start.column + columnOffset]
+          if (!field) { invalidCount += 1; return }
+          if (field.key === 'serviceTechPerDiem' || field.type === 'date' || field.type === 'textarea' || field.type === 'text') {
+            patch[field.key] = rawValue
+            return
+          }
+          const parsed = parseGridCellValue(rawValue.replace(/[$,]/g, ''), 'number')
+          if (!parsed.valid) { invalidCount += 1; return }
+          patch[field.key] = parsed.value === '' ? '' : String(parsed.value)
+        })
+        if (!Object.keys(patch).length) continue
+        setSavingRowId(row.id)
+        const updated = await recordsService.updateRecord('PerDiem', row.id, { data: patch })
+        if (updated) {
+          targetRows[start.row + rowOffset] = updated
+          setRows(current => current.map(item => item.id === row.id ? updated : item))
+        }
+      }
+      const lastRow = Math.min(targetRows.length - 1, start.row + matrix.length - 1)
+      const lastColumn = Math.min(fields.length - 1, start.column + Math.max(...matrix.map(row => row.length)) - 1)
+      setGridSelection({ view, anchor: { row: lastRow, column: lastColumn }, focus: start })
+      focusGridCell(start, view)
+      if (invalidCount) setError(`${invalidCount} pasted cell${invalidCount === 1 ? '' : 's'} skipped because the value was invalid or outside the grid`)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to paste Per Diem cells')
+    } finally {
+      setSavingRowId(null)
+      setSaving(false)
+    }
+  }
+
+  const gridClipboardMatrix = (selection: PerDiemGridSelection): unknown[][] => {
+    const bounds = getGridSelectionBounds(selection)
+    const fields = gridFieldsForView(selection.view)
+    return rows.slice(bounds.top, bounds.bottom + 1).map(row =>
+      fields.slice(bounds.left, bounds.right + 1).map(field => row.data?.[field.key]),
+    )
+  }
+
+  const handleGridCopy = (event: React.ClipboardEvent<HTMLDivElement>, cut = false) => {
+    if (!gridSelection || editingCellId) return
+    event.clipboardData.setData('text/plain', serializeGridClipboard(gridClipboardMatrix(gridSelection)))
+    event.preventDefault()
+    setCopiedGridSelection(gridSelection)
+    if (cut) {
+      const bounds = getGridSelectionBounds(gridSelection)
+      void applyGridClipboard(getGridSelectionOrigin(gridSelection), gridSelection.view, Array.from(
+        { length: bounds.bottom - bounds.top + 1 },
+        () => Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+      ))
+    }
+  }
+
+  const handleGridPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    if (!gridSelection || editingCellId) return
+    event.preventDefault()
+    setCopiedGridSelection(null)
+    void applyGridClipboard(getGridSelectionOrigin(gridSelection), gridSelection.view, parseGridClipboard(event.clipboardData.getData('text/plain')))
+  }
+
+  const handleGridCellMouseDown = (event: React.MouseEvent<HTMLElement>, row: number, column: number, view: 'desktop' | 'mobile') => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('[data-grid-ignore-selection]')) return
+    const coordinate = { row, column }
+    setGridSelection(current => event.shiftKey && current?.view === view
+      ? { ...current, focus: coordinate }
+      : { view, anchor: coordinate, focus: coordinate })
+    selectingGridRef.current = true
+    if (!(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement) && !(event.target instanceof HTMLButtonElement)) {
+      event.preventDefault()
+      event.currentTarget.focus()
+    }
+  }
+
+  const handleGridCellMouseEnter = (row: number, column: number, view: 'desktop' | 'mobile') => {
+    if (!selectingGridRef.current) return
+    const coordinate = { row, column }
+    setGridSelection(current => current?.view === view
+      ? { ...current, focus: coordinate }
+      : { view, anchor: coordinate, focus: coordinate })
+  }
+
+  const gridCellClassName = (row: number, column: number, extra = '') =>
+    `${extra} ${gridSelection && isInGridSelection(row, column, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(row, column) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`
+
+  const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number, view: 'desktop' | 'mobile') => {
+    if (event.defaultPrevented || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return
+    if (event.key === 'Escape' && copiedGridSelection) { setCopiedGridSelection(null); return }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+      event.preventDefault()
+      if (rows.length) setGridSelection({ view, anchor: { row: rows.length - 1, column: gridFieldsForView(view).length - 1 }, focus: { row: 0, column: 0 } })
+      return
+    }
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+      event.preventDefault()
+      navigateGrid(row, column, event.key.slice(5).toLowerCase() as NavDirection, view, event.shiftKey)
+      return
+    }
+    if (event.key === 'Tab' || event.key === 'Enter') {
+      event.preventDefault()
+      navigateGrid(row, column, event.key === 'Enter' ? 'down' : event.shiftKey ? 'left' : 'right', view)
+      return
+    }
+    if (event.key === 'F2') {
+      event.preventDefault()
+      const rowData = rows[row]
+      const field = gridFieldsForView(view)[column]
+      if (rowData && field) setEditingCellId(`${rowData.id}:${field.key}`)
+      return
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      if (gridSelection?.view === view) {
+        const bounds = getGridSelectionBounds(gridSelection)
+        void applyGridClipboard(getGridSelectionOrigin(gridSelection), view, Array.from(
+          { length: bounds.bottom - bounds.top + 1 },
+          () => Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+        ))
+      }
+    }
   }
 
   const load = useCallback(async () => {
@@ -524,7 +705,16 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div
+      ref={gridRootRef}
+      className="space-y-3"
+      onMouseUp={() => { selectingGridRef.current = false }}
+      onMouseLeave={() => { selectingGridRef.current = false }}
+      onCopy={(event) => handleGridCopy(event)}
+      onCut={(event) => handleGridCopy(event, true)}
+      onPaste={handleGridPaste}
+    >
+      <GridRangeStyles />
       <div className="hidden items-center justify-between border-b border-gray-200 pb-3 md:flex">
         <div className="flex items-center gap-2">
           <WalletCards className="h-5 w-5 text-brand-navy" />
@@ -577,7 +767,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
         <div className="py-8 text-center text-sm text-gray-400"><CalendarDays className="mx-auto mb-2 h-8 w-8 text-gray-300" />No per diem records yet.</div>
       ) : (
         <div className="hidden overflow-visible rounded-lg border border-gray-200 md:block">
-          <table className="w-full table-fixed border-collapse text-sm">
+          <table data-per-diem-grid="desktop" className="w-full table-fixed border-collapse text-sm">
             <colgroup>
               {FIELDS.map((field) => (
                 <col key={field.key} style={{ width: getColWidthRem(field.type) }} />
@@ -597,10 +787,18 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
                     const cellId = `${row.id}:${field.key}`
                     return <td
                       key={field.key}
-                      onMouseEnter={() => { handleFillDragEnter(index, colIndex); setHoveredCellId(cellId) }}
+                      data-grid-view="desktop"
+                      data-grid-row={index}
+                      data-grid-column={colIndex}
+                      tabIndex={gridSelection?.view === 'desktop' && gridSelection.focus.row === index && gridSelection.focus.column === colIndex ? 0 : -1}
+                      aria-selected={gridSelection?.view === 'desktop' ? isInGridSelection(index, colIndex, gridSelection) : false}
+                      onMouseDown={(event) => handleGridCellMouseDown(event, index, colIndex, 'desktop')}
+                      onMouseEnter={() => { handleFillDragEnter(index, colIndex); handleGridCellMouseEnter(index, colIndex, 'desktop'); setHoveredCellId(cellId) }}
                       onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
-                      className={`relative border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words ${isCellInFillRange(index, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                      onKeyDown={(event) => handleGridKeyDown(event, index, colIndex, 'desktop')}
+                      className={gridCellClassName(index, colIndex, 'relative border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words')}
                     >
+                      <GridRangeDecoration row={index} column={colIndex} selection={gridSelection?.view === 'desktop' ? gridSelection : null} copiedSelection={copiedGridSelection?.view === 'desktop' ? copiedGridSelection : null} />
                       <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} onStartEdit={() => setEditingCellId(cellId)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} onNavigate={handleNavigate} />
                       {hoveredCellId === cellId && editingCellId !== cellId && (
                         <span
@@ -615,7 +813,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
                       )}
                     </td>
                   })}
-                  <td className="w-8 border-b border-gray-100 px-1 py-1.5 align-top"><button type="button" onClick={() => void handleDelete(row)} disabled={deletingRowId === row.id || savingRowId === row.id} aria-label="Delete per diem record" title="Delete per diem record" className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">{deletingRowId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}</button></td>
+                  <td data-grid-ignore-selection="true" className="w-8 border-b border-gray-100 px-1 py-1.5 align-top"><button type="button" onClick={() => void handleDelete(row)} disabled={deletingRowId === row.id || savingRowId === row.id} aria-label="Delete per diem record" title="Delete per diem record" className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40">{deletingRowId === row.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -624,17 +822,25 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
       )}
 
       {!loading && rows.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 md:hidden">
+        <div data-per-diem-grid="mobile" className="overflow-x-auto rounded-lg border border-gray-200 md:hidden">
           {rows.map((row, rowIndex) => (
             <article key={row.id} className="flex min-w-[36rem] items-center gap-3 border-b border-gray-100 bg-white px-2 py-2 last:border-b-0">
               {MOBILE_FIELDS.map((field, colIndex) => {
                 const cellId = `${row.id}:${field.key}`
                 return <div
                   key={field.key}
-                  onMouseEnter={() => { handleFillDragEnter(rowIndex, colIndex); setHoveredCellId(cellId) }}
+                  data-grid-view="mobile"
+                  data-grid-row={rowIndex}
+                  data-grid-column={colIndex}
+                  tabIndex={gridSelection?.view === 'mobile' && gridSelection.focus.row === rowIndex && gridSelection.focus.column === colIndex ? 0 : -1}
+                  aria-selected={gridSelection?.view === 'mobile' ? isInGridSelection(rowIndex, colIndex, gridSelection) : false}
+                  onMouseDown={(event) => handleGridCellMouseDown(event, rowIndex, colIndex, 'mobile')}
+                  onMouseEnter={() => { handleFillDragEnter(rowIndex, colIndex); handleGridCellMouseEnter(rowIndex, colIndex, 'mobile'); setHoveredCellId(cellId) }}
                   onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
-                  className={`relative shrink-0 ${field.width} ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                  onKeyDown={(event) => handleGridKeyDown(event, rowIndex, colIndex, 'mobile')}
+                  className={gridCellClassName(rowIndex, colIndex, `relative shrink-0 ${field.width}`)}
                 >
+                  <GridRangeDecoration row={rowIndex} column={colIndex} selection={gridSelection?.view === 'mobile' ? gridSelection : null} copiedSelection={copiedGridSelection?.view === 'mobile' ? copiedGridSelection : null} />
                   <p className="text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
                   <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} onStartEdit={() => setEditingCellId(cellId)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} />
                   {hoveredCellId === cellId && editingCellId !== cellId && (
@@ -659,6 +865,11 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
       )}
 
       {showNewModal && <NewPerDiemModal saving={saving} onCancel={() => setShowNewModal(false)} onSubmit={(values) => void handleCreate(values)} />}
+      <div className="flex min-h-7 items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+        <span className="font-mono font-medium text-gray-700">{gridSelection ? `${spreadsheetColumnLabel(gridSelection.focus.column)}${gridSelection.focus.row + 1}` : ' '}</span>
+        <span>{gridSelection ? `${(Math.abs(gridSelection.focus.row - gridSelection.anchor.row) + 1) * (Math.abs(gridSelection.focus.column - gridSelection.anchor.column) + 1)} cells selected` : ''}</span>
+        <span>{savingRowId ? 'Saving…' : ' '}</span>
+      </div>
     </div>
   )
 }
