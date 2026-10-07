@@ -485,13 +485,27 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     const onMouseUp = () => {
       const drag = fillDrag
       setFillDrag(null)
+      const patches = new Map<number, Record<string, unknown>>()
       for (const target of getGridFillTargets(drag.selection, drag.target)) {
-        const row = rows[target.row]
         const source = rows[target.sourceRow]
         const sourceField = ALL_FIELDS[target.sourceColumn]
         const destinationField = ALL_FIELDS[target.column]
-        if (row && source && sourceField && destinationField) {
-          void handleCellCommit(row.id, destinationField.key, source.data?.[sourceField.key])
+        if (!source || !sourceField || !destinationField) continue
+        const patch = patches.get(target.row) ?? {}
+        patch[destinationField.key] = source.data?.[sourceField.key] ?? ''
+        patches.set(target.row, patch)
+      }
+      for (const [rowIndex, patch] of patches) {
+        const row = rows[rowIndex]
+        if (!row) continue
+        setSavingRowId(row.id)
+        try {
+          const updated = await recordsService.updateRecord('AutoCad', row.id, { data: patch })
+          if (updated) setRows(current => current.map(item => item.id === row.id ? updated : item))
+        } catch (err: unknown) {
+          setError(err instanceof Error ? err.message : 'Failed to fill selected cells')
+        } finally {
+          setSavingRowId(null)
         }
       }
     }

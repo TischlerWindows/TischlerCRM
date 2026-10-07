@@ -561,19 +561,51 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     const onMouseUp = () => {
       const drag = fillDrag
       setFillDrag(null)
+      const patches = new Map<number, Record<string, unknown>>()
       for (const target of getGridFillTargets(drag.selection, drag.target)) {
-        const destination = activeRows[target.row]
         const source = activeRows[target.sourceRow]
         const column = columns[target.column]
         const sourceColumn = columns[target.sourceColumn]
-        if (destination && source && column && sourceColumn) {
-          void handleCellCommit(destination.id, column.key, source.data?.[sourceColumn.key] ?? '')
+        if (!source || !column || !sourceColumn) continue
+        const patch = patches.get(target.row) ?? {}
+        patch[column.key] = source.data?.[sourceColumn.key] ?? ''
+        patches.set(target.row, patch)
+      }
+      for (const [rowIndex, patch] of patches) {
+        const destination = activeRows[rowIndex]
+        if (!destination) continue
+        setSavingRowId(destination.id)
+        try {
+          const updated = await recordsService.updateRecord('CadIndexItem', destination.id, { data: patch })
+          if (updated) setRows((current) => current.map((item) => item.id === destination.id ? updated : item))
+        } catch (err: unknown) {
+          setError(err instanceof Error ? err.message : 'Failed to fill selected cells')
+          continue
+        } finally {
+          setSavingRowId(null)
+        }
+
+        if (patch.unit && String(patch.unit).trim() && rowIndex === activeRows.length - 1 && !autoAddedRows.current.has(destination.id)) {
+          autoAddedRows.current.add(destination.id)
+          setCreating(true)
+          try {
+            const created = await recordsService.createRecord('CadIndexItem', {
+              data: { project: projectId, reportType: activeReportType },
+            })
+            if (created) setRows((current) => [...current, created])
+            else throw new Error('Failed to add row after filling the Unit column')
+          } catch (err: unknown) {
+            autoAddedRows.current.delete(destination.id)
+            setError(err instanceof Error ? err.message : 'Failed to add row')
+          } finally {
+            setCreating(false)
+          }
         }
       }
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [fillDrag, activeRows, columns, handleCellCommit])
+  }, [fillDrag, activeRows, columns, projectId, activeReportType])
 
   if (object?.apiName && object.apiName !== 'Project') {
     return (

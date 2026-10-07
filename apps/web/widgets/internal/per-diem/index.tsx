@@ -540,19 +540,34 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
       const drag = fillDrag
       setFillDrag(null)
       const fields = gridFieldsForView(drag.selection.view)
+      const patches = new Map<number, Record<string, unknown>>()
       for (const target of getGridFillTargets(drag.selection, drag.target)) {
-        const field = fields[target.column]
         const sourceField = fields[target.sourceColumn]
-        const row = rows[target.row]
         const sourceRow = rows[target.sourceRow]
-        if (field && sourceField && row && sourceRow) {
-          void handleCommit(row.id, field.key, sourceRow.data?.[sourceField.key] ?? '')
+        const field = fields[target.column]
+        if (!field || !sourceField || !sourceRow) continue
+        const patch = patches.get(target.row) ?? {}
+        patch[field.key] = sourceRow.data?.[sourceField.key] ?? ''
+        patches.set(target.row, patch)
+      }
+      for (const [rowIndex, patch] of patches) {
+        const row = rows[rowIndex]
+        if (!row) continue
+        setSavingRowId(row.id)
+        setError(null)
+        try {
+          const updated = await recordsService.updateRecord('PerDiem', row.id, { data: patch })
+          if (updated) setRows(current => current.map(item => item.id === row.id ? updated : item))
+        } catch (err: unknown) {
+          setError(err instanceof Error ? err.message : 'Failed to fill selected cells')
+        } finally {
+          setSavingRowId(null)
         }
       }
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [fillDrag, rows, handleCommit])
+  }, [fillDrag, rows])
 
   const handleFillDragEnter = (rowIndex: number, colIndex: number, view: 'desktop' | 'mobile') => {
     setFillDrag((previous) => previous?.selection.view === view
