@@ -76,6 +76,13 @@ export function GridRangeStyles() {
       td[data-summary-grid-left="true"] { border-left: 2px solid #217346 !important; }
       td[data-summary-grid-right="true"] { border-right: 2px solid #217346 !important; }
       td.summary-grid-copied { animation: summary-grid-march 0.35s linear infinite; }
+      table[data-summary-grid] td:focus,
+      table[data-summary-grid] td:focus-visible,
+      table[data-summary-grid] td :focus,
+      table[data-summary-grid] td :focus-visible {
+        outline: none !important;
+        box-shadow: none !important;
+      }
       @keyframes summary-grid-march {
         to { background-position: 6px 0, -6px 100%, 0 6px, 100% -6px; }
       }
