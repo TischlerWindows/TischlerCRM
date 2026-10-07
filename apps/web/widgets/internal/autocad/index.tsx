@@ -15,6 +15,7 @@ import type { NavDirection } from '@/lib/cell-navigation'
 import { readProjectField } from '@/lib/factory-order-spec'
 import { userLookupIds, type LookupUserIdentity } from '@/lib/user-lookup'
 import {
+  getGridFillTargets,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -45,11 +46,8 @@ function isLikelyUserId(value: string): boolean {
 }
 
 interface FillDrag {
-  rowIndex: number
-  colIndex: number
-  colKey: string
-  value: unknown
-  targetRowIndex: number
+  selection: GridSelection
+  target: GridCoordinate
 }
 
 /** Full fastener catalog — a single searchable dropdown (replaces the old
@@ -122,13 +120,11 @@ function FastenerComboBox({
   value,
   options,
   onSelect,
-  onSelectAndNavigate,
   onCancel,
 }: {
   value: unknown
   options: string[]
   onSelect: (value: string) => void
-  onSelectAndNavigate: (value: string, el: HTMLElement) => void
   onCancel: () => void
 }) {
   const [query, setQuery] = useState(typeof value === 'string' ? value : '')
@@ -173,7 +169,7 @@ function FastenerComboBox({
           }
           if (e.key === 'Tab') {
             const picked = filtered[highlighted]
-            if (picked) { e.preventDefault(); onSelectAndNavigate(picked, e.currentTarget) }
+            if (picked) { e.preventDefault(); onSelect(picked) }
           }
         }}
         onBlur={() => setTimeout(onCancel, 150)}
@@ -208,9 +204,8 @@ function displayValue(value: unknown): string {
 }
 
 /**
- * Click-to-edit grid cell, same conventions as the Punch List/Per Diem
- * widgets: editing state is lifted to the parent so keyboard navigation
- * (Tab/Enter/arrows) can move it to the adjacent cell.
+ * Double-click or type-to-edit cell. Grid navigation is handled by the
+ * spreadsheet selection surface, not by the cell editor.
  */
 function EditableCell({
   cellId,
@@ -222,7 +217,6 @@ function EditableCell({
   onStartEdit,
   onStopEdit,
   onCommit,
-  onNavigate,
 }: {
   cellId?: string
   value: unknown
@@ -234,7 +228,6 @@ function EditableCell({
   onStartEdit?: () => void
   onStopEdit?: () => void
   onCommit: (newValue: unknown) => void
-  onNavigate?: (fromEl: HTMLElement, direction: NavDirection) => void
 }) {
   const [draft, setDraft] = useState<unknown>(value)
 
@@ -253,15 +246,6 @@ function EditableCell({
     if (newValue !== value) onCommit(newValue)
   }
 
-  const navigateFrom = (el: HTMLElement, direction: NavDirection, newValue: unknown) => {
-    onStopEdit?.()
-    if (newValue !== value) onCommit(newValue)
-    onNavigate?.(el, direction)
-  }
-
-  // A row that's merely mid-save (saving=true for the whole row while any
-  // one field in it is in flight) must stay reachable by keyboard nav, or
-  // Tab/Enter/arrows stop working across the entire row.
   const dataCellId = cellId
 
   if (isEditing) {
@@ -271,7 +255,6 @@ function EditableCell({
           value={draft}
           options={options ?? []}
           onSelect={(nextValue) => { setDraft(nextValue); commit(nextValue) }}
-          onSelectAndNavigate={(nextValue, el) => { setDraft(nextValue); navigateFrom(el, 'right', nextValue) }}
           onCancel={() => onStopEdit?.()}
         />
       )
@@ -286,27 +269,8 @@ function EditableCell({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => commit(draft)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); onNavigate ? navigateFrom(e.currentTarget, 'right', draft) : commit(draft); return }
+          if (e.key === 'Enter') { e.preventDefault(); commit(draft); return }
           if (e.key === 'Escape') { onStopEdit?.(); return }
-          if (!onNavigate) return
-          if (e.key === 'Tab') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft); return }
-          // Number inputs don't reliably support selectionStart/End (throws
-          // in Firefox), and native ArrowUp/Down increments the value —
-          // arrow keys always navigate instead of moving the caret.
-          if (isNumber) {
-            if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(e.currentTarget, 'down', draft) }
-            else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(e.currentTarget, 'up', draft) }
-            else if (e.key === 'ArrowRight') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft) }
-            else if (e.key === 'ArrowLeft') { e.preventDefault(); navigateFrom(e.currentTarget, 'left', draft) }
-            return
-          }
-          const el = e.currentTarget
-          const atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
-          const atStart = el.selectionStart === 0 && el.selectionEnd === 0
-          if (e.key === 'ArrowRight' && atEnd) { e.preventDefault(); navigateFrom(el, 'right', draft) }
-          else if (e.key === 'ArrowLeft' && atStart) { e.preventDefault(); navigateFrom(el, 'left', draft) }
-          else if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(el, 'down', draft) }
-          else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(el, 'up', draft) }
         }}
         className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
       />
@@ -319,12 +283,6 @@ function EditableCell({
       data-cell-id={dataCellId}
       onDoubleClick={startEdit}
       disabled={saving}
-      onKeyDown={(e) => {
-        if (!onNavigate) return
-        const dir: NavDirection | undefined =
-          e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : undefined
-        if (dir) { e.preventDefault(); onNavigate(e.currentTarget, dir) }
-      }}
       className="w-full text-left rounded px-1 py-0.5 -mx-1 hover:bg-brand-navy/5 disabled:opacity-50 whitespace-normal break-words"
     >
       {displayValue(value, type)}
@@ -344,7 +302,6 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   // Which grid cell (`${rowId}:${fieldKey}`) is currently in edit mode —
   // lifted here so keyboard navigation can move editing to the next cell.
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
-  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [selection, setSelection] = useState<GridSelection | null>(null)
   const [copiedSelection, setCopiedSelection] = useState<GridSelection | null>(null)
@@ -376,15 +333,6 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     nextRow = Math.max(0, Math.min(nextRow, rows.length - 1))
     nextColumn = Math.max(0, Math.min(nextColumn, ALL_FIELDS.length - 1))
     selectGridCell({ row: nextRow, column: nextColumn }, extend)
-  }
-
-  const handleNavigate = (el: HTMLElement, direction: NavDirection) => {
-    const cell = el.closest<HTMLElement>('[data-grid-row][data-grid-column]')
-    const row = Number(cell?.dataset.gridRow)
-    const column = Number(cell?.dataset.gridColumn)
-    if (!cell || !Number.isInteger(row) || !Number.isInteger(column)) return
-    setEditingCellId(null)
-    navigateGrid(row, column, direction)
   }
 
   const applyClipboardMatrix = async (start: GridCoordinate, matrix: string[][]) => {
@@ -537,12 +485,14 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     const onMouseUp = () => {
       const drag = fillDrag
       setFillDrag(null)
-      const lo = Math.min(drag.rowIndex, drag.targetRowIndex)
-      const hi = Math.max(drag.rowIndex, drag.targetRowIndex)
-      for (let rowIndex = lo; rowIndex <= hi; rowIndex++) {
-        if (rowIndex === drag.rowIndex) continue
-        const row = rows[rowIndex]
-        if (row) void handleCellCommit(row.id, drag.colKey, drag.value)
+      for (const target of getGridFillTargets(drag.selection, drag.target)) {
+        const row = rows[target.row]
+        const source = rows[target.sourceRow]
+        const sourceField = ALL_FIELDS[target.sourceColumn]
+        const destinationField = ALL_FIELDS[target.column]
+        if (row && source && sourceField && destinationField) {
+          void handleCellCommit(row.id, destinationField.key, source.data?.[sourceField.key])
+        }
       }
     }
     window.addEventListener('mouseup', onMouseUp)
@@ -550,15 +500,12 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   }, [fillDrag, rows, handleCellCommit])
 
   const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
-    setFillDrag((previous) => previous && previous.colIndex === colIndex
-      ? { ...previous, targetRowIndex: rowIndex }
-      : previous)
+    setFillDrag(previous => previous ? { ...previous, target: { row: rowIndex, column: colIndex } } : previous)
   }
 
   const isCellInFillRange = (rowIndex: number, colIndex: number) => {
-    if (!fillDrag || colIndex !== fillDrag.colIndex) return false
-    return rowIndex >= Math.min(fillDrag.rowIndex, fillDrag.targetRowIndex)
-      && rowIndex <= Math.max(fillDrag.rowIndex, fillDrag.targetRowIndex)
+    return !!fillDrag && getGridFillTargets(fillDrag.selection, fillDrag.target)
+      .some(target => target.row === rowIndex && target.column === colIndex)
   }
 
   if (object?.apiName && object.apiName !== 'Project') {
@@ -769,6 +716,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                 <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   {ALL_FIELDS.map((f, colIndex) => {
                     const cellId = `${row.id}:${f.key}`
+                    const selectedBounds = selection ? getGridSelectionBounds(selection) : null
+                    const isFillAnchor = selectedBounds?.bottom === i && selectedBounds.right === colIndex
                     return <td
                       key={f.key}
                       data-grid-row={i}
@@ -781,13 +730,12 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                         setSelection((current) => event.shiftKey && current ? { ...current, focus: coordinate } : { anchor: coordinate, focus: coordinate })
                         selectingCellsRef.current = true
                       }}
-                      onMouseEnter={() => { handleFillDragEnter(i, colIndex); setHoveredCellId(cellId) }}
+                      onMouseEnter={() => handleFillDragEnter(i, colIndex)}
                       onMouseEnterCapture={() => {
                         if (selectingCellsRef.current) setSelection((current) => current
                           ? { ...current, focus: { row: i, column: colIndex } }
                           : { anchor: { row: i, column: colIndex }, focus: { row: i, column: colIndex } })
                       }}
-                      onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
                       onKeyDown={(event) => handleGridKeyDown(event, i, colIndex)}
                       className={`relative px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${selection && isInGridSelection(i, colIndex, selection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(i, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
                     >
@@ -802,17 +750,16 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                         onStartEdit={() => setEditingCellId(cellId)}
                         onStopEdit={() => setEditingCellId(null)}
                         onCommit={(value) => handleCellCommit(row.id, f.key, value)}
-                        onNavigate={handleNavigate}
                       />
-                      {hoveredCellId === cellId && editingCellId !== cellId && (
+                      {isFillAnchor && editingCellId !== cellId && (
                         <span
                           onMouseDown={(event) => {
                             event.preventDefault()
                             event.stopPropagation()
-                            setFillDrag({ rowIndex: i, colIndex, colKey: f.key, value: row.data?.[f.key], targetRowIndex: i })
+                            if (selection) setFillDrag({ selection, target: { row: i, column: colIndex } })
                           }}
                           aria-hidden="true"
-                          className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
+                          className="absolute bottom-0 right-0 z-30 h-2 w-2 cursor-crosshair rounded-[1px] bg-[#217346]"
                         />
                       )}
                     </td>
@@ -844,6 +791,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
             <article key={row.id} className="flex min-w-[48rem] items-center gap-2 border-b border-gray-100 bg-white px-2 py-2 last:border-b-0">
               {ALL_FIELDS.map((field, colIndex) => {
                 const cellId = `${row.id}:${field.key}`
+                const selectedBounds = selection ? getGridSelectionBounds(selection) : null
+                const isFillAnchor = selectedBounds?.bottom === rowIndex && selectedBounds.right === colIndex
                 return <div
                   key={field.key}
                   data-grid-row={rowIndex}
@@ -856,13 +805,12 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                     setSelection((current) => event.shiftKey && current ? { ...current, focus: coordinate } : { anchor: coordinate, focus: coordinate })
                     selectingCellsRef.current = true
                   }}
-                  onMouseEnter={() => { handleFillDragEnter(rowIndex, colIndex); setHoveredCellId(cellId) }}
+                  onMouseEnter={() => handleFillDragEnter(rowIndex, colIndex)}
                   onMouseEnterCapture={() => {
                     if (selectingCellsRef.current) setSelection((current) => current
                       ? { ...current, focus: { row: rowIndex, column: colIndex } }
                       : { anchor: { row: rowIndex, column: colIndex }, focus: { row: rowIndex, column: colIndex } })
                   }}
-                  onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
                   onKeyDown={(event) => handleGridKeyDown(event, rowIndex, colIndex)}
                   className={`${getMobileRowWidthClass(field)} relative shrink-0 ${selection && isInGridSelection(rowIndex, colIndex, selection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
                 >
@@ -879,15 +827,15 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                     onStopEdit={() => setEditingCellId(null)}
                     onCommit={(value) => handleCellCommit(row.id, field.key, value)}
                   />
-                  {hoveredCellId === cellId && editingCellId !== cellId && (
+                  {isFillAnchor && editingCellId !== cellId && (
                     <span
                       onMouseDown={(event) => {
                         event.preventDefault()
                         event.stopPropagation()
-                        setFillDrag({ rowIndex, colIndex, colKey: field.key, value: row.data?.[field.key], targetRowIndex: rowIndex })
+                        if (selection) setFillDrag({ selection, target: { row: rowIndex, column: colIndex } })
                       }}
                       aria-hidden="true"
-                      className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
+                      className="absolute bottom-0 right-0 z-30 h-2 w-2 cursor-crosshair rounded-[1px] bg-[#217346]"
                     />
                   )}
                 </div>

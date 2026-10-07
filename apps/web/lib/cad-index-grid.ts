@@ -72,3 +72,32 @@ export function parseGridCellValue(value: string, type: GridColumnType): { valid
   if (['false', '0', 'no', 'n', ''].includes(normalized)) return { valid: true, value: false }
   return { valid: false, value: false }
 }
+
+export function getGridFillTargets(
+  selection: GridSelection,
+  target: GridCoordinate,
+): Array<{ row: number; column: number; sourceRow: number; sourceColumn: number }> {
+  const bounds = getGridSelectionBounds(selection)
+  const height = bounds.bottom - bounds.top + 1
+  const width = bounds.right - bounds.left + 1
+  const top = Math.min(bounds.top, target.row)
+  const bottom = Math.max(bounds.bottom, target.row)
+  const left = Math.min(bounds.left, target.column)
+  const right = Math.max(bounds.right, target.column)
+  const targets: Array<{ row: number; column: number; sourceRow: number; sourceColumn: number }> = []
+
+  for (let row = top; row <= bottom; row++) {
+    for (let column = left; column <= right; column++) {
+      if (isInGridSelection(row, column, selection)) continue
+      const rowOffset = ((row - bounds.top) % height + height) % height
+      const columnOffset = ((column - bounds.left) % width + width) % width
+      targets.push({
+        row,
+        column,
+        sourceRow: bounds.top + rowOffset,
+        sourceColumn: bounds.left + columnOffset,
+      })
+    }
+  }
+  return targets
+}

@@ -1,6 +1,7 @@
 import {
   getGridSelectionBounds,
   getGridSelectionOrigin,
+  getGridFillTargets,
   isInGridSelection,
   parseGridCellValue,
   parseGridClipboard,
@@ -19,6 +20,24 @@ describe('CAD Index List spreadsheet grid helpers', () => {
 
   it('converts zero-based grid columns to spreadsheet labels', () => {
     expect([0, 25, 26, 27, 701].map(spreadsheetColumnLabel)).toEqual(['A', 'Z', 'AA', 'AB', 'ZZ'])
+  })
+
+  it('repeats a selected block into the cells covered by the fill handle', () => {
+    const selection = { anchor: { row: 1, column: 1 }, focus: { row: 2, column: 2 } }
+    expect(getGridFillTargets(selection, { row: 4, column: 4 })).toEqual([
+      { row: 1, column: 3, sourceRow: 1, sourceColumn: 1 },
+      { row: 1, column: 4, sourceRow: 1, sourceColumn: 2 },
+      { row: 2, column: 3, sourceRow: 2, sourceColumn: 1 },
+      { row: 2, column: 4, sourceRow: 2, sourceColumn: 2 },
+      { row: 3, column: 1, sourceRow: 1, sourceColumn: 1 },
+      { row: 3, column: 2, sourceRow: 1, sourceColumn: 2 },
+      { row: 3, column: 3, sourceRow: 1, sourceColumn: 1 },
+      { row: 3, column: 4, sourceRow: 1, sourceColumn: 2 },
+      { row: 4, column: 1, sourceRow: 2, sourceColumn: 1 },
+      { row: 4, column: 2, sourceRow: 2, sourceColumn: 2 },
+      { row: 4, column: 3, sourceRow: 2, sourceColumn: 1 },
+      { row: 4, column: 4, sourceRow: 2, sourceColumn: 2 },
+    ])
   })
 
   it('round-trips tabular clipboard data including tabs, quotes, and line breaks', () => {

@@ -1,4 +1,3 @@
-type PerDiemGridSelection = GridSelection & { view: 'desktop' | 'mobile' }
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -8,8 +7,9 @@ import { recordsService, RecordData } from '@/lib/records-service'
 import { apiClient } from '@/lib/api-client'
 import { resolveLookupDisplayName } from '@/lib/utils'
 import { MultiLookupUserSearch } from '@/components/form/lookup-search'
-import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
+import type { NavDirection } from '@/lib/cell-navigation'
 import {
+  getGridFillTargets,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -22,6 +22,8 @@ import {
 import { GridRangeDecoration, GridRangeStyles } from '../shared/grid-range-decoration'
 import { generatePerDiemPdf } from './pdf'
 
+type PerDiemGridSelection = GridSelection & { view: 'desktop' | 'mobile' }
+
 type FieldType = 'text' | 'textarea' | 'currency' | 'date' | 'user'
 
 interface FieldDef {
@@ -31,11 +33,8 @@ interface FieldDef {
 }
 
 interface FillDrag {
-  rowIndex: number
-  colIndex: number
-  colKey: string
-  value: unknown
-  targetRowIndex: number
+  selection: PerDiemGridSelection
+  target: GridCoordinate
 }
 
 const FIELDS: FieldDef[] = [
@@ -53,6 +52,9 @@ const MOBILE_FIELDS: Array<FieldDef & { width: string }> = [
   { key: 'perDiemAmount', label: 'Amount', type: 'currency', width: 'w-24' },
   { key: 'perDiemNotes', label: 'Notes', type: 'textarea', width: 'min-w-[14rem] flex-1' },
 ]
+
+const gridFieldsForView = (view: 'desktop' | 'mobile'): FieldDef[] =>
+  view === 'desktop' ? FIELDS : MOBILE_FIELDS
 
 function dateValue(value: unknown): string {
   const match = String(value ?? '').match(/^(\d{4}-\d{2}-\d{2})/)
@@ -147,7 +149,6 @@ function EditableCell({
   onStartEdit,
   onStopEdit,
   onCommit,
-  onNavigate,
 }: {
   cellId?: string
   value: unknown
@@ -157,7 +158,6 @@ function EditableCell({
   onStartEdit?: () => void
   onStopEdit?: () => void
   onCommit: (value: unknown) => void
-  onNavigate?: (fromEl: HTMLElement, direction: NavDirection) => void
 }) {
   const [draft, setDraft] = useState<unknown>(value)
 
@@ -166,10 +166,7 @@ function EditableCell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing])
 
-  // MultiLookupUserSearch's input has no autoFocus of its own (unlike the
-  // other field types' plain <input>/<textarea>), so nothing gives it DOM
-  // focus when keyboard nav lands here — without this, Tab/Escape/typing
-  // all silently do nothing since no element in the cell is focused.
+  // MultiLookupUserSearch does not auto-focus its input when edit mode starts.
   const userCellRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (isEditing && type === 'user') userCellRef.current?.querySelector('input')?.focus()
@@ -197,34 +194,16 @@ function EditableCell({
     if (draft !== value) onCommit(draft)
   }
 
-  const navigateFrom = (el: HTMLElement, direction: NavDirection, newValue: unknown) => {
-    onStopEdit?.()
-    if (newValue !== value) onCommit(newValue)
-    onNavigate?.(el, direction)
-  }
-
-  // Per Diem has no permanently non-editable fields, so unlike Punch List's
-  // computed column, `saving` (temporary, whole-row) must never hide this
-  // cell from keyboard navigation — that would stall Tab/Enter/arrows across
-  // the entire row until the in-flight save resolves.
   const dataCellId = cellId
 
   if (isEditing) {
     if (type === 'user') {
-      // MultiLookupUserSearch owns its own input/dropdown and has no notion
-      // of cell navigation, so Tab/Escape are intercepted here (ArrowUp/Down
-      // are left alone — the dropdown uses them to highlight options).
+      // Keep Escape available without interfering with the lookup's own arrows.
       return (
         <div
           ref={userCellRef}
           onKeyDown={(event) => {
-            if (event.key === 'Tab') {
-              event.preventDefault()
-              if (onNavigate) navigateFrom(event.currentTarget, 'right', draft)
-              else onStopEdit?.()
-            } else if (event.key === 'Escape') {
-              onStopEdit?.()
-            }
+            if (event.key === 'Escape') onStopEdit?.()
           }}
         >
           <UserLookupField
@@ -249,16 +228,7 @@ function EditableCell({
           onBlur={commit}
           onKeyDown={(event) => {
             if (event.key === 'Escape') { onStopEdit?.(); return }
-            if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); onNavigate ? navigateFrom(event.currentTarget, 'right', draft) : commit(); return }
-            if (!onNavigate) return
-            if (event.key === 'Tab') { event.preventDefault(); navigateFrom(event.currentTarget, 'right', draft); return }
-            const el = event.currentTarget
-            const atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
-            const atStart = el.selectionStart === 0 && el.selectionEnd === 0
-            if (event.key === 'ArrowRight' && atEnd) { event.preventDefault(); navigateFrom(el, 'right', draft) }
-            else if (event.key === 'ArrowLeft' && atStart) { event.preventDefault(); navigateFrom(el, 'left', draft) }
-            else if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(el, 'down', draft) }
-            else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(el, 'up', draft) }
+            if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); commit(); }
           }}
           rows={1}
           className="w-full resize-none overflow-hidden rounded border border-brand-navy/40 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
@@ -276,35 +246,8 @@ function EditableCell({
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') { event.preventDefault(); onNavigate ? navigateFrom(event.currentTarget, 'right', draft) : commit(); return }
+          if (event.key === 'Enter') { event.preventDefault(); commit(); return }
           if (event.key === 'Escape') { onStopEdit?.(); return }
-          if (!onNavigate) return
-          if (event.key === 'Tab') { event.preventDefault(); navigateFrom(event.currentTarget, 'right', draft); return }
-          // Number inputs don't reliably support selectionStart/End (throws
-          // in Firefox) and native ArrowUp/Down increments the value, so
-          // arrows always navigate instead of moving the caret. Date inputs
-          // keep native ArrowLeft/Right to move between month/day/year.
-          if (isNumber) {
-            if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(event.currentTarget, 'down', draft) }
-            else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(event.currentTarget, 'up', draft) }
-            else if (event.key === 'ArrowRight') { event.preventDefault(); navigateFrom(event.currentTarget, 'right', draft) }
-            else if (event.key === 'ArrowLeft') { event.preventDefault(); navigateFrom(event.currentTarget, 'left', draft) }
-            return
-          }
-          if (type === 'date') {
-            if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(event.currentTarget, 'down', draft) }
-            else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(event.currentTarget, 'up', draft) }
-            else if (event.key === 'ArrowRight') { event.preventDefault(); navigateFrom(event.currentTarget, 'right', draft) }
-            else if (event.key === 'ArrowLeft') { event.preventDefault(); navigateFrom(event.currentTarget, 'left', draft) }
-            return
-          }
-          const el = event.currentTarget
-          const atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
-          const atStart = el.selectionStart === 0 && el.selectionEnd === 0
-          if (event.key === 'ArrowRight' && atEnd) { event.preventDefault(); navigateFrom(el, 'right', draft) }
-          else if (event.key === 'ArrowLeft' && atStart) { event.preventDefault(); navigateFrom(el, 'left', draft) }
-          else if (event.key === 'ArrowDown') { event.preventDefault(); navigateFrom(el, 'down', draft) }
-          else if (event.key === 'ArrowUp') { event.preventDefault(); navigateFrom(el, 'up', draft) }
         }}
         className="w-full rounded border border-brand-navy/40 px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
       />
@@ -393,28 +336,12 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
   const [deletingRowId, setDeletingRowId] = useState<string | null>(null)
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const workOrderName = String(record?.name ?? record?.title ?? record?.workOrderNumber ?? '')
-  // Which grid cell (`${rowId}:${fieldKey}`) is currently in edit mode — lifted
-  // here so keyboard navigation can move editing to the next cell.
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
-  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [gridSelection, setGridSelection] = useState<PerDiemGridSelection | null>(null)
   const [copiedGridSelection, setCopiedGridSelection] = useState<PerDiemGridSelection | null>(null)
   const gridRootRef = useRef<HTMLDivElement>(null)
   const selectingGridRef = useRef(false)
-
-  const handleNavigate = (el: HTMLElement, direction: NavDirection) => {
-    const td = el.closest('td')
-    const nextCellId = td ? findAdjacentCellId(td, direction) : null
-    setEditingCellId(nextCellId)
-    const nextCell = nextCellId ? document.querySelector<HTMLElement>(`[data-cell-id="${nextCellId}"]`) : null
-    const gridCell = nextCell?.closest<HTMLElement>('[data-grid-row][data-grid-column]')
-    const table = gridCell?.closest<HTMLElement>('[data-per-diem-grid]')
-    if (gridCell && table?.dataset.perDiemGrid) {
-      const coordinate = { row: Number(gridCell.dataset.gridRow), column: Number(gridCell.dataset.gridColumn) }
-      setGridSelection({ view: table.dataset.perDiemGrid as 'desktop' | 'mobile', anchor: coordinate, focus: coordinate })
-    }
-  }
 
   const focusGridCell = (coordinate: GridCoordinate, view: 'desktop' | 'mobile') => {
     requestAnimationFrame(() => {
@@ -539,8 +466,8 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
       : { view, anchor: coordinate, focus: coordinate })
   }
 
-  const gridCellClassName = (row: number, column: number, extra = '') =>
-    `${extra} ${gridSelection && isInGridSelection(row, column, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(row, column) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`
+  const gridCellClassName = (row: number, column: number, view: 'desktop' | 'mobile', extra = '') =>
+    `${extra} ${gridSelection?.view === view && isInGridSelection(row, column, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(row, column, view) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number, view: 'desktop' | 'mobile') => {
     if (event.defaultPrevented || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return
@@ -612,28 +539,30 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     const onMouseUp = () => {
       const drag = fillDrag
       setFillDrag(null)
-      const lo = Math.min(drag.rowIndex, drag.targetRowIndex)
-      const hi = Math.max(drag.rowIndex, drag.targetRowIndex)
-      for (let rowIndex = lo; rowIndex <= hi; rowIndex++) {
-        if (rowIndex === drag.rowIndex) continue
-        const row = rows[rowIndex]
-        if (row) void handleCommit(row.id, drag.colKey, drag.value)
+      const fields = gridFieldsForView(drag.selection.view)
+      for (const target of getGridFillTargets(drag.selection, drag.target)) {
+        const field = fields[target.column]
+        const sourceField = fields[target.sourceColumn]
+        const row = rows[target.row]
+        const sourceRow = rows[target.sourceRow]
+        if (field && sourceField && row && sourceRow) {
+          void handleCommit(row.id, field.key, sourceRow.data?.[sourceField.key] ?? '')
+        }
       }
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
   }, [fillDrag, rows, handleCommit])
 
-  const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
-    setFillDrag((previous) => previous && previous.colIndex === colIndex
-      ? { ...previous, targetRowIndex: rowIndex }
+  const handleFillDragEnter = (rowIndex: number, colIndex: number, view: 'desktop' | 'mobile') => {
+    setFillDrag((previous) => previous?.selection.view === view
+      ? { ...previous, target: { row: rowIndex, column: colIndex } }
       : previous)
   }
 
-  const isCellInFillRange = (rowIndex: number, colIndex: number) => {
-    if (!fillDrag || colIndex !== fillDrag.colIndex) return false
-    return rowIndex >= Math.min(fillDrag.rowIndex, fillDrag.targetRowIndex)
-      && rowIndex <= Math.max(fillDrag.rowIndex, fillDrag.targetRowIndex)
+  const isCellInFillRange = (rowIndex: number, colIndex: number, view: 'desktop' | 'mobile') => {
+    return !!fillDrag && fillDrag.selection.view === view && getGridFillTargets(fillDrag.selection, fillDrag.target)
+      .some(target => target.row === rowIndex && target.column === colIndex)
   }
 
   if (object?.apiName && object.apiName !== 'WorkOrder') {
@@ -793,19 +722,18 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
                       tabIndex={gridSelection?.view === 'desktop' && gridSelection.focus.row === index && gridSelection.focus.column === colIndex ? 0 : -1}
                       aria-selected={gridSelection?.view === 'desktop' ? isInGridSelection(index, colIndex, gridSelection) : false}
                       onMouseDown={(event) => handleGridCellMouseDown(event, index, colIndex, 'desktop')}
-                      onMouseEnter={() => { handleFillDragEnter(index, colIndex); handleGridCellMouseEnter(index, colIndex, 'desktop'); setHoveredCellId(cellId) }}
-                      onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
+                      onMouseEnter={() => { handleFillDragEnter(index, colIndex, 'desktop'); handleGridCellMouseEnter(index, colIndex, 'desktop') }}
                       onKeyDown={(event) => handleGridKeyDown(event, index, colIndex, 'desktop')}
-                      className={gridCellClassName(index, colIndex, 'relative border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words')}
+                      className={gridCellClassName(index, colIndex, 'desktop', 'relative border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words')}
                     >
                       <GridRangeDecoration row={index} column={colIndex} selection={gridSelection?.view === 'desktop' ? gridSelection : null} copiedSelection={copiedGridSelection?.view === 'desktop' ? copiedGridSelection : null} />
-                      <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} onStartEdit={() => setEditingCellId(cellId)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} onNavigate={handleNavigate} />
-                      {hoveredCellId === cellId && editingCellId !== cellId && (
+                      <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} onStartEdit={() => setEditingCellId(cellId)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} />
+                      {gridSelection?.view === 'desktop' && !editingCellId && getGridSelectionBounds(gridSelection).bottom === index && getGridSelectionBounds(gridSelection).right === colIndex && (
                         <span
                           onMouseDown={(event) => {
                             event.preventDefault()
                             event.stopPropagation()
-                            setFillDrag({ rowIndex: index, colIndex, colKey: field.key, value: row.data?.[field.key], targetRowIndex: index })
+                            setFillDrag({ selection: gridSelection, target: { row: index, column: colIndex } })
                           }}
                           aria-hidden="true"
                           className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
@@ -835,20 +763,19 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
                   tabIndex={gridSelection?.view === 'mobile' && gridSelection.focus.row === rowIndex && gridSelection.focus.column === colIndex ? 0 : -1}
                   aria-selected={gridSelection?.view === 'mobile' ? isInGridSelection(rowIndex, colIndex, gridSelection) : false}
                   onMouseDown={(event) => handleGridCellMouseDown(event, rowIndex, colIndex, 'mobile')}
-                  onMouseEnter={() => { handleFillDragEnter(rowIndex, colIndex); handleGridCellMouseEnter(rowIndex, colIndex, 'mobile'); setHoveredCellId(cellId) }}
-                  onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
+                  onMouseEnter={() => { handleFillDragEnter(rowIndex, colIndex, 'mobile'); handleGridCellMouseEnter(rowIndex, colIndex, 'mobile') }}
                   onKeyDown={(event) => handleGridKeyDown(event, rowIndex, colIndex, 'mobile')}
-                  className={gridCellClassName(rowIndex, colIndex, `relative shrink-0 ${field.width}`)}
+                  className={gridCellClassName(rowIndex, colIndex, 'mobile', `relative shrink-0 ${field.width}`)}
                 >
                   <GridRangeDecoration row={rowIndex} column={colIndex} selection={gridSelection?.view === 'mobile' ? gridSelection : null} copiedSelection={copiedGridSelection?.view === 'mobile' ? copiedGridSelection : null} />
                   <p className="text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
                   <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} onStartEdit={() => setEditingCellId(cellId)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} />
-                  {hoveredCellId === cellId && editingCellId !== cellId && (
+                  {gridSelection?.view === 'mobile' && !editingCellId && getGridSelectionBounds(gridSelection).bottom === rowIndex && getGridSelectionBounds(gridSelection).right === colIndex && (
                     <span
                       onMouseDown={(event) => {
                         event.preventDefault()
                         event.stopPropagation()
-                        setFillDrag({ rowIndex, colIndex, colKey: field.key, value: row.data?.[field.key], targetRowIndex: rowIndex })
+                        setFillDrag({ selection: gridSelection, target: { row: rowIndex, column: colIndex } })
                       }}
                       aria-hidden="true"
                       className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"

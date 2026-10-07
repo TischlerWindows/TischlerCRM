@@ -20,8 +20,9 @@ import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2, FileText } from 'luc
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { useAuth } from '@/lib/auth-context'
-import { findAdjacentCellId, type NavDirection } from '@/lib/cell-navigation'
+import type { NavDirection } from '@/lib/cell-navigation'
 import {
+  getGridFillTargets,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -46,11 +47,8 @@ interface FieldDef {
 }
 
 interface FillDrag {
-  rowIndex: number
-  colIndex: number
-  colKey: string
-  value: unknown
-  targetRowIndex: number
+  selection: GridSelection
+  target: GridCoordinate
 }
 
 const INFO_FIELDS: FieldDef[] = [
@@ -153,13 +151,7 @@ function computeTotalHours(values: Record<string, unknown>): number {
   return Math.round(men * hours * 100) / 100
 }
 
-/**
- * Click-to-edit grid cell. Commits immediately on blur/Enter — punch list
- * rows are meant to be edited in place, one field at a time, with no
- * separate Save step. When `onNavigate` is supplied (desktop table only),
- * Tab/Enter/arrow keys move to the adjacent cell Excel-style, matching the
- * Summary pages' grid navigation.
- */
+/** Cell editor; selection and keyboard movement belong to the surrounding grid. */
 function EditableCell({
   cellId,
   value,
@@ -170,7 +162,6 @@ function EditableCell({
   onStartEdit,
   onStopEdit,
   onCommit,
-  onNavigate,
 }: {
   cellId?: string
   value: unknown
@@ -183,7 +174,6 @@ function EditableCell({
   onStartEdit?: () => void
   onStopEdit?: () => void
   onCommit: (newValue: unknown) => void
-  onNavigate?: (fromEl: HTMLElement, direction: NavDirection) => void
 }) {
   const [draft, setDraft] = useState<unknown>(value)
 
@@ -200,14 +190,6 @@ function EditableCell({
   const commit = (newValue: unknown) => {
     onStopEdit?.()
     if (newValue !== value) onCommit(newValue)
-  }
-
-  // Commits the draft, then hands off to the adjacent cell (or just stops
-  // editing if there's nowhere to go / navigation isn't wired up here).
-  const navigateFrom = (el: HTMLElement, direction: NavDirection, newValue: unknown) => {
-    onStopEdit?.()
-    if (newValue !== value) onCommit(newValue)
-    onNavigate?.(el, direction)
   }
 
   // Only a permanently computed cell is skipped by keyboard navigation —
@@ -245,13 +227,6 @@ function EditableCell({
         checked={!!value}
         disabled={saving}
         onChange={(e) => onCommit(e.target.checked)}
-        onKeyDown={(e) => {
-          if (!onNavigate) return
-          if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); onNavigate(e.currentTarget, 'right'); return }
-          const dir: NavDirection | undefined =
-            e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : undefined
-          if (dir) { e.preventDefault(); onNavigate(e.currentTarget, dir) }
-        }}
         className="h-4 w-4 rounded border-gray-300 text-brand-navy focus:ring-brand-navy"
       />
     )
@@ -268,14 +243,8 @@ function EditableCell({
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => commit(draft)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); onNavigate ? navigateFrom(e.currentTarget, 'right', draft) : commit(draft); return }
+            if (e.key === 'Enter') { e.preventDefault(); commit(draft); return }
             if (e.key === 'Escape') { onStopEdit?.(); return }
-            if (!onNavigate) return
-            if (e.key === 'Tab') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft) }
-            else if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(e.currentTarget, 'down', draft) }
-            else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(e.currentTarget, 'up', draft) }
-            else if (e.key === 'ArrowRight') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft) }
-            else if (e.key === 'ArrowLeft') { e.preventDefault(); navigateFrom(e.currentTarget, 'left', draft) }
           }}
           className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
         />
@@ -292,16 +261,7 @@ function EditableCell({
           onBlur={() => commit(draft)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') { onStopEdit?.(); return }
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onNavigate ? navigateFrom(e.currentTarget, 'right', draft) : commit(draft); return }
-            if (!onNavigate) return
-            if (e.key === 'Tab') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft); return }
-            const el = e.currentTarget
-            const atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
-            const atStart = el.selectionStart === 0 && el.selectionEnd === 0
-            if (e.key === 'ArrowRight' && atEnd) { e.preventDefault(); navigateFrom(el, 'right', draft) }
-            else if (e.key === 'ArrowLeft' && atStart) { e.preventDefault(); navigateFrom(el, 'left', draft) }
-            else if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(el, 'down', draft) }
-            else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(el, 'up', draft) }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(draft) }
           }}
           rows={1}
           className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm resize-none overflow-hidden focus:outline-none focus:ring-1 focus:ring-brand-navy"
@@ -318,27 +278,8 @@ function EditableCell({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => commit(draft)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); onNavigate ? navigateFrom(e.currentTarget, 'right', draft) : commit(draft); return }
+          if (e.key === 'Enter') { e.preventDefault(); commit(draft); return }
           if (e.key === 'Escape') { onStopEdit?.(); return }
-          if (!onNavigate) return
-          if (e.key === 'Tab') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft); return }
-          // Number inputs don't reliably support selectionStart/End (throws
-          // in Firefox), and native ArrowUp/Down increments the value —
-          // arrow keys always navigate instead of moving the caret.
-          if (isNumber) {
-            if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(e.currentTarget, 'down', draft) }
-            else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(e.currentTarget, 'up', draft) }
-            else if (e.key === 'ArrowRight') { e.preventDefault(); navigateFrom(e.currentTarget, 'right', draft) }
-            else if (e.key === 'ArrowLeft') { e.preventDefault(); navigateFrom(e.currentTarget, 'left', draft) }
-            return
-          }
-          const el = e.currentTarget
-          const atEnd = el.selectionStart === el.value.length && el.selectionEnd === el.value.length
-          const atStart = el.selectionStart === 0 && el.selectionEnd === 0
-          if (e.key === 'ArrowRight' && atEnd) { e.preventDefault(); navigateFrom(el, 'right', draft) }
-          else if (e.key === 'ArrowLeft' && atStart) { e.preventDefault(); navigateFrom(el, 'left', draft) }
-          else if (e.key === 'ArrowDown') { e.preventDefault(); navigateFrom(el, 'down', draft) }
-          else if (e.key === 'ArrowUp') { e.preventDefault(); navigateFrom(el, 'up', draft) }
         }}
         className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
       />
@@ -541,28 +482,13 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   const [punchListCreated, setPunchListCreated] = useState(!!(record?.WorkOrder__punchListCreated ?? record?.punchListCreated))
   const [punchListCompleted, setPunchListCompleted] = useState(!!(record?.punchListCompleted ?? record?.punchListPrinted))
   const [savingFlagKey, setSavingFlagKey] = useState<string | null>(null)
-  // Which grid cell (`${rowId}:${fieldKey}`) is currently in edit mode — lifted
-  // here (rather than local to EditableCell) so keyboard navigation can move
-  // editing from one cell to the next, Excel/Summary-page style.
+  // Which grid cell (`${rowId}:${fieldKey}`) is currently being edited.
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
-  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [gridSelection, setGridSelection] = useState<GridSelection | null>(null)
   const [copiedGridSelection, setCopiedGridSelection] = useState<GridSelection | null>(null)
   const gridRootRef = useRef<HTMLDivElement>(null)
   const selectingGridRef = useRef(false)
-
-  const handleNavigate = (el: HTMLElement, direction: NavDirection) => {
-    const td = el.closest('td')
-    const nextCellId = td ? findAdjacentCellId(td, direction) : null
-    setEditingCellId(nextCellId)
-    const nextCell = nextCellId ? document.querySelector<HTMLElement>(`[data-cell-id="${nextCellId}"]`) : null
-    const position = nextCell?.closest<HTMLElement>('[data-grid-row][data-grid-column]')
-    if (position) {
-      const coordinate = { row: Number(position.dataset.gridRow), column: Number(position.dataset.gridColumn) }
-      setGridSelection({ anchor: coordinate, focus: coordinate })
-    }
-  }
 
   const focusGridCell = (coordinate: GridCoordinate) => {
     requestAnimationFrame(() => {
@@ -667,7 +593,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {
     if (event.defaultPrevented) return
-    if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return
+    if (event.target instanceof HTMLTextAreaElement || (event.target instanceof HTMLInputElement && event.target.type !== 'checkbox')) return
     if (event.key === 'Escape' && copiedGridSelection) { setCopiedGridSelection(null); return }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
       event.preventDefault()
@@ -765,28 +691,39 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     const onMouseUp = () => {
       const drag = fillDrag
       setFillDrag(null)
-      const lo = Math.min(drag.rowIndex, drag.targetRowIndex)
-      const hi = Math.max(drag.rowIndex, drag.targetRowIndex)
-      for (let rowIndex = lo; rowIndex <= hi; rowIndex++) {
-        if (rowIndex === drag.rowIndex) continue
+      const patches = new Map<number, Record<string, unknown>>()
+      for (const target of getGridFillTargets(drag.selection, drag.target)) {
+        const field = ALL_FIELDS[target.column]
+        const sourceField = ALL_FIELDS[target.sourceColumn]
+        const sourceRow = rows[target.sourceRow]
+        const destinationRow = rows[target.row]
+        if (!field || field.computed || !sourceField || !sourceRow || !destinationRow) continue
+        const patch = patches.get(target.row) ?? {}
+        patch[field.key] = sourceRow.data?.[sourceField.key] ?? ''
+        patches.set(target.row, patch)
+      }
+      for (const [rowIndex, patch] of patches) {
         const row = rows[rowIndex]
-        if (row) void handleCellCommit(row.id, drag.colKey, drag.value)
+        if (!row) continue
+        if ('estimateOfMen' in patch || 'estimateOfIndividualHours' in patch) {
+          patch.totalEstimateOfHours = computeTotalHours({ ...(row.data ?? {}), ...patch })
+        }
+        void recordsService.updateRecord('PunchList', row.id, { data: patch })
+          .then(updated => { if (updated) setRows(current => current.map(item => item.id === row.id ? updated : item)) })
+          .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Failed to fill selected cells'))
       }
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [fillDrag, rows, handleCellCommit])
+  }, [fillDrag, rows])
 
   const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
-    setFillDrag((previous) => previous && previous.colIndex === colIndex
-      ? { ...previous, targetRowIndex: rowIndex }
-      : previous)
+    setFillDrag(previous => previous ? { ...previous, target: { row: rowIndex, column: colIndex } } : previous)
   }
 
   const isCellInFillRange = (rowIndex: number, colIndex: number) => {
-    if (!fillDrag || colIndex !== fillDrag.colIndex) return false
-    return rowIndex >= Math.min(fillDrag.rowIndex, fillDrag.targetRowIndex)
-      && rowIndex <= Math.max(fillDrag.rowIndex, fillDrag.targetRowIndex)
+    return !!fillDrag && getGridFillTargets(fillDrag.selection, fillDrag.target)
+      .some(target => target.row === rowIndex && target.column === colIndex)
   }
 
   if (object?.apiName && object.apiName !== 'WorkOrder') {
@@ -1103,7 +1040,6 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                 <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   {ALL_FIELDS.map((f, colIndex) => {
                     const cellId = `${row.id}:${f.key}`
-                    const canFill = f.type !== 'checkbox' && f.computed !== true
                     return <td
                       key={f.key}
                       data-grid-row={i}
@@ -1114,9 +1050,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                       onMouseEnter={() => {
                         handleFillDragEnter(i, colIndex)
                         handleGridCellMouseEnter(i, colIndex)
-                        if (canFill) setHoveredCellId(cellId)
                       }}
-                      onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
                       onKeyDown={(event) => handleGridKeyDown(event, i, colIndex)}
                       className={gridCellClassName(i, colIndex, 'relative px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words')}
                     >
@@ -1131,14 +1065,13 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                         onStartEdit={() => setEditingCellId(cellId)}
                         onStopEdit={() => setEditingCellId(null)}
                         onCommit={(value) => handleCellCommit(row.id, f.key, value)}
-                        onNavigate={handleNavigate}
                       />
-                      {canFill && hoveredCellId === cellId && editingCellId !== cellId && (
+                      {gridSelection && !editingCellId && getGridSelectionBounds(gridSelection).bottom === i && getGridSelectionBounds(gridSelection).right === colIndex && (
                         <span
                           onMouseDown={(event) => {
                             event.preventDefault()
                             event.stopPropagation()
-                            setFillDrag({ rowIndex: i, colIndex, colKey: f.key, value: row.data?.[f.key], targetRowIndex: i })
+                            setFillDrag({ selection: gridSelection, target: { row: i, column: colIndex } })
                           }}
                           aria-hidden="true"
                           className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
@@ -1173,7 +1106,6 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
             <article key={row.id} className={`flex min-w-[72rem] items-center gap-2 border-b border-gray-100 px-2 py-2 last:border-b-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
               {ALL_FIELDS.map((field, colIndex) => {
                 const cellId = `${row.id}:${field.key}`
-                const canFill = field.type !== 'checkbox' && field.computed !== true
                 return <div
                   key={field.key}
                   data-grid-row={index}
@@ -1184,9 +1116,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                   onMouseEnter={() => {
                     handleFillDragEnter(index, colIndex)
                     handleGridCellMouseEnter(index, colIndex)
-                    if (canFill) setHoveredCellId(cellId)
                   }}
-                  onMouseLeave={() => setHoveredCellId((previous) => previous === cellId ? null : previous)}
                   onKeyDown={(event) => handleGridKeyDown(event, index, colIndex)}
                   className={gridCellClassName(index, colIndex, `${getMobileRowWidthClass(field)} relative shrink-0`)}
                 >
@@ -1203,12 +1133,12 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                     onStopEdit={() => setEditingCellId(null)}
                     onCommit={(value) => handleCellCommit(row.id, field.key, value)}
                   />
-                  {canFill && hoveredCellId === cellId && editingCellId !== cellId && (
+                  {gridSelection && !editingCellId && getGridSelectionBounds(gridSelection).bottom === index && getGridSelectionBounds(gridSelection).right === colIndex && (
                     <span
                       onMouseDown={(event) => {
                         event.preventDefault()
                         event.stopPropagation()
-                        setFillDrag({ rowIndex: index, colIndex, colKey: field.key, value: row.data?.[field.key], targetRowIndex: index })
+                        setFillDrag({ selection: gridSelection, target: { row: index, column: colIndex } })
                       }}
                       aria-hidden="true"
                       className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"

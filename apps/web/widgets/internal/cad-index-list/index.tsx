@@ -22,6 +22,7 @@ import { getRecordName } from '../shared/recordName'
 import { orderedColumns } from '@/lib/cad-index-column-order'
 import { parseCadIndexComments } from '@/lib/cad-index-comments'
 import {
+  getGridFillTargets,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -43,15 +44,9 @@ interface ColumnDef {
   multiline?: boolean
 }
 
-/** Active Excel-style "fill handle" drag — copies the source cell's value
- * down every cell the drag passes over in the same column (vertical only
- * for now). */
 interface FillDrag {
-  rowIndex: number
-  colIndex: number
-  colKey: string
-  value: unknown
-  targetRowIndex: number
+  selection: GridSelection
+  target: GridCoordinate
 }
 
 const REPORT_TYPES = [
@@ -110,7 +105,6 @@ function TextCell({
   onStartEdit,
   onCommit,
   onCancel,
-  onNavigate,
 }: {
   value: unknown
   type: 'text' | 'number'
@@ -121,7 +115,6 @@ function TextCell({
   onStartEdit: () => void
   onCommit: (value: string) => void
   onCancel: () => void
-  onNavigate: (direction: 'left' | 'right' | 'up' | 'down') => void
 }) {
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -148,27 +141,6 @@ function TextCell({
     if (event.key === 'Enter' && (!multiline || !event.shiftKey)) {
       event.preventDefault()
       commit(draft)
-      onNavigate('down')
-      return
-    }
-    if (event.key === 'Tab') {
-      event.preventDefault()
-      commit(draft)
-      onNavigate(event.shiftKey ? 'left' : 'right')
-      return
-    }
-
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
-    const input = event.currentTarget
-    const isNumber = type === 'number'
-    const isTextEditor = input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement
-    const atStart = isTextEditor && (isNumber || input.selectionStart === 0)
-    const atEnd = isTextEditor && (isNumber || input.selectionEnd === input.value.length)
-    if ((!multiline && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) ||
-      (event.key === 'ArrowLeft' && atStart) || (event.key === 'ArrowRight' && atEnd)) {
-      event.preventDefault()
-      commit(draft)
-      onNavigate(event.key.slice(5).toLowerCase() as 'left' | 'right' | 'up' | 'down')
     }
   }
 
@@ -214,7 +186,6 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [activeReportType, setActiveReportType] = useState<ReportType>(REPORT_TYPES[0])
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
-  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null)
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
   const [columnOrder, setColumnOrder] = useState<unknown>(() => record?.cadIndexColumnOrder)
   const [savingColumns, setSavingColumns] = useState(false)
@@ -590,17 +561,19 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     const onMouseUp = () => {
       const drag = fillDrag
       setFillDrag(null)
-      const lo = Math.min(drag.rowIndex, drag.targetRowIndex)
-      const hi = Math.max(drag.rowIndex, drag.targetRowIndex)
-      for (let r = lo; r <= hi; r++) {
-        if (r === drag.rowIndex) continue
-        const row = activeRows[r]
-        if (row) void handleCellCommit(row.id, drag.colKey, drag.value)
+      for (const target of getGridFillTargets(drag.selection, drag.target)) {
+        const destination = activeRows[target.row]
+        const source = activeRows[target.sourceRow]
+        const column = columns[target.column]
+        const sourceColumn = columns[target.sourceColumn]
+        if (destination && source && column && sourceColumn) {
+          void handleCellCommit(destination.id, column.key, source.data?.[sourceColumn.key] ?? '')
+        }
       }
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [fillDrag, activeRows, handleCellCommit])
+  }, [fillDrag, activeRows, columns, handleCellCommit])
 
   if (object?.apiName && object.apiName !== 'Project') {
     return (
@@ -610,23 +583,13 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     )
   }
 
-  const handleFillHandleMouseDown = (rowIndex: number, colIndex: number, colKey: string, value: unknown) => {
-    setFillDrag({ rowIndex, colIndex, colKey, value, targetRowIndex: rowIndex })
-  }
-
   const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
-    setFillDrag((prev) => {
-      // Vertical fill only, for now — ignore dragging into a different column.
-      if (!prev || colIndex !== prev.colIndex) return prev
-      return { ...prev, targetRowIndex: rowIndex }
-    })
+    setFillDrag((prev) => prev ? { ...prev, target: { row: rowIndex, column: colIndex } } : prev)
   }
 
   const isCellInFillRange = (rowIndex: number, colIndex: number): boolean => {
-    if (!fillDrag || colIndex !== fillDrag.colIndex) return false
-    const lo = Math.min(fillDrag.rowIndex, fillDrag.targetRowIndex)
-    const hi = Math.max(fillDrag.rowIndex, fillDrag.targetRowIndex)
-    return rowIndex >= lo && rowIndex <= hi
+    return !!fillDrag && getGridFillTargets(fillDrag.selection, fillDrag.target)
+      .some(target => target.row === rowIndex && target.column === colIndex)
   }
 
   const handleAddRow = async () => {
@@ -918,9 +881,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                           if (selectingCellsRef.current) setSelection((current) => current
                             ? { ...current, focus: { row: rowIndex, column: colIndex } }
                             : { anchor: { row: rowIndex, column: colIndex }, focus: { row: rowIndex, column: colIndex } })
-                          if (col.type !== 'checkbox') setHoveredCellId(cellId)
                         }}
-                        onMouseLeave={() => setHoveredCellId((prev) => (prev === cellId ? null : prev))}
                         onKeyDown={(event) => handleGridKeyDown(event, rowIndex, colIndex)}
                         className={`relative border-b border-gray-100 px-1.5 py-1 align-top outline-none ${
                           selection && isInGridSelection(rowIndex, colIndex, selection)
@@ -952,21 +913,19 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                               onStartEdit={() => beginCellEdit(rowIndex, colIndex)}
                               onCommit={(value) => void handleCellCommit(row.id, col.key, col.type === 'number' ? (value === '' ? '' : Number(value)) : value)}
                               onCancel={() => { setEditingCellId(null); setEditSeed(null) }}
-                              onNavigate={(direction) => {
-                                setEditingCellId(null)
-                                setEditSeed(null)
-                                navigateGrid(rowIndex, colIndex, direction)
-                              }}
                             />
-                            {/* Excel-style fill handle — only shown while hovering the cell, and not while typing in it. Drag down/up to copy its value into that column's other rows. */}
-                            {hoveredCellId === cellId && editingCellId !== cellId && (
-                              <span
-                                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleFillHandleMouseDown(rowIndex, colIndex, col.key, row.data?.[col.key]) }}
-                                aria-hidden="true"
-                                className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
-                              />
-                            )}
                           </>
+                        )}
+                        {selection && editingCellId === null && getGridSelectionBounds(selection).bottom === rowIndex && getGridSelectionBounds(selection).right === colIndex && (
+                          <span
+                            onMouseDown={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              setFillDrag({ selection, target: { row: rowIndex, column: colIndex } })
+                            }}
+                            aria-hidden="true"
+                            className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
+                          />
                         )}
                       </td>
                     )
