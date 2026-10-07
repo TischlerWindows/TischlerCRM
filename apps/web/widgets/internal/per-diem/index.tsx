@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, CalendarDays, FileText, Loader2, Plus, Trash2, WalletCards, X } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
+import { restoreGridRows, snapshotGridRows } from '@/lib/grid-undo-records'
+import { useGridUndo } from '@/lib/use-grid-undo'
 import { apiClient } from '@/lib/api-client'
 import { resolveLookupDisplayName } from '@/lib/utils'
 import { MultiLookupUserSearch } from '@/components/form/lookup-search'
@@ -340,6 +342,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [gridSelection, setGridSelection] = useState<PerDiemGridSelection | null>(null)
   const [copiedGridSelection, setCopiedGridSelection] = useState<PerDiemGridSelection | null>(null)
+  const { pushUndo, popUndo, clearUndo } = useGridUndo<RecordData[]>()
   const gridRootRef = useRef<HTMLDivElement>(null)
   const selectingGridRef = useRef(false)
 
@@ -368,6 +371,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
 
   const applyGridClipboard = async (start: GridCoordinate, view: 'desktop' | 'mobile', matrix: string[][]) => {
     if (!recordId || !matrix.length) return
+    pushUndo(snapshotGridRows(rows))
     setError(null)
     setSaving(true)
     const targetRows = [...rows]
@@ -471,6 +475,11 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number, view: 'desktop' | 'mobile') => {
     if (event.defaultPrevented || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+      event.preventDefault()
+      void undoGridAction()
+      return
+    }
     if (event.key === 'Escape' && copiedGridSelection) { setCopiedGridSelection(null); return }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
       event.preventDefault()
@@ -512,16 +521,19 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     setError(null)
     try {
       setRows(await recordsService.getRecords('PerDiem', { filter: { workOrder: recordId } }))
+      clearUndo()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load per diem records')
     } finally {
       setLoading(false)
     }
-  }, [recordId])
+  }, [recordId, clearUndo])
 
   useEffect(() => { void load() }, [load])
 
   const handleCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
+    const previousRow = rows.find(row => row.id === rowId)
+    if (previousRow && !Object.is(previousRow.data?.[key], value)) pushUndo(snapshotGridRows(rows))
     setSavingRowId(rowId)
     setError(null)
     try {
@@ -532,7 +544,27 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     } finally {
       setSavingRowId(null)
     }
-  }, [])
+  }, [rows, pushUndo])
+
+  async function undoGridAction() {
+    const previousRows = popUndo()
+    if (!previousRows) return
+    try {
+      setRows(await restoreGridRows('PerDiem', rows, previousRows))
+    } catch (err: unknown) {
+      pushUndo(previousRows)
+      setError(err instanceof Error ? err.message : 'Failed to undo Per Diem change')
+    }
+  }
+
+  const handleGridUndoKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement
+    if (event.defaultPrevented || target.matches('input, textarea, select') || target.isContentEditable) return
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault()
+      void undoGridAction()
+    }
+  }
 
   useEffect(() => {
     if (!fillDrag) return
@@ -550,6 +582,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
         patch[field.key] = sourceRow.data?.[sourceField.key] ?? ''
         patches.set(target.row, patch)
       }
+      if (patches.size) pushUndo(snapshotGridRows(rows))
       for (const [rowIndex, patch] of patches) {
         const row = rows[rowIndex]
         if (!row) continue
@@ -567,7 +600,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [fillDrag, rows])
+  }, [fillDrag, rows, pushUndo])
 
   const handleFillDragEnter = (rowIndex: number, colIndex: number, view: 'desktop' | 'mobile') => {
     setFillDrag((previous) => previous?.selection.view === view
@@ -586,6 +619,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
 
   const handleCreate = async (values: Record<string, unknown>) => {
     if (!recordId) return
+    pushUndo(snapshotGridRows(rows))
     setSaving(true)
     setError(null)
     try {
@@ -603,6 +637,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
 
   const handleAddBlankRow = async () => {
     if (!recordId) return
+    pushUndo(snapshotGridRows(rows))
     setSaving(true)
     setError(null)
     try {
@@ -617,6 +652,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
 
   const handleDelete = async (row: RecordData) => {
     if (!window.confirm('Delete this per diem record? This cannot be undone.')) return
+    clearUndo()
     setDeletingRowId(row.id)
     setError(null)
     try {
@@ -652,6 +688,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     <div
       ref={gridRootRef}
       className="space-y-3"
+      onKeyDown={handleGridUndoKeyDown}
       onMouseUp={() => { selectingGridRef.current = false }}
       onMouseLeave={() => { selectingGridRef.current = false }}
       onCopy={(event) => handleGridCopy(event)}

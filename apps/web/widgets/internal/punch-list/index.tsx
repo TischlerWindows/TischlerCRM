@@ -19,6 +19,8 @@ import type { ReactNode } from 'react'
 import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2, FileText } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
+import { restoreGridRows, snapshotGridRows } from '@/lib/grid-undo-records'
+import { useGridUndo } from '@/lib/use-grid-undo'
 import { useAuth } from '@/lib/auth-context'
 import type { NavDirection } from '@/lib/cell-navigation'
 import {
@@ -487,6 +489,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [gridSelection, setGridSelection] = useState<GridSelection | null>(null)
   const [copiedGridSelection, setCopiedGridSelection] = useState<GridSelection | null>(null)
+  const { pushUndo, popUndo, clearUndo } = useGridUndo<RecordData[]>()
   const gridRootRef = useRef<HTMLDivElement>(null)
   const selectingGridRef = useRef(false)
 
@@ -512,6 +515,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
 
   const applyGridClipboard = async (start: GridCoordinate, matrix: string[][]) => {
     if (!recordId || !matrix.length) return
+    pushUndo(snapshotGridRows(rows))
     setError(null)
     setCreating(true)
     const targetRows = [...rows]
@@ -594,6 +598,11 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {
     if (event.defaultPrevented) return
     if (event.target instanceof HTMLTextAreaElement || (event.target instanceof HTMLInputElement && event.target.type !== 'checkbox')) return
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+      event.preventDefault()
+      void undoGridAction()
+      return
+    }
     if (event.key === 'Escape' && copiedGridSelection) { setCopiedGridSelection(null); return }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
       event.preventDefault()
@@ -658,16 +667,19 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     try {
       const records = await recordsService.getRecords('PunchList', { filter: { workOrder: recordId } })
       setRows(records)
+      clearUndo()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load punch list items')
     } finally {
       setLoading(false)
     }
-  }, [recordId])
+  }, [recordId, clearUndo])
 
   useEffect(() => { load() }, [load])
 
   const handleCellCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
+    const previousRow = rows.find(row => row.id === rowId)
+    if (previousRow && !Object.is(previousRow.data?.[key], value)) pushUndo(snapshotGridRows(rows))
     setSavingRowId(rowId)
     try {
       const changed: Record<string, unknown> = { [key]: value }
@@ -684,7 +696,27 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     } finally {
       setSavingRowId(null)
     }
-  }, [rows])
+  }, [rows, pushUndo])
+
+  async function undoGridAction() {
+    const previousRows = popUndo()
+    if (!previousRows) return
+    try {
+      setRows(await restoreGridRows('PunchList', rows, previousRows))
+    } catch (err: unknown) {
+      pushUndo(previousRows)
+      setError(err instanceof Error ? err.message : 'Failed to undo Punch List change')
+    }
+  }
+
+  const handleGridUndoKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement
+    if (event.defaultPrevented || target.matches('input, textarea, select') || target.isContentEditable) return
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault()
+      void undoGridAction()
+    }
+  }
 
   useEffect(() => {
     if (!fillDrag) return
@@ -702,6 +734,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
         patch[field.key] = sourceRow.data?.[sourceField.key] ?? ''
         patches.set(target.row, patch)
       }
+      if (patches.size) pushUndo(snapshotGridRows(rows))
       for (const [rowIndex, patch] of patches) {
         const row = rows[rowIndex]
         if (!row) continue
@@ -715,7 +748,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [fillDrag, rows])
+  }, [fillDrag, rows, pushUndo])
 
   const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
     setFillDrag(previous => previous ? { ...previous, target: { row: rowIndex, column: colIndex } } : previous)
@@ -736,6 +769,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
 
   const handleCreate = async (values: Record<string, unknown>) => {
     if (!recordId) return
+    pushUndo(snapshotGridRows(rows))
     setCreating(true)
     setError(null)
     try {
@@ -759,6 +793,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
 
   const handleAddBlankRow = async () => {
     if (!recordId) return
+    pushUndo(snapshotGridRows(rows))
     setCreating(true)
     setError(null)
     try {
@@ -778,6 +813,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
 
   const handleDelete = async (row: RecordData) => {
     if (!window.confirm('Delete this punch list item? This cannot be undone.')) return
+    clearUndo()
     setDeletingRowId(row.id)
     setError(null)
     try {
@@ -853,6 +889,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     <div
       ref={gridRootRef}
       className="space-y-3"
+      onKeyDown={handleGridUndoKeyDown}
       onMouseUp={() => { selectingGridRef.current = false }}
       onMouseLeave={() => { selectingGridRef.current = false }}
       onCopy={(event) => handleGridCopy(event)}

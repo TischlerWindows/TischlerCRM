@@ -10,6 +10,8 @@ import { createPortal } from 'react-dom'
 import { AlertCircle, FileText, Loader2, Plus, Trash2, Wrench } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
+import { restoreGridRows, snapshotGridRows } from '@/lib/grid-undo-records'
+import { useGridUndo } from '@/lib/use-grid-undo'
 import { apiClient } from '@/lib/api-client'
 import type { NavDirection } from '@/lib/cell-navigation'
 import { readProjectField } from '@/lib/factory-order-spec'
@@ -305,6 +307,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [selection, setSelection] = useState<GridSelection | null>(null)
   const [copiedSelection, setCopiedSelection] = useState<GridSelection | null>(null)
+  const { pushUndo, popUndo, clearUndo } = useGridUndo<RecordData[]>()
   const gridRootRef = useRef<HTMLDivElement>(null)
   const selectingCellsRef = useRef(false)
 
@@ -337,6 +340,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
 
   const applyClipboardMatrix = async (start: GridCoordinate, matrix: string[][]) => {
     if (!recordId || !matrix.length) return
+    pushUndo(snapshotGridRows(rows))
     setError(null)
     setCreating(true)
     const targetRows = [...rows]
@@ -414,6 +418,11 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {
     if (event.target instanceof HTMLInputElement) return
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+      event.preventDefault()
+      void undoGridAction()
+      return
+    }
     if (event.key === 'Escape' && copiedSelection) { setCopiedSelection(null); return }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
       event.preventDefault()
@@ -454,12 +463,13 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     setError(null)
     try {
       setRows(await recordsService.getRecords('AutoCad', { filter: { project: recordId } }))
+      clearUndo()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load AutoCad items')
     } finally {
       setLoading(false)
     }
-  }, [recordId])
+  }, [recordId, clearUndo])
 
   useEffect(() => { void load() }, [load])
 
@@ -468,6 +478,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   }, [rows.length, selection])
 
   const handleCellCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
+    const previousRow = rows.find(row => row.id === rowId)
+    if (previousRow && !Object.is(previousRow.data?.[key], value)) pushUndo(snapshotGridRows(rows))
     setSavingRowId(rowId)
     setError(null)
     try {
@@ -478,7 +490,27 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     } finally {
       setSavingRowId(null)
     }
-  }, [])
+  }, [rows, pushUndo])
+
+  async function undoGridAction() {
+    const previousRows = popUndo()
+    if (!previousRows) return
+    try {
+      setRows(await restoreGridRows('AutoCad', rows, previousRows))
+    } catch (err: unknown) {
+      pushUndo(previousRows)
+      setError(err instanceof Error ? err.message : 'Failed to undo AutoCad change')
+    }
+  }
+
+  const handleGridUndoKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement
+    if (event.defaultPrevented || target.matches('input, textarea, select') || target.isContentEditable) return
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault()
+      void undoGridAction()
+    }
+  }
 
   useEffect(() => {
     if (!fillDrag) return
@@ -495,6 +527,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
         patch[destinationField.key] = source.data?.[sourceField.key] ?? ''
         patches.set(target.row, patch)
       }
+      if (patches.size) pushUndo(snapshotGridRows(rows))
       for (const [rowIndex, patch] of patches) {
         const row = rows[rowIndex]
         if (!row) continue
@@ -511,7 +544,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [fillDrag, rows, handleCellCommit])
+  }, [fillDrag, rows, handleCellCommit, pushUndo])
 
   const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
     setFillDrag(previous => previous ? { ...previous, target: { row: rowIndex, column: colIndex } } : previous)
@@ -532,6 +565,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
 
   const handleAddBlankRow = async () => {
     if (!recordId) return
+    pushUndo(snapshotGridRows(rows))
     setCreating(true)
     setError(null)
     try {
@@ -546,6 +580,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
 
   const handleDelete = async (row: RecordData) => {
     if (!window.confirm('Delete this AutoCad item? This cannot be undone.')) return
+    clearUndo()
     setDeletingRowId(row.id)
     setError(null)
     try {
@@ -627,6 +662,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     <div
       ref={gridRootRef}
       className="space-y-3"
+      onKeyDown={handleGridUndoKeyDown}
       onMouseUp={() => { selectingCellsRef.current = false; if (selection) focusGridCell(selection.focus) }}
       onMouseLeave={() => { selectingCellsRef.current = false }}
       onCopy={(event) => handleGridCopy(event)}

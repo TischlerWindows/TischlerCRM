@@ -17,6 +17,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, ChevronLeft, ChevronRight, FileText, GripVertical, ListChecks, Loader2, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
+import { restoreGridRows, snapshotGridRows } from '@/lib/grid-undo-records'
+import { useGridUndo } from '@/lib/use-grid-undo'
 import { apiClient } from '@/lib/api-client'
 import { getRecordName } from '../shared/recordName'
 import { orderedColumns } from '@/lib/cad-index-column-order'
@@ -201,6 +203,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const selectingCellsRef = useRef(false)
   const [selection, setSelection] = useState<GridSelection | null>(null)
   const [copiedSelection, setCopiedSelection] = useState<GridSelection | null>(null)
+  const { pushUndo, popUndo, clearUndo } = useGridUndo<RecordData[]>()
   const [editSeed, setEditSeed] = useState<string | null>(null)
 
   useEffect(() => { setColumnOrder(record?.cadIndexColumnOrder) }, [projectId, record?.cadIndexColumnOrder])
@@ -212,12 +215,13 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     setError(null)
     try {
       setRows(await recordsService.getRecords('CadIndexItem', { filter: { project: projectId } }))
+      clearUndo()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load CAD Index List items')
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, clearUndo])
 
   useEffect(() => { void load() }, [load])
 
@@ -230,7 +234,8 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   useEffect(() => {
     setSelection(null)
     setEditingCellId(null)
-  }, [activeReportType])
+    clearUndo()
+  }, [activeReportType, clearUndo])
 
   useEffect(() => {
     if (!selection && activeRows.length > 0 && columns.length > 0) {
@@ -366,6 +371,8 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   }
 
   const handleCellCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
+    const previousRow = rows.find(row => row.id === rowId)
+    if (previousRow && !Object.is(previousRow.data?.[key], value)) pushUndo(snapshotGridRows(rows))
     setSavingRowId(rowId)
     setError(null)
     try {
@@ -391,10 +398,11 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     } finally {
       setSavingRowId(null)
     }
-  }, [activeReportType, activeRows, projectId])
+  }, [activeReportType, activeRows, projectId, rows, pushUndo])
 
   const applyClipboardMatrix = async (start: GridCoordinate, matrix: string[][]) => {
     if (!projectId || !matrix.length || !columns.length) return
+    pushUndo(snapshotGridRows(rows))
     setError(null)
     setCreating(true)
     const targetRows = [...activeRows]
@@ -500,6 +508,11 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>, row: number, column: number) => {
     const target = event.target
     if ((target instanceof HTMLInputElement && target.type !== 'checkbox') || target instanceof HTMLTextAreaElement) return
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+      event.preventDefault()
+      void undoGridAction()
+      return
+    }
     if (event.key === 'Escape' && copiedSelection) {
       event.preventDefault()
       setCopiedSelection(null)
@@ -553,6 +566,26 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     }
   }
 
+  async function undoGridAction() {
+    const previousRows = popUndo()
+    if (!previousRows) return
+    try {
+      setRows(await restoreGridRows('CadIndexItem', rows, previousRows))
+    } catch (err: unknown) {
+      pushUndo(previousRows)
+      setError(err instanceof Error ? err.message : 'Failed to undo CAD Index change')
+    }
+  }
+
+  const handleGridUndoKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement
+    if (event.defaultPrevented || target.matches('input, textarea, select') || target.isContentEditable) return
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault()
+      void undoGridAction()
+    }
+  }
+
   // Commit the fill-handle drag on mouseup, wherever the pointer is released —
   // re-registered on every fillDrag update so the closure always sees the
   // latest dragged-over range.
@@ -571,6 +604,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
         patch[column.key] = source.data?.[sourceColumn.key] ?? ''
         patches.set(target.row, patch)
       }
+      if (patches.size) pushUndo(snapshotGridRows(rows))
       for (const [rowIndex, patch] of patches) {
         const destination = activeRows[rowIndex]
         if (!destination) continue
@@ -605,7 +639,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [fillDrag, activeRows, columns, projectId, activeReportType])
+  }, [fillDrag, activeRows, columns, projectId, activeReportType, rows, pushUndo])
 
   if (object?.apiName && object.apiName !== 'Project') {
     return (
@@ -626,6 +660,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
 
   const handleAddRow = async () => {
     if (!projectId) return
+    pushUndo(snapshotGridRows(rows))
     setCreating(true)
     setError(null)
     try {
@@ -640,6 +675,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
 
   const handleDeleteRow = async (row: RecordData) => {
     if (!window.confirm('Delete this row? This cannot be undone.')) return
+    clearUndo()
     setDeletingRowId(row.id)
     setError(null)
     try {
@@ -705,7 +741,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" onKeyDown={handleGridUndoKeyDown}>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-3">
         <div className="flex items-center gap-2">
           <ListChecks className="h-5 w-5 text-brand-navy" />

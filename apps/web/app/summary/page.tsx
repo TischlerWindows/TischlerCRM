@@ -58,6 +58,7 @@ import {
   type GridSelection,
 } from '@/lib/cad-index-grid';
 import { GridRangeStyles } from '@/widgets/internal/shared/grid-range-decoration';
+import { useGridUndo } from '@/lib/use-grid-undo';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -986,6 +987,8 @@ export default function SummaryPage() {
   const [summaryGridSelection, setSummaryGridSelection] = useState<SummaryGridRange | null>(null);
   const [copiedSummaryGridSelection, setCopiedSummaryGridSelection] = useState<SummaryGridRange | null>(null);
   const [summaryGridFillDrag, setSummaryGridFillDrag] = useState<SummaryGridFillDrag | null>(null);
+  const { pushUndo: pushSummaryUndo, popUndo: popSummaryUndo, clearUndo: clearSummaryUndo } = useGridUndo<Summary>();
+  const summaryGridUndoBatchRef = useRef(false);
   const selectingSummaryGridRef = useRef(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [tusPositionLocked, setTusPositionLocked] = useState(true);
@@ -1003,6 +1006,10 @@ export default function SummaryPage() {
   const lockHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    clearSummaryUndo();
+  }, [editingSummary?.id, clearSummaryUndo]);
 
   // Derive picklist options from the live Opportunity schema
   const schema = useSchemaStore(s => s.schema);
@@ -1068,6 +1075,16 @@ export default function SummaryPage() {
       // Don't intercept keystrokes when the user is typing in a real form field.
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement)?.isContentEditable) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && summaryGridSelection) {
+        e.preventDefault();
+        const previousSummary = popSummaryUndo();
+        if (previousSummary) {
+          setEditingSummary(previousSummary);
+          setEditingCellId(null);
+          setActiveCellId(null);
+        }
+        return;
+      }
       const focusedPosition = getSummaryGridCellPosition(document.activeElement);
       if (!focusedPosition) return;
       if (e.key === 'Escape' && copiedSummaryGridSelection) {
@@ -1121,7 +1138,7 @@ export default function SummaryPage() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editingCellId, summaryGridSelection, copiedSummaryGridSelection]);
+  }, [editingCellId, summaryGridSelection, copiedSummaryGridSelection, popSummaryUndo]);
 
   useEffect(() => {
     (async () => {
@@ -2946,6 +2963,7 @@ export default function SummaryPage() {
 
   const handleAddRow = () => {
     if (!editingSummary) return;
+    pushSummaryUndo(structuredClone(editingSummary));
     
     const newRow: SummaryRow = {
       id: Date.now().toString(),
@@ -2991,6 +3009,7 @@ export default function SummaryPage() {
 
   const handleAddRowBelow = (rowId: string) => {
     if (!editingSummary) return;
+    pushSummaryUndo(structuredClone(editingSummary));
     
     const newRow: SummaryRow = {
       id: Date.now().toString(),
@@ -3041,12 +3060,14 @@ export default function SummaryPage() {
 
   const handleDeleteRow = (rowId: string) => {
     if (!editingSummary) return;
+    pushSummaryUndo(structuredClone(editingSummary));
     
     setEditingSummary(mutateRows(editingSummary, rows => rows.filter(r => r.id !== rowId)));
   };
 
   const updateRow = (rowId: string, field: keyof SummaryRow, value: string) => {
     if (!editingSummary) return;
+    if (!summaryGridUndoBatchRef.current) pushSummaryUndo(structuredClone(editingSummary));
     
     setEditingSummary(current => current ? mutateRows(current, rows => rows.map(r => {
         if (r.id !== rowId) return r;
@@ -3293,6 +3314,7 @@ export default function SummaryPage() {
   // Doors handlers
   const handleAddDoorRow = () => {
     if (!editingSummary) return;
+    pushSummaryUndo(structuredClone(editingSummary));
     
     const newRow: DoorRow = {
       id: Date.now().toString() + '-door',
@@ -3338,6 +3360,7 @@ export default function SummaryPage() {
 
   const handleAddDoorRowBelow = (rowId: string) => {
     if (!editingSummary) return;
+    pushSummaryUndo(structuredClone(editingSummary));
     
     const newRow: DoorRow = {
       id: Date.now().toString() + '-door',
@@ -3388,12 +3411,14 @@ export default function SummaryPage() {
 
   const handleDeleteDoorRow = (rowId: string) => {
     if (!editingSummary) return;
+    pushSummaryUndo(structuredClone(editingSummary));
     
     setEditingSummary(mutateDoorRows(editingSummary, rows => rows.filter(r => r.id !== rowId)));
   };
 
   const updateDoorRow = (rowId: string, field: keyof DoorRow, value: string) => {
     if (!editingSummary) return;
+    if (!summaryGridUndoBatchRef.current) pushSummaryUndo(structuredClone(editingSummary));
     
     setEditingSummary(current => current ? mutateDoorRows(current, rows => rows.map(r => {
         if (r.id !== rowId) return r;
@@ -3738,22 +3763,28 @@ export default function SummaryPage() {
       .find(candidate => candidate.dataset.summaryGrid === gridId) ?? null;
     const rows = getSummaryGridRows(table);
     if (!table || !matrix.length) return;
-    matrix.forEach((clipboardRow, rowOffset) => {
-      const row = rows[start.row + rowOffset];
-      if (!row) return;
-      const cells = getSummaryGridCells(row);
-      clipboardRow.forEach((value, columnOffset) => {
-        const cell = cells[start.column + columnOffset];
-        const cellId = cell?.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId;
-        if (!cellId) return;
-        const separator = cellId.lastIndexOf(':');
-        if (separator < 1) return;
-        const rowId = cellId.slice(0, separator);
-        const field = cellId.slice(separator + 1);
-        if (gridId === 'windows') updateRow(rowId, field as keyof SummaryRow, value);
-        else updateDoorRow(rowId, field as keyof DoorRow, value);
+    if (editingSummary) pushSummaryUndo(structuredClone(editingSummary));
+    summaryGridUndoBatchRef.current = true;
+    try {
+      matrix.forEach((clipboardRow, rowOffset) => {
+        const row = rows[start.row + rowOffset];
+        if (!row) return;
+        const cells = getSummaryGridCells(row);
+        clipboardRow.forEach((value, columnOffset) => {
+          const cell = cells[start.column + columnOffset];
+          const cellId = cell?.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId;
+          if (!cellId) return;
+          const separator = cellId.lastIndexOf(':');
+          if (separator < 1) return;
+          const rowId = cellId.slice(0, separator);
+          const field = cellId.slice(separator + 1);
+          if (gridId === 'windows') updateRow(rowId, field as keyof SummaryRow, value);
+          else updateDoorRow(rowId, field as keyof DoorRow, value);
+        });
       });
-    });
+    } finally {
+      summaryGridUndoBatchRef.current = false;
+    }
     const lastRow = Math.min(rows.length - 1, start.row + matrix.length - 1);
     const lastColumn = Math.min(getSummaryGridCells(rows[0]).length - 1,
       start.column + Math.max(...matrix.map(row => row.length)) - 1);
@@ -3776,23 +3807,30 @@ export default function SummaryPage() {
       const table = Array.from(document.querySelectorAll<HTMLTableElement>('table[data-summary-grid]'))
         .find(candidate => candidate.dataset.summaryGrid === drag.selection.gridId) ?? null;
       const rows = getSummaryGridRows(table);
-      for (const target of getGridFillTargets(drag.selection, drag.target)) {
-        const sourceCell = getSummaryGridCells(rows[target.sourceRow])[target.sourceColumn];
-        const destinationCell = getSummaryGridCells(rows[target.row])[target.column];
-        const cellId = destinationCell?.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId;
-        if (!sourceCell || !cellId) continue;
-        const separator = cellId.lastIndexOf(':');
-        if (separator < 1) continue;
-        const rowId = cellId.slice(0, separator);
-        const field = cellId.slice(separator + 1);
-        const value = readSummaryGridCell(sourceCell);
-        if (drag.selection.gridId === 'windows') updateRow(rowId, field as keyof SummaryRow, value);
-        else updateDoorRow(rowId, field as keyof DoorRow, value);
+      const targets = getGridFillTargets(drag.selection, drag.target);
+      if (targets.length && editingSummary) pushSummaryUndo(structuredClone(editingSummary));
+      summaryGridUndoBatchRef.current = true;
+      try {
+        for (const target of targets) {
+          const sourceCell = getSummaryGridCells(rows[target.sourceRow])[target.sourceColumn];
+          const destinationCell = getSummaryGridCells(rows[target.row])[target.column];
+          const cellId = destinationCell?.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId;
+          if (!sourceCell || !cellId) continue;
+          const separator = cellId.lastIndexOf(':');
+          if (separator < 1) continue;
+          const rowId = cellId.slice(0, separator);
+          const field = cellId.slice(separator + 1);
+          const value = readSummaryGridCell(sourceCell);
+          if (drag.selection.gridId === 'windows') updateRow(rowId, field as keyof SummaryRow, value);
+          else updateDoorRow(rowId, field as keyof DoorRow, value);
+        }
+      } finally {
+        summaryGridUndoBatchRef.current = false;
       }
     };
     window.addEventListener('mouseup', onMouseUp);
     return () => window.removeEventListener('mouseup', onMouseUp);
-  }, [summaryGridFillDrag, updateRow, updateDoorRow]);
+  }, [summaryGridFillDrag, editingSummary, updateRow, updateDoorRow, pushSummaryUndo]);
 
   function handleSummaryGridCopy(event: React.ClipboardEvent<HTMLTableElement>, cut = false) {
     const selection = summaryGridSelection;
