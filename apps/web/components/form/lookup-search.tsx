@@ -772,6 +772,7 @@ export function MultiLookupUserSearch({
               {user.name || user.email}
               <button
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => removeUser(user.id)}
                 disabled={disabled}
                 className="text-brand-navy/60 hover:text-brand-navy"
