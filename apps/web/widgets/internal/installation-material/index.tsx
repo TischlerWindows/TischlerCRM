@@ -8,6 +8,7 @@ import { recordsService } from '@/lib/records-service'
 import { getRecordName } from '../shared/recordName'
 import {
   getGridSelectionBounds,
+  getGridSelectionOrigin,
   isInGridSelection,
   parseGridClipboard,
   serializeGridClipboard,
@@ -366,7 +367,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     if (!gridSelection) return
     event.preventDefault()
     setCopiedGridSelection(null)
-    applyMaterialClipboard(gridSelection.focus, parseGridClipboard(event.clipboardData.getData('text/plain')))
+    applyMaterialClipboard(getGridSelectionOrigin(gridSelection), parseGridClipboard(event.clipboardData.getData('text/plain')))
   }
 
   const handleMaterialGridKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>, row: number, column: number) => {

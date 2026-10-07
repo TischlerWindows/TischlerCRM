@@ -23,6 +23,7 @@ import { orderedColumns } from '@/lib/cad-index-column-order'
 import { parseCadIndexComments } from '@/lib/cad-index-comments'
 import {
   getGridSelectionBounds,
+  getGridSelectionOrigin,
   isInGridSelection,
   parseGridCellValue,
   parseGridClipboard,
@@ -522,7 +523,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     if (!selection || (target instanceof HTMLInputElement && target.type !== 'checkbox') || target instanceof HTMLTextAreaElement) return
     event.preventDefault()
     setCopiedSelection(null)
-    void applyClipboardMatrix(selection.focus, parseGridClipboard(event.clipboardData.getData('text/plain')))
+    void applyClipboardMatrix(getGridSelectionOrigin(selection), parseGridClipboard(event.clipboardData.getData('text/plain')))
   }
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>, row: number, column: number) => {

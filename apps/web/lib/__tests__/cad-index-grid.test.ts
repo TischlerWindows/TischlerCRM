@@ -1,5 +1,6 @@
 import {
   getGridSelectionBounds,
+  getGridSelectionOrigin,
   isInGridSelection,
   parseGridCellValue,
   parseGridClipboard,
@@ -11,6 +12,7 @@ describe('CAD Index List spreadsheet grid helpers', () => {
   it('normalizes a rectangular selection regardless of drag direction', () => {
     const selection = { anchor: { row: 3, column: 4 }, focus: { row: 1, column: 2 } }
     expect(getGridSelectionBounds(selection)).toEqual({ top: 1, bottom: 3, left: 2, right: 4 })
+    expect(getGridSelectionOrigin(selection)).toEqual({ row: 1, column: 2 })
     expect(isInGridSelection(2, 3, selection)).toBe(true)
     expect(isInGridSelection(0, 3, selection)).toBe(false)
   })

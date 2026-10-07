@@ -32,6 +32,11 @@ export function getGridSelectionBounds(selection: GridSelection) {
   }
 }
 
+export function getGridSelectionOrigin(selection: GridSelection): GridCoordinate {
+  const bounds = getGridSelectionBounds(selection)
+  return { row: bounds.top, column: bounds.left }
+}
+
 export function isInGridSelection(row: number, column: number, selection: GridSelection): boolean {
   const bounds = getGridSelectionBounds(selection)
   return row >= bounds.top && row <= bounds.bottom

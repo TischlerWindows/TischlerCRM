@@ -16,6 +16,7 @@ import { readProjectField } from '@/lib/factory-order-spec'
 import { userLookupIds, type LookupUserIdentity } from '@/lib/user-lookup'
 import {
   getGridSelectionBounds,
+  getGridSelectionOrigin,
   isInGridSelection,
   parseGridCellValue,
   parseGridClipboard,
@@ -460,7 +461,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     if (!selection || editingCellId) return
     event.preventDefault()
     setCopiedSelection(null)
-    void applyClipboardMatrix(selection.focus, parseGridClipboard(event.clipboardData.getData('text/plain')))
+    void applyClipboardMatrix(getGridSelectionOrigin(selection), parseGridClipboard(event.clipboardData.getData('text/plain')))
   }
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {
