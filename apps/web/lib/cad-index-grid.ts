@@ -120,7 +120,7 @@ export function getGridFillRangeCellClasses(
   if (row < bounds.top || row > bounds.bottom || column < bounds.left || column > bounds.right) return ''
 
   return [
-    isTarget ? 'bg-gray-300' : '',
+    isTarget ? '!bg-gray-300' : '',
     row === bounds.top ? 'border-t-2 border-t-[#217346]' : '',
     row === bounds.bottom ? 'border-b-2 border-b-[#217346]' : '',
     column === bounds.left ? 'border-l-2 border-l-[#217346]' : '',

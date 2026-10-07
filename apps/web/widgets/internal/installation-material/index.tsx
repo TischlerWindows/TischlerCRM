@@ -7,6 +7,8 @@ import { apiClient } from '@/lib/api-client'
 import { recordsService } from '@/lib/records-service'
 import { getRecordName } from '../shared/recordName'
 import {
+  getGridFillRangeCellClasses,
+  getGridFillTargets,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -16,6 +18,7 @@ import {
   type GridCoordinate,
   type GridSelection,
 } from '@/lib/cad-index-grid'
+import { useGridUndo } from '@/lib/use-grid-undo'
 import { GridRangeDecoration, GridRangeStyles } from '../shared/grid-range-decoration'
 import { readProjectField } from '@/lib/factory-order-spec'
 import { normalizeSingleLookupUserValue, type LookupUserIdentity } from '@/lib/user-lookup'
@@ -27,11 +30,10 @@ import {
 
 const inputClass = 'w-full min-w-0 rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 focus:border-brand-navy focus:outline-none'
 
-interface QuantityFillDrag {
+interface MaterialFillDrag {
   template: InstallationMaterialWorkbook['activeTemplate']
-  rowIndex: number
-  targetRowIndex: number
-  value: string
+  selection: GridSelection
+  target: GridCoordinate
 }
 
 function hydrateWorkbook(
@@ -74,32 +76,45 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [quantityMessage, setQuantityMessage] = useState<string | null>(null)
-  const [hoveredQtyIndex, setHoveredQtyIndex] = useState<number | null>(null)
-  const [focusedQtyIndex, setFocusedQtyIndex] = useState<number | null>(null)
-  const [quantityFillDrag, setQuantityFillDrag] = useState<QuantityFillDrag | null>(null)
+  const [fillDrag, setFillDrag] = useState<MaterialFillDrag | null>(null)
   const [gridSelection, setGridSelection] = useState<GridSelection | null>(null)
   const [copiedGridSelection, setCopiedGridSelection] = useState<GridSelection | null>(null)
+  const { pushUndo, popUndo, clearUndo } = useGridUndo<InstallationMaterialWorkbook>()
   const gridTableRef = useRef<HTMLTableElement>(null)
   const selectingGridRef = useRef(false)
 
   useEffect(() => {
-    if (!quantityFillDrag) return
+    if (!fillDrag) return
     const onMouseUp = () => {
-      const drag = quantityFillDrag
-      setQuantityFillDrag(null)
+      const drag = fillDrag
+      setFillDrag(null)
+      const fields = drag.template === 'US Supplied Inst.'
+        ? ['qty', 'units', 'description', 'unitPrice', 'total']
+        : ['qty', 'units', 'description', 'screwSize', 'unitPrice', 'total']
+      const patches = new Map<number, Partial<InstallationMaterialRow>>()
+      const sourceRows = workbook.sheets[drag.template].rows
+      for (const target of getGridFillTargets(drag.selection, drag.target)) {
+        const field = fields[target.column]
+        const sourceField = fields[target.sourceColumn]
+        if ((field !== 'qty' && field !== 'unitPrice')
+          || (sourceField !== 'qty' && sourceField !== 'unitPrice')) continue
+        const sourceRow = sourceRows[target.sourceRow]
+        if (!sourceRow) continue
+        const patch = patches.get(target.row) ?? {}
+        patch[field] = sourceRow[field]
+        patches.set(target.row, patch)
+      }
+      if (!patches.size) return
+      pushUndo(structuredClone(workbook))
       setWorkbook(current => ({
         ...current,
         sheets: {
           ...current.sheets,
           [drag.template]: {
             ...current.sheets[drag.template],
-            rows: current.sheets[drag.template].rows.map((row, index) => (
-              index !== drag.rowIndex
-                && index >= Math.min(drag.rowIndex, drag.targetRowIndex)
-                && index <= Math.max(drag.rowIndex, drag.targetRowIndex)
-                ? { ...row, qty: drag.value }
-                : row
-            )),
+            rows: current.sheets[drag.template].rows.map((row, index) =>
+              patches.has(index) ? { ...row, ...patches.get(index) } : row,
+            ),
           },
         },
       }))
@@ -108,7 +123,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [quantityFillDrag])
+  }, [fillDrag, workbook, pushUndo])
 
   useEffect(() => {
     setWorkbook(hydrateWorkbook(parseInstallationMaterialWorkbook(raw, projectName), {
@@ -116,11 +131,14 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     }))
     setDirty(false)
     setSaved(false)
-  }, [projectId, raw, projectName, location, attn])
+    clearUndo()
+    setFillDrag(null)
+  }, [projectId, raw, projectName, location, attn, clearUndo])
 
   useEffect(() => {
     setGridSelection(null)
     setCopiedGridSelection(null)
+    setFillDrag(null)
   }, [workbook.activeTemplate])
 
   useEffect(() => {
@@ -146,6 +164,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   }, [managerValue, projectId])
 
   const update = (patch: Partial<InstallationMaterial>) => {
+    pushUndo(structuredClone(workbook))
     setWorkbook(current => ({
       ...current,
       sheets: {
@@ -158,6 +177,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   }
 
   const selectSheet = (template: typeof INSTALLATION_MATERIAL_TEMPLATES[number]) => {
+    if (template !== workbook.activeTemplate) pushUndo(structuredClone(workbook))
     setWorkbook(current => ({ ...current, activeTemplate: template }))
     setDirty(true)
     setSaved(false)
@@ -176,6 +196,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
         totalQty: row.data?.totalQty,
       })))
       if (generated.matchedFasteners > 0) {
+        pushUndo(structuredClone(workbook))
         setWorkbook(current => ({
           ...current,
           sheets: generateInstallationMaterialWorkbookQuantities(current.sheets, autocadRows.map(row => ({
@@ -328,6 +349,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     })
 
     if (changed) {
+      pushUndo(structuredClone(workbook))
       setWorkbook(current => ({
         ...current,
         sheets: { ...current.sheets, [template]: { ...current.sheets[template], rows: nextRows } },
@@ -371,6 +393,12 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   }
 
   const handleMaterialGridKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>, row: number, column: number) => {
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z'
+      && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
+      event.preventDefault()
+      undoMaterialAction()
+      return
+    }
     if (event.key === 'Escape' && copiedGridSelection) { setCopiedGridSelection(null); return }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
       event.preventDefault()
@@ -405,6 +433,54 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     }
   }
 
+  const undoMaterialAction = () => {
+    const previous = popUndo()
+    if (!previous) return
+    setWorkbook(previous)
+    setDirty(true)
+    setSaved(false)
+    setGridSelection(null)
+    setCopiedGridSelection(null)
+    setError(null)
+  }
+
+  const handleUndoKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement
+    if (event.defaultPrevented || target.matches('input, textarea, select') || target.isContentEditable) return
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === 'z') {
+      event.preventDefault()
+      undoMaterialAction()
+    }
+  }
+
+  const fillPreviewClassName = (row: number, column: number) =>
+    fillDrag?.template === workbook.activeTemplate
+      ? getGridFillRangeCellClasses(row, column, fillDrag.selection, fillDrag.target)
+      : ''
+
+  const isFillTargetCell = (row: number, column: number) =>
+    fillPreviewClassName(row, column).includes('bg-gray-300')
+
+  const gridCellClassName = (row: number, column: number, extra = '') =>
+    `${extra} ${gridSelection && isInGridSelection(row, column, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${fillPreviewClassName(row, column)}`
+
+  const renderFillHandle = (row: number, column: number) => {
+    if (!gridSelection || fillDrag || !form.rows.length) return null
+    const bounds = getGridSelectionBounds(gridSelection)
+    if (bounds.bottom !== row || bounds.right !== column) return null
+    return (
+      <span
+        onMouseDown={event => {
+          event.preventDefault()
+          event.stopPropagation()
+          setFillDrag({ template: workbook.activeTemplate, selection: gridSelection, target: { row, column } })
+        }}
+        aria-hidden="true"
+        className="absolute bottom-0 right-0 z-30 h-2 w-2 cursor-crosshair border border-white bg-[#217346]"
+      />
+    )
+  }
+
   const gridCellProps = (row: number, column: number): React.TdHTMLAttributes<HTMLTableCellElement> => ({
     role: 'gridcell',
     'data-grid-row': row,
@@ -419,14 +495,15 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
       if (!(event.target instanceof HTMLInputElement)) event.currentTarget.focus()
     },
     onMouseEnter: () => {
-      if (selectingGridRef.current) setGridSelection(current => current
-        ? { ...current, focus: { row, column } }
-        : { anchor: { row, column }, focus: { row, column } })
-      if (column === 0) setHoveredQtyIndex(row)
-      setQuantityFillDrag(current => current ? { ...current, targetRowIndex: row } : current)
-    },
-    onMouseLeave: () => {
-      if (column === 0) setHoveredQtyIndex(current => current === row ? null : current)
+      if (fillDrag?.template === workbook.activeTemplate) {
+        setFillDrag(current => current?.template === workbook.activeTemplate
+          ? { ...current, target: { row, column } }
+          : current)
+      } else if (selectingGridRef.current) {
+        setGridSelection(current => current
+          ? { ...current, focus: { row, column } }
+          : { anchor: { row, column }, focus: { row, column } })
+      }
     },
     onKeyDown: event => handleMaterialGridKeyDown(event, row, column),
   })
@@ -434,7 +511,7 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
   if (object.apiName !== 'Project') return <p className="text-sm text-amber-700">Installation Material is available on Project records only.</p>
 
   return (
-    <div className="space-y-4 text-sm text-gray-800">
+    <div className="space-y-4 text-sm text-gray-800" onKeyDown={handleUndoKeyDown}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3">
         <div>
           <h2 className="text-base font-bold text-brand-navy">Installation Material</h2>
@@ -545,34 +622,22 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
                 <th scope="row" className="sticky left-0 z-10 border border-gray-300 bg-gray-50 px-1 text-center font-normal tabular-nums text-gray-500">{index + 1}</th>
                 <td
                   {...gridCellProps(index, 0)}
-                  className={`relative border border-gray-300 bg-yellow-100 p-1 ${gridSelection && isInGridSelection(index, 0, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${quantityFillDrag && index >= Math.min(quantityFillDrag.rowIndex, quantityFillDrag.targetRowIndex) && index <= Math.max(quantityFillDrag.rowIndex, quantityFillDrag.targetRowIndex) ? 'outline outline-1 outline-green-500' : ''}`}
+                  className={gridCellClassName(index, 0, 'relative border border-gray-300 bg-yellow-100 p-1')}
                 >
                   <GridRangeDecoration row={index} column={0} selection={gridSelection} copiedSelection={copiedGridSelection} />
                   <input
                     aria-label={`Quantity row ${index + 1}`}
-                    className={inputClass}
+                    className={`${inputClass} ${isFillTargetCell(index, 0) ? '!bg-gray-300' : ''}`}
                     value={row.qty}
-                    onFocus={() => setFocusedQtyIndex(index)}
-                    onBlur={() => setFocusedQtyIndex(current => current === index ? null : current)}
                     onChange={event => updateRow(index, { qty: event.target.value })}
                   />
-                  {hoveredQtyIndex === index && focusedQtyIndex !== index && (
-                    <span
-                      onMouseDown={event => {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        setQuantityFillDrag({ template: workbook.activeTemplate, rowIndex: index, targetRowIndex: index, value: row.qty })
-                      }}
-                      aria-hidden="true"
-                      className="absolute bottom-0 right-0 h-2 w-2 cursor-crosshair rounded-[1px] bg-green-600"
-                    />
-                  )}
+                  {renderFillHandle(index, 0)}
                 </td>
-                <td {...gridCellProps(index, 1)} className={`relative border border-gray-300 p-1 ${gridSelection && isInGridSelection(index, 1, gridSelection) ? 'bg-[#e2f0d9]' : ''}`}><GridRangeDecoration row={index} column={1} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`Units row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.units} onChange={event => updateRow(index, { units: event.target.value })} /></td>
-                <td {...gridCellProps(index, 2)} className={`relative border border-gray-300 p-1 ${gridSelection && isInGridSelection(index, 2, gridSelection) ? 'bg-[#e2f0d9]' : ''}`}><GridRangeDecoration row={index} column={2} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`Description row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.description} onChange={event => updateRow(index, { description: event.target.value })} /></td>
-                {!isUsSupplied && <td {...gridCellProps(index, 3)} className={`relative border border-gray-300 bg-gray-100 p-1 ${gridSelection && isInGridSelection(index, 3, gridSelection) ? 'bg-[#e2f0d9]' : ''}`}><GridRangeDecoration row={index} column={3} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`US screw size row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} disabled:cursor-not-allowed disabled:text-gray-600`} value={row.screwSize} onChange={event => updateRow(index, { screwSize: event.target.value })} /></td>}
-                <td {...gridCellProps(index, isUsSupplied ? 3 : 4)} className={`relative border border-gray-300 p-1 ${gridSelection && isInGridSelection(index, isUsSupplied ? 3 : 4, gridSelection) ? 'bg-[#e2f0d9]' : ''}`}><GridRangeDecoration row={index} column={isUsSupplied ? 3 : 4} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`Unit price row ${index + 1}`} inputMode="decimal" className={`${inputClass} text-right`} value={row.unitPrice} onChange={event => updateRow(index, { unitPrice: event.target.value })} /></td>
-                <td {...gridCellProps(index, isUsSupplied ? 4 : 5)} className={`relative border border-gray-300 bg-rose-200 px-2 text-right font-medium ${gridSelection && isInGridSelection(index, isUsSupplied ? 4 : 5, gridSelection) ? 'bg-[#e2f0d9]' : ''}`}><GridRangeDecoration row={index} column={isUsSupplied ? 4 : 5} selection={gridSelection} copiedSelection={copiedGridSelection} />{rowTotal ? formatMaterialTotal(rowTotal) : ''}</td>
+                <td {...gridCellProps(index, 1)} className={gridCellClassName(index, 1, 'relative border border-gray-300 p-1')}><GridRangeDecoration row={index} column={1} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`Units row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} ${isFillTargetCell(index, 1) ? '!bg-gray-300' : ''} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.units} onChange={event => updateRow(index, { units: event.target.value })} />{renderFillHandle(index, 1)}</td>
+                <td {...gridCellProps(index, 2)} className={gridCellClassName(index, 2, 'relative border border-gray-300 p-1')}><GridRangeDecoration row={index} column={2} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`Description row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} ${isFillTargetCell(index, 2) ? '!bg-gray-300' : ''} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-600`} value={row.description} onChange={event => updateRow(index, { description: event.target.value })} />{renderFillHandle(index, 2)}</td>
+                {!isUsSupplied && <td {...gridCellProps(index, 3)} className={gridCellClassName(index, 3, 'relative border border-gray-300 bg-gray-100 p-1')}><GridRangeDecoration row={index} column={3} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`US screw size row ${index + 1}`} disabled={lockFixedColumns} className={`${inputClass} ${isFillTargetCell(index, 3) ? '!bg-gray-300' : ''} disabled:cursor-not-allowed disabled:text-gray-600`} value={row.screwSize} onChange={event => updateRow(index, { screwSize: event.target.value })} />{renderFillHandle(index, 3)}</td>}
+                <td {...gridCellProps(index, isUsSupplied ? 3 : 4)} className={gridCellClassName(index, isUsSupplied ? 3 : 4, 'relative border border-gray-300 p-1')}><GridRangeDecoration row={index} column={isUsSupplied ? 3 : 4} selection={gridSelection} copiedSelection={copiedGridSelection} /><input aria-label={`Unit price row ${index + 1}`} inputMode="decimal" className={`${inputClass} text-right ${isFillTargetCell(index, isUsSupplied ? 3 : 4) ? '!bg-gray-300' : ''}`} value={row.unitPrice} onChange={event => updateRow(index, { unitPrice: event.target.value })} />{renderFillHandle(index, isUsSupplied ? 3 : 4)}</td>
+                <td {...gridCellProps(index, isUsSupplied ? 4 : 5)} className={gridCellClassName(index, isUsSupplied ? 4 : 5, 'relative border border-gray-300 bg-rose-200 px-2 text-right font-medium')}><GridRangeDecoration row={index} column={isUsSupplied ? 4 : 5} selection={gridSelection} copiedSelection={copiedGridSelection} />{rowTotal ? formatMaterialTotal(rowTotal) : ''}{renderFillHandle(index, isUsSupplied ? 4 : 5)}</td>
               </tr>
             })}
           </tbody>
