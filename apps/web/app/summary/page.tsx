@@ -225,6 +225,7 @@ const SCREEN_MESH_TYPES = ['Fiberglass', 'Clearview', 'Bronze', 'Dog'];
 interface CellNavCtx {
   activeCellId: string | null;
   editingCellId: string | null;
+  hasGridSelection: boolean;
   setActive: (id: string | null) => void;
   setEditing: (id: string | null) => void;
   pendingInput: string | null;
@@ -233,6 +234,7 @@ interface CellNavCtx {
 const CellNavContext = createContext<CellNavCtx>({
   activeCellId: null,
   editingCellId: null,
+  hasGridSelection: false,
   setActive: () => {},
   setEditing: () => {},
   pendingInput: null,
@@ -310,7 +312,7 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
   /** Called with the current value when the cell stops editing (blur/select). */
   onEditEnd?: (value: string) => void;
 }) => {
-  const { activeCellId, editingCellId, setActive, setEditing, pendingInput, setPendingInput } = useContext(CellNavContext);
+  const { activeCellId, editingCellId, hasGridSelection, setActive, setEditing, pendingInput, setPendingInput } = useContext(CellNavContext);
   const cellId = `${rowId}:${field}`;
   const isActive = activeCellId === cellId;
   const isEditing = editingCellId === cellId;
@@ -525,7 +527,7 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
         data-cell-id={cellId}
         className={cn(
           "w-full px-1 py-0.5 text-xs rounded min-h-[20px] cursor-default whitespace-pre-wrap break-words",
-          isActive ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
+          isActive ? (hasGridSelection ? "bg-[#e2f0d9]" : "ring-2 ring-blue-500 bg-blue-50") : "hover:bg-gray-50"
         )}
         onClick={() => setActive(cellId)}
         onDoubleClick={() => { setActive(cellId); setEditing(cellId); }}
@@ -546,7 +548,7 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
         onFocus={() => setIsOpen(true)}
         onBlur={handleBlur}
         autoFocus
-        className="w-full px-1 py-0.5 text-xs border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white resize-none overflow-hidden"
+        className={`w-full px-1 py-0.5 text-xs rounded focus:outline-none resize-none overflow-hidden ${hasGridSelection ? 'border border-transparent bg-transparent focus:ring-0' : 'border border-blue-500 bg-white focus:ring-1 focus:ring-blue-500'}`}
         style={{ minHeight: '20px' }}
         rows={1}
         placeholder="Type to search..."
@@ -577,7 +579,7 @@ const CellInput = ({ rowId, field, value, onChange }: {
   value: string; 
   onChange: (value: string) => void;
 }) => {
-  const { activeCellId, editingCellId, setActive, setEditing, pendingInput, setPendingInput } = useContext(CellNavContext);
+  const { activeCellId, editingCellId, hasGridSelection, setActive, setEditing, pendingInput, setPendingInput } = useContext(CellNavContext);
   const cellId = `${rowId}:${field}`;
   const isActive = activeCellId === cellId;
   const isEditing = editingCellId === cellId;
@@ -688,7 +690,7 @@ const CellInput = ({ rowId, field, value, onChange }: {
         data-cell-id={cellId}
         className={cn(
           "w-full px-1 py-0.5 text-xs rounded min-h-[24px] cursor-default whitespace-pre-wrap break-words",
-          isActive ? "ring-2 ring-blue-500 bg-blue-50" : "border border-gray-300 bg-white"
+          isActive ? (hasGridSelection ? "bg-[#e2f0d9]" : "ring-2 ring-blue-500 bg-blue-50") : "border border-gray-300 bg-white"
         )}
         onClick={() => setActive(cellId)}
         onDoubleClick={() => { setActive(cellId); setEditing(cellId); }}
@@ -709,7 +711,7 @@ const CellInput = ({ rowId, field, value, onChange }: {
       autoFocus
       maxLength={400}
       rows={1}
-      className="w-full px-1 py-0.5 text-xs border border-blue-500 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none overflow-hidden bg-white"
+      className={`w-full px-1 py-0.5 text-xs rounded resize-none overflow-hidden ${hasGridSelection ? 'border border-transparent bg-transparent focus:ring-0 focus:border-transparent' : 'border border-blue-500 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500'}`}
       style={{ height: 'auto', minHeight: '24px' }}
     />
   );
@@ -4458,7 +4460,7 @@ export default function SummaryPage() {
 
     {/* Summary Editor Dialog */}
     {showNewSummary && editingSummary && (
-      <CellNavContext.Provider value={{ activeCellId, editingCellId, setActive: setActiveCellId, setEditing: setEditingCellId, pendingInput, setPendingInput }}>
+      <CellNavContext.Provider value={{ activeCellId, editingCellId, hasGridSelection: !!summaryGridSelection, setActive: setActiveCellId, setEditing: setEditingCellId, pendingInput, setPendingInput }}>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 sm:p-4">
         <div className="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-[95vw] h-full sm:h-auto sm:max-h-[95dvh] flex flex-col">
             <GridRangeStyles />
