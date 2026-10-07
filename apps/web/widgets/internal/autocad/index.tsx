@@ -18,6 +18,7 @@ import { readProjectField } from '@/lib/factory-order-spec'
 import { userLookupIds, type LookupUserIdentity } from '@/lib/user-lookup'
 import {
   getGridFillTargets,
+  getGridFillRangeCellClasses,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -550,10 +551,9 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     setFillDrag(previous => previous ? { ...previous, target: { row: rowIndex, column: colIndex } } : previous)
   }
 
-  const isCellInFillRange = (rowIndex: number, colIndex: number) => {
-    return !!fillDrag && getGridFillTargets(fillDrag.selection, fillDrag.target)
-      .some(target => target.row === rowIndex && target.column === colIndex)
-  }
+  const gridFillClassName = (rowIndex: number, colIndex: number) => fillDrag
+    ? getGridFillRangeCellClasses(rowIndex, colIndex, fillDrag.selection, fillDrag.target)
+    : ''
 
   if (object?.apiName && object.apiName !== 'Project') {
     return (
@@ -787,7 +787,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                           : { anchor: { row: i, column: colIndex }, focus: { row: i, column: colIndex } })
                       }}
                       onKeyDown={(event) => handleGridKeyDown(event, i, colIndex)}
-                      className={`relative px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${selection && isInGridSelection(i, colIndex, selection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(i, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                      className={`relative px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${selection && isInGridSelection(i, colIndex, selection) ? 'bg-[#e2f0d9]' : ''} ${gridFillClassName(i, colIndex)}`}
                     >
                       <GridRangeDecoration row={i} column={colIndex} selection={selection} copiedSelection={copiedSelection} />
                       <EditableCell
@@ -862,7 +862,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                       : { anchor: { row: rowIndex, column: colIndex }, focus: { row: rowIndex, column: colIndex } })
                   }}
                   onKeyDown={(event) => handleGridKeyDown(event, rowIndex, colIndex)}
-                  className={`${getMobileRowWidthClass(field)} relative shrink-0 ${selection && isInGridSelection(rowIndex, colIndex, selection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                  className={`${getMobileRowWidthClass(field)} relative shrink-0 ${selection && isInGridSelection(rowIndex, colIndex, selection) ? 'bg-[#e2f0d9]' : ''} ${gridFillClassName(rowIndex, colIndex)}`}
                 >
                   <GridRangeDecoration row={rowIndex} column={colIndex} selection={selection} copiedSelection={copiedSelection} />
                   <p className="truncate text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>

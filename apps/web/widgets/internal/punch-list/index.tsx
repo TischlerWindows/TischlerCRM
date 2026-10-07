@@ -25,6 +25,7 @@ import { useAuth } from '@/lib/auth-context'
 import type { NavDirection } from '@/lib/cell-navigation'
 import {
   getGridFillTargets,
+  getGridFillRangeCellClasses,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -658,7 +659,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   }
 
   const gridCellClassName = (row: number, column: number, extra = '') =>
-    `${extra} ${gridSelection && isInGridSelection(row, column, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(row, column) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`
+    `${extra} ${gridSelection && isInGridSelection(row, column, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${fillDrag ? getGridFillRangeCellClasses(row, column, fillDrag.selection, fillDrag.target) : ''}`
 
   const load = useCallback(async () => {
     if (!recordId) return
@@ -752,11 +753,6 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
 
   const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
     setFillDrag(previous => previous ? { ...previous, target: { row: rowIndex, column: colIndex } } : previous)
-  }
-
-  const isCellInFillRange = (rowIndex: number, colIndex: number) => {
-    return !!fillDrag && getGridFillTargets(fillDrag.selection, fillDrag.target)
-      .some(target => target.row === rowIndex && target.column === colIndex)
   }
 
   if (object?.apiName && object.apiName !== 'WorkOrder') {

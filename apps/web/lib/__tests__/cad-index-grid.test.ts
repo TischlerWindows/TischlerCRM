@@ -1,6 +1,8 @@
 import {
   getGridSelectionBounds,
   getGridSelectionOrigin,
+  getGridFillRangeCellClasses,
+  getGridFillRangeBounds,
   getGridFillTargets,
   isInGridSelection,
   parseGridCellValue,
@@ -38,6 +40,15 @@ describe('CAD Index List spreadsheet grid helpers', () => {
       { row: 4, column: 3, sourceRow: 2, sourceColumn: 1 },
       { row: 4, column: 4, sourceRow: 2, sourceColumn: 2 },
     ])
+  })
+
+  it('uses one outer perimeter and a shaded destination for the fill preview', () => {
+    const selection = { anchor: { row: 1, column: 1 }, focus: { row: 1, column: 1 } }
+    const target = { row: 3, column: 2 }
+    expect(getGridFillRangeBounds(selection, target)).toEqual({ top: 1, bottom: 3, left: 1, right: 2 })
+    expect(getGridFillRangeCellClasses(2, 1, selection, target)).toBe('bg-gray-300 border-l-2 border-l-[#217346]')
+    expect(getGridFillRangeCellClasses(3, 2, selection, target)).toBe('bg-gray-300 border-b-2 border-b-[#217346] border-r-2 border-r-[#217346]')
+    expect(getGridFillRangeCellClasses(0, 0, selection, target)).toBe('')
   })
 
   it('round-trips tabular clipboard data including tabs, quotes, and line breaks', () => {

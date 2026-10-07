@@ -49,6 +49,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { filterPicklistValues } from '@/components/form/picklist-fields';
 import {
   getGridFillTargets,
+  getGridFillRangeBounds,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   parseGridClipboard,
@@ -3869,10 +3870,9 @@ export default function SummaryPage() {
       const copiedBounds = copiedSummaryGridSelection && copiedSummaryGridSelection.gridId === gridId
         ? getGridSelectionBounds(copiedSummaryGridSelection)
         : null;
-      const fillTargets = summaryGridFillDrag?.selection.gridId === gridId
-        ? new Set(getGridFillTargets(summaryGridFillDrag.selection, summaryGridFillDrag.target)
-          .map(target => `${target.row}:${target.column}`))
-        : new Set<string>();
+      const fillBounds = summaryGridFillDrag?.selection.gridId === gridId
+        ? getGridFillRangeBounds(summaryGridFillDrag.selection, summaryGridFillDrag.target)
+        : null;
       rows.forEach((row, rowIndex) => getSummaryGridCells(row).forEach((cell, columnIndex) => {
         const selected = !!selectedBounds && rowIndex >= selectedBounds.top && rowIndex <= selectedBounds.bottom
           && columnIndex >= selectedBounds.left && columnIndex <= selectedBounds.right;
@@ -3889,7 +3889,13 @@ export default function SummaryPage() {
         setRangeAttribute('data-summary-grid-right', selected && columnIndex === selectedBounds?.right);
         setRangeAttribute('data-summary-grid-fill-anchor', selected && !editingCellId
           && rowIndex === selectedBounds?.bottom && columnIndex === selectedBounds?.right);
-        setRangeAttribute('data-summary-grid-fill-target', fillTargets.has(`${rowIndex}:${columnIndex}`));
+        const inFillRange = !!fillBounds && rowIndex >= fillBounds.top && rowIndex <= fillBounds.bottom
+          && columnIndex >= fillBounds.left && columnIndex <= fillBounds.right;
+        setRangeAttribute('data-summary-grid-fill-target', inFillRange && !selected);
+        setRangeAttribute('data-summary-grid-fill-top', inFillRange && rowIndex === fillBounds?.top);
+        setRangeAttribute('data-summary-grid-fill-bottom', inFillRange && rowIndex === fillBounds?.bottom);
+        setRangeAttribute('data-summary-grid-fill-left', inFillRange && columnIndex === fillBounds?.left);
+        setRangeAttribute('data-summary-grid-fill-right', inFillRange && columnIndex === fillBounds?.right);
         cell.classList.toggle('summary-grid-copied', copied);
         if (copied && copiedBounds) {
           const stripe = 'repeating-linear-gradient(90deg, #fff 0 3px, #217346 3px 6px)';

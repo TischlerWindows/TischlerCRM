@@ -12,6 +12,7 @@ import { MultiLookupUserSearch } from '@/components/form/lookup-search'
 import type { NavDirection } from '@/lib/cell-navigation'
 import {
   getGridFillTargets,
+  getGridFillRangeCellClasses,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -471,7 +472,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
   }
 
   const gridCellClassName = (row: number, column: number, view: 'desktop' | 'mobile', extra = '') =>
-    `${extra} ${gridSelection?.view === view && isInGridSelection(row, column, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${isCellInFillRange(row, column, view) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`
+    `${extra} ${gridSelection?.view === view && isInGridSelection(row, column, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${fillDrag?.selection.view === view ? getGridFillRangeCellClasses(row, column, fillDrag.selection, fillDrag.target) : ''}`
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number, view: 'desktop' | 'mobile') => {
     if (event.defaultPrevented || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return
@@ -606,11 +607,6 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     setFillDrag((previous) => previous?.selection.view === view
       ? { ...previous, target: { row: rowIndex, column: colIndex } }
       : previous)
-  }
-
-  const isCellInFillRange = (rowIndex: number, colIndex: number, view: 'desktop' | 'mobile') => {
-    return !!fillDrag && fillDrag.selection.view === view && getGridFillTargets(fillDrag.selection, fillDrag.target)
-      .some(target => target.row === rowIndex && target.column === colIndex)
   }
 
   if (object?.apiName && object.apiName !== 'WorkOrder') {

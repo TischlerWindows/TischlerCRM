@@ -89,10 +89,12 @@ export function GridRangeStyles() {
         z-index: 50;
       }
       td[data-summary-grid-fill-target="true"] {
-        background-color: #d4edda !important;
-        outline: 1px solid #217346;
-        outline-offset: -1px;
+        background-color: #d1d5db !important;
       }
+      td[data-summary-grid-fill-top="true"] { border-top: 2px solid #217346 !important; }
+      td[data-summary-grid-fill-bottom="true"] { border-bottom: 2px solid #217346 !important; }
+      td[data-summary-grid-fill-left="true"] { border-left: 2px solid #217346 !important; }
+      td[data-summary-grid-fill-right="true"] { border-right: 2px solid #217346 !important; }
       td.summary-grid-copied { animation: summary-grid-march 0.35s linear infinite; }
       table[data-summary-grid] td:focus,
       table[data-summary-grid] td:focus-visible,

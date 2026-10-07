@@ -78,16 +78,13 @@ export function getGridFillTargets(
   target: GridCoordinate,
 ): Array<{ row: number; column: number; sourceRow: number; sourceColumn: number }> {
   const bounds = getGridSelectionBounds(selection)
+  const fillBounds = getGridFillRangeBounds(selection, target)
   const height = bounds.bottom - bounds.top + 1
   const width = bounds.right - bounds.left + 1
-  const top = Math.min(bounds.top, target.row)
-  const bottom = Math.max(bounds.bottom, target.row)
-  const left = Math.min(bounds.left, target.column)
-  const right = Math.max(bounds.right, target.column)
   const targets: Array<{ row: number; column: number; sourceRow: number; sourceColumn: number }> = []
 
-  for (let row = top; row <= bottom; row++) {
-    for (let column = left; column <= right; column++) {
+  for (let row = fillBounds.top; row <= fillBounds.bottom; row++) {
+    for (let column = fillBounds.left; column <= fillBounds.right; column++) {
       if (isInGridSelection(row, column, selection)) continue
       const rowOffset = ((row - bounds.top) % height + height) % height
       const columnOffset = ((column - bounds.left) % width + width) % width
@@ -100,4 +97,33 @@ export function getGridFillTargets(
     }
   }
   return targets
+}
+
+export function getGridFillRangeBounds(selection: GridSelection, target: GridCoordinate) {
+  const bounds = getGridSelectionBounds(selection)
+  return {
+    top: Math.min(bounds.top, target.row),
+    bottom: Math.max(bounds.bottom, target.row),
+    left: Math.min(bounds.left, target.column),
+    right: Math.max(bounds.right, target.column),
+  }
+}
+
+export function getGridFillRangeCellClasses(
+  row: number,
+  column: number,
+  selection: GridSelection,
+  target: GridCoordinate,
+): string {
+  const bounds = getGridFillRangeBounds(selection, target)
+  const isTarget = !isInGridSelection(row, column, selection)
+  if (row < bounds.top || row > bounds.bottom || column < bounds.left || column > bounds.right) return ''
+
+  return [
+    isTarget ? 'bg-gray-300' : '',
+    row === bounds.top ? 'border-t-2 border-t-[#217346]' : '',
+    row === bounds.bottom ? 'border-b-2 border-b-[#217346]' : '',
+    column === bounds.left ? 'border-l-2 border-l-[#217346]' : '',
+    column === bounds.right ? 'border-r-2 border-r-[#217346]' : '',
+  ].filter(Boolean).join(' ')
 }

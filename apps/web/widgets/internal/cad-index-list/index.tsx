@@ -25,6 +25,7 @@ import { orderedColumns } from '@/lib/cad-index-column-order'
 import { parseCadIndexComments } from '@/lib/cad-index-comments'
 import {
   getGridFillTargets,
+  getGridFillRangeCellClasses,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -653,10 +654,9 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     setFillDrag((prev) => prev ? { ...prev, target: { row: rowIndex, column: colIndex } } : prev)
   }
 
-  const isCellInFillRange = (rowIndex: number, colIndex: number): boolean => {
-    return !!fillDrag && getGridFillTargets(fillDrag.selection, fillDrag.target)
-      .some(target => target.row === rowIndex && target.column === colIndex)
-  }
+  const gridFillClassName = (rowIndex: number, colIndex: number) => fillDrag
+    ? getGridFillRangeCellClasses(rowIndex, colIndex, fillDrag.selection, fillDrag.target)
+    : ''
 
   const handleAddRow = async () => {
     if (!projectId) return
@@ -955,7 +955,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                           selection && isInGridSelection(rowIndex, colIndex, selection)
                             ? 'bg-[#e2f0d9]'
                             : ''
-                        } ${isCellInFillRange(rowIndex, colIndex) ? 'bg-green-50 outline outline-1 outline-green-500' : ''}`}
+                        } ${gridFillClassName(rowIndex, colIndex)}`}
                       >
                         <GridRangeDecoration row={rowIndex} column={colIndex} selection={selection} copiedSelection={copiedSelection} />
                         {col.type === 'checkbox' ? (
