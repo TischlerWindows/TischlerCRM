@@ -3349,7 +3349,7 @@ export default function SummaryPage() {
   function handleSummaryGridCopy(event: React.ClipboardEvent<HTMLTableElement>, cut = false) {
     const selection = summaryGridSelection;
     const gridId = event.currentTarget.dataset.summaryGrid;
-    if (!selection || selection.gridId !== gridId || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return;
+    if (!selection || selection.gridId !== gridId) return;
     event.clipboardData.setData('text/plain', serializeGridClipboard(getSummaryGridClipboardMatrix(selection)));
     event.preventDefault();
     setCopiedSummaryGridSelection(selection);
@@ -3365,7 +3365,7 @@ export default function SummaryPage() {
   function handleSummaryGridPaste(event: React.ClipboardEvent<HTMLTableElement>) {
     const selection = summaryGridSelection;
     const gridId = event.currentTarget.dataset.summaryGrid;
-    if (!selection || selection.gridId !== gridId || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return;
+    if (!selection || selection.gridId !== gridId) return;
     event.preventDefault();
     setCopiedSummaryGridSelection(null);
     applySummaryGridClipboard(gridId, getGridSelectionOrigin(selection), parseGridClipboard(event.clipboardData.getData('text/plain')));
@@ -3383,11 +3383,15 @@ export default function SummaryPage() {
           && columnIndex >= selectedBounds.left && columnIndex <= selectedBounds.right;
         const copied = !!copiedBounds && rowIndex >= copiedBounds.top && rowIndex <= copiedBounds.bottom
           && columnIndex >= copiedBounds.left && columnIndex <= copiedBounds.right;
-        cell.toggleAttribute('data-summary-grid-selected', selected);
-        cell.toggleAttribute('data-summary-grid-top', selected && rowIndex === selectedBounds?.top);
-        cell.toggleAttribute('data-summary-grid-bottom', selected && rowIndex === selectedBounds?.bottom);
-        cell.toggleAttribute('data-summary-grid-left', selected && columnIndex === selectedBounds?.left);
-        cell.toggleAttribute('data-summary-grid-right', selected && columnIndex === selectedBounds?.right);
+        const setRangeAttribute = (name: string, enabled: boolean) => {
+          if (enabled) cell.setAttribute(name, 'true');
+          else cell.removeAttribute(name);
+        };
+        setRangeAttribute('data-summary-grid-selected', selected);
+        setRangeAttribute('data-summary-grid-top', selected && rowIndex === selectedBounds?.top);
+        setRangeAttribute('data-summary-grid-bottom', selected && rowIndex === selectedBounds?.bottom);
+        setRangeAttribute('data-summary-grid-left', selected && columnIndex === selectedBounds?.left);
+        setRangeAttribute('data-summary-grid-right', selected && columnIndex === selectedBounds?.right);
         cell.classList.toggle('summary-grid-copied', copied);
         if (copied && copiedBounds) {
           const stripe = 'repeating-linear-gradient(90deg, #fff 0 3px, #217346 3px 6px)';
