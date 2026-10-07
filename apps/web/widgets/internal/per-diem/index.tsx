@@ -536,7 +536,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
 
   useEffect(() => {
     if (!fillDrag) return
-    const onMouseUp = () => {
+    const onMouseUp = async () => {
       const drag = fillDrag
       setFillDrag(null)
       const fields = gridFieldsForView(drag.selection.view)

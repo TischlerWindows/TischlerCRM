@@ -482,7 +482,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
 
   useEffect(() => {
     if (!fillDrag) return
-    const onMouseUp = () => {
+    const onMouseUp = async () => {
       const drag = fillDrag
       setFillDrag(null)
       const patches = new Map<number, Record<string, unknown>>()

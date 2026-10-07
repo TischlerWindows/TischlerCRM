@@ -558,7 +558,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   // latest dragged-over range.
   useEffect(() => {
     if (!fillDrag) return
-    const onMouseUp = () => {
+    const onMouseUp = async () => {
       const drag = fillDrag
       setFillDrag(null)
       const patches = new Map<number, Record<string, unknown>>()
