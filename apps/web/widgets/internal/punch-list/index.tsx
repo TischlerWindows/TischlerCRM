@@ -33,6 +33,7 @@ import {
   parseGridClipboard,
   serializeGridClipboard,
   spreadsheetColumnLabel,
+  tileGridClipboardToSelection,
   type GridCoordinate,
   type GridSelection,
 } from '@/lib/cad-index-grid'
@@ -593,7 +594,8 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     if (!gridSelection || editingCellId) return
     event.preventDefault()
     setCopiedGridSelection(null)
-    void applyGridClipboard(getGridSelectionOrigin(gridSelection), parseGridClipboard(event.clipboardData.getData('text/plain')))
+    const matrix = tileGridClipboardToSelection(parseGridClipboard(event.clipboardData.getData('text/plain')), gridSelection)
+    void applyGridClipboard(getGridSelectionOrigin(gridSelection), matrix)
   }
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {

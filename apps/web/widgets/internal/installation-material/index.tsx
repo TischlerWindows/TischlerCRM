@@ -15,6 +15,7 @@ import {
   parseGridClipboard,
   serializeGridClipboard,
   spreadsheetColumnLabel,
+  tileGridClipboardToSelection,
   type GridCoordinate,
   type GridSelection,
 } from '@/lib/cad-index-grid'
@@ -389,7 +390,8 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     if (!gridSelection) return
     event.preventDefault()
     setCopiedGridSelection(null)
-    applyMaterialClipboard(getGridSelectionOrigin(gridSelection), parseGridClipboard(event.clipboardData.getData('text/plain')))
+    const matrix = tileGridClipboardToSelection(parseGridClipboard(event.clipboardData.getData('text/plain')), gridSelection)
+    applyMaterialClipboard(getGridSelectionOrigin(gridSelection), matrix)
   }
 
   const handleMaterialGridKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>, row: number, column: number) => {

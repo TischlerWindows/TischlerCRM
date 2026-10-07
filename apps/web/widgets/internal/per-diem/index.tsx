@@ -19,6 +19,7 @@ import {
   parseGridClipboard,
   serializeGridClipboard,
   spreadsheetColumnLabel,
+  tileGridClipboardToSelection,
   type GridCoordinate,
   type GridSelection,
 } from '@/lib/cad-index-grid'
@@ -447,7 +448,8 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     if (!gridSelection || editingCellId) return
     event.preventDefault()
     setCopiedGridSelection(null)
-    void applyGridClipboard(getGridSelectionOrigin(gridSelection), gridSelection.view, parseGridClipboard(event.clipboardData.getData('text/plain')))
+    const matrix = tileGridClipboardToSelection(parseGridClipboard(event.clipboardData.getData('text/plain')), gridSelection)
+    void applyGridClipboard(getGridSelectionOrigin(gridSelection), gridSelection.view, matrix)
   }
 
   const handleGridCellMouseDown = (event: React.MouseEvent<HTMLElement>, row: number, column: number, view: 'desktop' | 'mobile') => {

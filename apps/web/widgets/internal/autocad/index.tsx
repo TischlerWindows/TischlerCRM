@@ -26,6 +26,7 @@ import {
   parseGridClipboard,
   serializeGridClipboard,
   spreadsheetColumnLabel,
+  tileGridClipboardToSelection,
   type GridCoordinate,
   type GridSelection,
 } from '@/lib/cad-index-grid'
@@ -429,7 +430,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     if (!selection || editingCellId) return
     event.preventDefault()
     setCopiedSelection(null)
-    void applyClipboardMatrix(getGridSelectionOrigin(selection), parseGridClipboard(event.clipboardData.getData('text/plain')))
+    const matrix = tileGridClipboardToSelection(parseGridClipboard(event.clipboardData.getData('text/plain')), selection)
+    void applyClipboardMatrix(getGridSelectionOrigin(selection), matrix)
   }
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {

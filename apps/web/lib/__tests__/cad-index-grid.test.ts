@@ -9,6 +9,7 @@ import {
   parseGridClipboard,
   spreadsheetColumnLabel,
   serializeGridClipboard,
+  tileGridClipboardToSelection,
 } from '../cad-index-grid'
 
 describe('CAD Index List spreadsheet grid helpers', () => {
@@ -49,6 +50,22 @@ describe('CAD Index List spreadsheet grid helpers', () => {
     expect(getGridFillRangeCellClasses(2, 1, selection, target)).toBe('!bg-gray-300 border-l-2 border-l-[#217346]')
     expect(getGridFillRangeCellClasses(3, 2, selection, target)).toBe('!bg-gray-300 border-b-2 border-b-[#217346] border-r-2 border-r-[#217346]')
     expect(getGridFillRangeCellClasses(0, 0, selection, target)).toBe('')
+  })
+
+  it('repeats a copied value across a larger selected paste range', () => {
+    const selection = { anchor: { row: 4, column: 1 }, focus: { row: 1, column: 3 } }
+    expect(tileGridClipboardToSelection([['55']], selection)).toEqual([
+      ['55', '55', '55'],
+      ['55', '55', '55'],
+      ['55', '55', '55'],
+      ['55', '55', '55'],
+    ])
+  })
+
+  it('preserves a clipboard matrix that is larger than the selected range', () => {
+    const selection = { anchor: { row: 0, column: 0 }, focus: { row: 0, column: 0 } }
+    const matrix = [['A', 'B'], ['C', 'D']]
+    expect(tileGridClipboardToSelection(matrix, selection)).toBe(matrix)
   })
 
   it('round-trips tabular clipboard data including tabs, quotes, and line breaks', () => {

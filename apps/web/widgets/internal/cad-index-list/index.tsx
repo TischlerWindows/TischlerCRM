@@ -33,6 +33,7 @@ import {
   parseGridClipboard,
   serializeGridClipboard,
   spreadsheetColumnLabel,
+  tileGridClipboardToSelection,
   type GridCoordinate,
   type GridSelection,
 } from '@/lib/cad-index-grid'
@@ -503,7 +504,8 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     if (!selection || (target instanceof HTMLInputElement && target.type !== 'checkbox') || target instanceof HTMLTextAreaElement) return
     event.preventDefault()
     setCopiedSelection(null)
-    void applyClipboardMatrix(getGridSelectionOrigin(selection), parseGridClipboard(event.clipboardData.getData('text/plain')))
+    const matrix = tileGridClipboardToSelection(parseGridClipboard(event.clipboardData.getData('text/plain')), selection)
+    void applyClipboardMatrix(getGridSelectionOrigin(selection), matrix)
   }
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>, row: number, column: number) => {

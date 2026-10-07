@@ -59,6 +59,19 @@ export function serializeGridClipboard(rows: unknown[][]): string {
   })), { delimiter: '\t', newline: '\r\n', quotes: true })
 }
 
+export function tileGridClipboardToSelection(matrix: string[][], selection: GridSelection): string[][] {
+  if (!matrix.length) return matrix
+  const bounds = getGridSelectionBounds(selection)
+  const height = bounds.bottom - bounds.top + 1
+  const width = bounds.right - bounds.left + 1
+  const sourceWidth = Math.max(...matrix.map(row => row.length))
+  if (matrix.length > height || sourceWidth > width || (matrix.length === height && sourceWidth === width)) return matrix
+
+  return Array.from({ length: height }, (_, row) =>
+    Array.from({ length: width }, (_, column) => matrix[row % matrix.length]?.[column % sourceWidth] ?? ''),
+  )
+}
+
 export function parseGridCellValue(value: string, type: GridColumnType): { valid: boolean; value: unknown } {
   if (type === 'text') return { valid: true, value }
   if (type === 'number') {

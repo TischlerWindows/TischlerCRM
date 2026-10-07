@@ -55,6 +55,7 @@ import {
   parseGridClipboard,
   serializeGridClipboard,
   spreadsheetColumnLabel,
+  tileGridClipboardToSelection,
   type GridCoordinate,
   type GridSelection,
 } from '@/lib/cad-index-grid';
@@ -3856,7 +3857,8 @@ export default function SummaryPage() {
     if (!selection || selection.gridId !== gridId) return;
     event.preventDefault();
     setCopiedSummaryGridSelection(null);
-    applySummaryGridClipboard(gridId, getGridSelectionOrigin(selection), parseGridClipboard(event.clipboardData.getData('text/plain')));
+    const matrix = tileGridClipboardToSelection(parseGridClipboard(event.clipboardData.getData('text/plain')), selection);
+    applySummaryGridClipboard(gridId, getGridSelectionOrigin(selection), matrix);
   }
 
   useEffect(() => {
