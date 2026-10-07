@@ -70,9 +70,18 @@ export function GridRangeStyles() {
       .grid-range-copy.grid-range-top, .grid-range-copy.grid-range-bottom {
         background-image: repeating-linear-gradient(90deg, #fff 0 3px, #217346 3px 6px);
       }
+      td[data-summary-grid-selected="true"] { background-color: #e2f0d9 !important; }
+      td[data-summary-grid-top="true"] { border-top: 2px solid #217346 !important; }
+      td[data-summary-grid-bottom="true"] { border-bottom: 2px solid #217346 !important; }
+      td[data-summary-grid-left="true"] { border-left: 2px solid #217346 !important; }
+      td[data-summary-grid-right="true"] { border-right: 2px solid #217346 !important; }
+      td.summary-grid-copied { animation: summary-grid-march 0.35s linear infinite; }
+      @keyframes summary-grid-march {
+        to { background-position: 6px 0, -6px 100%, 0 6px, 100% -6px; }
+      }
       @keyframes grid-range-march { to { background-position: 6px 0; } }
       @media (prefers-reduced-motion: reduce) {
-        .grid-range-copy { animation: none; }
+        .grid-range-copy, td.summary-grid-copied { animation: none; }
       }
     `}</style>
   )

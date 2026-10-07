@@ -47,6 +47,16 @@ import { apiClient } from '@/lib/api-client';
 import { DateInput } from '@/components/date-input';
 import { useSchemaStore } from '@/lib/schema-store';
 import { filterPicklistValues } from '@/components/form/picklist-fields';
+import {
+  getGridSelectionBounds,
+  getGridSelectionOrigin,
+  parseGridClipboard,
+  serializeGridClipboard,
+  spreadsheetColumnLabel,
+  type GridCoordinate,
+  type GridSelection,
+} from '@/lib/cad-index-grid';
+import { GridRangeStyles } from '@/widgets/internal/shared/grid-range-decoration';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -228,6 +238,8 @@ const CellNavContext = createContext<CellNavCtx>({
   pendingInput: null,
   setPendingInput: () => {},
 });
+
+type SummaryGridRange = GridSelection & { gridId: string };
 
 // Finds the data-cell-id of the table cell adjacent to `td` in the given direction.
 // 'right' wraps to the first cell of the next row when at the end of a row.
@@ -964,6 +976,9 @@ export default function SummaryPage() {
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
   const [editingCellId, setEditingCellId] = useState<string | null>(null);
   const [pendingInput, setPendingInput] = useState<string | null>(null);
+  const [summaryGridSelection, setSummaryGridSelection] = useState<SummaryGridRange | null>(null);
+  const [copiedSummaryGridSelection, setCopiedSummaryGridSelection] = useState<SummaryGridRange | null>(null);
+  const selectingSummaryGridRef = useRef(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [tusPositionLocked, setTusPositionLocked] = useState(true);
   // Opportunity picker state
@@ -1012,37 +1027,93 @@ export default function SummaryPage() {
     return filterPicklistValues(raw, fieldDef, recordData, {});
   };
 
+  function moveSummaryGridFocus(direction: 'left' | 'right' | 'up' | 'down', extend = false) {
+    const position = getSummaryGridCellPosition(document.activeElement);
+    if (!position) return;
+    const currentSelection = summaryGridSelection?.gridId === position.gridId
+      ? summaryGridSelection
+      : { gridId: position.gridId, anchor: { row: position.row, column: position.column }, focus: { row: position.row, column: position.column } };
+    const rows = getSummaryGridRows(position.table);
+    const cells = getSummaryGridCells(rows[0]);
+    let row = currentSelection.focus.row + (direction === 'down' ? 1 : direction === 'up' ? -1 : 0);
+    let column = currentSelection.focus.column + (direction === 'right' ? 1 : direction === 'left' ? -1 : 0);
+    if (column < 0) { column = cells.length - 1; row -= 1; }
+    if (column >= cells.length) { column = 0; row += 1; }
+    row = Math.max(0, Math.min(row, rows.length - 1));
+    column = Math.max(0, Math.min(column, cells.length - 1));
+    const focus = { row, column };
+    setSummaryGridSelection({
+      gridId: position.gridId,
+      anchor: extend ? currentSelection.anchor : focus,
+      focus,
+    });
+    const targetCell = getSummaryGridCells(rows[row])[column];
+    const cellId = targetCell?.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId ?? null;
+    setActiveCellId(cellId);
+    if (targetCell) { targetCell.tabIndex = -1; targetCell.focus(); }
+  }
+
   // Arrow-key/Tab navigation when a cell is selected but not in edit mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!activeCellId || editingCellId) return;
+      if (editingCellId) return;
       // Don't intercept keystrokes when the user is typing in a real form field.
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement)?.isContentEditable) return;
+      const focusedPosition = getSummaryGridCellPosition(document.activeElement);
+      if (!focusedPosition) return;
+      if (e.key === 'Escape' && copiedSummaryGridSelection) {
+        setCopiedSummaryGridSelection(null);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        const rows = getSummaryGridRows(focusedPosition.table);
+        const columnCount = getSummaryGridCells(rows[0]).length;
+        if (rows.length && columnCount) {
+          setSummaryGridSelection({
+            gridId: focusedPosition.gridId,
+            anchor: { row: rows.length - 1, column: columnCount - 1 },
+            focus: { row: 0, column: 0 },
+          });
+        }
+        return;
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && summaryGridSelection?.gridId === focusedPosition.gridId) {
+        e.preventDefault();
+        const bounds = getGridSelectionBounds(summaryGridSelection);
+        void applySummaryGridClipboard(summaryGridSelection.gridId, getGridSelectionOrigin(summaryGridSelection),
+          Array.from({ length: bounds.bottom - bounds.top + 1 }, () =>
+            Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+          ));
+        return;
+      }
       const dir = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down'
         : e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right'
-        : e.key === 'Tab' ? 'right' : null;
+        : e.key === 'Tab' ? (e.shiftKey ? 'left' : 'right') : null;
       if (dir) {
         e.preventDefault();
-        const el = document.querySelector(`[data-cell-id="${activeCellId}"]`);
-        const td = el?.closest('td');
-        if (!td) return;
-        const cId = findAdjacentCellId(td, dir);
-        if (cId) setActiveCellId(cId);
+        moveSummaryGridFocus(dir, e.shiftKey && e.key !== 'Tab');
       } else if (e.key === 'Enter' || e.key === 'F2') {
         e.preventDefault();
-        setEditingCellId(activeCellId);
+        const cellId = focusedPosition.cell.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId;
+        if (cellId) { setActiveCellId(cellId); setEditingCellId(cellId); }
       } else if (e.key === 'Escape') {
         setActiveCellId(null);
       } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        setPendingInput(e.key);
-        setEditingCellId(activeCellId);
+        const cellId = focusedPosition.cell.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId;
+        if (cellId) {
+          e.preventDefault();
+          setActiveCellId(cellId);
+          setPendingInput(e.key);
+          setEditingCellId(cellId);
+        }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [activeCellId, editingCellId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingCellId, summaryGridSelection, copiedSummaryGridSelection]);
 
   useEffect(() => {
     (async () => {
@@ -2969,7 +3040,7 @@ export default function SummaryPage() {
   const updateRow = (rowId: string, field: keyof SummaryRow, value: string) => {
     if (!editingSummary) return;
     
-    setEditingSummary(mutateRows(editingSummary, rows => rows.map(r => {
+    setEditingSummary(current => current ? mutateRows(current, rows => rows.map(r => {
         if (r.id !== rowId) return r;
         
         const updatedRow = { ...r, [field]: value };
@@ -3208,7 +3279,7 @@ export default function SummaryPage() {
         }
         
         return updatedRow;
-      })));
+      })) : current);
   };
 
   // Doors handlers
@@ -3316,7 +3387,7 @@ export default function SummaryPage() {
   const updateDoorRow = (rowId: string, field: keyof DoorRow, value: string) => {
     if (!editingSummary) return;
     
-    setEditingSummary(mutateDoorRows(editingSummary, rows => rows.map(r => {
+    setEditingSummary(current => current ? mutateDoorRows(current, rows => rows.map(r => {
         if (r.id !== rowId) return r;
         
         const updatedRow = { ...r, [field]: value };
@@ -3553,8 +3624,193 @@ export default function SummaryPage() {
         }
         
         return updatedRow;
-      })));
+      })) : current);
   };
+
+  function getSummaryGridRows(table: HTMLTableElement | null): HTMLTableRowElement[] {
+    return table ? Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody > tr[data-summary-grid-row-index]')) : [];
+  }
+
+  function getSummaryGridCells(row: HTMLTableRowElement | undefined): HTMLTableCellElement[] {
+    if (!row) return [];
+    return Array.from(row.querySelectorAll<HTMLTableCellElement>(':scope > td'))
+      .filter(cell => cell.dataset.summaryGridExclude !== 'true');
+  }
+
+  function getSummaryGridCellPosition(target: EventTarget | null): {
+    table: HTMLTableElement
+    gridId: string
+    row: number
+    column: number
+    cell: HTMLTableCellElement
+  } | null {
+    if (!(target instanceof Element)) return null;
+    const cell = target.closest<HTMLTableCellElement>('td');
+    const row = cell?.closest<HTMLTableRowElement>('tr[data-summary-grid-row-index]');
+    const table = row?.closest<HTMLTableElement>('table[data-summary-grid]');
+    const gridId = table?.dataset.summaryGrid;
+    if (!cell || !row || !table || !gridId || cell.dataset.summaryGridExclude === 'true') return null;
+    const column = getSummaryGridCells(row).indexOf(cell);
+    if (column < 0) return null;
+    return { table, gridId, row: Number(row.dataset.summaryGridRowIndex), column, cell };
+  }
+
+  function handleSummaryGridMouseDown(event: React.MouseEvent<HTMLTableElement>) {
+    if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+    const position = getSummaryGridCellPosition(event.target);
+    if (!position) return;
+    const coordinate = { row: position.row, column: position.column };
+    setSummaryGridSelection(current => event.shiftKey && current?.gridId === position.gridId
+      ? { ...current, focus: coordinate }
+      : { gridId: position.gridId, anchor: coordinate, focus: coordinate });
+    const cellId = position.cell.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId ?? null;
+    setActiveCellId(cellId);
+    selectingSummaryGridRef.current = true;
+    event.preventDefault();
+    position.cell.tabIndex = -1;
+    position.cell.focus();
+  }
+
+  function handleSummaryGridFocusCapture(event: React.FocusEvent<HTMLTableElement>) {
+    const position = getSummaryGridCellPosition(event.target);
+    if (!position) return;
+    const coordinate = { row: position.row, column: position.column };
+    setActiveCellId(position.cell.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId ?? null);
+    if (selectingSummaryGridRef.current || summaryGridSelection?.gridId === position.gridId) return;
+    setSummaryGridSelection({ gridId: position.gridId, anchor: coordinate, focus: coordinate });
+  }
+
+  function handleSummaryGridMouseMove(event: React.MouseEvent<HTMLTableElement>) {
+    if (!selectingSummaryGridRef.current) return;
+    const position = getSummaryGridCellPosition(event.target);
+    if (!position) return;
+    const coordinate = { row: position.row, column: position.column };
+    setSummaryGridSelection(current => current?.gridId === position.gridId
+      ? { ...current, focus: coordinate }
+      : { gridId: position.gridId, anchor: coordinate, focus: coordinate });
+  }
+
+  function readSummaryGridCell(cell: HTMLTableCellElement): string {
+    const editor = cell.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input:not([type="checkbox"]), textarea, select');
+    if (editor) return editor.value;
+    return (cell.innerText || cell.textContent || '').trim();
+  }
+
+  function getSummaryGridClipboardMatrix(selection: SummaryGridRange): string[][] {
+    const table = Array.from(document.querySelectorAll<HTMLTableElement>('table[data-summary-grid]'))
+      .find(candidate => candidate.dataset.summaryGrid === selection.gridId) ?? null;
+    const rows = getSummaryGridRows(table);
+    const bounds = getGridSelectionBounds(selection);
+    return rows.slice(bounds.top, bounds.bottom + 1).map(row =>
+      getSummaryGridCells(row).slice(bounds.left, bounds.right + 1).map(readSummaryGridCell),
+    );
+  }
+
+  function applySummaryGridClipboard(gridId: string, start: GridCoordinate, matrix: string[][]) {
+    const table = Array.from(document.querySelectorAll<HTMLTableElement>('table[data-summary-grid]'))
+      .find(candidate => candidate.dataset.summaryGrid === gridId) ?? null;
+    const rows = getSummaryGridRows(table);
+    if (!table || !matrix.length) return;
+    matrix.forEach((clipboardRow, rowOffset) => {
+      const row = rows[start.row + rowOffset];
+      if (!row) return;
+      const cells = getSummaryGridCells(row);
+      clipboardRow.forEach((value, columnOffset) => {
+        const cell = cells[start.column + columnOffset];
+        const cellId = cell?.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId;
+        if (!cellId) return;
+        const separator = cellId.lastIndexOf(':');
+        if (separator < 1) return;
+        const rowId = cellId.slice(0, separator);
+        const field = cellId.slice(separator + 1);
+        if (gridId === 'windows') updateRow(rowId, field as keyof SummaryRow, value);
+        else updateDoorRow(rowId, field as keyof DoorRow, value);
+      });
+    });
+    const lastRow = Math.min(rows.length - 1, start.row + matrix.length - 1);
+    const lastColumn = Math.min(getSummaryGridCells(rows[0]).length - 1,
+      start.column + Math.max(...matrix.map(row => row.length)) - 1);
+    const lastCellId = getSummaryGridCells(rows[lastRow])[lastColumn]?.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId;
+    if (lastCellId) setActiveCellId(lastCellId);
+    const firstTargetCell = getSummaryGridCells(rows[start.row])[start.column];
+    if (firstTargetCell) { firstTargetCell.tabIndex = -1; firstTargetCell.focus(); }
+    setSummaryGridSelection({
+      gridId,
+      anchor: { row: lastRow, column: lastColumn },
+      focus: start,
+    });
+  }
+
+  function handleSummaryGridCopy(event: React.ClipboardEvent<HTMLTableElement>, cut = false) {
+    const selection = summaryGridSelection;
+    const gridId = event.currentTarget.dataset.summaryGrid;
+    if (!selection || selection.gridId !== gridId || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return;
+    const matrix = getSummaryGridClipboardMatrix(selection);
+    event.clipboardData.setData('text/plain', serializeGridClipboard(matrix));
+    event.preventDefault();
+    setCopiedSummaryGridSelection(selection);
+    if (cut) {
+      const bounds = getGridSelectionBounds(selection);
+      applySummaryGridClipboard(selection.gridId, getGridSelectionOrigin(selection),
+        Array.from({ length: bounds.bottom - bounds.top + 1 }, () =>
+          Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
+        ));
+    }
+  }
+
+  function handleSummaryGridPaste(event: React.ClipboardEvent<HTMLTableElement>) {
+    const selection = summaryGridSelection;
+    const gridId = event.currentTarget.dataset.summaryGrid;
+    if (!selection || selection.gridId !== gridId || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return;
+    event.preventDefault();
+    setCopiedSummaryGridSelection(null);
+    applySummaryGridClipboard(gridId, getGridSelectionOrigin(selection), parseGridClipboard(event.clipboardData.getData('text/plain')));
+  }
+
+  useEffect(() => {
+    const tables = document.querySelectorAll<HTMLTableElement>('table[data-summary-grid]');
+    tables.forEach(table => {
+      const gridId = table.dataset.summaryGrid;
+      const rows = getSummaryGridRows(table);
+      const selectedBounds = summaryGridSelection && summaryGridSelection.gridId === gridId
+        ? getGridSelectionBounds(summaryGridSelection)
+        : null;
+      const copiedBounds = copiedSummaryGridSelection && copiedSummaryGridSelection.gridId === gridId
+        ? getGridSelectionBounds(copiedSummaryGridSelection)
+        : null;
+      rows.forEach((row, rowIndex) => getSummaryGridCells(row).forEach((cell, columnIndex) => {
+        const selected = !!selectedBounds && rowIndex >= selectedBounds.top && rowIndex <= selectedBounds.bottom
+          && columnIndex >= selectedBounds.left && columnIndex <= selectedBounds.right;
+        const copied = !!copiedBounds && rowIndex >= copiedBounds.top && rowIndex <= copiedBounds.bottom
+          && columnIndex >= copiedBounds.left && columnIndex <= copiedBounds.right;
+        cell.toggleAttribute('data-summary-grid-selected', selected);
+        cell.toggleAttribute('data-summary-grid-top', selected && rowIndex === selectedBounds?.top);
+        cell.toggleAttribute('data-summary-grid-bottom', selected && rowIndex === selectedBounds?.bottom);
+        cell.toggleAttribute('data-summary-grid-left', selected && columnIndex === selectedBounds?.left);
+        cell.toggleAttribute('data-summary-grid-right', selected && columnIndex === selectedBounds?.right);
+        cell.classList.toggle('summary-grid-copied', copied);
+        if (copied && copiedBounds) {
+          const stripe = 'repeating-linear-gradient(90deg, #fff 0 3px, #217346 3px 6px)';
+          const verticalStripe = 'repeating-linear-gradient(180deg, #fff 0 3px, #217346 3px 6px)';
+          cell.style.backgroundImage = [
+            rowIndex === copiedBounds.top ? stripe : 'linear-gradient(transparent, transparent)',
+            rowIndex === copiedBounds.bottom ? stripe : 'linear-gradient(transparent, transparent)',
+            columnIndex === copiedBounds.left ? verticalStripe : 'linear-gradient(transparent, transparent)',
+            columnIndex === copiedBounds.right ? verticalStripe : 'linear-gradient(transparent, transparent)',
+          ].join(',');
+          cell.style.backgroundSize = '6px 2px, 6px 2px, 2px 6px, 2px 6px';
+          cell.style.backgroundPosition = 'top left, bottom left, top left, top right';
+          cell.style.backgroundRepeat = 'repeat-x, repeat-x, repeat-y, repeat-y';
+        } else {
+          cell.style.removeProperty('background-image');
+          cell.style.removeProperty('background-size');
+          cell.style.removeProperty('background-position');
+          cell.style.removeProperty('background-repeat');
+        }
+      }));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summaryGridSelection, copiedSummaryGridSelection, editingSummary, showType3, showType4, showMagneticContact, showShadeBoxesNoTrim, showShadeBoxesWithTrim, showFinalFinish]);
   
   if (loading) {
     return (
@@ -4201,6 +4457,7 @@ export default function SummaryPage() {
       <CellNavContext.Provider value={{ activeCellId, editingCellId, setActive: setActiveCellId, setEditing: setEditingCellId, pendingInput, setPendingInput }}>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 sm:p-4">
         <div className="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-[95vw] h-full sm:h-auto sm:max-h-[95dvh] flex flex-col">
+            <GridRangeStyles />
             <div className="p-3 sm:p-6 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2 print:hidden">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Edit Tischler Fensterwerk Summary</h2>
@@ -6467,7 +6724,20 @@ export default function SummaryPage() {
                   </div>
                 </div>
                 <div className="overflow-x-auto max-h-[800px] overflow-y-auto pb-64">
-                  <table className="text-sm">
+                  <table
+                    className="text-sm"
+                    data-summary-grid="windows"
+                    role="grid"
+                    aria-label="Tischler Summary windows spreadsheet"
+                    onMouseDown={handleSummaryGridMouseDown}
+                    onMouseMove={handleSummaryGridMouseMove}
+                    onFocusCapture={handleSummaryGridFocusCapture}
+                    onMouseUp={() => { selectingSummaryGridRef.current = false; }}
+                    onMouseLeave={() => { selectingSummaryGridRef.current = false; }}
+                    onCopy={(event) => handleSummaryGridCopy(event)}
+                    onCut={(event) => handleSummaryGridCopy(event, true)}
+                    onPaste={handleSummaryGridPaste}
+                  >
                     <thead className="bg-gray-100 sticky top-0 z-30">
                       {/* Spanning header row */}
                       <tr>
@@ -6530,8 +6800,8 @@ export default function SummaryPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {getActiveRows(editingSummary).map((row) => (
-                        <tr key={row.id} className="hover:bg-gray-50">
+                      {getActiveRows(editingSummary).map((row, rowIndex) => (
+                        <tr key={row.id} data-summary-grid-row-index={rowIndex} className="hover:bg-gray-50">
                           <td className="px-0.5 py-1 align-top" style={tusPositionLocked ? {position:'sticky',left:0,zIndex:10,background:'white'} : {}}>
                             <CellInput rowId={row.id} field="tusPosition" value={row.tusPosition} onChange={(v) => updateRow(row.id, 'tusPosition', v)} />
                           </td>
@@ -6658,8 +6928,8 @@ export default function SummaryPage() {
                               <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={getCustomColPos(row, col.id)} /></td>
                             </Fragment>
                           ))}
-                          <td className="px-0.5 py-1"></td>
-                          <td className="px-0.5 py-1">
+                          <td data-summary-grid-exclude="true" className="px-0.5 py-1"></td>
+                          <td data-summary-grid-exclude="true" className="px-0.5 py-1">
                             <div className="flex gap-1 justify-end mr-2">
                               <button
                                 onClick={() => handleAddRowBelow(row.id)}
@@ -6682,6 +6952,20 @@ export default function SummaryPage() {
                       {renderGridTotalRow(getActiveRows(editingSummary), 'win')}
                     </tbody>
                   </table>
+                  <div className="flex min-h-7 items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+                    <span className="font-mono font-medium text-gray-700">
+                      {summaryGridSelection?.gridId === 'windows' ? (() => {
+                        const bounds = getGridSelectionBounds(summaryGridSelection);
+                        const start = `${spreadsheetColumnLabel(bounds.left)}${bounds.top + 1}`;
+                        const end = `${spreadsheetColumnLabel(bounds.right)}${bounds.bottom + 1}`;
+                        return start === end ? start : `${start}:${end}`;
+                      })() : ' '}
+                    </span>
+                    <span>{summaryGridSelection?.gridId === 'windows'
+                      ? `${(Math.abs(summaryGridSelection.focus.row - summaryGridSelection.anchor.row) + 1) * (Math.abs(summaryGridSelection.focus.column - summaryGridSelection.anchor.column) + 1)} cells selected`
+                      : ''}</span>
+                    <span>{copiedSummaryGridSelection?.gridId === 'windows' ? 'Copied' : ' '}</span>
+                  </div>
                 </div>
               </div>
 
@@ -6782,7 +7066,20 @@ export default function SummaryPage() {
                   </div>
                 </div>
                 <div className="overflow-x-auto max-h-[800px] overflow-y-auto pb-64">
-                  <table className="text-sm">
+                  <table
+                    className="text-sm"
+                    data-summary-grid="doors"
+                    role="grid"
+                    aria-label="Tischler Summary doors spreadsheet"
+                    onMouseDown={handleSummaryGridMouseDown}
+                    onMouseMove={handleSummaryGridMouseMove}
+                    onFocusCapture={handleSummaryGridFocusCapture}
+                    onMouseUp={() => { selectingSummaryGridRef.current = false; }}
+                    onMouseLeave={() => { selectingSummaryGridRef.current = false; }}
+                    onCopy={(event) => handleSummaryGridCopy(event)}
+                    onCut={(event) => handleSummaryGridCopy(event, true)}
+                    onPaste={handleSummaryGridPaste}
+                  >
                     <thead className="bg-gray-100 sticky top-0 z-30">
                       {/* Spanning header row */}
                       <tr>
@@ -6845,8 +7142,8 @@ export default function SummaryPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {getActiveDoorRows(editingSummary).map((row) => (
-                        <tr key={row.id} className="hover:bg-gray-50">
+                      {getActiveDoorRows(editingSummary).map((row, rowIndex) => (
+                        <tr key={row.id} data-summary-grid-row-index={rowIndex} className="hover:bg-gray-50">
                           <td className="px-0.5 py-1 align-top" style={tusPositionLocked ? {position:'sticky',left:0,zIndex:10,background:'white'} : {}}>
                             <CellInput rowId={row.id} field="tusPosition" value={row.tusPosition} onChange={(v) => updateDoorRow(row.id, 'tusPosition', v)} />
                           </td>
@@ -6973,8 +7270,8 @@ export default function SummaryPage() {
                               <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={getCustomColPos(row, col.id)} /></td>
                             </Fragment>
                           ))}
-                          <td className="px-0.5 py-1"></td>
-                          <td className="px-0.5 py-1">
+                          <td data-summary-grid-exclude="true" className="px-0.5 py-1"></td>
+                          <td data-summary-grid-exclude="true" className="px-0.5 py-1">
                             <div className="flex gap-1 justify-end mr-2">
                               <button
                                 onClick={() => handleAddDoorRowBelow(row.id)}
@@ -6997,6 +7294,20 @@ export default function SummaryPage() {
                       {renderGridTotalRow(getActiveDoorRows(editingSummary), 'door')}
                     </tbody>
                   </table>
+                  <div className="flex min-h-7 items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-500">
+                    <span className="font-mono font-medium text-gray-700">
+                      {summaryGridSelection?.gridId === 'doors' ? (() => {
+                        const bounds = getGridSelectionBounds(summaryGridSelection);
+                        const start = `${spreadsheetColumnLabel(bounds.left)}${bounds.top + 1}`;
+                        const end = `${spreadsheetColumnLabel(bounds.right)}${bounds.bottom + 1}`;
+                        return start === end ? start : `${start}:${end}`;
+                      })() : ' '}
+                    </span>
+                    <span>{summaryGridSelection?.gridId === 'doors'
+                      ? `${(Math.abs(summaryGridSelection.focus.row - summaryGridSelection.anchor.row) + 1) * (Math.abs(summaryGridSelection.focus.column - summaryGridSelection.anchor.column) + 1)} cells selected`
+                      : ''}</span>
+                    <span>{copiedSummaryGridSelection?.gridId === 'doors' ? 'Copied' : ' '}</span>
+                  </div>
                 </div>
               </div>
             
