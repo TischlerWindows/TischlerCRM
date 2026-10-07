@@ -235,11 +235,25 @@ function EditableCell({
   onCommit: (newValue: unknown) => void
 }) {
   const [draft, setDraft] = useState<unknown>(value)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const isNumber = type === 'number'
 
   useEffect(() => {
     if (isEditing) setDraft(value ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing])
+
+  useEffect(() => {
+    if (!isEditing || type === 'combobox') return
+    const focusFrame = requestAnimationFrame(() => {
+      const input = inputRef.current
+      const rect = input?.getBoundingClientRect()
+      if (!input || !rect || (rect.width === 0 && rect.height === 0)) return
+      input.focus()
+      if (!isNumber) input.select()
+    })
+    return () => cancelAnimationFrame(focusFrame)
+  }, [isEditing, isNumber, type])
 
   const startEdit = () => {
     if (saving) return
@@ -264,12 +278,11 @@ function EditableCell({
         />
       )
     }
-    const isNumber = type === 'number'
     return (
       <input
+        ref={inputRef}
         type={isNumber ? 'number' : 'text'}
         data-cell-id={dataCellId}
-        autoFocus
         value={typeof draft === 'string' || typeof draft === 'number' ? String(draft) : ''}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => commit(draft)}
