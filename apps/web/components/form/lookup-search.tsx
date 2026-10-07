@@ -652,6 +652,7 @@ export interface MultiLookupUserSearchProps {
   disabled?: boolean;
   error?: string;
   userRecords: any[];
+  selectedUserRecords?: any[];
   lookupQuery: string;
   isActive: boolean;
   onQueryChange: (query: string) => void;
@@ -667,6 +668,7 @@ export function MultiLookupUserSearch({
   disabled,
   error,
   userRecords,
+  selectedUserRecords = userRecords,
   lookupQuery,
   isActive,
   onQueryChange,
@@ -682,9 +684,10 @@ export function MultiLookupUserSearch({
     ? value.map(String)
     : [];
 
-  const selectedUsers = selectedIds
-    .map((id) => userRecords.find((u) => String(u.id) === id))
-    .filter(Boolean) as any[];
+  const selectedUsers = selectedIds.map((id) => {
+    const user = selectedUserRecords.find((candidate) => String(candidate.id) === id)
+    return user ?? { id, name: `Unavailable user (${id.slice(0, 8)})`, email: '', unavailable: true }
+  })
 
   const toggleUser = (userId: string, user: any) => {
     upsertLookupCacheRecord('User', user);

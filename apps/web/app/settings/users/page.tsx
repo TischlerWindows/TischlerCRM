@@ -67,6 +67,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [userTab, setUserTab] = useState<'active' | 'inactive'>('active');
 
   const [showNewModal, setShowNewModal] = useState(false);
   const [newForm, setNewForm] = useState<CreateUserInput>({ name: '', email: '' });
@@ -130,15 +131,15 @@ export default function UsersPage() {
 
   const filtered = users.filter(u => {
     const q = search.toLowerCase();
+    const inSelectedTab = userTab === 'active' ? u.isActive : !u.isActive;
     const matchSearch = !search
       || (u.name?.toLowerCase().includes(q) ?? false)
       || u.email.toLowerCase().includes(q);
     const matchDept = !deptFilter || u.department?.id === deptFilter;
     const matchStatus = !statusFilter
-      || (statusFilter === 'active' && (u.inviteStatus === 'ACCEPTED' || u.inviteStatus === 'LEGACY') && u.isActive)
-      || (statusFilter === 'pending' && (u.inviteStatus === 'PENDING' || u.inviteStatus === 'EXPIRED'))
-      || (statusFilter === 'frozen' && !u.isActive);
-    return matchSearch && matchDept && matchStatus;
+      || (statusFilter === 'active' && (u.inviteStatus === 'ACCEPTED' || u.inviteStatus === 'LEGACY'))
+      || (statusFilter === 'pending' && (u.inviteStatus === 'PENDING' || u.inviteStatus === 'EXPIRED'));
+    return inSelectedTab && matchSearch && matchDept && matchStatus;
   });
 
   async function handleCreate() {
@@ -224,6 +225,29 @@ export default function UsersPage() {
         } : undefined}
       />
 
+      <div role="tablist" aria-label="User status" className="flex gap-1 border-b border-gray-200">
+        {([
+          ['active', 'Active Users'],
+          ['inactive', 'Inactive Users'],
+        ] as const).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={userTab === tab}
+            onClick={() => { setUserTab(tab); setStatusFilter(''); }}
+            className={`border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${userTab === tab
+              ? 'border-[#151f6d] text-[#151f6d]'
+              : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+          >
+            {label}
+            <span className="ml-2 text-xs font-normal text-gray-400">
+              {users.filter(user => tab === 'active' ? user.isActive : !user.isActive).length}
+            </span>
+          </button>
+        ))}
+      </div>
+
       <SettingsFilterBar
         searchValue={search}
         onSearchChange={setSearch}
@@ -244,7 +268,6 @@ export default function UsersPage() {
               { label: 'All Statuses', value: '' },
               { label: 'Active', value: 'active' },
               { label: 'Invite Pending', value: 'pending' },
-              { label: 'Frozen', value: 'frozen' },
             ],
           },
         ]}
@@ -267,7 +290,11 @@ export default function UsersPage() {
             <Users className="w-10 h-10 text-gray-200 mb-3" />
             <p className="text-sm text-gray-500 font-medium">No users found</p>
             <p className="text-xs text-gray-400 mt-1">
-              {search || deptFilter || statusFilter ? 'Try adjusting your filters.' : 'Create the first user to get started.'}
+              {search || deptFilter || statusFilter
+                ? 'Try adjusting your filters.'
+                : userTab === 'inactive'
+                  ? 'No inactive users.'
+                  : 'Create the first user to get started.'}
             </p>
           </div>
         ) : (
@@ -328,10 +355,9 @@ export default function UsersPage() {
                       </td>
                       <td className="py-3 px-3">
                         <div className="flex flex-col gap-1">
-                          <InviteStatusBadge status={user.inviteStatus} />
-                          {!user.isActive && (
+                          {user.isActive ? <InviteStatusBadge status={user.inviteStatus} /> : (
                             <span className="inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 border border-gray-200 w-fit">
-                              Frozen
+                              Inactive
                             </span>
                           )}
                         </div>
@@ -374,7 +400,7 @@ export default function UsersPage() {
                           <button
                             onClick={() => setConfirmAction({ type: 'freeze', userId: user.id, userName: user.name ?? user.email, isActive: user.isActive })}
                             className="p-1.5 text-gray-400 hover:text-orange-600 rounded-md hover:bg-orange-50 transition-colors"
-                            title={user.isActive ? 'Freeze account' : 'Unfreeze account'}
+                            title={user.isActive ? 'Deactivate account' : 'Reactivate account'}
                           >
                             <Ban className="w-3.5 h-3.5" />
                           </button>
@@ -535,12 +561,12 @@ export default function UsersPage() {
           <div className="bg-white rounded-2xl shadow-2xl p-7 w-full max-w-sm mx-4">
             <h2 className="text-base font-bold text-gray-900 mb-2">
               {confirmAction.type === 'freeze'
-                ? (confirmAction.isActive ? 'Freeze Account' : 'Unfreeze Account')
+                ? (confirmAction.isActive ? 'Deactivate Account' : 'Reactivate Account')
                 : 'Delete User'}
             </h2>
             <p className="text-sm text-gray-500 mb-6">
               {confirmAction.type === 'freeze'
-                ? `${confirmAction.isActive ? 'Freeze' : 'Unfreeze'} ${confirmAction.userName}? ${confirmAction.isActive ? 'They will not be able to log in until unfrozen.' : 'They will regain access immediately.'}`
+                ? `${confirmAction.isActive ? 'Deactivate' : 'Reactivate'} ${confirmAction.userName}? ${confirmAction.isActive ? 'They will no longer be able to log in and will move to the Inactive Users tab. Existing record references will be preserved.' : 'They will regain access and return to the Active Users tab.'}`
                 : `Permanently delete ${confirmAction.userName}? This moves them to the Recycle Bin.`}
             </p>
             <div className="flex gap-3 justify-end">
@@ -555,7 +581,7 @@ export default function UsersPage() {
                 disabled={actionLoading}
                 className={`px-5 py-2.5 text-sm text-white rounded-lg disabled:opacity-50 transition-colors ${confirmAction.type === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-600 hover:bg-orange-700'}`}
               >
-                {actionLoading ? 'Please wait…' : confirmAction.type === 'freeze' ? (confirmAction.isActive ? 'Freeze' : 'Unfreeze') : 'Delete'}
+                {actionLoading ? 'Please wait…' : confirmAction.type === 'freeze' ? (confirmAction.isActive ? 'Deactivate' : 'Reactivate') : 'Delete'}
               </button>
             </div>
           </div>

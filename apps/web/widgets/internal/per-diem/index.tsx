@@ -70,6 +70,7 @@ interface UserRecord {
   name?: string
   email?: string
   title?: string
+  isActive: boolean
 }
 
 /** Fixed column widths for the desktop table (via <colgroup>) — with
@@ -110,7 +111,8 @@ function UserLookupField({
       fieldDef={{ id: 'serviceTechPerDiem', apiName: 'serviceTechPerDiem', label: 'Service Tech Per Diem', type: 'MultiLookupUser' }}
       value={value}
       onChange={onChange}
-      userRecords={users}
+      userRecords={users.filter((user) => user.isActive)}
+      selectedUserRecords={users}
       lookupQuery={query}
       isActive={active}
       onQueryChange={setQuery}
