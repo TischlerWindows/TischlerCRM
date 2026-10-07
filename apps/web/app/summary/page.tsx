@@ -48,6 +48,7 @@ import { DateInput } from '@/components/date-input';
 import { useSchemaStore } from '@/lib/schema-store';
 import { filterPicklistValues } from '@/components/form/picklist-fields';
 import {
+  getGridFillTargets,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   parseGridClipboard,
@@ -242,6 +243,10 @@ const CellNavContext = createContext<CellNavCtx>({
 });
 
 type SummaryGridRange = GridSelection & { gridId: string };
+interface SummaryGridFillDrag {
+  selection: SummaryGridRange;
+  target: GridCoordinate;
+}
 
 // Finds the data-cell-id of the table cell adjacent to `td` in the given direction.
 // 'right' wraps to the first cell of the next row when at the end of a row.
@@ -980,6 +985,7 @@ export default function SummaryPage() {
   const [pendingInput, setPendingInput] = useState<string | null>(null);
   const [summaryGridSelection, setSummaryGridSelection] = useState<SummaryGridRange | null>(null);
   const [copiedSummaryGridSelection, setCopiedSummaryGridSelection] = useState<SummaryGridRange | null>(null);
+  const [summaryGridFillDrag, setSummaryGridFillDrag] = useState<SummaryGridFillDrag | null>(null);
   const selectingSummaryGridRef = useRef(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [tusPositionLocked, setTusPositionLocked] = useState(true);
@@ -3658,10 +3664,23 @@ export default function SummaryPage() {
   }
 
   function handleSummaryGridMouseDown(event: React.MouseEvent<HTMLTableElement>) {
+    if (event.button !== 0) return;
     if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
     const position = getSummaryGridCellPosition(event.target);
     if (!position) return;
     const coordinate = { row: position.row, column: position.column };
+    if (summaryGridSelection?.gridId === position.gridId) {
+      const bounds = getGridSelectionBounds(summaryGridSelection);
+      const rect = position.cell.getBoundingClientRect();
+      if (bounds.bottom === position.row && bounds.right === position.column
+        && event.clientX >= rect.right - 9 && event.clientY >= rect.bottom - 9) {
+        event.preventDefault();
+        event.stopPropagation();
+        selectingSummaryGridRef.current = false;
+        setSummaryGridFillDrag({ selection: summaryGridSelection, target: coordinate });
+        return;
+      }
+    }
     setSummaryGridSelection(current => event.shiftKey && current?.gridId === position.gridId
       ? { ...current, focus: coordinate }
       : { gridId: position.gridId, anchor: coordinate, focus: coordinate });
@@ -3683,10 +3702,16 @@ export default function SummaryPage() {
   }
 
   function handleSummaryGridMouseMove(event: React.MouseEvent<HTMLTableElement>) {
-    if (!selectingSummaryGridRef.current) return;
     const position = getSummaryGridCellPosition(event.target);
     if (!position) return;
     const coordinate = { row: position.row, column: position.column };
+    if (summaryGridFillDrag?.selection.gridId === position.gridId) {
+      setSummaryGridFillDrag(current => current?.selection.gridId === position.gridId
+        ? { ...current, target: coordinate }
+        : current);
+      return;
+    }
+    if (!selectingSummaryGridRef.current) return;
     setSummaryGridSelection(current => current?.gridId === position.gridId
       ? { ...current, focus: coordinate }
       : { gridId: position.gridId, anchor: coordinate, focus: coordinate });
@@ -3743,6 +3768,32 @@ export default function SummaryPage() {
     });
   }
 
+  useEffect(() => {
+    if (!summaryGridFillDrag) return;
+    const onMouseUp = () => {
+      const drag = summaryGridFillDrag;
+      setSummaryGridFillDrag(null);
+      const table = Array.from(document.querySelectorAll<HTMLTableElement>('table[data-summary-grid]'))
+        .find(candidate => candidate.dataset.summaryGrid === drag.selection.gridId) ?? null;
+      const rows = getSummaryGridRows(table);
+      for (const target of getGridFillTargets(drag.selection, drag.target)) {
+        const sourceCell = getSummaryGridCells(rows[target.sourceRow])[target.sourceColumn];
+        const destinationCell = getSummaryGridCells(rows[target.row])[target.column];
+        const cellId = destinationCell?.querySelector<HTMLElement>('[data-cell-id]')?.dataset.cellId;
+        if (!sourceCell || !cellId) continue;
+        const separator = cellId.lastIndexOf(':');
+        if (separator < 1) continue;
+        const rowId = cellId.slice(0, separator);
+        const field = cellId.slice(separator + 1);
+        const value = readSummaryGridCell(sourceCell);
+        if (drag.selection.gridId === 'windows') updateRow(rowId, field as keyof SummaryRow, value);
+        else updateDoorRow(rowId, field as keyof DoorRow, value);
+      }
+    };
+    window.addEventListener('mouseup', onMouseUp);
+    return () => window.removeEventListener('mouseup', onMouseUp);
+  }, [summaryGridFillDrag, updateRow, updateDoorRow]);
+
   function handleSummaryGridCopy(event: React.ClipboardEvent<HTMLTableElement>, cut = false) {
     const selection = summaryGridSelection;
     const gridId = event.currentTarget.dataset.summaryGrid;
@@ -3780,6 +3831,10 @@ export default function SummaryPage() {
       const copiedBounds = copiedSummaryGridSelection && copiedSummaryGridSelection.gridId === gridId
         ? getGridSelectionBounds(copiedSummaryGridSelection)
         : null;
+      const fillTargets = summaryGridFillDrag?.selection.gridId === gridId
+        ? new Set(getGridFillTargets(summaryGridFillDrag.selection, summaryGridFillDrag.target)
+          .map(target => `${target.row}:${target.column}`))
+        : new Set<string>();
       rows.forEach((row, rowIndex) => getSummaryGridCells(row).forEach((cell, columnIndex) => {
         const selected = !!selectedBounds && rowIndex >= selectedBounds.top && rowIndex <= selectedBounds.bottom
           && columnIndex >= selectedBounds.left && columnIndex <= selectedBounds.right;
@@ -3794,6 +3849,9 @@ export default function SummaryPage() {
         setRangeAttribute('data-summary-grid-bottom', selected && rowIndex === selectedBounds?.bottom);
         setRangeAttribute('data-summary-grid-left', selected && columnIndex === selectedBounds?.left);
         setRangeAttribute('data-summary-grid-right', selected && columnIndex === selectedBounds?.right);
+        setRangeAttribute('data-summary-grid-fill-anchor', selected && !editingCellId
+          && rowIndex === selectedBounds?.bottom && columnIndex === selectedBounds?.right);
+        setRangeAttribute('data-summary-grid-fill-target', fillTargets.has(`${rowIndex}:${columnIndex}`));
         cell.classList.toggle('summary-grid-copied', copied);
         if (copied && copiedBounds) {
           const stripe = 'repeating-linear-gradient(90deg, #fff 0 3px, #217346 3px 6px)';
@@ -3816,7 +3874,7 @@ export default function SummaryPage() {
       }));
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [summaryGridSelection, copiedSummaryGridSelection, editingSummary, showType3, showType4, showMagneticContact, showShadeBoxesNoTrim, showShadeBoxesWithTrim, showFinalFinish]);
+  }, [summaryGridSelection, copiedSummaryGridSelection, summaryGridFillDrag, editingCellId, editingSummary, showType3, showType4, showMagneticContact, showShadeBoxesNoTrim, showShadeBoxesWithTrim, showFinalFinish]);
   
   if (loading) {
     return (

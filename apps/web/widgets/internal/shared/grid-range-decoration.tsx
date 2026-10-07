@@ -75,6 +75,24 @@ export function GridRangeStyles() {
       td[data-summary-grid-bottom="true"] { border-bottom: 2px solid #217346 !important; }
       td[data-summary-grid-left="true"] { border-left: 2px solid #217346 !important; }
       td[data-summary-grid-right="true"] { border-right: 2px solid #217346 !important; }
+      td[data-summary-grid-fill-anchor="true"] { position: relative; }
+      td[data-summary-grid-fill-anchor="true"]::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 8px;
+        height: 8px;
+        border: 1px solid #fff;
+        background: #217346;
+        cursor: crosshair;
+        z-index: 50;
+      }
+      td[data-summary-grid-fill-target="true"] {
+        background-color: #d4edda !important;
+        outline: 1px solid #217346;
+        outline-offset: -1px;
+      }
       td.summary-grid-copied { animation: summary-grid-march 0.35s linear infinite; }
       table[data-summary-grid] td:focus,
       table[data-summary-grid] td:focus-visible,
