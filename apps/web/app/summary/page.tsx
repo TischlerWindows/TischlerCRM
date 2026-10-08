@@ -1037,6 +1037,18 @@ export default function SummaryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const setSummaryGridEditing = (id: string | null) => {
+    setEditingCellId(id);
+    if (!id) return;
+    setActiveCellId(id);
+    const cellElement = Array.from(document.querySelectorAll<HTMLElement>('[data-cell-id]'))
+      .find(element => element.dataset.cellId === id);
+    const position = getSummaryGridCellPosition(cellElement ?? null);
+    if (!position) return;
+    const coordinate = { row: position.row, column: position.column };
+    setSummaryGridSelection({ gridId: position.gridId, anchor: coordinate, focus: coordinate });
+  };
+
   useEffect(() => {
     clearSummaryUndo();
   }, [editingSummary?.id, clearSummaryUndo]);
@@ -4592,7 +4604,7 @@ export default function SummaryPage() {
 
     {/* Summary Editor Dialog */}
     {showNewSummary && editingSummary && (
-      <CellNavContext.Provider value={{ activeCellId, editingCellId, hasGridSelection: !!summaryGridSelection, setActive: setActiveCellId, setEditing: setEditingCellId, pendingInput, setPendingInput }}>
+      <CellNavContext.Provider value={{ activeCellId, editingCellId, hasGridSelection: !!summaryGridSelection, setActive: setActiveCellId, setEditing: setSummaryGridEditing, pendingInput, setPendingInput }}>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 sm:p-4">
         <div className="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-[95vw] h-full sm:h-auto sm:max-h-[95dvh] flex flex-col">
             <GridRangeStyles />
