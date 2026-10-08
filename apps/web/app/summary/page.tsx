@@ -402,6 +402,7 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
   };
 
   const handleSelectOption = (option: string) => {
+    const currentCell = textareaRef.current?.closest<HTMLTableCellElement>('td') ?? null;
     onChange(option);
     setSearchTerm('');
     setIsOpen(false);
@@ -415,6 +416,11 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
     } else {
       onEditEnd?.(option);
       setEditing(null);
+      requestAnimationFrame(() => {
+        if (!currentCell?.isConnected) return;
+        currentCell.tabIndex = -1;
+        currentCell.focus();
+      });
     }
     setTimeout(() => adjustHeight(textareaRef.current), 0);
   };
