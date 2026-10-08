@@ -13,6 +13,7 @@ import type { NavDirection } from '@/lib/cell-navigation'
 import {
   getGridFillTargets,
   getGridFillRangeCellClasses,
+  isCaretAtHorizontalEdge,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -477,7 +478,21 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     `${extra} ${gridSelection?.view === view && isInGridSelection(row, column, gridSelection) ? 'bg-[#e2f0d9]' : ''} ${fillDrag?.selection.view === view ? getGridFillRangeCellClasses(row, column, fillDrag.selection, fillDrag.target) : ''}`
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number, view: 'desktop' | 'mobile') => {
-    if (event.defaultPrevented || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) return
+    if (event.defaultPrevented) return
+    if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) {
+      const target = event.target
+      const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
+      const atEdge = direction && target instanceof HTMLInputElement && target.type === 'number'
+        ? true
+        : direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+          ? isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
+          : false
+      if (direction && atEdge) {
+        event.preventDefault()
+        navigateGrid(row, column, direction, view)
+      }
+      return
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault()
       void undoGridAction()

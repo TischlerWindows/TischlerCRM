@@ -26,6 +26,7 @@ import { parseCadIndexComments } from '@/lib/cad-index-comments'
 import {
   getGridFillTargets,
   getGridFillRangeCellClasses,
+  isCaretAtHorizontalEdge,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -510,7 +511,21 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>, row: number, column: number) => {
     const target = event.target
-    if ((target instanceof HTMLInputElement && target.type !== 'checkbox') || target instanceof HTMLTextAreaElement) return
+    if ((target instanceof HTMLInputElement && target.type !== 'checkbox') || target instanceof HTMLTextAreaElement) {
+      const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
+      const atEdge = direction && target instanceof HTMLInputElement && target.type === 'number'
+        ? true
+        : direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+          ? isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
+          : false
+      if (direction && atEdge) {
+        event.preventDefault()
+        setEditingCellId(null)
+        setEditSeed(null)
+        navigateGrid(row, column, direction)
+      }
+      return
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault()
       void undoGridAction()

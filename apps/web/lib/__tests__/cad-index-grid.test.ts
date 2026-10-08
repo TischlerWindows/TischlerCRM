@@ -1,6 +1,7 @@
 import {
   getGridSelectionBounds,
   getGridSelectionOrigin,
+  isCaretAtHorizontalEdge,
   getGridFillRangeCellClasses,
   getGridFillRangeBounds,
   getGridFillTargets,
@@ -13,6 +14,14 @@ import {
 } from '../cad-index-grid'
 
 describe('CAD Index List spreadsheet grid helpers', () => {
+  it('detects horizontal caret boundaries in text and textarea editors', () => {
+    expect(isCaretAtHorizontalEdge('55', 2, 2, 'right')).toBe(true)
+    expect(isCaretAtHorizontalEdge('55', 2, 2, 'left')).toBe(false)
+    expect(isCaretAtHorizontalEdge('notes', 0, 0, 'left')).toBe(true)
+    expect(isCaretAtHorizontalEdge('notes', 0, 0, 'right')).toBe(false)
+    expect(isCaretAtHorizontalEdge('55', null, null, 'right')).toBe(false)
+  })
+
   it('normalizes a rectangular selection regardless of drag direction', () => {
     const selection = { anchor: { row: 3, column: 4 }, focus: { row: 1, column: 2 } }
     expect(getGridSelectionBounds(selection)).toEqual({ top: 1, bottom: 3, left: 2, right: 4 })

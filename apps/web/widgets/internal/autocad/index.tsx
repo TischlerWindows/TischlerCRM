@@ -17,6 +17,7 @@ import type { NavDirection } from '@/lib/cell-navigation'
 import { readProjectField } from '@/lib/factory-order-spec'
 import { userLookupIds, type LookupUserIdentity } from '@/lib/user-lookup'
 import {
+  isCaretAtHorizontalEdge,
   getGridFillTargets,
   getGridFillRangeCellClasses,
   getGridSelectionBounds,
@@ -435,7 +436,17 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   }
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {
-    if (event.target instanceof HTMLInputElement) return
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
+      const atEdge = direction && (event.target instanceof HTMLInputElement && event.target.type === 'number'
+        || isCaretAtHorizontalEdge(event.target.value, event.target.selectionStart, event.target.selectionEnd, direction))
+      if (direction && atEdge) {
+        event.preventDefault()
+        setEditingCellId(null)
+        navigateGrid(row, column, direction)
+      }
+      return
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault()
       void undoGridAction()

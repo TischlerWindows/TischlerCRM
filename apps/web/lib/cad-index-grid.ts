@@ -140,3 +140,15 @@ export function getGridFillRangeCellClasses(
     column === bounds.right ? 'border-r-2 border-r-[#217346]' : '',
   ].filter(Boolean).join(' ')
 }
+
+export function isCaretAtHorizontalEdge(
+  value: string,
+  selectionStart: number | null,
+  selectionEnd: number | null,
+  direction: 'left' | 'right',
+): boolean {
+  if (selectionStart === null || selectionEnd === null) return false
+  return direction === 'left'
+    ? selectionStart === 0 && selectionEnd === 0
+    : selectionStart === value.length && selectionEnd === value.length
+}

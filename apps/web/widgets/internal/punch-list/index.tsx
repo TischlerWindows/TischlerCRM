@@ -26,6 +26,7 @@ import type { NavDirection } from '@/lib/cell-navigation'
 import {
   getGridFillTargets,
   getGridFillRangeCellClasses,
+  isCaretAtHorizontalEdge,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -600,7 +601,20 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {
     if (event.defaultPrevented) return
-    if (event.target instanceof HTMLTextAreaElement || (event.target instanceof HTMLInputElement && event.target.type !== 'checkbox')) return
+    if (event.target instanceof HTMLTextAreaElement || (event.target instanceof HTMLInputElement && event.target.type !== 'checkbox')) {
+      const target = event.target
+      const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
+      const atEdge = direction && target instanceof HTMLInputElement && target.type === 'number'
+        ? true
+        : direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+          ? isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
+          : false
+      if (direction && atEdge) {
+        event.preventDefault()
+        navigateGrid(row, column, direction)
+      }
+      return
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
       event.preventDefault()
       void undoGridAction()

@@ -52,6 +52,7 @@ import {
   getGridFillRangeBounds,
   getGridSelectionBounds,
   getGridSelectionOrigin,
+  isCaretAtHorizontalEdge,
   parseGridClipboard,
   serializeGridClipboard,
   spreadsheetColumnLabel,
@@ -414,6 +415,20 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const horizontalDirection = e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : null;
+    if (horizontalDirection && isCaretAtHorizontalEdge(
+      e.currentTarget.value,
+      e.currentTarget.selectionStart,
+      e.currentTarget.selectionEnd,
+      horizontalDirection,
+    )) {
+      e.preventDefault();
+      const td = e.currentTarget.closest('td');
+      setEditing(null);
+      const id = td && findAdjacentCellId(td, horizontalDirection);
+      if (id) { setActive(id); setEditing(id); }
+      return;
+    }
     if (!isOpen || filteredOptions.length === 0) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -454,8 +469,8 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
         return;
       }
       const textarea = e.currentTarget;
-      const atEnd = textarea.selectionStart === textarea.value.length && textarea.selectionEnd === textarea.value.length;
-      const atStart = textarea.selectionStart === 0 && textarea.selectionEnd === 0;
+      const atEnd = isCaretAtHorizontalEdge(textarea.value, textarea.selectionStart, textarea.selectionEnd, 'right');
+      const atStart = isCaretAtHorizontalEdge(textarea.value, textarea.selectionStart, textarea.selectionEnd, 'left');
       if (e.key === 'ArrowRight' && atEnd) {
         e.preventDefault();
         const td = e.currentTarget.closest('td');
@@ -656,8 +671,8 @@ const CellInput = ({ rowId, field, value, onChange }: {
     }
 
     const textarea = e.currentTarget;
-    const atEnd = textarea.selectionStart === textarea.value.length && textarea.selectionEnd === textarea.value.length;
-    const atStart = textarea.selectionStart === 0 && textarea.selectionEnd === 0;
+    const atEnd = isCaretAtHorizontalEdge(textarea.value, textarea.selectionStart, textarea.selectionEnd, 'right');
+    const atStart = isCaretAtHorizontalEdge(textarea.value, textarea.selectionStart, textarea.selectionEnd, 'left');
     if (e.key === 'ArrowRight' && atEnd) {
       e.preventDefault();
       const td = e.currentTarget.closest('td');
