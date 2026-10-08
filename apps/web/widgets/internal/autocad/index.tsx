@@ -464,6 +464,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
       )
       if (direction && atEdge) {
         event.preventDefault()
+        if (event.target instanceof HTMLElement) event.target.blur()
         setEditingCellId(null)
         navigateGrid(row, column, direction)
       }

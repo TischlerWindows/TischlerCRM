@@ -429,6 +429,7 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
     )) {
       e.preventDefault();
       const td = e.currentTarget.closest('td');
+      e.currentTarget.blur();
       setEditing(null);
       const id = td && findAdjacentCellId(td, horizontalDirection);
       if (id) { setActive(id); setEditing(id); }
@@ -686,6 +687,7 @@ const CellInput = ({ rowId, field, value, onChange }: {
     if (e.key === 'ArrowRight' && atEnd) {
       e.preventDefault();
       const td = e.currentTarget.closest('td');
+      e.currentTarget.blur();
       setEditing(null);
       const id = td && findAdjacentCellId(td, 'right');
       if (id) { setActive(id); setEditing(id); }
@@ -694,6 +696,7 @@ const CellInput = ({ rowId, field, value, onChange }: {
     if (e.key === 'ArrowLeft' && atStart) {
       e.preventDefault();
       const td = e.currentTarget.closest('td');
+      e.currentTarget.blur();
       setEditing(null);
       const id = td && findAdjacentCellId(td, 'left');
       if (id) { setActive(id); setEditing(id); }

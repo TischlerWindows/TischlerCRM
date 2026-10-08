@@ -525,6 +525,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
         && isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
       if (direction && atEdge) {
         event.preventDefault()
+        target.blur()
         setEditingCellId(null)
         setEditSeed(null)
         navigateGrid(row, column, direction)

@@ -631,6 +631,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
         && isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
       if (direction && atEdge) {
         event.preventDefault()
+        target.blur()
         navigateGrid(row, column, direction)
       }
       return
