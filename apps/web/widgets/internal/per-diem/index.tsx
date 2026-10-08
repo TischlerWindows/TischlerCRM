@@ -503,10 +503,15 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     if (event.defaultPrevented) return
     if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) {
       const target = event.target
-      const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
-      const atEdge = direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
-        && isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
-      if (direction && atEdge) {
+      const direction = event.key === 'ArrowLeft' ? 'left'
+        : event.key === 'ArrowRight' ? 'right'
+        : event.key === 'ArrowUp' ? 'up'
+        : event.key === 'ArrowDown' ? 'down'
+        : null
+      const atHorizontalEdge = direction === 'left' || direction === 'right'
+        ? isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
+        : direction !== null
+      if (direction && atHorizontalEdge) {
         event.preventDefault()
         target.blur()
         navigateGrid(row, column, direction, view)

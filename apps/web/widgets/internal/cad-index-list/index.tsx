@@ -520,10 +520,15 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>, row: number, column: number) => {
     const target = event.target
     if ((target instanceof HTMLInputElement && target.type !== 'checkbox') || target instanceof HTMLTextAreaElement) {
-      const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
-      const atEdge = direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
-        && isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
-      if (direction && atEdge) {
+      const direction = event.key === 'ArrowLeft' ? 'left'
+        : event.key === 'ArrowRight' ? 'right'
+        : event.key === 'ArrowUp' ? 'up'
+        : event.key === 'ArrowDown' ? 'down'
+        : null
+      const atHorizontalEdge = direction === 'left' || direction === 'right'
+        ? isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
+        : direction !== null
+      if (direction && atHorizontalEdge) {
         event.preventDefault()
         target.blur()
         setEditingCellId(null)

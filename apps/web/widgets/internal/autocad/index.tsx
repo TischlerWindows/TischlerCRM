@@ -454,15 +454,22 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   }
 
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {
+    if (event.defaultPrevented) return
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-      const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
-      const atEdge = direction && isCaretAtHorizontalEdge(
+      const direction = event.key === 'ArrowLeft' ? 'left'
+        : event.key === 'ArrowRight' ? 'right'
+        : event.key === 'ArrowUp' ? 'up'
+        : event.key === 'ArrowDown' ? 'down'
+        : null
+      const atHorizontalEdge = direction === 'left' || direction === 'right'
+        ? isCaretAtHorizontalEdge(
         event.target.value,
         event.target.selectionStart,
         event.target.selectionEnd,
         direction,
       )
-      if (direction && atEdge) {
+        : direction !== null
+      if (direction && atHorizontalEdge) {
         event.preventDefault()
         if (event.target instanceof HTMLElement) event.target.blur()
         setEditingCellId(null)
