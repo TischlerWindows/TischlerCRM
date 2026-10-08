@@ -764,13 +764,18 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
             ? getConnectedRecordTypeLabel(accountRecords, accountId, connectionTarget)
             : ''
         : ''
-      const role = explicitRole || connectedType || (isLookupConnection ? getStr(member, 'connectionFieldLabel') : '')
+      const connectionFieldLabel = isLookupConnection ? getStr(member, 'connectionFieldLabel').trim() : ''
+      const role = explicitRole || connectedType || connectionFieldLabel
+      const memberRoles = Array.from(new Set([
+        role,
+        useConnectedRecordType ? connectionFieldLabel : '',
+      ].filter(Boolean)))
       const isPrimary = getField(member, 'primaryContact') === true || getField(member, 'primaryContact') === 'true'
       const isContractHolder = getField(member, 'contractHolder') === true || getField(member, 'contractHolder') === 'true'
       const isQuoteRecipient = getField(member, 'quoteRecipient') === true || getField(member, 'quoteRecipient') === 'true'
       const memberId = String(member.id)
 
-      if (role) roleSet.add(role)
+      memberRoles.forEach(memberRole => roleSet.add(memberRole))
 
       // Determine "via" source — which parent record this member belongs to.
       // Skip the self-referential entry: when the member is directly attached
@@ -800,7 +805,9 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       if (contactId) {
         const existing = contactMap.get(contactId)
         if (existing) {
-          if (role && !existing.roles.includes(role)) existing.roles.push(role)
+          for (const memberRole of memberRoles) {
+            if (!existing.roles.includes(memberRole)) existing.roles.push(memberRole)
+          }
           for (const vs of viaSources) {
             if (!existing.viaSources.some(s => s.objectApiName === vs.objectApiName && s.recordId === vs.recordId)) {
               existing.viaSources.push(vs)
@@ -822,7 +829,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
             contactData: contactRecords.get(contactId) ?? {},
             accountId: accountId || undefined,
             accountName: accountName || undefined,
-            roles: role ? [role] : [],
+            roles: memberRoles,
             viaSources,
             isPrimary,
             isContractHolder,
@@ -842,7 +849,9 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       if (accountId) {
         const existing = accountMap.get(accountId)
         if (existing) {
-          if (role && !existing.roles.includes(role)) existing.roles.push(role)
+          for (const memberRole of memberRoles) {
+            if (!existing.roles.includes(memberRole)) existing.roles.push(memberRole)
+          }
           for (const vs of viaSources) {
             if (!existing.viaSources.some(s => s.objectApiName === vs.objectApiName && s.recordId === vs.recordId)) {
               existing.viaSources.push(vs)
@@ -858,7 +867,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
             accountId,
             accountName: accountName || 'Unknown Account',
             accountData: accountRecords.get(accountId) ?? {},
-            roles: role ? [role] : [],
+            roles: memberRoles,
             viaSources,
             isPrimary,
             isContractHolder,

@@ -30,6 +30,7 @@ interface AssociationRow {
   parentRecordName: string
   parentRecordData: Record<string, unknown>
   role: string
+  roles?: string[]
   isPrimary: boolean
   isContractHolder: boolean
   isQuoteRecipient: boolean
@@ -361,6 +362,7 @@ function AssocRow({
           ) : (
             <ConnectionBadges
               role={assoc.role}
+              roles={assoc.roles}
               flags={{
                 primary: assoc.isPrimary,
                 contractHolder: assoc.isContractHolder,
@@ -505,6 +507,7 @@ function FlatTile({
           ) : (
             <ConnectionBadges
               role={assoc.role}
+              roles={assoc.roles}
               flags={{
                 primary: assoc.isPrimary,
                 contractHolder: assoc.isContractHolder,
@@ -800,17 +803,22 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
         const roleApiName = getConnectionRoleFieldApiName(field.apiName)
         const roleBareName = getConnectionRoleFieldBareName(field.apiName)
         const savedRole = recordData[roleApiName] ?? recordData[roleBareName]
+        const role = typeof savedRole === 'string' && savedRole.trim()
+          ? savedRole.trim()
+          : (field.type === 'ConnectionContact' || field.type === 'ConnectionAccount') && connectedRecordType
+            ? connectedRecordType
+            : field.label
+        const roles = (field.type === 'ConnectionContact' || field.type === 'ConnectionAccount') && connectedRecordType
+          ? Array.from(new Set([role, field.label].filter(Boolean)))
+          : [role]
         const row: AssociationRow = {
           memberId: `connection:${sourceApiName}:${field.apiName}:${connectedRecord.id}`,
           objectApiName: sourceApiName,
           parentRecordId: String(connectedRecord.id),
           parentRecordName: getRecordName(connectedRecord as unknown as Record<string, unknown>),
           parentRecordData: recordData,
-          role: typeof savedRole === 'string' && savedRole.trim()
-            ? savedRole.trim()
-            : (field.type === 'ConnectionContact' || field.type === 'ConnectionAccount') && connectedRecordType
-              ? connectedRecordType
-              : field.label,
+          role,
+          roles,
           isPrimary: false,
           isContractHolder: false,
           isQuoteRecipient: false,
