@@ -130,7 +130,11 @@ function TextCell({
   useEffect(() => {
     if (!editing) return
     setDraft(editSeed ?? (typeof value === 'string' || typeof value === 'number' ? String(value) : ''))
-    requestAnimationFrame(() => (multiline ? textareaRef.current : inputRef.current)?.focus())
+    requestAnimationFrame(() => {
+      const editor = multiline ? textareaRef.current : inputRef.current
+      editor?.focus()
+      if (editSeed !== null) editor?.setSelectionRange(editSeed.length, editSeed.length)
+    })
   }, [editing, editSeed, multiline, value])
 
   const commit = (next: string) => {

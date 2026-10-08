@@ -127,16 +127,23 @@ function FastenerComboBox({
   options,
   onSelect,
   onCancel,
+  selectOnFocus,
 }: {
   value: unknown
   options: string[]
   onSelect: (value: string) => void
   onCancel: () => void
+  selectOnFocus: boolean
 }) {
   const [query, setQuery] = useState(typeof value === 'string' ? value : '')
   const [highlighted, setHighlighted] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  useEffect(() => {
+    setQuery(typeof value === 'string' ? value : '')
+    setHighlighted(0)
+  }, [value])
 
   useEffect(() => {
     // The desktop table and mobile card list both render an EditableCell for
@@ -148,11 +155,12 @@ function FastenerComboBox({
       const rect = input?.getBoundingClientRect()
       if (!input || !rect || (rect.width === 0 && rect.height === 0)) return
       input.focus()
-      input.select()
+      if (selectOnFocus) input.select()
+      else input.setSelectionRange(input.value.length, input.value.length)
       setDropdownPosition({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 280) })
     })
     return () => cancelAnimationFrame(focusFrame)
-  }, [])
+  }, [selectOnFocus])
 
   const filtered = options.filter((opt) => opt.toLowerCase().includes(query.trim().toLowerCase()))
 
@@ -222,6 +230,7 @@ function EditableCell({
   saving,
   options,
   isEditing,
+  editSeed,
   onStartEdit,
   onStopEdit,
   onCommit,
@@ -233,6 +242,7 @@ function EditableCell({
   /** Dropdown options — only used when type is 'select'. */
   options?: string[]
   isEditing?: boolean
+  editSeed?: string | null
   onStartEdit?: () => void
   onStopEdit?: () => void
   onCommit: (newValue: unknown) => void
@@ -242,7 +252,7 @@ function EditableCell({
   const isNumber = type === 'number'
 
   useEffect(() => {
-    if (isEditing) setDraft(value ?? '')
+    if (isEditing) setDraft(editSeed ?? value ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing])
 
@@ -253,10 +263,11 @@ function EditableCell({
       const rect = input?.getBoundingClientRect()
       if (!input || !rect || (rect.width === 0 && rect.height === 0)) return
       input.focus()
-      if (!isNumber) input.select()
+      if (editSeed !== null) input.setSelectionRange(input.value.length, input.value.length)
+      else if (!isNumber) input.select()
     })
     return () => cancelAnimationFrame(focusFrame)
-  }, [isEditing, isNumber, type])
+  }, [isEditing, isNumber, editSeed, type])
 
   const startEdit = () => {
     if (saving) return
@@ -276,6 +287,7 @@ function EditableCell({
         <FastenerComboBox
           value={draft}
           options={options ?? []}
+          selectOnFocus={editSeed === null}
           onSelect={(nextValue) => { setDraft(nextValue); commit(nextValue) }}
           onCancel={() => onStopEdit?.()}
         />
@@ -327,6 +339,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   // Which grid cell (`${rowId}:${fieldKey}`) is currently in edit mode —
   // lifted here so keyboard navigation can move editing to the next cell.
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
+  const [editSeed, setEditSeed] = useState<string | null>(null)
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [selection, setSelection] = useState<GridSelection | null>(null)
   const [copiedSelection, setCopiedSelection] = useState<GridSelection | null>(null)
@@ -491,7 +504,11 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1) {
       const rowData = rows[row]
       const field = ALL_FIELDS[column]
-      if (rowData && field) setEditingCellId(`${rowData.id}:${field.key}`)
+      if (rowData && field) {
+        event.preventDefault()
+        setEditSeed(event.key)
+        setEditingCellId(`${rowData.id}:${field.key}`)
+      }
     }
   }
 
@@ -834,8 +851,9 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                         saving={savingRowId === row.id}
                         options={f.options}
                         isEditing={editingCellId === cellId}
-                        onStartEdit={() => setEditingCellId(cellId)}
-                        onStopEdit={() => setEditingCellId(null)}
+                        editSeed={editingCellId === cellId ? editSeed : null}
+                        onStartEdit={() => { setEditSeed(null); setEditingCellId(cellId) }}
+                        onStopEdit={() => { setEditSeed(null); setEditingCellId(null) }}
                         onCommit={(value) => handleCellCommit(row.id, f.key, value)}
                       />
                       {isFillAnchor && editingCellId !== cellId && (
@@ -910,8 +928,9 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                     saving={savingRowId === row.id}
                     options={field.options}
                     isEditing={editingCellId === cellId}
-                    onStartEdit={() => setEditingCellId(cellId)}
-                    onStopEdit={() => setEditingCellId(null)}
+                    editSeed={editingCellId === cellId ? editSeed : null}
+                    onStartEdit={() => { setEditSeed(null); setEditingCellId(cellId) }}
+                    onStopEdit={() => { setEditSeed(null); setEditingCellId(null) }}
                     onCommit={(value) => handleCellCommit(row.id, field.key, value)}
                   />
                   {isFillAnchor && editingCellId !== cellId && (

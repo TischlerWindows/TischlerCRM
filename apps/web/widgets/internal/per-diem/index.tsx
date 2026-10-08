@@ -107,13 +107,15 @@ function UserLookupField({
   value,
   onChange,
   onClose,
+  initialQuery = '',
 }: {
   value: unknown
   onChange: (value: unknown) => void
   onClose?: () => void
+  initialQuery?: string
 }) {
   const [users, setUsers] = useState<UserRecord[]>([])
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
   const [active, setActive] = useState(false)
 
   useEffect(() => {
@@ -155,6 +157,7 @@ function EditableCell({
   onStartEdit,
   onStopEdit,
   onCommit,
+  editSeed,
 }: {
   cellId?: string
   value: unknown
@@ -164,24 +167,37 @@ function EditableCell({
   onStartEdit?: () => void
   onStopEdit?: () => void
   onCommit: (value: unknown) => void
+  editSeed?: string | null
 }) {
   const [draft, setDraft] = useState<unknown>(value)
 
   useEffect(() => {
-    if (isEditing) setDraft(value ?? '')
+    if (isEditing) setDraft(editSeed ?? value ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing])
 
-  // MultiLookupUserSearch does not auto-focus its input when edit mode starts.
   const userCellRef = useRef<HTMLDivElement>(null)
+  const editorInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
-    if (isEditing && type === 'user') userCellRef.current?.querySelector('input')?.focus()
-  }, [isEditing, type])
+    if (!isEditing) return
+    const focusFrame = requestAnimationFrame(() => {
+      const editor = type === 'user'
+        ? userCellRef.current?.querySelector<HTMLInputElement>('input')
+        : type === 'textarea' ? textareaRef.current : editorInputRef.current
+      const rect = editor?.getBoundingClientRect()
+      if (!editor || !rect || (rect.width === 0 && rect.height === 0)) return
+      editor.focus()
+      if (editSeed !== null && !(editor instanceof HTMLInputElement && editor.type === 'date')) {
+        editor.setSelectionRange(editor.value.length, editor.value.length)
+      }
+    })
+    return () => cancelAnimationFrame(focusFrame)
+  }, [isEditing, type, editSeed])
 
   // Grows the textarea to match its wrapped-text content height (same as
   // the display button's height) so the row doesn't shrink to a fixed
   // 2-row textarea and then jump back when editing ends.
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   useEffect(() => {
     if (isEditing && type === 'textarea' && textareaRef.current) {
       const el = textareaRef.current
@@ -214,6 +230,7 @@ function EditableCell({
         >
           <UserLookupField
             value={draft}
+            initialQuery={editSeed ?? ''}
             onClose={() => onStopEdit?.()}
             onChange={(nextValue) => {
               setDraft(nextValue)
@@ -228,7 +245,6 @@ function EditableCell({
         <textarea
           ref={textareaRef}
           data-cell-id={dataCellId}
-          autoFocus
           value={typeof draft === 'string' ? draft : ''}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commit}
@@ -244,8 +260,8 @@ function EditableCell({
     const isNumber = type === 'currency'
     return (
       <input
+        ref={editorInputRef}
         data-cell-id={dataCellId}
-        autoFocus
         type={type === 'date' ? 'date' : 'text'}
         inputMode={isNumber ? 'decimal' : undefined}
         value={type === 'date' ? dateValue(draft) : typeof draft === 'string' || typeof draft === 'number' ? String(draft) : ''}
@@ -346,6 +362,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const workOrderName = String(record?.name ?? record?.title ?? record?.workOrderNumber ?? '')
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
+  const [editSeed, setEditSeed] = useState<string | null>(null)
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [gridSelection, setGridSelection] = useState<PerDiemGridSelection | null>(null)
   const [copiedGridSelection, setCopiedGridSelection] = useState<PerDiemGridSelection | null>(null)
@@ -373,6 +390,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
       ? { ...current, focus }
       : { view, anchor: focus, focus })
     setEditingCellId(null)
+    setEditSeed(null)
     focusGridCell(focus, view)
   }
 
@@ -519,7 +537,10 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
       event.preventDefault()
       const rowData = rows[row]
       const field = gridFieldsForView(view)[column]
-      if (rowData && field) setEditingCellId(`${rowData.id}:${field.key}`)
+      if (rowData && field) {
+        setEditSeed(null)
+        setEditingCellId(`${rowData.id}:${field.key}`)
+      }
       return
     }
     if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -530,6 +551,16 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
           { length: bounds.bottom - bounds.top + 1 },
           () => Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
         ))
+      }
+      return
+    }
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1) {
+      const rowData = rows[row]
+      const field = gridFieldsForView(view)[column]
+      if (rowData && field && field.type !== 'date') {
+        event.preventDefault()
+        setEditSeed(event.key)
+        setEditingCellId(`${rowData.id}:${field.key}`)
       }
     }
   }
@@ -793,7 +824,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
                       className={gridCellClassName(index, colIndex, 'desktop', 'relative border-b border-gray-100 px-2 py-1.5 align-top whitespace-normal break-words')}
                     >
                       <GridRangeDecoration row={index} column={colIndex} selection={gridSelection?.view === 'desktop' ? gridSelection : null} copiedSelection={copiedGridSelection?.view === 'desktop' ? copiedGridSelection : null} />
-                      <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} onStartEdit={() => setEditingCellId(cellId)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} />
+                      <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} editSeed={editingCellId === cellId ? editSeed : null} onStartEdit={() => { setEditSeed(null); setEditingCellId(cellId) }} onStopEdit={() => { setEditSeed(null); setEditingCellId(null) }} onCommit={(value) => void handleCommit(row.id, field.key, value)} />
                       {gridSelection?.view === 'desktop' && !editingCellId && getGridSelectionBounds(gridSelection).bottom === index && getGridSelectionBounds(gridSelection).right === colIndex && (
                         <span
                           onMouseDown={(event) => {
@@ -835,7 +866,7 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
                 >
                   <GridRangeDecoration row={rowIndex} column={colIndex} selection={gridSelection?.view === 'mobile' ? gridSelection : null} copiedSelection={copiedGridSelection?.view === 'mobile' ? copiedGridSelection : null} />
                   <p className="text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
-                  <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} onStartEdit={() => setEditingCellId(cellId)} onStopEdit={() => setEditingCellId(null)} onCommit={(value) => void handleCommit(row.id, field.key, value)} />
+                  <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} editSeed={editingCellId === cellId ? editSeed : null} onStartEdit={() => { setEditSeed(null); setEditingCellId(cellId) }} onStopEdit={() => { setEditSeed(null); setEditingCellId(null) }} onCommit={(value) => void handleCommit(row.id, field.key, value)} />
                   {gridSelection?.view === 'mobile' && !editingCellId && getGridSelectionBounds(gridSelection).bottom === rowIndex && getGridSelectionBounds(gridSelection).right === colIndex && (
                     <span
                       onMouseDown={(event) => {

@@ -364,6 +364,11 @@ const CellDropdown = ({ rowId, field, value, onChange, options, redirectOnValue,
       if (pendingInput !== null) {
         setSearchTerm(pendingInput);
         setPendingInput(null);
+        requestAnimationFrame(() => {
+          const textarea = textareaRef.current;
+          textarea?.focus();
+          textarea?.setSelectionRange(pendingInput.length, pendingInput.length);
+        });
       }
     } else {
       setIsOpen(false);
@@ -623,6 +628,11 @@ const CellInput = ({ rowId, field, value, onChange }: {
     if (isEditing && pendingInput !== null) {
       onChange(pendingInput);
       setPendingInput(null);
+      requestAnimationFrame(() => {
+        const textarea = textareaRef.current;
+        textarea?.focus();
+        textarea?.setSelectionRange(pendingInput.length, pendingInput.length);
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);

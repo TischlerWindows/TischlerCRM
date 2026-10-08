@@ -165,6 +165,7 @@ function EditableCell({
   saving,
   computed,
   isEditing,
+  editSeed,
   onStartEdit,
   onStopEdit,
   onCommit,
@@ -177,6 +178,7 @@ function EditableCell({
    * keyboard navigation, unlike `saving` which is only temporarily true. */
   computed?: boolean
   isEditing?: boolean
+  editSeed?: string | null
   onStartEdit?: () => void
   onStopEdit?: () => void
   onCommit: (newValue: unknown) => void
@@ -184,7 +186,7 @@ function EditableCell({
   const [draft, setDraft] = useState<unknown>(value)
 
   useEffect(() => {
-    if (isEditing) setDraft(value ?? (type === 'checkbox' ? false : ''))
+    if (isEditing) setDraft(editSeed ?? value ?? (type === 'checkbox' ? false : ''))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing])
 
@@ -216,6 +218,21 @@ function EditableCell({
   // the display button's height) so the row doesn't shrink to a fixed
   // 2-row textarea and then jump back when editing ends.
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!isEditing) return
+    const focusFrame = requestAnimationFrame(() => {
+      const editor = type === 'textarea' ? textareaRef.current : inputRef.current
+      const rect = editor?.getBoundingClientRect()
+      if (!editor || !rect || (rect.width === 0 && rect.height === 0)) return
+      editor.focus()
+      if (editSeed !== null && !(editor instanceof HTMLInputElement && editor.type === 'date')) {
+        editor.setSelectionRange(editor.value.length, editor.value.length)
+      }
+    })
+    return () => cancelAnimationFrame(focusFrame)
+  }, [isEditing, type, editSeed])
+
   useEffect(() => {
     if (isEditing && type === 'textarea' && textareaRef.current) {
       const el = textareaRef.current
@@ -242,9 +259,9 @@ function EditableCell({
     if (type === 'date') {
       return (
         <input
+          ref={inputRef}
           type="date"
           data-cell-id={dataCellId}
-          autoFocus
           value={toDateInputValue(draft)}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => commit(draft)}
@@ -261,7 +278,6 @@ function EditableCell({
         <textarea
           ref={textareaRef}
           data-cell-id={dataCellId}
-          autoFocus
           value={typeof draft === 'string' ? draft : ''}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => commit(draft)}
@@ -277,10 +293,10 @@ function EditableCell({
     const isNumber = type === 'number'
     return (
       <input
+        ref={inputRef}
         type="text"
         inputMode={isNumber ? 'decimal' : undefined}
         data-cell-id={dataCellId}
-        autoFocus
         value={typeof draft === 'string' || typeof draft === 'number' ? String(draft) : ''}
         onChange={(e) => {
           if (isNumber && !isValidGridDecimalInput(e.target.value)) return
@@ -494,6 +510,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   const [savingFlagKey, setSavingFlagKey] = useState<string | null>(null)
   // Which grid cell (`${rowId}:${fieldKey}`) is currently being edited.
   const [editingCellId, setEditingCellId] = useState<string | null>(null)
+  const [editSeed, setEditSeed] = useState<string | null>(null)
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [gridSelection, setGridSelection] = useState<GridSelection | null>(null)
   const [copiedGridSelection, setCopiedGridSelection] = useState<GridSelection | null>(null)
@@ -518,6 +535,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     const focus = { row: nextRow, column: nextColumn }
     setGridSelection(current => extend && current ? { ...current, focus } : { anchor: focus, focus })
     setEditingCellId(null)
+    setEditSeed(null)
     focusGridCell(focus)
   }
 
@@ -642,7 +660,10 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
       event.preventDefault()
       const rowData = rows[row]
       const field = ALL_FIELDS[column]
-      if (rowData && field && !field.computed) setEditingCellId(`${rowData.id}:${field.key}`)
+      if (rowData && field && !field.computed) {
+        setEditSeed(null)
+        setEditingCellId(`${rowData.id}:${field.key}`)
+      }
       return
     }
     if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -653,6 +674,16 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
           { length: bounds.bottom - bounds.top + 1 },
           () => Array.from({ length: bounds.right - bounds.left + 1 }, () => ''),
         ))
+      }
+      return
+    }
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1) {
+      const rowData = rows[row]
+      const field = ALL_FIELDS[column]
+      if (rowData && field && !field.computed && field.type !== 'checkbox' && field.type !== 'date') {
+        event.preventDefault()
+        setEditSeed(event.key)
+        setEditingCellId(`${rowData.id}:${field.key}`)
       }
     }
   }
@@ -1113,8 +1144,9 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                         saving={savingRowId === row.id || f.computed === true}
                         computed={f.computed === true}
                         isEditing={editingCellId === cellId}
-                        onStartEdit={() => setEditingCellId(cellId)}
-                        onStopEdit={() => setEditingCellId(null)}
+                        editSeed={editingCellId === cellId ? editSeed : null}
+                        onStartEdit={() => { setEditSeed(null); setEditingCellId(cellId) }}
+                        onStopEdit={() => { setEditSeed(null); setEditingCellId(null) }}
                         onCommit={(value) => handleCellCommit(row.id, f.key, value)}
                       />
                       {gridSelection && !editingCellId && getGridSelectionBounds(gridSelection).bottom === i && getGridSelectionBounds(gridSelection).right === colIndex && (
@@ -1180,8 +1212,9 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                     saving={savingRowId === row.id || field.computed === true}
                     computed={field.computed === true}
                     isEditing={editingCellId === cellId}
-                    onStartEdit={() => setEditingCellId(cellId)}
-                    onStopEdit={() => setEditingCellId(null)}
+                    editSeed={editingCellId === cellId ? editSeed : null}
+                    onStartEdit={() => { setEditSeed(null); setEditingCellId(cellId) }}
+                    onStopEdit={() => { setEditSeed(null); setEditingCellId(null) }}
                     onCommit={(value) => handleCellCommit(row.id, field.key, value)}
                   />
                   {gridSelection && !editingCellId && getGridSelectionBounds(gridSelection).bottom === index && getGridSelectionBounds(gridSelection).right === colIndex && (
