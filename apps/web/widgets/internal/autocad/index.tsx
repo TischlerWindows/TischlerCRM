@@ -542,10 +542,6 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
 
   useEffect(() => { void load() }, [load])
 
-  useEffect(() => {
-    if (!selection && rows.length) setSelection({ anchor: { row: 0, column: 0 }, focus: { row: 0, column: 0 } })
-  }, [rows.length, selection])
-
   const handleCellCommit = useCallback(async (rowId: string, key: string, value: unknown) => {
     const previousRow = rows.find(row => row.id === rowId)
     if (previousRow && !Object.is(previousRow.data?.[key], value)) pushUndo(snapshotGridRows(rows))

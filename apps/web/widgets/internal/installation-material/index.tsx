@@ -289,10 +289,6 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     ? ['qty', 'units', 'description', 'unitPrice', 'total']
     : ['qty', 'units', 'description', 'screwSize', 'unitPrice', 'total']
 
-  useEffect(() => {
-    if (!gridSelection && form.rows.length) setGridSelection({ anchor: { row: 0, column: 0 }, focus: { row: 0, column: 0 } })
-  }, [form.rows.length, gridSelection, workbook.activeTemplate])
-
   const focusMaterialCell = (coordinate: GridCoordinate) => {
     requestAnimationFrame(() => {
       const cell = gridTableRef.current?.querySelector<HTMLElement>(`[data-grid-row="${coordinate.row}"][data-grid-column="${coordinate.column}"]`)

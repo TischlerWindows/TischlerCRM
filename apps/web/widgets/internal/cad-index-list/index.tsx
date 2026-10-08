@@ -248,12 +248,6 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     clearUndo()
   }, [activeReportType, clearUndo])
 
-  useEffect(() => {
-    if (!selection && activeRows.length > 0 && columns.length > 0) {
-      setSelection({ anchor: { row: 0, column: 0 }, focus: { row: 0, column: 0 } })
-    }
-  }, [activeRows.length, columns.length, selection])
-
   const focusGridCell = (coordinate: GridCoordinate) => {
     requestAnimationFrame(() => {
       gridTableRef.current
