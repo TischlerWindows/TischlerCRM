@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
-import { getConnectionRoleFieldApiName, getConnectionTargetObject, isConnectionFieldType, type FieldDef, type TeamMemberAssociationsConfig } from '@/lib/schema'
+import { getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, isConnectionFieldType, type FieldDef, type TeamMemberAssociationsConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
 import { FieldDisplay, getFieldValue } from '../shared/FieldDisplay'
@@ -547,6 +547,14 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   const displayFields: DisplayFieldsConfig = typedConfig.displayFields ?? {}
   const objectApiName = object.apiName
   const recordId = record?.id ? String(record.id) : null
+  const rootRecord = record as Record<string, unknown> | undefined
+  const rootData = rootRecord?.data && typeof rootRecord.data === 'object'
+    ? rootRecord.data as Record<string, unknown>
+    : rootRecord ?? {}
+  const connectionTypeField = objectApiName === 'Contact' ? 'contactType' : objectApiName === 'Account' ? 'accountType' : ''
+  const connectedRecordType = connectionTypeField
+    ? String(rootData[`${objectApiName}__${connectionTypeField}`] ?? rootData[connectionTypeField] ?? '').trim()
+    : ''
   const isSupported = SUPPORTED_OBJECTS.includes(objectApiName)
   const schema = useSchemaStore(state => state.schema)
   const connectionFields = useMemo(() => (schema?.objects ?? []).flatMap(sourceObject => (
@@ -790,7 +798,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           : connectedRecord as unknown as Record<string, unknown>
         const propertyId = lookupConnectionPropertyIds[index] ?? ''
         const roleApiName = getConnectionRoleFieldApiName(field.apiName)
-        const roleBareName = roleApiName.replace(/^[A-Za-z]+__/, '')
+        const roleBareName = getConnectionRoleFieldBareName(field.apiName)
         const savedRole = recordData[roleApiName] ?? recordData[roleBareName]
         const row: AssociationRow = {
           memberId: `connection:${sourceApiName}:${field.apiName}:${connectedRecord.id}`,
@@ -798,7 +806,11 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           parentRecordId: String(connectedRecord.id),
           parentRecordName: getRecordName(connectedRecord as unknown as Record<string, unknown>),
           parentRecordData: recordData,
-          role: typeof savedRole === 'string' && savedRole.trim() ? savedRole.trim() : field.label,
+          role: typeof savedRole === 'string' && savedRole.trim()
+            ? savedRole.trim()
+            : (field.type === 'ConnectionContact' || field.type === 'ConnectionAccount') && connectedRecordType
+              ? connectedRecordType
+              : field.label,
           isPrimary: false,
           isContractHolder: false,
           isQuoteRecipient: false,
@@ -820,7 +832,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     } finally {
       setLoading(false)
     }
-  }, [recordId, objectApiName, isSupported, connectionFields])
+  }, [recordId, objectApiName, isSupported, connectionFields, connectedRecordType])
 
   useEffect(() => {
     fetchAssociations()

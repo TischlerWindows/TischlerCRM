@@ -242,12 +242,13 @@ export default function DynamicForm({
     if (!obj) return seed;
     for (const field of obj.fields) {
       if (!isLookupFieldType(field.type) && field.type !== 'LookupUser' && field.type !== 'MultiLookupUser') continue;
-      if (!field.lookupObject) continue;
+      const lookupTarget = getLookupTargetApi(field, obj.fields, schema?.objects);
+      if (!lookupTarget) continue;
       const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
       const val = recordData[stripped] ?? recordData[field.apiName];
       if (!val) continue;
-      const rec = getLookupCachedRecord(field.lookupObject, String(val));
-      if (rec) seed[field.lookupObject] = [rec];
+      const rec = getLookupCachedRecord(lookupTarget, String(val));
+      if (rec) seed[lookupTarget] = [rec];
     }
     return seed;
   });
@@ -275,13 +276,14 @@ export default function DynamicForm({
       const updates: Record<string, string> = {};
       for (const field of object.fields) {
         if (!isLookupFieldType(field.type) && field.type !== 'LookupUser' && field.type !== 'MultiLookupUser') continue;
-        if (!field.lookupObject) continue;
+        const lookupTarget = getLookupTargetApi(field, object.fields, schema?.objects);
+        if (!lookupTarget) continue;
         const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
         const val = recordData[stripped] ?? recordData[field.apiName];
         if (!val) continue;
         // Skip if already set (user may have typed something)
         if (prev[field.apiName] || prev[stripped]) continue;
-        const label = resolveLookupDisplayName(String(val), field.lookupObject);
+        const label = resolveLookupDisplayName(String(val), lookupTarget);
         if (label && label !== '-' && label !== String(val)) {
           updates[field.apiName] = label;
           updates[stripped] = label;

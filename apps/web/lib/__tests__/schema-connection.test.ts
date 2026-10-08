@@ -1,5 +1,6 @@
 import {
   getConnectionRoleFieldApiName,
+  getConnectionRoleFieldBareName,
   getConnectionTargetObject,
   isConnectionFieldType,
   isLookupFieldType,
@@ -20,5 +21,7 @@ describe('explicit Connection field types', () => {
     expect(isLookupFieldType('ConnectionContact')).toBe(true)
     expect(isLookupFieldType('ConnectionAccount')).toBe(true)
     expect(getConnectionRoleFieldApiName('Project__primaryContact')).toBe('Project__primaryContact__role')
+    expect(getConnectionRoleFieldBareName('Project__primaryContact')).toBe('primaryContact__role')
+    expect(getConnectionRoleFieldBareName('primaryContact')).toBe('primaryContact__role')
   })
 })

@@ -9,6 +9,7 @@ import {
   normalizeFieldType,
   isSystemField,
   getConnectionRoleFieldApiName,
+  getConnectionRoleFieldBareName,
   getConnectionTargetObject,
 } from '@/lib/schema';
 import { Input } from '@/components/ui/input';
@@ -770,8 +771,9 @@ export function FieldInput({
         : undefined;
       const hasExistingRole = existingRole !== undefined && existingRole !== null && String(existingRole).trim() !== '';
       const connectionRoleApiName = getConnectionRoleFieldApiName(fieldDef.apiName);
+      const connectionRoleBareName = getConnectionRoleFieldBareName(fieldDef.apiName);
       const connectionRoleValue = formData[connectionRoleApiName]
-        ?? formData[connectionRoleApiName.replace(/^[A-Za-z]+__/, '')]
+        ?? formData[connectionRoleBareName]
         ?? '';
       inputElement = (
         <div className="space-y-2">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Pencil } from 'lucide-react';
-import { getConnectionRoleFieldApiName, getConnectionTargetObject, type FieldDef } from '@/lib/schema';
+import { getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, type FieldDef } from '@/lib/schema';
 import { useInlineEdit } from './inline-edit-context';
 import { useSchemaStore } from '@/lib/schema-store';
 import { recordsService } from '@/lib/records-service';
@@ -79,6 +79,7 @@ export function InlineEditableField({ fieldDef, value, children, formData }: Inl
   if (editingAll) {
     const draft = getDraft(fieldDef.apiName, value ?? (fieldDef.type === 'Checkbox' ? false : ''));
     const connectionRoleApiName = getConnectionRoleFieldApiName(fieldDef.apiName);
+    const connectionRoleBareName = getConnectionRoleFieldBareName(fieldDef.apiName);
     const handleKeyDown = (e: React.KeyboardEvent) => {
       const isMultilineOrComplex = [
         'TextArea', 'LongTextArea', 'RichTextArea', 'Address', 'CompositeText',
@@ -100,7 +101,7 @@ export function InlineEditableField({ fieldDef, value, children, formData }: Inl
           setDraft={(v) => setDraft(fieldDef.apiName, v)}
           onKeyDown={handleKeyDown}
           formData={formData}
-          connectionRole={getDraft(connectionRoleApiName, formData?.[connectionRoleApiName] ?? '')}
+          connectionRole={getDraft(connectionRoleApiName, getDraft(connectionRoleBareName, formData?.[connectionRoleApiName] ?? formData?.[connectionRoleBareName] ?? ''))}
           onConnectionRoleChange={(role) => setDraft(connectionRoleApiName, role)}
         />
       </div>

@@ -81,6 +81,10 @@ export function getConnectionRoleFieldApiName(fieldApiName: string): string {
   return `${fieldApiName}__role`;
 }
 
+export function getConnectionRoleFieldBareName(fieldApiName: string): string {
+  return `${fieldApiName.replace(/^[A-Za-z]+__/, '')}__role`;
+}
+
 export interface FieldDef {
   id: string;
   apiName: string;

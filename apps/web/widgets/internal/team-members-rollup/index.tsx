@@ -7,7 +7,7 @@ import {
   Phone, Mail,
 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
-import { getConnectionRoleFieldApiName, getConnectionTargetObject, isConnectionFieldType, type FieldDef, type TeamMembersRollupConfig } from '@/lib/schema'
+import { getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, isConnectionFieldType, type FieldDef, type TeamMembersRollupConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
 import { FieldDisplay } from '../shared/FieldDisplay'
@@ -260,17 +260,38 @@ function connectionMembersForRecord(
     if (!lookupId) return []
     const linkField = getConnectionTargetObject(field.type, field.lookupObject) === 'Contact' ? 'contact' : 'account'
     const roleApiName = getConnectionRoleFieldApiName(field.apiName)
-    const roleBareName = roleApiName.replace(/^[A-Za-z]+__/, '')
+    const roleBareName = getConnectionRoleFieldBareName(field.apiName)
     const roleValue = sourceRecord[roleApiName] ?? sourceRecord[roleBareName] ?? data[roleApiName] ?? data[roleBareName]
+    const connectionTarget = getConnectionTargetObject(field.type, field.lookupObject) ?? ''
     return [{
       id: `connection:${sourceApiName}:${sourceId}:${field.apiName}`,
       data: {
         [linkField]: lookupId,
-        role: typeof roleValue === 'string' && roleValue.trim() ? roleValue.trim() : field.label,
+        role: typeof roleValue === 'string' ? roleValue.trim() : '',
+        isLookupConnection: true,
+        useConnectedRecordType: field.type === 'ConnectionContact' || field.type === 'ConnectionAccount',
+        connectionTarget,
+        connectionFieldLabel: field.label,
         ...(parentField ? { [parentField]: sourceId } : {}),
       },
     }]
   })
+}
+
+function getConnectedRecordTypeLabel(
+  records: Map<string, Record<string, unknown>>,
+  recordId: string,
+  objectApiName: string,
+): string {
+  const record = records.get(recordId)
+  if (!record) return ''
+  const data = record.data && typeof record.data === 'object'
+    ? record.data as Record<string, unknown>
+    : record
+  const field = objectApiName === 'Contact' ? 'contactType' : objectApiName === 'Account' ? 'accountType' : ''
+  if (!field) return ''
+  const value = data[`${objectApiName}__${field}`] ?? data[field] ?? record[`${objectApiName}__${field}`] ?? record[field]
+  return typeof value === 'string' ? value.trim() : ''
 }
 
 function getPrimaryContactDetails(record: Record<string, unknown>): { email: string; phone: string } {
@@ -730,7 +751,20 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         getLookupName(member, 'account') ||
         getStr(member, 'accountName') ||
         getStr(member, 'TeamMember__accountName')
-      const role = getStr(member, 'role')
+      const explicitRole = getStr(member, 'role').trim()
+      const isLookupConnection = getField(member, 'isLookupConnection') === true
+        || getField(member, 'isLookupConnection') === 'true'
+      const useConnectedRecordType = getField(member, 'useConnectedRecordType') === true
+        || getField(member, 'useConnectedRecordType') === 'true'
+      const connectionTarget = getStr(member, 'connectionTarget')
+      const connectedType = isLookupConnection && useConnectedRecordType
+        ? contactId
+          ? getConnectedRecordTypeLabel(contactRecords, contactId, connectionTarget)
+          : accountId
+            ? getConnectedRecordTypeLabel(accountRecords, accountId, connectionTarget)
+            : ''
+        : ''
+      const role = explicitRole || connectedType || (isLookupConnection ? getStr(member, 'connectionFieldLabel') : '')
       const isPrimary = getField(member, 'primaryContact') === true || getField(member, 'primaryContact') === 'true'
       const isContractHolder = getField(member, 'contractHolder') === true || getField(member, 'contractHolder') === 'true'
       const isQuoteRecipient = getField(member, 'quoteRecipient') === true || getField(member, 'quoteRecipient') === 'true'
