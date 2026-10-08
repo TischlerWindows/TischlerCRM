@@ -8,6 +8,8 @@ import {
   ObjectDef,
   normalizeFieldType,
   isSystemField,
+  getConnectionRoleFieldApiName,
+  getConnectionTargetObject,
 } from '@/lib/schema';
 import { Input } from '@/components/ui/input';
 import { PasswordVisibilityInput } from '@/components/password-visibility-input';
@@ -167,6 +169,9 @@ export function getFieldIcon(type: FieldType) {
     Address: MapPin,
     Geolocation: MapPin,
     Lookup: LinkIcon,
+    Connection: LinkIcon,
+    ConnectionContact: LinkIcon,
+    ConnectionAccount: LinkIcon,
     ExternalLookup: LinkIcon,
     LookupUser: UserIcon,
     AutoNumber: Hash,
@@ -741,6 +746,8 @@ export function FieldInput({
     // ── Lookup / ExternalLookup ──────────────────────────────
     case 'Lookup':
     case 'Connection':
+    case 'ConnectionContact':
+    case 'ConnectionAccount':
     case 'ExternalLookup': {
       const targetApi = getLookupTargetApi(
         fieldDef,
@@ -748,24 +755,63 @@ export function FieldInput({
         schema?.objects,
       );
       const records = targetApi ? lookupRecordsCache[targetApi] || [] : [];
+      const isTypedConnection = fieldDef.type === 'ConnectionContact' || fieldDef.type === 'ConnectionAccount';
+      const selectedId = value && typeof value === 'object'
+        ? String((value as Record<string, unknown>).lookup ?? (value as Record<string, unknown>).id ?? '')
+        : String(value ?? '');
+      const selectedRecord = records.find(record => String(record.id) === selectedId);
+      const roleFieldName = targetApi === 'Contact' ? 'contactType' : targetApi === 'Account' ? 'accountType' : '';
+      const targetObjectDef = schema?.objects?.find((objectDef: ObjectDef) => objectDef.apiName === targetApi);
+      const roleFieldDef = roleFieldName
+        ? targetObjectDef?.fields?.find((field: FieldDef) => field.apiName.replace(/^[A-Za-z]+__/, '') === roleFieldName)
+        : undefined;
+      const existingRole = selectedRecord && roleFieldDef
+        ? selectedRecord[roleFieldDef.apiName] ?? selectedRecord[roleFieldName] ?? selectedRecord[`${targetApi}__${roleFieldName}`]
+        : undefined;
+      const hasExistingRole = existingRole !== undefined && existingRole !== null && String(existingRole).trim() !== '';
+      const connectionRoleApiName = getConnectionRoleFieldApiName(fieldDef.apiName);
+      const connectionRoleValue = formData[connectionRoleApiName]
+        ?? formData[connectionRoleApiName.replace(/^[A-Za-z]+__/, '')]
+        ?? '';
       inputElement = (
-        <LookupSearch
-          fieldDef={fieldDef}
-          value={value}
-          onChange={(val) => {
-            onFieldChange(fieldDef.apiName, val);
-          }}
-          disabled={isReadOnly}
-          error={error}
-          records={records}
-          lookupQuery={lookupQueries[fieldDef.apiName] ?? ''}
-          isActive={activeLookupField === fieldDef.apiName}
-          onQueryChange={(q) => onLookupQueryChange(fieldDef.apiName, q)}
-          onFocus={() => onLookupFocus(fieldDef.apiName)}
-          onBlur={() => onLookupBlur(fieldDef.apiName)}
-          onInlineCreate={(tApi) => onInlineCreate(tApi, fieldDef.apiName)}
-          schemaObjects={schema?.objects}
-        />
+        <div className="space-y-2">
+          <LookupSearch
+            fieldDef={{
+              ...fieldDef,
+              lookupObject: getConnectionTargetObject(fieldDef.type, fieldDef.lookupObject),
+            }}
+            value={value}
+            onChange={(val) => {
+              onFieldChange(fieldDef.apiName, val);
+              if (isTypedConnection) onFieldChange(connectionRoleApiName, '');
+            }}
+            disabled={isReadOnly}
+            error={error}
+            records={records}
+            lookupQuery={lookupQueries[fieldDef.apiName] ?? ''}
+            isActive={activeLookupField === fieldDef.apiName}
+            onQueryChange={(q) => onLookupQueryChange(fieldDef.apiName, q)}
+            onFocus={() => onLookupFocus(fieldDef.apiName)}
+            onBlur={() => onLookupBlur(fieldDef.apiName)}
+            onInlineCreate={(tApi) => onInlineCreate(tApi, fieldDef.apiName)}
+            schemaObjects={schema?.objects}
+          />
+          {isTypedConnection && selectedRecord && !hasExistingRole && roleFieldDef?.picklistValues?.length ? (
+            <div className="flex flex-col gap-1">
+              <Label htmlFor={connectionRoleApiName} className="text-xs">Role</Label>
+              <select
+                id={connectionRoleApiName}
+                value={String(connectionRoleValue)}
+                onChange={(event) => onFieldChange(connectionRoleApiName, event.target.value)}
+                disabled={isReadOnly}
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+              >
+                <option value="">Select Role</option>
+                {roleFieldDef.picklistValues.map((role: string) => <option key={role} value={role}>{role}</option>)}
+              </select>
+            </div>
+          ) : null}
+        </div>
       );
       break;
     }

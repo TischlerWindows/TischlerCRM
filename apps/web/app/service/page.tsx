@@ -386,7 +386,7 @@ export default function ServicePage() {
     const schemaLookupField = serviceObject?.fields?.find(f => f.apiName === `Service__${columnId}` || f.apiName === columnId);
     const lookupObjectType = inferLookupObjectType(columnId) ||
       (schemaLookupField?.type === 'LookupUser' ? 'User' : null) ||
-      ((schemaLookupField?.type === 'Lookup' || schemaLookupField?.type === 'Connection' || schemaLookupField?.type === 'ExternalLookup') ? schemaLookupField.lookupObject ?? null : null);
+      ((schemaLookupField?.type === 'Lookup' || schemaLookupField?.type === 'Connection' || schemaLookupField?.type === 'ConnectionContact' || schemaLookupField?.type === 'ConnectionAccount' || schemaLookupField?.type === 'ExternalLookup') ? schemaLookupField.lookupObject ?? null : null);
     if (lookupObjectType && typeof value === 'string') {
       return resolveLookupDisplayName(value, lookupObjectType);
     }

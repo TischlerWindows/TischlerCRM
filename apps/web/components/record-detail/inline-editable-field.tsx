@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Pencil } from 'lucide-react';
-import type { FieldDef } from '@/lib/schema';
+import { getConnectionRoleFieldApiName, getConnectionTargetObject, type FieldDef } from '@/lib/schema';
 import { useInlineEdit } from './inline-edit-context';
 import { useSchemaStore } from '@/lib/schema-store';
 import { recordsService } from '@/lib/records-service';
@@ -34,7 +34,7 @@ const INLINE_EDITABLE_TYPES = new Set<string>([
   'Date', 'DateTime', 'Time',
   'Checkbox',
   'Picklist', 'MultiPicklist', 'MultiSelectPicklist', 'PicklistText', 'DropdownWithCustom',
-  'Lookup', 'Connection', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup',
+  'Lookup', 'Connection', 'ConnectionContact', 'ConnectionAccount', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup',
   'Address', 'CompositeText',
 ]);
 
@@ -78,10 +78,11 @@ export function InlineEditableField({ fieldDef, value, children, formData }: Inl
 
   if (editingAll) {
     const draft = getDraft(fieldDef.apiName, value ?? (fieldDef.type === 'Checkbox' ? false : ''));
+    const connectionRoleApiName = getConnectionRoleFieldApiName(fieldDef.apiName);
     const handleKeyDown = (e: React.KeyboardEvent) => {
       const isMultilineOrComplex = [
         'TextArea', 'LongTextArea', 'RichTextArea', 'Address', 'CompositeText',
-        'Lookup', 'Connection', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup',
+        'Lookup', 'Connection', 'ConnectionContact', 'ConnectionAccount', 'ExternalLookup', 'LookupUser', 'MultiLookupUser', 'PicklistLookup',
       ].includes(fieldDef.type);
       if (e.key === 'Enter' && !isMultilineOrComplex) {
         e.preventDefault();
@@ -99,6 +100,8 @@ export function InlineEditableField({ fieldDef, value, children, formData }: Inl
           setDraft={(v) => setDraft(fieldDef.apiName, v)}
           onKeyDown={handleKeyDown}
           formData={formData}
+          connectionRole={getDraft(connectionRoleApiName, formData?.[connectionRoleApiName] ?? '')}
+          onConnectionRoleChange={(role) => setDraft(connectionRoleApiName, role)}
         />
       </div>
     );
@@ -127,12 +130,16 @@ function FieldEditor({
   setDraft,
   onKeyDown,
   formData,
+  connectionRole,
+  onConnectionRoleChange,
 }: {
   fieldDef: FieldDef;
   draft: unknown;
   setDraft: (v: unknown) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   formData?: Record<string, unknown>;
+  connectionRole?: unknown;
+  onConnectionRoleChange?: (role: string) => void;
 }): React.ReactNode {
   const common =
     'w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy';
@@ -199,6 +206,17 @@ function FieldEditor({
     case 'Connection':
     case 'ExternalLookup':
       return <InlineLookupEditor fieldDef={fieldDef} value={draft} onChange={setDraft} />;
+    case 'ConnectionContact':
+    case 'ConnectionAccount':
+      return (
+        <InlineConnectionEditor
+          fieldDef={fieldDef}
+          value={draft}
+          onChange={setDraft}
+          role={connectionRole}
+          onRoleChange={onConnectionRoleChange ?? (() => {})}
+        />
+      );
     case 'LookupUser':
       return <InlineLookupUserEditor fieldDef={fieldDef} value={draft} onChange={setDraft} />;
     case 'MultiLookupUser':
@@ -413,6 +431,62 @@ function InlineLookupEditor({
       onBlur={() => setTimeout(() => setIsActive(false), 150)}
       schemaObjects={schema?.objects}
     />
+  );
+}
+
+function InlineConnectionEditor({
+  fieldDef,
+  value,
+  onChange,
+  role,
+  onRoleChange,
+}: {
+  fieldDef: FieldDef;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  role: unknown;
+  onRoleChange: (role: string) => void;
+}) {
+  const { schema } = useSchemaStore();
+  const targetApi = getConnectionTargetObject(fieldDef.type, fieldDef.lookupObject);
+  const records = useLookupCandidates(targetApi);
+  const selectedId = value && typeof value === 'object'
+    ? String((value as Record<string, unknown>).lookup ?? (value as Record<string, unknown>).id ?? '')
+    : String(value ?? '');
+  const selectedRecord = records.find(record => String(record.id) === selectedId);
+  const roleFieldName = targetApi === 'Contact' ? 'contactType' : targetApi === 'Account' ? 'accountType' : '';
+  const roleField = schema?.objects.find(object => object.apiName === targetApi)?.fields.find(
+    field => field.apiName.replace(/^[A-Za-z]+__/, '') === roleFieldName,
+  );
+  const recordData = selectedRecord?.data && typeof selectedRecord.data === 'object'
+    ? selectedRecord.data as Record<string, unknown>
+    : selectedRecord as Record<string, unknown> | undefined;
+  const originalRole = roleField && recordData
+    ? recordData[roleField.apiName] ?? recordData[roleFieldName] ?? recordData[`${targetApi}__${roleFieldName}`]
+    : undefined;
+  const roleIsBlank = originalRole === undefined || originalRole === null || String(originalRole).trim() === '';
+
+  return (
+    <div className="space-y-2">
+      <InlineLookupEditor
+        fieldDef={{ ...fieldDef, lookupObject: targetApi }}
+        value={value}
+        onChange={next => { onChange(next); onRoleChange(''); }}
+      />
+      {selectedRecord && roleIsBlank && roleField?.picklistValues?.length ? (
+        <label className="block text-xs font-medium text-gray-600">
+          Role
+          <select
+            value={String(role ?? '')}
+            onChange={event => onRoleChange(event.target.value)}
+            className="mt-1 h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
+          >
+            <option value="">Select Role</option>
+            {roleField.picklistValues.map(option => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </label>
+      ) : null}
+    </div>
   );
 }
 

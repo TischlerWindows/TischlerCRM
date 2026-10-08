@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
-import type { FieldDef, TeamMemberAssociationsConfig } from '@/lib/schema'
+import { getConnectionRoleFieldApiName, getConnectionTargetObject, isConnectionFieldType, type FieldDef, type TeamMemberAssociationsConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
 import { FieldDisplay, getFieldValue } from '../shared/FieldDisplay'
@@ -551,7 +551,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   const schema = useSchemaStore(state => state.schema)
   const connectionFields = useMemo(() => (schema?.objects ?? []).flatMap(sourceObject => (
     sourceObject.fields
-      .filter((field: FieldDef) => field.type === 'Connection' && field.lookupObject === objectApiName)
+      .filter((field: FieldDef) => isConnectionFieldType(field.type) && getConnectionTargetObject(field.type, field.lookupObject) === objectApiName)
       .map((field: FieldDef) => ({ sourceApiName: sourceObject.apiName, field }))
   )), [schema, objectApiName])
 
@@ -789,13 +789,16 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           ? connectedRecord.data
           : connectedRecord as unknown as Record<string, unknown>
         const propertyId = lookupConnectionPropertyIds[index] ?? ''
+        const roleApiName = getConnectionRoleFieldApiName(field.apiName)
+        const roleBareName = roleApiName.replace(/^[A-Za-z]+__/, '')
+        const savedRole = recordData[roleApiName] ?? recordData[roleBareName]
         const row: AssociationRow = {
           memberId: `connection:${sourceApiName}:${field.apiName}:${connectedRecord.id}`,
           objectApiName: sourceApiName,
           parentRecordId: String(connectedRecord.id),
           parentRecordName: getRecordName(connectedRecord as unknown as Record<string, unknown>),
           parentRecordData: recordData,
-          role: field.label,
+          role: typeof savedRole === 'string' && savedRole.trim() ? savedRole.trim() : field.label,
           isPrimary: false,
           isContractHolder: false,
           isQuoteRecipient: false,

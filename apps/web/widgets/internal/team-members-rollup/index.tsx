@@ -7,7 +7,7 @@ import {
   Phone, Mail,
 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
-import type { FieldDef, TeamMembersRollupConfig } from '@/lib/schema'
+import { getConnectionRoleFieldApiName, getConnectionTargetObject, isConnectionFieldType, type FieldDef, type TeamMembersRollupConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
 import { FieldDisplay } from '../shared/FieldDisplay'
@@ -258,12 +258,15 @@ function connectionMembersForRecord(
         ).trim()
         : ''
     if (!lookupId) return []
-    const linkField = field.lookupObject === 'Contact' ? 'contact' : 'account'
+    const linkField = getConnectionTargetObject(field.type, field.lookupObject) === 'Contact' ? 'contact' : 'account'
+    const roleApiName = getConnectionRoleFieldApiName(field.apiName)
+    const roleBareName = roleApiName.replace(/^[A-Za-z]+__/, '')
+    const roleValue = sourceRecord[roleApiName] ?? sourceRecord[roleBareName] ?? data[roleApiName] ?? data[roleBareName]
     return [{
       id: `connection:${sourceApiName}:${sourceId}:${field.apiName}`,
       data: {
         [linkField]: lookupId,
-        role: field.label,
+        role: typeof roleValue === 'string' && roleValue.trim() ? roleValue.trim() : field.label,
         ...(parentField ? { [parentField]: sourceId } : {}),
       },
     }]
@@ -382,7 +385,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     (schema?.objects ?? []).map(schemaObject => [
       schemaObject.apiName,
       schemaObject.fields.filter((field: FieldDef) =>
-        field.type === 'Connection' && ['Contact', 'Account'].includes(field.lookupObject ?? ''),
+        isConnectionFieldType(field.type) && ['Contact', 'Account'].includes(getConnectionTargetObject(field.type, field.lookupObject) ?? ''),
       ),
     ]),
   ), [schema])

@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Input } from '@/components/ui/input';
-import { FieldDef, ObjectDef } from '@/lib/schema';
+import { FieldDef, ObjectDef, getConnectionTargetObject } from '@/lib/schema';
 import { cn, resolveLookupDisplayName, upsertLookupCacheRecord } from '@/lib/utils';
 import LocationMapPreview from '@/components/location-map-preview';
 import { normalizeSingleLookupUserValue } from '@/lib/user-lookup';
@@ -244,6 +244,8 @@ export function getLookupTargetApi(
   objectFields: FieldDef[],
   schemaObjects?: ObjectDef[],
 ): string | undefined {
+  const connectionTarget = getConnectionTargetObject(fieldDef.type, fieldDef.lookupObject);
+  if (connectionTarget) return connectionTarget;
   const relatedObject = (fieldDef as any).relatedObject as string | undefined;
   if (fieldDef.lookupObject) return fieldDef.lookupObject;
   if (fieldDef.relationship?.targetObject)

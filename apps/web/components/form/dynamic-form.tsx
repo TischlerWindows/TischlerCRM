@@ -12,6 +12,7 @@ import {
   LayoutSection,
   normalizeFieldType,
   isSystemField,
+  isLookupFieldType,
 } from '@/lib/schema';
 import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
 import { resolveLayoutForUser } from '@/lib/layout-resolver';
@@ -240,7 +241,7 @@ export default function DynamicForm({
     const obj = schema?.objects.find((o) => o.apiName === objectApiName);
     if (!obj) return seed;
     for (const field of obj.fields) {
-      if (field.type !== 'Lookup' && field.type !== 'Connection' && field.type !== 'ExternalLookup') continue;
+      if (!isLookupFieldType(field.type) && field.type !== 'LookupUser' && field.type !== 'MultiLookupUser') continue;
       if (!field.lookupObject) continue;
       const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
       const val = recordData[stripped] ?? recordData[field.apiName];
@@ -273,7 +274,7 @@ export default function DynamicForm({
     setLookupQueries((prev) => {
       const updates: Record<string, string> = {};
       for (const field of object.fields) {
-        if (field.type !== 'Lookup' && field.type !== 'Connection' && field.type !== 'ExternalLookup') continue;
+        if (!isLookupFieldType(field.type) && field.type !== 'LookupUser' && field.type !== 'MultiLookupUser') continue;
         if (!field.lookupObject) continue;
         const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
         const val = recordData[stripped] ?? recordData[field.apiName];
@@ -435,6 +436,8 @@ export default function DynamicForm({
             } else if (
               fieldType === 'Lookup' ||
               fieldType === 'Connection' ||
+              fieldType === 'ConnectionContact' ||
+              fieldType === 'ConnectionAccount' ||
               fieldType === 'ExternalLookup' ||
               fieldType === 'PicklistLookup'
             ) {
@@ -1011,6 +1014,8 @@ export default function DynamicForm({
         return String(val);
       case 'Lookup':
       case 'Connection':
+      case 'ConnectionContact':
+      case 'ConnectionAccount':
       case 'ExternalLookup':
       case 'LookupUser': {
         const lookupLabel = lookupQueries[fieldDef.apiName];

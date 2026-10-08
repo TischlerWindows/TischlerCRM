@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { preloadLookupRecords } from '@/lib/utils';
 import { useSchemaStore } from '@/lib/schema-store';
+import { getConnectionTargetObject, isLookupFieldType } from '@/lib/schema';
 
 /**
  * Hook that preloads lookup records for an object definition's
@@ -35,12 +36,13 @@ export function useLookupPreloader(
 
     for (const field of objectDef.fields) {
       const t = field.type;
+      const target = getConnectionTargetObject(t, field.lookupObject) ?? field.lookupObject
       if (
-        (t === 'Lookup' || t === 'Connection' || t === 'ExternalLookup' || t === 'LookupUser' || t === 'MultiLookupUser' || t === 'PicklistLookup') &&
-        field.lookupObject &&
-        knownObjects.has(field.lookupObject)
+        (isLookupFieldType(t) || t === 'LookupUser' || t === 'MultiLookupUser' || t === 'PicklistLookup') &&
+        target &&
+        knownObjects.has(target)
       ) {
-        targets.add(field.lookupObject);
+        targets.add(target);
       }
       if (t === 'LookupUser' || t === 'MultiLookupUser') {
         targets.add('User');

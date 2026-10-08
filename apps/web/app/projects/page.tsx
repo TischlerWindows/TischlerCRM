@@ -341,7 +341,7 @@ export default function ProjectsPage() {
     const schemaFieldForLookup = projectObject?.fields?.find(f => f.apiName === `Project__${columnId}` || f.apiName === columnId);
     const lookupObjectType = inferLookupObjectType(columnId) ||
       (schemaFieldForLookup?.type === 'LookupUser' ? 'User' : null) ||
-      ((schemaFieldForLookup?.type === 'Lookup' || schemaFieldForLookup?.type === 'Connection' || schemaFieldForLookup?.type === 'ExternalLookup') ? schemaFieldForLookup.lookupObject ?? null : null);
+      ((schemaFieldForLookup?.type === 'Lookup' || schemaFieldForLookup?.type === 'Connection' || schemaFieldForLookup?.type === 'ConnectionContact' || schemaFieldForLookup?.type === 'ConnectionAccount' || schemaFieldForLookup?.type === 'ExternalLookup') ? schemaFieldForLookup.lookupObject ?? null : null);
     if (lookupObjectType && typeof value === 'string') {
       return resolveLookupDisplayName(value, lookupObjectType);
     }
@@ -532,11 +532,11 @@ export default function ProjectsPage() {
     // Dynamically find the actual field apiNames from the schema so we don't
     // rely on hardcoded names that may differ per deployment.
     const oppField = projectObject.fields.find(
-      (f) => (f.type === 'Lookup' || f.type === 'Connection' || f.type === 'ExternalLookup') &&
+      (f) => (f.type === 'Lookup' || f.type === 'Connection' || f.type === 'ConnectionContact' || f.type === 'ConnectionAccount' || f.type === 'ExternalLookup') &&
              f.lookupObject === 'Opportunity',
     );
     const propField = projectObject.fields.find(
-      (f) => (f.type === 'Lookup' || f.type === 'Connection' || f.type === 'ExternalLookup') &&
+      (f) => (f.type === 'Lookup' || f.type === 'Connection' || f.type === 'ConnectionContact' || f.type === 'ConnectionAccount' || f.type === 'ExternalLookup') &&
              f.lookupObject === 'Property',
     );
 

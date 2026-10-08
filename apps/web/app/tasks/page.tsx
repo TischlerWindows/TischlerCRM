@@ -213,7 +213,7 @@ export default function TasksPage() {
 
     const lookupObjectType = inferLookupObjectType(columnId) ||
       (schemaField?.type === 'LookupUser' ? 'User' : null) ||
-      ((schemaField?.type === 'Lookup' || schemaField?.type === 'Connection' || schemaField?.type === 'ExternalLookup') ? schemaField.lookupObject ?? null : null);
+      ((schemaField?.type === 'Lookup' || schemaField?.type === 'Connection' || schemaField?.type === 'ConnectionContact' || schemaField?.type === 'ConnectionAccount' || schemaField?.type === 'ExternalLookup') ? schemaField.lookupObject ?? null : null);
     if (lookupObjectType && typeof value === 'string') {
       return resolveLookupDisplayName(value, lookupObjectType);
     }

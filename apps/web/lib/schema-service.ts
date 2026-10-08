@@ -476,7 +476,7 @@ class LocalStorageSchemaService implements SchemaService {
         const hasLookup = fields.some((field) => {
           const relatedObject = (field as any).relatedObject as string | undefined;
           return (
-            (field.type === 'Lookup' || field.type === 'Connection' || field.type === 'ExternalLookup') &&
+            (field.type === 'Lookup' || field.type === 'Connection' || field.type === 'ConnectionContact' || field.type === 'ConnectionAccount' || field.type === 'ExternalLookup') &&
             ((field.lookupObject && field.lookupObject === targetApi) || (relatedObject && relatedObject === targetApi))
           ) || field.apiName === `${targetApi}Id`;
         });
@@ -511,7 +511,7 @@ class LocalStorageSchemaService implements SchemaService {
           const panel = region.panels[0]!;
           const existingFieldApi = new Set(panel.fields.map((f) => f.fieldApiName));
           const relationshipFields = fields.filter((field) =>
-            (field.type === 'Lookup' || field.type === 'Connection' || field.type === 'ExternalLookup') &&
+            (field.type === 'Lookup' || field.type === 'Connection' || field.type === 'ConnectionContact' || field.type === 'ConnectionAccount' || field.type === 'ExternalLookup') &&
             !existingFieldApi.has(field.apiName)
           );
 
@@ -623,7 +623,7 @@ class LocalStorageSchemaService implements SchemaService {
       // Include relationship lookups too (fields without prefix, like ContactId)
       const relationshipFields = obj.fields.filter(
         (f) => !systemFieldApiNames.has(f.apiName) && !f.apiName.startsWith(`${obj.apiName}__`) &&
-               (f.type === 'Lookup' || f.type === 'Connection' || f.type === 'ExternalLookup')
+               (f.type === 'Lookup' || f.type === 'Connection' || f.type === 'ConnectionContact' || f.type === 'ConnectionAccount' || f.type === 'ExternalLookup')
       );
 
       const allLayoutFields = [...customFields, ...readOnlyFields, ...relationshipFields];

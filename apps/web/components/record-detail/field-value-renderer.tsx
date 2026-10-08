@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { formatFieldValue, resolveLookupDisplayName, getLookupCachedRecord } from '@/lib/utils';
-import { FieldDef, normalizeFieldType, type PageField } from '@/lib/schema';
+import { FieldDef, getConnectionTargetObject, isConnectionFieldType, normalizeFieldType, type PageField } from '@/lib/schema';
 import type { ObjectDef } from '@/lib/schema';
 import LocationMapPreview from '@/components/location-map-preview';
 import { DropboxFileBrowser } from '@/components/dropbox-file-browser';
@@ -249,8 +249,8 @@ export function renderValue(
   }
 
   // Lookup → clickable link showing resolved label (not raw UUID)
-  if ((fieldType === 'Lookup' || fieldType === 'Connection') && fieldDef?.lookupObject) {
-    const lookupTarget = fieldDef.lookupObject;
+  const lookupTarget = fieldDef ? getConnectionTargetObject(fieldType, fieldDef.lookupObject) : undefined;
+  if ((fieldType === 'Lookup' || isConnectionFieldType(fieldType)) && lookupTarget) {
     const route = LOOKUP_ROUTE_MAP[lookupTarget];
     const displayLabel = resolveLookupDisplayName(value, lookupTarget);
     const link = route ? (
@@ -259,7 +259,7 @@ export function renderValue(
       </Link>
     ) : displayLabel;
 
-    if (fieldType === 'Connection' && (lookupTarget === 'Contact' || lookupTarget === 'Account')) {
+    if (isConnectionFieldType(fieldType) && (lookupTarget === 'Contact' || lookupTarget === 'Account')) {
       const connectedRecord = getLookupCachedRecord(lookupTarget, String(value)) as Record<string, unknown> | null;
       const data = connectedRecord?.data && typeof connectedRecord.data === 'object'
         ? connectedRecord.data as Record<string, unknown>

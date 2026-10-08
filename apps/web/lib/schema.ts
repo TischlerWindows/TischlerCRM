@@ -2,7 +2,7 @@
 
 export type FieldType =
   | "AutoNumber" | "Formula" | "RollupSummary"
-  | "Lookup" | "Connection" | "ExternalLookup" | "LookupFields"
+  | "Lookup" | "Connection" | "ConnectionContact" | "ConnectionAccount" | "ExternalLookup" | "LookupFields"
   | "Checkbox" | "Currency" | "Date" | "DateTime" | "Email"
   | "Geolocation" | "Number" | "Percent" | "Phone" | "PhoneWithPrefix"
   | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText" | "PicklistLookup"
@@ -24,6 +24,8 @@ export function normalizeFieldType(raw: string): FieldType {
     rollupsummary: 'RollupSummary',
     lookup: 'Lookup',
     connection: 'Connection',
+    connectioncontact: 'ConnectionContact',
+    connectionaccount: 'ConnectionAccount',
     externallookup: 'ExternalLookup',
     lookupfields: 'LookupFields',
     checkbox: 'Checkbox',
@@ -59,6 +61,24 @@ export function normalizeFieldType(raw: string): FieldType {
     dropdownwithcustom: 'DropdownWithCustom',
   };
   return CANONICAL[raw.toLowerCase()] || (raw as FieldType);
+}
+
+export function isConnectionFieldType(type: string): boolean {
+  return type === 'Connection' || type === 'ConnectionContact' || type === 'ConnectionAccount';
+}
+
+export function isLookupFieldType(type: string): boolean {
+  return type === 'Lookup' || isConnectionFieldType(type) || type === 'ExternalLookup';
+}
+
+export function getConnectionTargetObject(type: string, configuredTarget?: string): string | undefined {
+  if (type === 'ConnectionContact') return 'Contact';
+  if (type === 'ConnectionAccount') return 'Account';
+  return configuredTarget;
+}
+
+export function getConnectionRoleFieldApiName(fieldApiName: string): string {
+  return `${fieldApiName}__role`;
 }
 
 export interface FieldDef {
@@ -1032,7 +1052,7 @@ export const FIELD_TYPES: FieldOption[] = [
 // Helper to get field type categories
 export const getFieldTypeCategory = (type: FieldType): string => {
   if (["AutoNumber", "Formula", "RollupSummary"].includes(type)) return "Advanced";
-  if (["Lookup", "Connection", "ExternalLookup", "LookupFields", "LookupUser", "MultiLookupUser", "PicklistLookup"].includes(type)) return "Relationship";
+  if (["Lookup", "Connection", "ConnectionContact", "ConnectionAccount", "ExternalLookup", "LookupFields", "LookupUser", "MultiLookupUser", "PicklistLookup"].includes(type)) return "Relationship";
   if (["Text", "TextArea", "LongTextArea", "RichTextArea", "EncryptedText"].includes(type)) return "Text";
   if (["Number", "Currency", "Percent"].includes(type)) return "Number";
   if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";
