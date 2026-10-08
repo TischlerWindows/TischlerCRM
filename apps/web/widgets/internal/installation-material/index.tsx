@@ -411,8 +411,8 @@ export default function InstallationMaterialWidget({ record, object, onRecordCha
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
       const input = event.target instanceof HTMLInputElement ? event.target : null
       const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
-      const horizontalAtEdge = direction && input && (input.type === 'number'
-        || isCaretAtHorizontalEdge(input.value, input.selectionStart, input.selectionEnd, direction))
+      const horizontalAtEdge = direction && input
+        && isCaretAtHorizontalEdge(input.value, input.selectionStart, input.selectionEnd, direction)
       const atEdge = !input || event.key === 'ArrowUp' || event.key === 'ArrowDown'
         || !!horizontalAtEdge
       if (event.shiftKey || atEdge) {

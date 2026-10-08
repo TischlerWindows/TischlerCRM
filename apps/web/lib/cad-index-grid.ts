@@ -152,3 +152,7 @@ export function isCaretAtHorizontalEdge(
     ? selectionStart === 0 && selectionEnd === 0
     : selectionStart === value.length && selectionEnd === value.length
 }
+
+export function isValidGridDecimalInput(value: string): boolean {
+  return /^-?\d*\.?\d*$/.test(value)
+}

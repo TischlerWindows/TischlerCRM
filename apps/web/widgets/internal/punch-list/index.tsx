@@ -27,6 +27,7 @@ import {
   getGridFillTargets,
   getGridFillRangeCellClasses,
   isCaretAtHorizontalEdge,
+  isValidGridDecimalInput,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -276,11 +277,15 @@ function EditableCell({
     const isNumber = type === 'number'
     return (
       <input
-        type={isNumber ? 'number' : 'text'}
+        type="text"
+        inputMode={isNumber ? 'decimal' : undefined}
         data-cell-id={dataCellId}
         autoFocus
         value={typeof draft === 'string' || typeof draft === 'number' ? String(draft) : ''}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          if (isNumber && !isValidGridDecimalInput(e.target.value)) return
+          setDraft(e.target.value)
+        }}
         onBlur={() => commit(draft)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); commit(draft); return }
@@ -604,11 +609,8 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     if (event.target instanceof HTMLTextAreaElement || (event.target instanceof HTMLInputElement && event.target.type !== 'checkbox')) {
       const target = event.target
       const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
-      const atEdge = direction && target instanceof HTMLInputElement && target.type === 'number'
-        ? true
-        : direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
-          ? isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
-          : false
+      const atEdge = direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+        && isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
       if (direction && atEdge) {
         event.preventDefault()
         navigateGrid(row, column, direction)

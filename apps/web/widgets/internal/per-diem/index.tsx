@@ -14,6 +14,7 @@ import {
   getGridFillTargets,
   getGridFillRangeCellClasses,
   isCaretAtHorizontalEdge,
+  isValidGridDecimalInput,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -245,10 +246,13 @@ function EditableCell({
       <input
         data-cell-id={dataCellId}
         autoFocus
-        type={type === 'date' ? 'date' : isNumber ? 'number' : 'text'}
-        step={isNumber ? '0.01' : undefined}
+        type={type === 'date' ? 'date' : 'text'}
+        inputMode={isNumber ? 'decimal' : undefined}
         value={type === 'date' ? dateValue(draft) : typeof draft === 'string' || typeof draft === 'number' ? String(draft) : ''}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => {
+          if (isNumber && !isValidGridDecimalInput(event.target.value)) return
+          setDraft(event.target.value)
+        }}
         onBlur={commit}
         onKeyDown={(event) => {
           if (event.key === 'Enter') { event.preventDefault(); commit(); return }
@@ -482,11 +486,8 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
     if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) {
       const target = event.target
       const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
-      const atEdge = direction && target instanceof HTMLInputElement && target.type === 'number'
-        ? true
-        : direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
-          ? isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
-          : false
+      const atEdge = direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+        && isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
       if (direction && atEdge) {
         event.preventDefault()
         navigateGrid(row, column, direction, view)

@@ -2,6 +2,7 @@ import {
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isCaretAtHorizontalEdge,
+  isValidGridDecimalInput,
   getGridFillRangeCellClasses,
   getGridFillRangeBounds,
   getGridFillTargets,
@@ -17,9 +18,17 @@ describe('CAD Index List spreadsheet grid helpers', () => {
   it('detects horizontal caret boundaries in text and textarea editors', () => {
     expect(isCaretAtHorizontalEdge('55', 2, 2, 'right')).toBe(true)
     expect(isCaretAtHorizontalEdge('55', 2, 2, 'left')).toBe(false)
+    expect(isCaretAtHorizontalEdge('1234', 2, 2, 'left')).toBe(false)
+    expect(isCaretAtHorizontalEdge('1234', 2, 2, 'right')).toBe(false)
+    expect(isCaretAtHorizontalEdge('1234', 2, 4, 'right')).toBe(false)
     expect(isCaretAtHorizontalEdge('notes', 0, 0, 'left')).toBe(true)
     expect(isCaretAtHorizontalEdge('notes', 0, 0, 'right')).toBe(false)
     expect(isCaretAtHorizontalEdge('55', null, null, 'right')).toBe(false)
+  })
+
+  it('accepts incomplete decimal edits but rejects non-numeric grid input', () => {
+    expect(['', '-', '.', '-.', '.5', '-12.50', '12.'].every(isValidGridDecimalInput)).toBe(true)
+    expect(['1.2.3', 'abc', '1,5'].some(isValidGridDecimalInput)).toBe(false)
   })
 
   it('normalizes a rectangular selection regardless of drag direction', () => {

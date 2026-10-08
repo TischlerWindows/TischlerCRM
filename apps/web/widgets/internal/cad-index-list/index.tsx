@@ -27,6 +27,7 @@ import {
   getGridFillTargets,
   getGridFillRangeCellClasses,
   isCaretAtHorizontalEdge,
+  isValidGridDecimalInput,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -152,7 +153,10 @@ function TextCell({
   if (editing) {
     const editorProps = {
       value: draft,
-      onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(event.target.value),
+      onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        if (type === 'number' && !isValidGridDecimalInput(event.target.value)) return
+        setDraft(event.target.value)
+      },
       onBlur: () => {
         if (cancelBlurRef.current) {
           cancelBlurRef.current = false
@@ -166,7 +170,7 @@ function TextCell({
     }
     return multiline
       ? <textarea {...editorProps} ref={textareaRef} rows={2} />
-      : <input {...editorProps} ref={inputRef} type={type} disabled={saving} />
+      : <input {...editorProps} ref={inputRef} type={type === 'number' ? 'text' : type} inputMode={type === 'number' ? 'decimal' : undefined} disabled={saving} />
   }
 
   const display = value === undefined || value === null || value === '' ? '\u2014' : String(value)
@@ -513,11 +517,8 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     const target = event.target
     if ((target instanceof HTMLInputElement && target.type !== 'checkbox') || target instanceof HTMLTextAreaElement) {
       const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
-      const atEdge = direction && target instanceof HTMLInputElement && target.type === 'number'
-        ? true
-        : direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
-          ? isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
-          : false
+      const atEdge = direction && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+        && isCaretAtHorizontalEdge(target.value, target.selectionStart, target.selectionEnd, direction)
       if (direction && atEdge) {
         event.preventDefault()
         setEditingCellId(null)

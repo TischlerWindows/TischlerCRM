@@ -20,6 +20,7 @@ import {
   isCaretAtHorizontalEdge,
   getGridFillTargets,
   getGridFillRangeCellClasses,
+  isValidGridDecimalInput,
   getGridSelectionBounds,
   getGridSelectionOrigin,
   isInGridSelection,
@@ -283,10 +284,14 @@ function EditableCell({
     return (
       <input
         ref={inputRef}
-        type={isNumber ? 'number' : 'text'}
+        type="text"
+        inputMode={isNumber ? 'decimal' : undefined}
         data-cell-id={dataCellId}
         value={typeof draft === 'string' || typeof draft === 'number' ? String(draft) : ''}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          if (isNumber && !isValidGridDecimalInput(e.target.value)) return
+          setDraft(e.target.value)
+        }}
         onBlur={() => commit(draft)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); commit(draft); return }
@@ -438,8 +443,12 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   const handleGridKeyDown = (event: React.KeyboardEvent<HTMLElement>, row: number, column: number) => {
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
       const direction = event.key === 'ArrowLeft' ? 'left' : event.key === 'ArrowRight' ? 'right' : null
-      const atEdge = direction && (event.target instanceof HTMLInputElement && event.target.type === 'number'
-        || isCaretAtHorizontalEdge(event.target.value, event.target.selectionStart, event.target.selectionEnd, direction))
+      const atEdge = direction && isCaretAtHorizontalEdge(
+        event.target.value,
+        event.target.selectionStart,
+        event.target.selectionEnd,
+        direction,
+      )
       if (direction && atEdge) {
         event.preventDefault()
         setEditingCellId(null)
