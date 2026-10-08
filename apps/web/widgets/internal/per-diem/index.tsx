@@ -558,6 +558,10 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
       const rowData = rows[row]
       const field = gridFieldsForView(view)[column]
       if (rowData && field && field.type !== 'date') {
+        if (field.type === 'currency' && !isValidGridDecimalInput(event.key)) {
+          event.preventDefault()
+          return
+        }
         event.preventDefault()
         setEditSeed(event.key)
         setEditingCellId(`${rowData.id}:${field.key}`)

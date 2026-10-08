@@ -584,6 +584,10 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
         }
         return
       }
+      if (activeColumn?.type === 'number' && !isValidGridDecimalInput(event.key)) {
+        event.preventDefault()
+        return
+      }
       event.preventDefault()
       beginCellEdit(row, column, event.key)
     }

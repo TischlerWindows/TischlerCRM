@@ -505,6 +505,10 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
       const rowData = rows[row]
       const field = ALL_FIELDS[column]
       if (rowData && field) {
+        if (field.type === 'number' && !isValidGridDecimalInput(event.key)) {
+          event.preventDefault()
+          return
+        }
         event.preventDefault()
         setEditSeed(event.key)
         setEditingCellId(`${rowData.id}:${field.key}`)
