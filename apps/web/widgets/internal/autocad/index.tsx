@@ -18,6 +18,7 @@ import { readProjectField } from '@/lib/factory-order-spec'
 import { userLookupIds, type LookupUserIdentity } from '@/lib/user-lookup'
 import {
   isCaretAtHorizontalEdge,
+  focusGridCellSurface,
   getGridFillTargets,
   getGridFillRangeCellClasses,
   isValidGridDecimalInput,
@@ -181,11 +182,12 @@ function FastenerComboBox({
             const picked = filtered[highlighted]
             if (picked) onSelect(picked)
             else onCancel()
+            focusGridCellSurface(e.currentTarget)
             return
           }
           if (e.key === 'Tab') {
             const picked = filtered[highlighted]
-            if (picked) { e.preventDefault(); onSelect(picked) }
+            if (picked) { e.preventDefault(); onSelect(picked); focusGridCellSurface(e.currentTarget) }
           }
         }}
         onBlur={() => setTimeout(onCancel, 150)}
@@ -306,7 +308,7 @@ function EditableCell({
         }}
         onBlur={() => commit(draft)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); commit(draft); return }
+          if (e.key === 'Enter') { e.preventDefault(); commit(draft); focusGridCellSurface(e.currentTarget); return }
           if (e.key === 'Escape') { onStopEdit?.(); return }
         }}
         className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"

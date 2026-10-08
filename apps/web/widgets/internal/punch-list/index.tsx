@@ -27,6 +27,7 @@ import {
   getGridFillTargets,
   getGridFillRangeCellClasses,
   isCaretAtHorizontalEdge,
+  focusGridCellSurface,
   isValidGridDecimalInput,
   getGridSelectionBounds,
   getGridSelectionOrigin,
@@ -266,7 +267,7 @@ function EditableCell({
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => commit(draft)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); commit(draft); return }
+            if (e.key === 'Enter') { e.preventDefault(); commit(draft); focusGridCellSurface(e.currentTarget); return }
             if (e.key === 'Escape') { onStopEdit?.(); return }
           }}
           className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
@@ -283,7 +284,7 @@ function EditableCell({
           onBlur={() => commit(draft)}
           onKeyDown={(e) => {
             if (e.key === 'Escape') { onStopEdit?.(); return }
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(draft) }
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit(draft); focusGridCellSurface(e.currentTarget) }
           }}
           rows={1}
           className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm resize-none overflow-hidden focus:outline-none focus:ring-1 focus:ring-brand-navy"
@@ -304,7 +305,7 @@ function EditableCell({
         }}
         onBlur={() => commit(draft)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); commit(draft); return }
+          if (e.key === 'Enter') { e.preventDefault(); commit(draft); focusGridCellSurface(e.currentTarget); return }
           if (e.key === 'Escape') { onStopEdit?.(); return }
         }}
         className="w-full border border-brand-navy/40 rounded px-1 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"

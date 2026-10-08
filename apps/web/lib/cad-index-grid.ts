@@ -141,6 +141,14 @@ export function getGridFillRangeCellClasses(
   ].filter(Boolean).join(' ')
 }
 
+export function focusGridCellSurface(target: HTMLElement): void {
+  const cell = target.closest<HTMLElement>('[data-grid-row][data-grid-column]')
+  if (!cell) return
+  requestAnimationFrame(() => {
+    if (cell.isConnected) cell.focus()
+  })
+}
+
 export function isCaretAtHorizontalEdge(
   value: string,
   selectionStart: number | null,
