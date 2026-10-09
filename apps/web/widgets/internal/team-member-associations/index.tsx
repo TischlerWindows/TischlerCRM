@@ -23,6 +23,7 @@ import { getRecordName } from '../shared/recordName'
 interface AssociationRow {
   memberId: string
   objectApiName: string
+  connectionFieldApiName?: string
   parentRecordId: string
   parentRecordName: string
   parentRecordData: Record<string, unknown>
@@ -337,7 +338,7 @@ function AssocRow({
           )}
         </div>
 
-        {!isEditing && (
+        {!isEditing && !assoc.isLookupConnection && (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
@@ -482,7 +483,7 @@ function FlatTile({
           )}
         </div>
 
-        {!isEditing && (
+        {!isEditing && !assoc.isLookupConnection && (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
@@ -620,6 +621,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
         const row: AssociationRow = {
           memberId: `connection:${sourceApiName}:${field.apiName}:${String(connectedRecord.id)}`,
           objectApiName: sourceApiName,
+          connectionFieldApiName: field.apiName,
           parentRecordId: String(connectedRecord.id ?? ''),
           parentRecordName: getRecordName(connectedRecord),
           parentRecordData: recordData,
@@ -652,7 +654,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     } finally {
       setLoading(false)
     }
-  }, [recordId, objectApiName, isSupported])
+  }, [recordId, objectApiName, isSupported, connectionFields, connectedRecordType])
 
   useEffect(() => {
     fetchAssociations()
@@ -676,20 +678,30 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     onDelete: () => {},
   }
 
-  const totalCount =
-    propertyGroups.reduce((n, g) => n + (g.direct ? 1 : 0) + g.children.length, 0) +
-    flatTiles.length
+  const visibleGroups = useMemo(() => propertyGroups
+    .map(group => ({
+      ...group,
+      direct: null,
+      children: group.children.filter(row => connectionFields.some(({ sourceApiName, field }) =>
+        sourceApiName === row.objectApiName && field.apiName === row.connectionFieldApiName,
+      )),
+    }))
+    .filter(group => group.children.length > 0), [propertyGroups, connectionFields])
+  const visibleFlatTiles = useMemo(() => flatTiles.filter(row => connectionFields.some(({ sourceApiName, field }) =>
+    sourceApiName === row.objectApiName && field.apiName === row.connectionFieldApiName,
+  )), [flatTiles, connectionFields])
+  const totalCount = visibleGroups.reduce((count, group) => count + group.children.length, 0) + visibleFlatTiles.length
 
   // ── Filtered view (search query) ──
   const filteredView = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return { groups: propertyGroups, flatTiles, hidden: 0 }
+    if (!q) return { groups: visibleGroups, flatTiles: visibleFlatTiles, hidden: 0 }
     const matchRow = (row: AssociationRow) =>
       row.parentRecordName.toLowerCase().includes(q) ||
       row.role.toLowerCase().includes(q)
     const groups: PropertyGroup[] = []
     let hidden = 0
-    for (const g of propertyGroups) {
+    for (const g of visibleGroups) {
       const propMatches = g.propertyName.toLowerCase().includes(q)
       const directMatches = g.direct ? matchRow(g.direct) : false
       const children = g.children.filter(matchRow)
@@ -706,10 +718,10 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
         hidden += (g.direct ? 1 : 0) + g.children.length
       }
     }
-    const filteredFlat = flatTiles.filter(matchRow)
-    hidden += flatTiles.length - filteredFlat.length
+    const filteredFlat = visibleFlatTiles.filter(matchRow)
+    hidden += visibleFlatTiles.length - filteredFlat.length
     return { groups, flatTiles: filteredFlat, hidden }
-  }, [propertyGroups, flatTiles, search])
+  }, [visibleGroups, visibleFlatTiles, search])
 
   // Default-collapse heuristic: once results are loaded and the user hasn't
   // toggled anything yet, collapse all groups when there are > 10 of them.
