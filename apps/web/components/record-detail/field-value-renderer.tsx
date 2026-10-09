@@ -313,10 +313,10 @@ export function renderValue(
               {displayLabel}
             </Link>
           ) : displayLabel}
-          <div className="mt-0.5 space-y-0.5 text-xs text-gray-500">
-            <div><span className="mr-1.5 text-gray-400">Primary Email:</span>{read('primaryEmail', 'email')}</div>
-            <div><span className="mr-1.5 text-gray-400">Primary Phone:</span>{read('primaryPhone', 'phone')}</div>
-            <div><span className="mr-1.5 text-gray-400">{connectionTypeLabel}:</span>{connectionTypeValue || '—'}</div>
+          <div className="mt-0.5 space-y-0.5 text-sm text-gray-900">
+            <div><span className="mr-1.5 text-gray-500">Primary Email:</span>{read('primaryEmail', 'email')}</div>
+            <div><span className="mr-1.5 text-gray-500">Primary Phone:</span>{read('primaryPhone', 'phone')}</div>
+            <div><span className="mr-1.5 text-gray-500">{connectionTypeLabel}:</span>{connectionTypeValue || '—'}</div>
           </div>
         </div>
       );
