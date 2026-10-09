@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { formatFieldValue, resolveLookupDisplayName, getLookupCachedRecord } from '@/lib/utils';
-import { FieldDef, getConnectionTargetObject, isConnectionFieldType, normalizeFieldType, type PageField } from '@/lib/schema';
+import { FieldDef, getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, isConnectionFieldType, normalizeFieldType, type PageField } from '@/lib/schema';
 import type { ObjectDef } from '@/lib/schema';
 import LocationMapPreview from '@/components/location-map-preview';
 import { DropboxFileBrowser } from '@/components/dropbox-file-browser';
@@ -251,7 +251,7 @@ export function renderValue(
   // Lookup → clickable link showing resolved label (not raw UUID)
   const lookupTarget = fieldDef ? getConnectionTargetObject(fieldType, fieldDef.lookupObject) : undefined;
   if ((fieldType === 'Lookup' || fieldType === 'ExternalLookup' || isConnectionFieldType(fieldType)) && lookupTarget) {
-    const lookupLabels = record?.lookupLabels as Record<string, { label: string; objectApiName: string; canRead: boolean }> | undefined;
+    const lookupLabels = record?.lookupLabels as Record<string, { label: string; objectApiName: string; canRead: boolean; connectionType?: string }> | undefined;
     const lookupMeta = lookupLabels?.[fieldDef?.apiName ?? apiName]
       ?? lookupLabels?.[(fieldDef?.apiName ?? apiName).replace(/^[A-Za-z]+__/, '')];
     const lookupId = value && typeof value === 'object'
@@ -259,8 +259,36 @@ export function renderValue(
       : String(value);
     const route = LOOKUP_ROUTE_MAP[lookupTarget];
     const displayLabel = lookupMeta?.label || resolveLookupDisplayName(lookupId, lookupTarget);
+    const isPersonConnection = isConnectionFieldType(fieldType) && (lookupTarget === 'Contact' || lookupTarget === 'Account');
+    const connectionTypeField = lookupTarget === 'Contact' ? 'contactType' : 'accountType';
+    const connectionRole = record?.[getConnectionRoleFieldApiName(fieldDef?.apiName ?? apiName)]
+      ?? record?.[getConnectionRoleFieldBareName(fieldDef?.apiName ?? apiName)];
+    const connectedRecord = isPersonConnection
+      ? getLookupCachedRecord(lookupTarget, lookupId) as Record<string, unknown> | null
+      : null;
+    const connectedData = connectedRecord?.data && typeof connectedRecord.data === 'object'
+      ? connectedRecord.data as Record<string, unknown>
+      : connectedRecord ?? {};
+    const connectedType = connectedData[`${lookupTarget}__${connectionTypeField}`]
+      ?? connectedData[connectionTypeField];
+    const connectionTypeValue = String(
+      (typeof connectionRole === 'string' && connectionRole.trim() ? connectionRole : undefined)
+      ?? lookupMeta?.connectionType
+      ?? connectedType
+      ?? '',
+    ).trim();
+    const connectionTypeLabel = lookupTarget === 'Contact' ? 'Contact Type' : 'Account Type';
     if (lookupMeta && !lookupMeta.canRead) {
-      return <span>{displayLabel}</span>;
+      return (
+        <div className="min-w-0">
+          <span>{displayLabel}</span>
+          {isPersonConnection && (
+            <div className="mt-0.5 text-xs text-gray-500">
+              <span className="mr-1.5 text-gray-400">{connectionTypeLabel}:</span>{connectionTypeValue || '—'}
+            </div>
+          )}
+        </div>
+      );
     }
     const link = route ? (
       <Link href={`/${route}/${lookupId}`} className="text-brand-navy hover:underline underline-offset-2">
@@ -268,15 +296,11 @@ export function renderValue(
       </Link>
     ) : displayLabel;
 
-    if (isConnectionFieldType(fieldType) && (lookupTarget === 'Contact' || lookupTarget === 'Account')) {
-      const connectedRecord = getLookupCachedRecord(lookupTarget, String(value)) as Record<string, unknown> | null;
-      const data = connectedRecord?.data && typeof connectedRecord.data === 'object'
-        ? connectedRecord.data as Record<string, unknown>
-        : connectedRecord ?? {};
+    if (isPersonConnection) {
       const read = (primaryKey: string, fallbackKey: string) => {
         const find = (key: string) => {
           const bareKey = key.replace(/^[A-Za-z]+__/, '');
-          const fieldValue = data[key] ?? data[bareKey] ?? data[`${lookupTarget}__${bareKey}`];
+          const fieldValue = connectedData[key] ?? connectedData[bareKey] ?? connectedData[`${lookupTarget}__${bareKey}`];
           return typeof fieldValue === 'string' ? fieldValue.trim() : '';
         };
         return find(primaryKey) || find(fallbackKey) || '—';
@@ -292,6 +316,7 @@ export function renderValue(
           <div className="mt-0.5 space-y-0.5 text-xs text-gray-500">
             <div><span className="mr-1.5 text-gray-400">Primary Email:</span>{read('primaryEmail', 'email')}</div>
             <div><span className="mr-1.5 text-gray-400">Primary Phone:</span>{read('primaryPhone', 'phone')}</div>
+            <div><span className="mr-1.5 text-gray-400">{connectionTypeLabel}:</span>{connectionTypeValue || '—'}</div>
           </div>
         </div>
       );
@@ -437,7 +462,7 @@ export function renderValue(
     let lookupPart: React.ReactNode = '';
     if (value.lookup && lookupTarget) {
       const route = LOOKUP_ROUTE_MAP[lookupTarget];
-      const lookupLabels = record?.lookupLabels as Record<string, { label: string; objectApiName: string; canRead: boolean }> | undefined;
+      const lookupLabels = record?.lookupLabels as Record<string, { label: string; objectApiName: string; canRead: boolean; connectionType?: string }> | undefined;
       const lookupMeta = lookupLabels?.[fieldDef?.apiName ?? apiName]
         ?? lookupLabels?.[(fieldDef?.apiName ?? apiName).replace(/^[A-Za-z]+__/, '')];
       const displayLabel = lookupMeta?.label || resolveLookupDisplayName(value.lookup, lookupTarget);

@@ -466,6 +466,7 @@ function InlineConnectionEditor({
     ? recordData[roleField.apiName] ?? recordData[roleFieldName] ?? recordData[`${targetApi}__${roleFieldName}`]
     : undefined;
   const roleIsBlank = originalRole === undefined || originalRole === null || String(originalRole).trim() === '';
+  const roleLabel = targetApi === 'Contact' ? 'Contact Type' : 'Account Type';
 
   return (
     <div className="space-y-2">
@@ -476,13 +477,13 @@ function InlineConnectionEditor({
       />
       {selectedRecord && roleIsBlank && roleField?.picklistValues?.length ? (
         <label className="block text-xs font-medium text-gray-600">
-          Role
+          {roleLabel}
           <select
             value={String(role ?? '')}
             onChange={event => onRoleChange(event.target.value)}
             className="mt-1 h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-navy"
           >
-            <option value="">Select Role</option>
+            <option value="">Select {roleLabel}</option>
             {roleField.picklistValues.map(option => <option key={option} value={option}>{option}</option>)}
           </select>
         </label>

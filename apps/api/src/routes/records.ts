@@ -146,7 +146,7 @@ async function buildLookupLabels(
   sourceData: unknown,
   userId: string,
   userRole: string,
-): Promise<Record<string, { label: string; objectApiName: string; canRead: boolean }>> {
+): Promise<Record<string, { label: string; objectApiName: string; canRead: boolean; connectionType?: string }>> {
   if (!sourceData || typeof sourceData !== 'object' || Array.isArray(sourceData)) return {};
   const schemaRow = await prisma.setting.findUnique({ where: { key: 'tces-object-manager-schema' } });
   const schema = schemaRow?.value as { objects?: Array<{ apiName: string; label: string; fields?: Array<Record<string, unknown>> }> } | undefined;
@@ -157,7 +157,13 @@ async function buildLookupLabels(
   const lookupFields = (sourceObject.fields ?? []).filter((field) =>
     ['Lookup', 'Connection', 'ConnectionContact', 'ConnectionAccount', 'ExternalLookup', 'PicklistLookup'].includes(String(field.type)),
   );
-  const descriptors: Array<{ apiName: string; targetApiName: string; recordId: string; embeddedLabel?: string }> = [];
+  const descriptors: Array<{
+    apiName: string;
+    targetApiName: string;
+    recordId: string;
+    embeddedLabel?: string;
+    connectionTypeField?: string;
+  }> = [];
   for (const field of lookupFields) {
     const type = String(field.type);
     const targetApiName = type === 'ConnectionContact'
@@ -175,7 +181,14 @@ async function buildLookupLabels(
       : typeof nestedValue?.label === 'string'
         ? nestedValue.label
         : undefined;
-    descriptors.push({ apiName: String(field.apiName), targetApiName, recordId, embeddedLabel });
+    descriptors.push({
+      apiName: String(field.apiName),
+      targetApiName,
+      recordId,
+      embeddedLabel,
+      ...(type === 'ConnectionContact' ? { connectionTypeField: 'contactType' } : {}),
+      ...(type === 'ConnectionAccount' ? { connectionTypeField: 'accountType' } : {}),
+    });
   }
 
   const targetApiNames = Array.from(new Set(descriptors.map((descriptor) => descriptor.targetApiName)));
@@ -210,7 +223,7 @@ async function buildLookupLabels(
     await checkObjectPermission(userId, userRole, targetApiName, 'read'),
   ] as const));
   const canReadByTarget = new Map(permissions);
-  const labels: Record<string, { label: string; objectApiName: string; canRead: boolean }> = {};
+  const labels: Record<string, { label: string; objectApiName: string; canRead: boolean; connectionType?: string }> = {};
   for (const descriptor of descriptors) {
     const targetObject = targetObjectMap.get(descriptor.targetApiName);
     const targetData = recordsByTarget.get(descriptor.targetApiName)?.get(descriptor.recordId);
@@ -221,6 +234,9 @@ async function buildLookupLabels(
         : `Unnamed ${targetObject?.label ?? descriptor.targetApiName}`),
       objectApiName: descriptor.targetApiName,
       canRead: canReadByTarget.get(descriptor.targetApiName) ?? false,
+      ...(descriptor.connectionTypeField && targetData ? {
+        connectionType: stringifyLookupName(getLookupDataValue(targetData, descriptor.connectionTypeField)),
+      } : {}),
     };
   }
   return labels;

@@ -775,6 +775,7 @@ export function FieldInput({
       const connectionRoleValue = formData[connectionRoleApiName]
         ?? formData[connectionRoleBareName]
         ?? '';
+      const connectionRoleLabel = targetApi === 'Contact' ? 'Contact Type' : 'Account Type';
       inputElement = (
         <div className="space-y-2">
           <LookupSearch
@@ -800,7 +801,7 @@ export function FieldInput({
           />
           {isTypedConnection && selectedRecord && !hasExistingRole && roleFieldDef?.picklistValues?.length ? (
             <div className="flex flex-col gap-1">
-              <Label htmlFor={connectionRoleApiName} className="text-xs">Role</Label>
+              <Label htmlFor={connectionRoleApiName} className="text-xs">{connectionRoleLabel}</Label>
               <select
                 id={connectionRoleApiName}
                 value={String(connectionRoleValue)}
@@ -808,7 +809,7 @@ export function FieldInput({
                 disabled={isReadOnly}
                 className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
               >
-                <option value="">Select Role</option>
+                <option value="">Select {connectionRoleLabel}</option>
                 {roleFieldDef.picklistValues.map((role: string) => <option key={role} value={role}>{role}</option>)}
               </select>
             </div>

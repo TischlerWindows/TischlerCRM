@@ -18,7 +18,7 @@ export interface RecordData {
   };
   createdAt: string;
   updatedAt: string;
-  lookupLabels?: Record<string, { label: string; objectApiName: string; canRead: boolean }>;
+  lookupLabels?: Record<string, { label: string; objectApiName: string; canRead: boolean; connectionType?: string }>;
 }
 
 export interface CreateRecordInput {
