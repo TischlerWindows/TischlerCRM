@@ -13,6 +13,7 @@ import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
 import { getObjectListHref } from '@/lib/object-list-routes';
 import { useToast } from '@/components/toast';
 import { useSchemaStore } from '@/lib/schema-store';
+import { apiClient } from '@/lib/api-client';
 import { buildPageLayout } from '../build-page-layout';
 import { useEditorStore } from '../editor-store';
 import type {
@@ -104,6 +105,9 @@ export interface EditorLifecycle {
   objectApiName: string;
   layoutId: string;
   routeKey: string;
+  layoutLockStatus: 'checking' | 'held' | 'locked' | 'error';
+  layoutLockMessage: string | null;
+  retryLayoutLock: () => void;
 
   /* Layout-derived data */
   sortedTabs: LayoutTab[];
@@ -177,6 +181,91 @@ export function useEditorLifecycle(): EditorLifecycle {
   const [showTemplateGallery, setShowTemplateGallery] = useState(layoutId === 'new');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [layoutLock, setLayoutLock] = useState<{
+    routeKey: string;
+    status: 'checking' | 'held' | 'locked' | 'error';
+    message: string | null;
+  }>({ routeKey: '', status: 'checking', message: null });
+  const [layoutLockRetry, setLayoutLockRetry] = useState(0);
+  const layoutLockSessionRef = useRef<{ layoutId: string; sessionId: string } | null>(null);
+
+  const getLayoutLockSessionId = useCallback(() => {
+    if (layoutLockSessionRef.current?.layoutId === layoutId) {
+      return layoutLockSessionRef.current.sessionId;
+    }
+    const sessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    layoutLockSessionRef.current = { layoutId, sessionId };
+    return sessionId;
+  }, [layoutId]);
+
+  const requestLayoutLock = useCallback(async (): Promise<{ ok: true } | { ok: false; message: string }> => {
+    if (layoutId === 'new') return { ok: true };
+    try {
+      await apiClient.post(`/layouts/${encodeURIComponent(layoutId)}/lock`, {
+        sessionId: getLayoutLockSessionId(),
+      });
+      return { ok: true };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : 'Could not acquire the layout edit lock.',
+      };
+    }
+  }, [getLayoutLockSessionId, layoutId]);
+
+  useEffect(() => {
+    if (layoutId === 'new') {
+      setLayoutLock({ routeKey, status: 'held', message: null });
+      return;
+    }
+
+    const sessionId = getLayoutLockSessionId();
+    let cancelled = false;
+    let ownsLock = false;
+    let heartbeat: number | undefined;
+    const releaseLayoutLock = () => {
+      void apiClient.post(`/layouts/${encodeURIComponent(layoutId)}/unlock`, { sessionId }).catch(() => {});
+    };
+    const acquireOrRenew = async () => {
+      const result = await requestLayoutLock();
+      // A pending acquisition may resolve after unmount; leave its lease to
+      // expire rather than risk releasing a newer mount's same-session lock.
+      if (cancelled) return;
+      if (!result.ok) {
+        ownsLock = false;
+        setLayoutLock({
+          routeKey,
+          status: result.message.includes('currently being edited by') ? 'locked' : 'error',
+          message: result.message,
+        });
+        return;
+      }
+      ownsLock = true;
+      setLayoutLock({ routeKey, status: 'held', message: null });
+    };
+
+    setLayoutLock({ routeKey, status: 'checking', message: null });
+    void acquireOrRenew().then(() => {
+      if (!cancelled && ownsLock && heartbeat === undefined) {
+        heartbeat = window.setInterval(() => { void acquireOrRenew(); }, 30_000);
+      }
+    });
+
+    const release = () => {
+      if (ownsLock) releaseLayoutLock();
+    };
+    window.addEventListener('pagehide', release);
+    return () => {
+      cancelled = true;
+      if (heartbeat !== undefined) window.clearInterval(heartbeat);
+      window.removeEventListener('pagehide', release);
+      release();
+    };
+  }, [layoutId, routeKey, layoutLockRetry, requestLayoutLock, getLayoutLockSessionId]);
+
+  const retryLayoutLock = useCallback(() => setLayoutLockRetry((retry) => retry + 1), []);
 
   const didLoadLayoutRef = useRef<string | null>(null);
   /** Captures `object.updatedAt` at load time for concurrent-edit detection. */
@@ -336,6 +425,19 @@ export function useEditorLifecycle(): EditorLifecycle {
       return false;
     }
 
+    if (layoutId !== 'new') {
+      const lockResult = await requestLayoutLock();
+      if (!lockResult.ok) {
+        setLayoutLock({
+          routeKey,
+          status: lockResult.message.includes('currently being edited by') ? 'locked' : 'error',
+          message: lockResult.message,
+        });
+        showToast(lockResult.message, 'error');
+        return false;
+      }
+    }
+
     // Concurrent-edit detection: compare the object's current updatedAt with the
     // value captured at load time. If another user (or tab) saved in the meantime,
     // the timestamps will differ.
@@ -399,7 +501,7 @@ export function useEditorLifecycle(): EditorLifecycle {
     } finally {
       setIsSaving(false);
     }
-  }, [layout, layoutId, loadLayout, object, objectApiName, router, updateObject, showToast]);
+  }, [layout, layoutId, loadLayout, object, objectApiName, router, updateObject, showToast, requestLayoutLock, routeKey]);
 
   const handleSave = useCallback(() => {
     void performSave();
@@ -457,6 +559,9 @@ export function useEditorLifecycle(): EditorLifecycle {
     objectApiName,
     layoutId,
     routeKey,
+    layoutLockStatus: layoutLock.routeKey === routeKey ? layoutLock.status : 'checking',
+    layoutLockMessage: layoutLock.routeKey === routeKey ? layoutLock.message : null,
+    retryLayoutLock,
 
     sortedTabs,
     activeTab,

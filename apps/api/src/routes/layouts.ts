@@ -118,6 +118,27 @@ const createLayoutSchema = z.object({
 
 const updateLayoutSchema = createLayoutSchema.omit({ objectApiName: true }).partial();
 
+const LAYOUT_EDITOR_LOCK_KEY = 'page-layout-editor-locks';
+const LAYOUT_EDITOR_LOCK_TTL_MS = 90_000;
+
+interface LayoutEditorLock {
+  userId: string;
+  sessionId: string;
+  userName: string;
+  lockedAt: string;
+}
+
+function readLayoutEditorLocks(value: unknown): Record<string, LayoutEditorLock> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as Record<string, LayoutEditorLock>;
+}
+
+function isLayoutEditorLockActive(lock: LayoutEditorLock | undefined, now: number): boolean {
+  if (!lock) return false;
+  const lockedAt = Date.parse(lock.lockedAt);
+  return Number.isFinite(lockedAt) && now - lockedAt < LAYOUT_EDITOR_LOCK_TTL_MS;
+}
+
 function buildExtensionsJson(
   extensions?: z.infer<typeof extensionsObjectSchema>,
   formattingRules?: z.infer<typeof formattingRuleSchema>[]
@@ -134,6 +155,87 @@ function buildExtensionsJson(
 }
 
 export async function layoutRoutes(app: FastifyInstance) {
+  app.post('/layouts/:layoutId/lock', async (req, reply) => {
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const { layoutId } = req.params as { layoutId: string };
+    const parsed = z.object({ sessionId: z.string().min(1).max(128) }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'A valid editor sessionId is required' });
+
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${LAYOUT_EDITOR_LOCK_KEY}), hashtext(${layoutId}))`;
+
+        const setting = await tx.setting.findUnique({ where: { key: LAYOUT_EDITOR_LOCK_KEY } });
+        const locks = readLayoutEditorLocks(setting?.value);
+        const existing = locks[layoutId];
+        const now = Date.now();
+        const sameSession = existing?.userId === userId && existing.sessionId === parsed.data.sessionId;
+        if (existing && !sameSession && isLayoutEditorLockActive(existing, now)) {
+          return { ok: false as const, lockedBy: existing };
+        }
+
+        const user = await tx.user.findUnique({ where: { id: userId }, select: { name: true, email: true } });
+        const lock: LayoutEditorLock = {
+          userId,
+          sessionId: parsed.data.sessionId,
+          userName: user?.name || user?.email || 'Another user',
+          lockedAt: new Date(now).toISOString(),
+        };
+        locks[layoutId] = lock;
+        await tx.setting.upsert({
+          where: { key: LAYOUT_EDITOR_LOCK_KEY },
+          create: { id: generateId('Setting'), key: LAYOUT_EDITOR_LOCK_KEY, value: locks as Prisma.InputJsonValue },
+          update: { value: locks as Prisma.InputJsonValue },
+        });
+        return { ok: true as const, lock };
+      });
+
+      if (!result.ok) {
+        return reply.code(409).send({
+          error: `This page layout is currently being edited by ${result.lockedBy.userName}.`,
+          lockedBy: { userName: result.lockedBy.userName, lockedAt: result.lockedBy.lockedAt },
+        });
+      }
+      return reply.send({ ok: true, expiresAt: new Date(Date.parse(result.lock.lockedAt) + LAYOUT_EDITOR_LOCK_TTL_MS).toISOString() });
+    } catch (err: any) {
+      app.log.error(err, 'POST /layouts/:layoutId/lock failed');
+      return reply.code(500).send({ error: 'Failed to acquire layout edit lock' });
+    }
+  });
+
+  app.post('/layouts/:layoutId/unlock', async (req, reply) => {
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const { layoutId } = req.params as { layoutId: string };
+    const parsed = z.object({ sessionId: z.string().min(1).max(128) }).safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'A valid editor sessionId is required' });
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${LAYOUT_EDITOR_LOCK_KEY}), hashtext(${layoutId}))`;
+
+        const setting = await tx.setting.findUnique({ where: { key: LAYOUT_EDITOR_LOCK_KEY } });
+        const locks = readLayoutEditorLocks(setting?.value);
+        const existing = locks[layoutId];
+        if (existing?.userId !== userId || existing.sessionId !== parsed.data.sessionId) return;
+
+        delete locks[layoutId];
+        await tx.setting.upsert({
+          where: { key: LAYOUT_EDITOR_LOCK_KEY },
+          create: { id: generateId('Setting'), key: LAYOUT_EDITOR_LOCK_KEY, value: locks as Prisma.InputJsonValue },
+          update: { value: locks as Prisma.InputJsonValue },
+        });
+      });
+      return reply.send({ ok: true });
+    } catch (err: any) {
+      app.log.error(err, 'POST /layouts/:layoutId/unlock failed');
+      return reply.code(500).send({ error: 'Failed to release layout edit lock' });
+    }
+  });
+
   // Get all layouts for an object.
   // Note: the runtime page-layout resolver lives on the web side
   // (apps/web/lib/layout-resolver.ts) and treats only `active === true` as

@@ -30,6 +30,42 @@ export default function EditorPage() {
     return <div className="p-6">Object not found</div>;
   }
 
+  if (lifecycle.layoutId !== 'new' && lifecycle.layoutLockStatus !== 'held') {
+    const isChecking = lifecycle.layoutLockStatus === 'checking';
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-gray-50 px-6">
+        <section className="w-full max-w-lg space-y-3 rounded-md border border-gray-200 bg-white p-6 shadow-sm" aria-live="polite">
+          <h1 className="text-lg font-semibold text-gray-900">
+            {isChecking ? 'Checking layout access' : 'Layout is being edited'}
+          </h1>
+          <p className="text-sm text-gray-600">
+            {isChecking
+              ? 'Checking whether another person is editing this layout.'
+              : lifecycle.layoutLockMessage || 'This layout is locked by another editor.'}
+          </p>
+          {!isChecking && (
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={lifecycle.retryLayoutLock}
+                className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(lifecycle.backHref)}
+                className="rounded bg-brand-navy px-3 py-2 text-sm font-medium text-white hover:bg-brand-navy/90"
+              >
+                {lifecycle.backLabel}
+              </button>
+            </div>
+          )}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col">
       <EditorToolbar
