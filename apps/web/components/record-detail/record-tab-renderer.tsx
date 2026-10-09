@@ -469,6 +469,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
           }
 
           const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
+          const visibilityHiddenFields = new Set<any>();
           const visibleFields = sortedFields.filter((f: any) => {
             if (f.behavior === 'hidden') return false;
             if (f.hideOnView) return false;
@@ -476,26 +477,58 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
             // they pass through here so the renderer below can dispatch on kind.
             if (f.kind === 'teamMemberSlot' && f.slotConfig) {
               if (f.hideOnExisting) return false;
+              if (f.visibleIf?.length > 0 && !evaluateVisibility(f.visibleIf, layoutVisibilityData, visibilityContext, f.visibleIfLogic)) {
+                visibilityHiddenFields.add(f);
+                return false;
+              }
               const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
-              if (fFx?.hidden) return false;
+              if (fFx?.hidden) {
+                visibilityHiddenFields.add(f);
+                return false;
+              }
               return true;
             }
             // lookupFields: virtual display tile, no fieldDef on parent object
             if (f.kind === 'lookupFields' && f.lookupFieldsConfig) {
               if (f.hideOnExisting) return false;
+              if (f.visibleIf?.length > 0 && !evaluateVisibility(f.visibleIf, layoutVisibilityData, visibilityContext, f.visibleIfLogic)) {
+                visibilityHiddenFields.add(f);
+                return false;
+              }
               return true;
             }
             const fd = getFieldDef(f.fieldApiName, objectDef);
             if (!fd) return false;
             if (f.hideOnExisting && fd.type !== 'DropboxFiles') return false;
-            // LookupFields field type: always pass through
-            if (fd.type === 'LookupFields') return true;
-            if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData, visibilityContext, fd.visibleIfLogic)) return false;
-            if (f.visibleIf?.length > 0 && !evaluateVisibility(f.visibleIf, layoutVisibilityData, visibilityContext, f.visibleIfLogic)) return false;
+            if (fd.type === 'LookupFields') {
+              const isVisible =
+                evaluateVisibility(fd.visibleIf, layoutVisibilityData, visibilityContext, fd.visibleIfLogic) &&
+                evaluateVisibility(f.visibleIf, layoutVisibilityData, visibilityContext, f.visibleIfLogic);
+              const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
+              if (!isVisible || fFx?.hidden) {
+                visibilityHiddenFields.add(f);
+                return false;
+              }
+              return true;
+            }
+            if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData, visibilityContext, fd.visibleIfLogic)) {
+              visibilityHiddenFields.add(f);
+              return false;
+            }
+            if (f.visibleIf?.length > 0 && !evaluateVisibility(f.visibleIf, layoutVisibilityData, visibilityContext, f.visibleIfLogic)) {
+              visibilityHiddenFields.add(f);
+              return false;
+            }
             const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
-            if (fFx?.hidden) return false;
+            if (fFx?.hidden) {
+              visibilityHiddenFields.add(f);
+              return false;
+            }
             return true;
           });
+          const fieldsToRender = panel.maintainColumn
+            ? sortedFields.filter((field: any) => visibleFields.includes(field) || visibilityHiddenFields.has(field))
+            : visibleFields;
 
           if (visibleFields.length === 0) return null;
 
@@ -544,7 +577,16 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                     gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))`,
                   }}
                 >
-                  {visibleFields.map((f: any) => {
+                  {fieldsToRender.map((f: any) => {
+                    if (visibilityHiddenFields.has(f)) {
+                      return (
+                        <div
+                          key={`${f.fieldApiName}-visibility-placeholder-${f.order}`}
+                          aria-hidden="true"
+                          style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
+                        />
+                      );
+                    }
                     // Synthetic TeamMemberSlot fields render through their own cell.
                     // During bulk edit, render in `staged` mode (like the full edit
                     // form does) so selections are buffered locally instead of

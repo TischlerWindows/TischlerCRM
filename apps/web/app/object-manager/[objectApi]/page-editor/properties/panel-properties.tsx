@@ -77,6 +77,16 @@ export function PanelProperties({ selection }: PanelPropertiesProps) {
         </div>
       </div>
 
+      <label className="flex items-center gap-2 text-xs text-gray-700">
+        <input
+          type="checkbox"
+          checked={!!selection.panel.maintainColumn}
+          onChange={(e) => updatePanel(selection.panel.id, { maintainColumn: e.target.checked })}
+          className="h-4 w-4 rounded border-gray-300"
+        />
+        Maintain column
+      </label>
+
       <ColorControl
         label="Header background"
         value={selection.panel.style.headerBackground}

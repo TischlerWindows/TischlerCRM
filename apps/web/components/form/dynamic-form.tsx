@@ -1234,14 +1234,30 @@ export default function DynamicForm({
       order: number;
       colSpan: number;
       rowSpan: number;
+      isPlaceholder?: boolean;
     }[] = [];
+    const addVisibilityPlaceholder = (field: any) => {
+      if (!panel.maintainColumn) return;
+      gridFields.push({
+        fieldDef: { apiName: field.fieldApiName, label: '', type: 'Text' } as FieldDef,
+        pageField: field as PageField,
+        column: field.column,
+        order: field.order,
+        colSpan: field.colSpan ?? 1,
+        rowSpan: field.rowSpan ?? 1,
+        isPlaceholder: true,
+      });
+    };
     for (const f of panel.fields) {
       if (isHiddenByLifecycle(f as any, layoutType)) continue;
       if ((f as any).behavior === 'hidden') continue;
       // Synthetic TeamMemberSlot fields bypass the FieldDef lookup; the renderer
       // dispatches on kind below and renders TeamMemberSlotField instead of FieldInput.
       if ((f as any).kind === 'teamMemberSlot' && (f as any).slotConfig) {
-        if (!evaluateVisibility(f.visibleIf, formData, visibilityCtx, f.visibleIfLogic)) continue;
+        if (!evaluateVisibility(f.visibleIf, formData, visibilityCtx, f.visibleIfLogic)) {
+          addVisibilityPlaceholder(f);
+          continue;
+        }
         gridFields.push({
           fieldDef: { apiName: f.fieldApiName, label: '', type: 'Text' } as FieldDef,
           pageField: f as any,
@@ -1254,6 +1270,10 @@ export default function DynamicForm({
       }
       // lookupFields kind: display-only virtual field, no fieldDef needed
       if ((f as any).kind === 'lookupFields' && (f as any).lookupFieldsConfig) {
+        if (!evaluateVisibility(f.visibleIf, formData, visibilityCtx, f.visibleIfLogic)) {
+          addVisibilityPlaceholder(f);
+          continue;
+        }
         gridFields.push({
           fieldDef: { apiName: f.fieldApiName, label: (f as any).labelOverride ?? 'Lookup Fields', type: 'Text' } as FieldDef,
           pageField: f as any,
@@ -1266,6 +1286,16 @@ export default function DynamicForm({
       }
       const fd = getFieldDef(f.fieldApiName, f as any);
       if (fd) {
+        if (fd.type === 'LookupFields') {
+          const isVisible =
+            evaluateVisibility(fd.visibleIf, formData, visibilityCtx, fd.visibleIfLogic) &&
+            evaluateVisibility(f.visibleIf, formData, visibilityCtx, f.visibleIfLogic);
+          const formatFx = getFormattingEffectsForField(layout, fd.apiName, formData, visibilityCtx);
+          if (!isVisible || formatFx?.hidden) {
+            addVisibilityPlaceholder(f);
+            continue;
+          }
+        }
         // Skip fields hidden by object-wide or placement-level "show only
         // when" rules, or by a conditional formatting "hidden" effect —
         // otherwise they'd still reserve their grid cell, leaving a gap
@@ -1273,9 +1303,15 @@ export default function DynamicForm({
         const isVisible =
           evaluateVisibility(fd.visibleIf, formData, visibilityCtx, fd.visibleIfLogic) &&
           evaluateVisibility(f.visibleIf, formData, visibilityCtx, f.visibleIfLogic);
-        if (!isVisible) continue;
+        if (!isVisible) {
+          addVisibilityPlaceholder(f);
+          continue;
+        }
         const formatFx = getFormattingEffectsForField(layout, fd.apiName, formData, visibilityCtx);
-        if (formatFx?.hidden) continue;
+        if (formatFx?.hidden) {
+          addVisibilityPlaceholder(f);
+          continue;
+        }
         gridFields.push({
           fieldDef: fd,
           pageField: f as any,
@@ -1364,9 +1400,18 @@ export default function DynamicForm({
             gap: '1rem',
           }}
         >
-          {placed.map((f) => (
+          {placed.map((f) => f.isPlaceholder ? (
             <div
-              key={f.fieldDef.apiName}
+              key={`${f.fieldDef.apiName}-placeholder-${f.order}`}
+              aria-hidden="true"
+              style={{
+                gridColumn: `${f.column + 1} / span ${Math.min(f.colSpan, panel.columns - f.column)}`,
+                gridRow: `${f.gridRow} / span ${f.rowSpan}`,
+              }}
+            />
+          ) : (
+            <div
+              key={f.pageField.fieldApiName}
               style={{
                 gridColumn: `${f.column + 1} / span ${Math.min(f.colSpan, panel.columns - f.column)}`,
                 gridRow: `${f.gridRow} / span ${f.rowSpan}`,

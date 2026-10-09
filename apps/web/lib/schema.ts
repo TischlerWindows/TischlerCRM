@@ -708,6 +708,7 @@ export interface LayoutPanel {
   label: string;
   order: number;
   columns: 1 | 2 | 3 | 4;
+  maintainColumn?: boolean;
   style: PanelStyle;
   fields: PanelField[];
   panelType?: 'fields' | 'components';

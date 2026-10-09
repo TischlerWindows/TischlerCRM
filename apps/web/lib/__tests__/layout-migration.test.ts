@@ -54,6 +54,40 @@ describe('migrateLegacyLayout', () => {
     expect(tab.hideOnNew).toBe(true)
   })
 
+  it('preserves the panel maintainColumn setting from editor tabs', () => {
+    const legacy = makeLegacyLayout({
+      extensions: {
+        editorTabs: [{
+          id: 'tab-with-maintained-columns',
+          label: 'Details',
+          order: 0,
+          regions: [{
+            id: 'region-1',
+            label: 'Information',
+            gridColumn: 1,
+            gridColumnSpan: 12,
+            gridRow: 1,
+            gridRowSpan: 1,
+            style: {},
+            panels: [{
+              id: 'panel-1',
+              label: 'Details',
+              order: 0,
+              columns: 2,
+              maintainColumn: true,
+              style: {},
+              fields: [],
+            }],
+            widgets: [],
+          }],
+        }],
+      },
+    })
+
+    const panel = migrateLegacyLayout(legacy).tabs[0].regions[0].panels[0]
+    expect(panel.maintainColumn).toBe(true)
+  })
+
   it('converts a legacy layout with PageTab/PageSection/PageField correctly', () => {
     const legacy = makeLegacyLayout();
     const result = migrateLegacyLayout(legacy);

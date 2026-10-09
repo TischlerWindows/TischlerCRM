@@ -103,6 +103,7 @@ function normalizePanel(rawPanel: unknown, panelIndex: number): LayoutPanel {
     label: typeof candidate.label === 'string' ? candidate.label : `Panel ${panelIndex + 1}`,
     order: typeof candidate.order === 'number' ? candidate.order : panelIndex,
     columns: columns as LayoutPanel['columns'],
+    ...(typeof candidate.maintainColumn === 'boolean' ? { maintainColumn: candidate.maintainColumn } : {}),
     style:
       candidate.style && typeof candidate.style === 'object'
         ? (candidate.style as LayoutPanel['style'])
