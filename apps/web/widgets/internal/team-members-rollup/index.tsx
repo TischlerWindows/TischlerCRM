@@ -521,10 +521,6 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         }
       }
 
-      // Check if this member "belongs" to the current record (editable)
-      const ownerParentId = getLookupId(member, currentField)
-      const isOwned = !!recordId && ownerParentId === recordId
-
       // Merge contact
       if (contactId) {
         const existing = contactMap.get(contactId)
@@ -540,7 +536,6 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           if (isPrimary) existing.isPrimary = true
           if (isContractHolder) existing.isContractHolder = true
           if (isQuoteRecipient) existing.isQuoteRecipient = true
-          if (isOwned && !existing.ownedMemberIds.includes(memberId)) existing.ownedMemberIds.push(memberId)
           if (!existing.allMemberIds.includes(memberId)) existing.allMemberIds.push(memberId)
           if (!existing.accountId && accountId) {
             existing.accountId = accountId
@@ -558,7 +553,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
             isPrimary,
             isContractHolder,
             isQuoteRecipient,
-            ownedMemberIds: isOwned ? [memberId] : [],
+            ownedMemberIds: [],
             allMemberIds: [memberId],
           })
         }
@@ -584,7 +579,6 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           if (isPrimary) existing.isPrimary = true
           if (isContractHolder) existing.isContractHolder = true
           if (isQuoteRecipient) existing.isQuoteRecipient = true
-          if (isOwned && !existing.ownedMemberIds.includes(memberId)) existing.ownedMemberIds.push(memberId)
           if (!existing.allMemberIds.includes(memberId)) existing.allMemberIds.push(memberId)
         } else {
           accountMap.set(accountId, {
@@ -596,7 +590,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
             isPrimary,
             isContractHolder,
             isQuoteRecipient,
-            ownedMemberIds: isOwned ? [memberId] : [],
+            ownedMemberIds: [],
             allMemberIds: [memberId],
           })
         }
@@ -608,7 +602,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       mergedAccounts: Array.from(accountMap.values()),
       allRoles: Array.from(roleSet).sort(),
     }
-  }, [allMembers, currentField, recordId, objectApiName, contactNames, accountNames, parentNames, contactRecords, accountRecords])
+  }, [allMembers, contactNames, accountNames, parentNames, contactRecords, accountRecords])
 
   // ── 5e: Search, Filter & Sort ──
   const filteredContacts = useMemo(() => {
