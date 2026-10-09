@@ -184,6 +184,28 @@ function getLookupName(rec: TeamMemberRecord, field: string): string {
   return ''
 }
 
+function normalizeConnectionFieldName(apiName: string): string {
+  return apiName.replace(/^[A-Za-z]+__/, '').replace(/[^A-Za-z0-9]/g, '').toLowerCase()
+}
+
+function getConnectionFieldValue(record: Record<string, unknown>, apiName: string): unknown {
+  const data = record.data && typeof record.data === 'object'
+    ? record.data as Record<string, unknown>
+    : record
+  const bareApiName = apiName.replace(/^[A-Za-z]+__/, '')
+  const exactValue = record[apiName] ?? record[bareApiName] ?? data[apiName] ?? data[bareApiName]
+  if (exactValue !== undefined && exactValue !== null) return exactValue
+
+  const normalizedName = normalizeConnectionFieldName(apiName)
+  for (const source of [record, data]) {
+    const match = Object.entries(source).find(([key, value]) =>
+      value !== undefined && value !== null && normalizeConnectionFieldName(key) === normalizedName,
+    )
+    if (match) return match[1]
+  }
+  return undefined
+}
+
 function connectionMembersForRecord(
   sourceApiName: string,
   sourceRecord: Record<string, unknown>,
@@ -191,16 +213,8 @@ function connectionMembersForRecord(
 ): TeamMemberRecord[] {
   const sourceId = String(sourceRecord.id ?? '')
   if (!sourceId) return []
-  const data = sourceRecord.data && typeof sourceRecord.data === 'object'
-    ? sourceRecord.data as Record<string, unknown>
-    : sourceRecord
-
   return fields.flatMap(field => {
-    const bareApiName = field.apiName.replace(/^[A-Za-z]+__/, '')
-    const rawValue = sourceRecord[field.apiName]
-      ?? sourceRecord[bareApiName]
-      ?? data[field.apiName]
-      ?? data[bareApiName]
+    const rawValue = getConnectionFieldValue(sourceRecord, field.apiName)
     const lookupId = typeof rawValue === 'string'
       ? rawValue.trim()
       : rawValue && typeof rawValue === 'object'
@@ -217,10 +231,8 @@ function connectionMembersForRecord(
     const linkField = targetObject === 'Contact' ? 'contact' : 'account'
     const roleApiName = getConnectionRoleFieldApiName(field.apiName)
     const roleBareName = getConnectionRoleFieldBareName(field.apiName)
-    const roleValue = sourceRecord[roleApiName]
-      ?? sourceRecord[roleBareName]
-      ?? data[roleApiName]
-      ?? data[roleBareName]
+    const roleValue = getConnectionFieldValue(sourceRecord, roleApiName)
+      ?? getConnectionFieldValue(sourceRecord, roleBareName)
     return [{
       id: `connection:${sourceApiName}:${sourceId}:${field.apiName}`,
       data: {
@@ -361,8 +373,9 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     (schema?.objects ?? []).map(schemaObject => {
       const resolved = resolveLayoutForUser(schemaObject, { profileId: user?.profileId ?? null })
       const placedFields = resolved.kind === 'resolved' ? getPageLayoutFieldApiNames(resolved.layout) : new Set<string>()
+      const normalizedPlacedFields = new Set(Array.from(placedFields, normalizeConnectionFieldName))
       return [schemaObject.apiName, schemaObject.fields.filter((field: FieldDef) =>
-        placedFields.has(field.apiName)
+        (placedFields.has(field.apiName) || normalizedPlacedFields.has(normalizeConnectionFieldName(field.apiName)))
         && (field.type === 'ConnectionContact' || field.type === 'ConnectionAccount')
         && ['Contact', 'Account'].includes(getConnectionTargetObject(field.type, field.lookupObject) ?? ''),
       )]
@@ -395,15 +408,11 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     setError(null)
 
     try {
-      let currentRecord = record as Record<string, unknown>
-      try {
-        currentRecord = await apiClient.get<Record<string, unknown>>(
-          `/objects/${encodeURIComponent(objectApiName)}/records/${encodeURIComponent(recordId)}`,
-        )
-      } catch {
-        // Use the record snapshot if the refresh read fails.
-      }
-      const members = connectionMembersForRecord(objectApiName, currentRecord, connectionFields)
+      const members = connectionMembersForRecord(
+        objectApiName,
+        record as Record<string, unknown>,
+        connectionFields,
+      )
 
       const contactIds = new Set<string>()
       const accountIds = new Set<string>()
