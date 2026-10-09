@@ -1,13 +1,13 @@
 'use client'
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  Plus, Search, Users, X, Edit2, Trash2, Copy,
+  Plus, Search, Users, X, Edit2, Trash2,
   Check, Building2, UserCircle, ArrowLeft, ChevronRight,
   Phone, Mail,
 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
-import { getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, isConnectionFieldType, type FieldDef, type TeamMembersRollupConfig } from '@/lib/schema'
+import { getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, type FieldDef, type TeamMembersRollupConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
 import { useAuth } from '@/lib/auth-context'
@@ -15,11 +15,7 @@ import { getPageLayoutFieldApiNames } from '@/lib/layout-migration'
 import { resolveLayoutForUser } from '@/lib/layout-resolver'
 import { FieldDisplay } from '../shared/FieldDisplay'
 import { ConnectionBadges } from '../shared/ConnectionBadges'
-import { InlineAddConnectionRow, type InlineAddConnectionPayload } from '../shared/InlineAddConnectionRow'
 import { getRecordName } from '../shared/recordName'
-import { usePendingWidget } from '@/components/form/pending-widget-context'
-import { usePendingTeamMemberPool } from '@/components/form/pending-team-member-pool'
-import { notifyTeamMembersChanged, subscribeTeamMembersChanged } from '../team-member-slot/teamMemberEvents'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -86,15 +82,6 @@ const OBJECT_TO_FIELD: Record<string, string> = {
 /** Auto-generated lookup field name used by ensureRelationshipFields
  *  (e.g. PropertyId, OpportunityId) — this is the field actually stored
  *  in the data column when records are linked through the UI. */
-const OBJECT_TO_LOOKUP_FIELD: Record<string, string> = {
-  Property: 'PropertyId',
-  Opportunity: 'OpportunityId',
-  Project: 'ProjectId',
-  WorkOrder: 'WorkOrderId',
-  Installation: 'InstallationId',
-  Lead: 'LeadId',
-}
-
 /** Reverse mapping: plain field name → auto-generated lookup field name */
 const FIELD_TO_LOOKUP: Record<string, string> = {
   property: 'PropertyId',
@@ -104,8 +91,6 @@ const FIELD_TO_LOOKUP: Record<string, string> = {
   installation: 'InstallationId',
   lead: 'LeadId',
 }
-
-const CHILD_OBJECT_TYPES = ['Opportunity', 'Project', 'WorkOrder', 'Installation']
 
 const ROLE_PICKLIST = [
   'Homeowner', 'General Contractor', 'Subcontractor', 'Architect / Designer',
@@ -199,6 +184,89 @@ function getLookupName(rec: TeamMemberRecord, field: string): string {
   return ''
 }
 
+function connectionMembersForRecord(
+  sourceApiName: string,
+  sourceRecord: Record<string, unknown>,
+  fields: FieldDef[],
+): TeamMemberRecord[] {
+  const sourceId = String(sourceRecord.id ?? '')
+  if (!sourceId) return []
+  const data = sourceRecord.data && typeof sourceRecord.data === 'object'
+    ? sourceRecord.data as Record<string, unknown>
+    : sourceRecord
+
+  return fields.flatMap(field => {
+    const bareApiName = field.apiName.replace(/^[A-Za-z]+__/, '')
+    const rawValue = sourceRecord[field.apiName]
+      ?? sourceRecord[bareApiName]
+      ?? data[field.apiName]
+      ?? data[bareApiName]
+    const lookupId = typeof rawValue === 'string'
+      ? rawValue.trim()
+      : rawValue && typeof rawValue === 'object'
+        ? String(
+          (rawValue as Record<string, unknown>).id
+          ?? (rawValue as Record<string, unknown>).lookup
+          ?? (rawValue as Record<string, unknown>).value
+          ?? '',
+        ).trim()
+        : ''
+    if (!lookupId) return []
+
+    const targetObject = getConnectionTargetObject(field.type, field.lookupObject) ?? ''
+    const linkField = targetObject === 'Contact' ? 'contact' : 'account'
+    const roleApiName = getConnectionRoleFieldApiName(field.apiName)
+    const roleBareName = getConnectionRoleFieldBareName(field.apiName)
+    const roleValue = sourceRecord[roleApiName]
+      ?? sourceRecord[roleBareName]
+      ?? data[roleApiName]
+      ?? data[roleBareName]
+    return [{
+      id: `connection:${sourceApiName}:${sourceId}:${field.apiName}`,
+      data: {
+        [linkField]: lookupId,
+        role: typeof roleValue === 'string' ? roleValue.trim() : '',
+        isLookupConnection: true,
+        connectionSourceObject: sourceApiName,
+        connectionFieldApiName: field.apiName,
+        useConnectedRecordType: field.type === 'ConnectionContact' || field.type === 'ConnectionAccount',
+        connectionTarget: targetObject,
+        connectionFieldLabel: field.label,
+      },
+    }]
+  })
+}
+
+function isConnectionFieldPlaced(
+  member: TeamMemberRecord,
+  fieldsByObject: Map<string, FieldDef[]>,
+): boolean {
+  const isLookupConnection = getField(member, 'isLookupConnection') === true
+    || getField(member, 'isLookupConnection') === 'true'
+  if (!isLookupConnection) return false
+
+  const idParts = String(member.id).split(':')
+  const sourceApiName = getStr(member, 'connectionSourceObject') || idParts[1] || ''
+  const fieldApiName = getStr(member, 'connectionFieldApiName') || idParts.slice(3).join(':')
+  return fieldsByObject.get(sourceApiName)?.some(field => field.apiName === fieldApiName) ?? false
+}
+
+function getConnectedRecordTypeLabel(
+  records: Map<string, Record<string, unknown>>,
+  recordId: string,
+  objectApiName: string,
+): string {
+  const record = records.get(recordId)
+  if (!record) return ''
+  const data = record.data && typeof record.data === 'object'
+    ? record.data as Record<string, unknown>
+    : record
+  const field = objectApiName === 'Contact' ? 'contactType' : objectApiName === 'Account' ? 'accountType' : ''
+  if (!field) return ''
+  const value = data[`${objectApiName}__${field}`] ?? data[field] ?? record[`${objectApiName}__${field}`] ?? record[field]
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 // `getRecordName` lives in shared/recordName.ts so the Associations widget and
 // the inline-add components share one resolution policy.
 
@@ -224,93 +292,6 @@ async function resolveRecords(objectApiName: string, ids: string[]): Promise<{ n
     }
   }
   return { names, records }
-}
-
-/** Batch-resolve a set of record IDs into display names only (for parent/via labels) */
-async function resolveNames(objectApiName: string, ids: string[]): Promise<NameMap> {
-  const { names } = await resolveRecords(objectApiName, ids)
-  return names
-}
-
-function connectionMembersForRecord(
-  sourceApiName: string,
-  sourceRecord: Record<string, unknown>,
-  fields: FieldDef[],
-): TeamMemberRecord[] {
-  const sourceId = String(sourceRecord.id ?? '')
-  if (!sourceId) return []
-  const data = sourceRecord.data && typeof sourceRecord.data === 'object'
-    ? sourceRecord.data as Record<string, unknown>
-    : sourceRecord
-  const parentField = OBJECT_TO_FIELD[sourceApiName]
-
-  return fields.flatMap(field => {
-    const bareApiName = field.apiName.replace(/^[A-Za-z]+__/, '')
-    const rawValue = sourceRecord[field.apiName]
-      ?? sourceRecord[bareApiName]
-      ?? data[field.apiName]
-      ?? data[bareApiName]
-    const lookupId = typeof rawValue === 'string'
-      ? rawValue.trim()
-      : rawValue && typeof rawValue === 'object'
-        ? String(
-          (rawValue as Record<string, unknown>).id
-          ?? (rawValue as Record<string, unknown>).lookup
-          ?? (rawValue as Record<string, unknown>).value
-          ?? '',
-        ).trim()
-        : ''
-    if (!lookupId) return []
-    const linkField = getConnectionTargetObject(field.type, field.lookupObject) === 'Contact' ? 'contact' : 'account'
-    const roleApiName = getConnectionRoleFieldApiName(field.apiName)
-    const roleBareName = getConnectionRoleFieldBareName(field.apiName)
-    const roleValue = sourceRecord[roleApiName] ?? sourceRecord[roleBareName] ?? data[roleApiName] ?? data[roleBareName]
-    const connectionTarget = getConnectionTargetObject(field.type, field.lookupObject) ?? ''
-    return [{
-      id: `connection:${sourceApiName}:${sourceId}:${field.apiName}`,
-      data: {
-        [linkField]: lookupId,
-        role: typeof roleValue === 'string' ? roleValue.trim() : '',
-        isLookupConnection: true,
-        connectionSourceObject: sourceApiName,
-        connectionFieldApiName: field.apiName,
-        useConnectedRecordType: field.type === 'ConnectionContact' || field.type === 'ConnectionAccount',
-        connectionTarget,
-        connectionFieldLabel: field.label,
-        ...(parentField ? { [parentField]: sourceId } : {}),
-      },
-    }]
-  })
-}
-
-function isConnectionFieldPlaced(
-  member: TeamMemberRecord,
-  fieldsByObject: Map<string, FieldDef[]>,
-): boolean {
-  const isLookupConnection = getField(member, 'isLookupConnection') === true
-    || getField(member, 'isLookupConnection') === 'true'
-  if (!isLookupConnection) return true
-
-  const idParts = String(member.id).split(':')
-  const sourceApiName = getStr(member, 'connectionSourceObject') || idParts[1] || ''
-  const fieldApiName = getStr(member, 'connectionFieldApiName') || idParts.slice(3).join(':')
-  return fieldsByObject.get(sourceApiName)?.some(field => field.apiName === fieldApiName) ?? false
-}
-
-function getConnectedRecordTypeLabel(
-  records: Map<string, Record<string, unknown>>,
-  recordId: string,
-  objectApiName: string,
-): string {
-  const record = records.get(recordId)
-  if (!record) return ''
-  const data = record.data && typeof record.data === 'object'
-    ? record.data as Record<string, unknown>
-    : record
-  const field = objectApiName === 'Contact' ? 'contactType' : objectApiName === 'Account' ? 'accountType' : ''
-  if (!field) return ''
-  const value = data[`${objectApiName}__${field}`] ?? data[field] ?? record[`${objectApiName}__${field}`] ?? record[field]
-  return typeof value === 'string' ? value.trim() : ''
 }
 
 function getPrimaryContactDetails(record: Record<string, unknown>): { email: string; phone: string } {
@@ -341,48 +322,6 @@ function PrimaryContactDetails({ record }: { record: Record<string, unknown> }) 
   )
 }
 
-/** Fetch records of `objectType` linked to `parentId` via any field variant
- *  for `parentObjectType`.  Tries plain, prefixed, and auto-lookup names,
- *  deduplicates by ID. */
-async function fetchLinkedRecords<T extends { id?: unknown }>(
-  objectType: string,
-  parentObjectType: string,
-  parentId: string,
-): Promise<T[]> {
-  const plain = OBJECT_TO_FIELD[parentObjectType]
-  const lookupField = OBJECT_TO_LOOKUP_FIELD[parentObjectType]
-  const queries: Promise<T[]>[] = []
-  if (plain) {
-    queries.push(
-      apiClient.get<T[]>(
-        `/objects/${objectType}/records?filter[${plain}]=${encodeURIComponent(parentId)}&limit=200`
-      ).catch(() => [] as T[])
-    )
-    queries.push(
-      apiClient.get<T[]>(
-        `/objects/${objectType}/records?filter[${objectType}__${plain}]=${encodeURIComponent(parentId)}&limit=200`
-      ).catch(() => [] as T[])
-    )
-  }
-  if (lookupField) {
-    queries.push(
-      apiClient.get<T[]>(
-        `/objects/${objectType}/records?filter[${lookupField}]=${encodeURIComponent(parentId)}&limit=200`
-      ).catch(() => [] as T[])
-    )
-  }
-  const results = await Promise.all(queries)
-  const seen = new Set<string>()
-  const items: T[] = []
-  for (const batch of results) {
-    for (const item of (Array.isArray(batch) ? batch : [])) {
-      const id = String(item.id)
-      if (!seen.has(id)) { seen.add(id); items.push(item) }
-    }
-  }
-  return items
-}
-
 // ── Skeleton ───────────────────────────────────────────────────────────
 
 function Skeleton() {
@@ -408,11 +347,7 @@ function Skeleton() {
 // ── Main Widget ────────────────────────────────────────────────────────
 
 export default function TeamMembersRollupWidget({ config, record, object }: WidgetProps) {
-  const {
-    rollupFromProperty = false,
-    label,
-    displayFields: configDisplayFields,
-  } = config as TeamMembersRollupConfig
+  const { label, displayFields: configDisplayFields } = config as TeamMembersRollupConfig
 
   const contactDisplayFields = configDisplayFields?.Contact ?? []
   const accountDisplayFields = configDisplayFields?.Account ?? []
@@ -428,7 +363,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       const placedFields = resolved.kind === 'resolved' ? getPageLayoutFieldApiNames(resolved.layout) : new Set<string>()
       return [schemaObject.apiName, schemaObject.fields.filter((field: FieldDef) =>
         placedFields.has(field.apiName)
-        && isConnectionFieldType(field.type)
+        && (field.type === 'ConnectionContact' || field.type === 'ConnectionAccount')
         && ['Contact', 'Account'].includes(getConnectionTargetObject(field.type, field.lookupObject) ?? ''),
       )]
     }),
@@ -439,7 +374,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   )
 
   // ── Cache-aware state init ──
-  const _cacheKey = recordId ? cacheKey(objectApiName, recordId, !!rollupFromProperty) : null
+  const _cacheKey = recordId ? cacheKey(objectApiName, recordId, false) : null
   const _cached = _cacheKey ? teamMembersCache.get(_cacheKey) : null
 
   const [rawMembers, setRawMembers] = useState<TeamMemberRecord[]>(_cached?.rawMembers ?? [])
@@ -453,235 +388,35 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('')
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showCopyModal, setShowCopyModal] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-
-  // Inline-edit state
-  const [editRole, setEditRole] = useState('')
-  const [editPrimary, setEditPrimary] = useState(false)
-  const [editContractHolder, setEditContractHolder] = useState(false)
-  const [editQuoteRecipient, setEditQuoteRecipient] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  // ── Pending widget support (create mode) ──
-  const pendingCtx = usePendingWidget()
-  const tmPool = usePendingTeamMemberPool()
-  const isCreateMode = pendingCtx?.isCreateMode === true && !recordId
-  const [privatePending, setPrivatePending] = useState<TeamMemberRecord[]>([])
-  const privatePendingRef = useRef(privatePending)
-  privatePendingRef.current = privatePending
-
-  // When the shared pool is available, view its rows as TeamMemberRecord[];
-  // otherwise fall back to the widget-private pending list (older layouts).
-  const pendingMembers: TeamMemberRecord[] = useMemo(() => {
-    if (tmPool) {
-      return tmPool.rows.map(r => ({ id: r.id, data: r.data, createdAt: '' } as TeamMemberRecord))
-    }
-    return privatePending
-  }, [tmPool, tmPool?.rows, tmPool?.version, privatePending])
-
-  // Register only when no pool is present — the pool registers itself once for all writers.
-  useEffect(() => {
-    if (!isCreateMode || !pendingCtx || !isSupported || tmPool) return
-
-    const widgetId = `team-members-${objectApiName}`
-
-    pendingCtx.registerWidget({
-      widgetId,
-      hasPendingData: () => privatePendingRef.current.length > 0,
-      savePendingData: async (parentRecordId: string) => {
-        const parentField = OBJECT_TO_FIELD[objectApiName]
-        if (!parentField) throw new Error(`No FK field for ${objectApiName}`)
-
-        for (const member of privatePendingRef.current) {
-          await apiClient.post('/objects/TeamMember/records', {
-            data: {
-              ...member.data,
-              [parentField]: parentRecordId,
-            },
-          })
-        }
-      },
-      getPendingSummary: () =>
-        `${privatePendingRef.current.length} connection(s)`,
-    })
-
-    return () => {
-      pendingCtx.unregisterWidget(widgetId)
-    }
-  }, [isCreateMode, pendingCtx, objectApiName, isSupported, tmPool])
-
-  /** Add a pending team member (create mode only) */
-  const addPendingMember = useCallback(
-    (data: Record<string, unknown>) => {
-      if (tmPool) {
-        tmPool.addRow(data)
-        return
-      }
-      const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      setPrivatePending((prev) => [
-        ...prev,
-        { id: tempId, data, createdAt: new Date().toISOString() },
-      ])
-    },
-    [tmPool],
-  )
-
-  /** Remove a pending team member by temp ID */
-  const removePendingMember = useCallback(
-    (id: string) => {
-      if (tmPool) {
-        tmPool.removeRow(id)
-        return
-      }
-      setPrivatePending((prev) => prev.filter((m) => m.id !== id))
-    },
-    [tmPool],
-  )
-
-  // ── 5b: Data Fetching ──
-  const fetchTeamMembers = useCallback(async () => {
+  const fetchConnections = useCallback(async () => {
     if (!recordId || !isSupported) return
-    // Only show loading skeleton when there is no cached data to display
-    const k = cacheKey(objectApiName, recordId, !!rollupFromProperty)
+    const k = cacheKey(objectApiName, recordId, false)
     if (!teamMembersCache.has(k)) setLoading(true)
     setError(null)
 
     try {
-      let members: TeamMemberRecord[] = []
-      let rollupChildRecordsByType: Record<string, Record<string, unknown>[]> = {}
-
-      if (!rollupFromProperty) {
-        // Self-only mode — try plain, prefixed, and auto-lookup field names
-        members = await fetchLinkedRecords<TeamMemberRecord>('TeamMember', objectApiName, recordId)
-      } else {
-        // Rollup mode: gather from Property tree
-        let propertyId = ''
-        if (objectApiName === 'Property') {
-          propertyId = recordId
-        } else {
-          // Look for the property reference under multiple possible field names
-          const recData = (record as Record<string, unknown>).data
-            ? (record as Record<string, unknown>).data as Record<string, unknown>
-            : record as Record<string, unknown>
-          const propField =
-            recData.property ||
-            recData.PropertyId ||
-            recData.propertyId ||
-            recData.property_id ||
-            recData[`${objectApiName}__property`] ||
-            (record as Record<string, unknown>).property ||
-            (record as Record<string, unknown>).PropertyId
-          if (propField && typeof propField === 'object' && propField !== null && 'id' in propField) {
-            propertyId = String((propField as { id: unknown }).id)
-          } else if (propField) {
-            propertyId = String(propField)
-          }
-        }
-
-        if (!propertyId) {
-          // No property linked, fall back to self-only
-          members = await fetchLinkedRecords<TeamMemberRecord>('TeamMember', objectApiName, recordId)
-        } else {
-          // Phase 1: fetch child record IDs in parallel (tries all field variants)
-          const childRecordsByType: Record<string, Record<string, unknown>[]> = {}
-          await Promise.all(CHILD_OBJECT_TYPES.map(async type => {
-            childRecordsByType[type] = await fetchLinkedRecords<Record<string, unknown>>(type, 'Property', propertyId)
-          }))
-          rollupChildRecordsByType = childRecordsByType
-
-          // Phase 2: fetch team members in parallel
-          const propertyMembersPromise = fetchLinkedRecords<TeamMemberRecord>('TeamMember', 'Property', propertyId)
-
-          const childMemberPromises: Promise<TeamMemberRecord[]>[] = []
-          for (const type of CHILD_OBJECT_TYPES) {
-            for (const rec of (childRecordsByType[type] ?? [])) {
-              childMemberPromises.push(
-                fetchLinkedRecords<TeamMemberRecord>('TeamMember', type, String(rec.id))
-              )
-            }
-          }
-
-          const [propertyMembers, ...childMemberBatches] = await Promise.all([
-            propertyMembersPromise,
-            ...childMemberPromises,
-          ])
-
-          // Deduplicate all members
-          const seenIds = new Set<string>()
-          members = []
-          for (const m of propertyMembers) {
-            if (!seenIds.has(String(m.id))) { seenIds.add(String(m.id)); members.push(m) }
-          }
-          for (const batch of childMemberBatches) {
-            for (const m of batch) {
-              if (!seenIds.has(String(m.id))) { seenIds.add(String(m.id)); members.push(m) }
-            }
-          }
-        }
+      let currentRecord = record as Record<string, unknown>
+      try {
+        currentRecord = await apiClient.get<Record<string, unknown>>(
+          `/objects/${encodeURIComponent(objectApiName)}/records/${encodeURIComponent(recordId)}`,
+        )
+      } catch {
+        // Use the record snapshot if the refresh read fails.
       }
+      const members = connectionMembersForRecord(objectApiName, currentRecord, connectionFields)
 
-      // A Connection field on this record is a direct relationship to a
-      // Contact or Account. Adapt it to the existing merge shape without
-      // inventing a TeamMember row, so it remains read-only here.
-      const connectionRows: TeamMemberRecord[] = []
-      if (record && connectionFields.length > 0) {
-        let currentRecord = record as Record<string, unknown>
-        try {
-          currentRecord = await apiClient.get<Record<string, unknown>>(
-            `/objects/${encodeURIComponent(objectApiName)}/records/${encodeURIComponent(recordId)}`,
-          )
-        } catch {
-          // Keep displaying the current page snapshot if the refresh read fails.
-        }
-        connectionRows.push(...connectionMembersForRecord(objectApiName, currentRecord, connectionFields))
-      }
-      if (rollupFromProperty) {
-        for (const [sourceApiName, childRecords] of Object.entries(rollupChildRecordsByType)) {
-          const fields = connectionFieldsByObject.get(sourceApiName) ?? []
-          for (const childRecord of childRecords) {
-            connectionRows.push(...connectionMembersForRecord(sourceApiName, childRecord, fields))
-          }
-        }
-      }
-      const seenConnectionIds = new Set(members.map(member => String(member.id)))
-      for (const connectionRow of connectionRows) {
-        if (seenConnectionIds.has(connectionRow.id)) continue
-        seenConnectionIds.add(connectionRow.id)
-        members.push(connectionRow)
-      }
-
-      // ── Resolve contact/account/parent names ──
       const contactIds = new Set<string>()
       const accountIds = new Set<string>()
-      // parentIds grouped by object type for batch resolution
-      const parentIdsByType: Record<string, Set<string>> = {}
       for (const m of members) {
         const cid = getLookupId(m, 'contact')
         const aid = getLookupId(m, 'account')
         if (cid) contactIds.add(cid)
         if (aid) accountIds.add(aid)
-        // Collect parent record IDs for "via" labels
-        for (const [objType, fieldKey] of Object.entries(OBJECT_TO_FIELD)) {
-          const pid = getLookupId(m, fieldKey)
-          if (pid) {
-            if (!parentIdsByType[objType]) parentIdsByType[objType] = new Set()
-            parentIdsByType[objType].add(pid)
-          }
-        }
       }
 
-      // Resolve all names in parallel; contacts/accounts also fetch full records
-      const parentResolvers = Object.entries(parentIdsByType).map(
-        ([objType, ids]) => resolveNames(objType, Array.from(ids))
-      )
-      const [cResolved, aResolved, ...parentResults] = await Promise.all([
+      const [cResolved, aResolved] = await Promise.all([
         resolveRecords('Contact', Array.from(contactIds)),
         resolveRecords('Account', Array.from(accountIds)),
-        ...parentResolvers,
       ])
 
       const cNames = cResolved.names
@@ -689,27 +424,21 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       const cRecords = cResolved.records
       const aRecords = aResolved.records
 
-      // Merge all parent names into one map
-      const pNames: NameMap = new Map()
-      for (const pMap of parentResults) {
-        for (const [id, name] of pMap) pNames.set(id, name)
-      }
-
       setRawMembers(members)
       setContactNames(cNames)
       setAccountNames(aNames)
-      setParentNames(pNames)
+      setParentNames(new Map())
       setContactRecords(cRecords)
       setAccountRecords(aRecords)
 
       // Persist to module-level cache for instant restore on remount
-      const ck = cacheKey(objectApiName, recordId, !!rollupFromProperty)
+      const ck = cacheKey(objectApiName, recordId, false)
       teamMembersCache.delete(ck) // refresh insertion order (LRU)
       teamMembersCache.set(ck, {
         rawMembers: members,
         contactNames: cNames,
         accountNames: aNames,
-        parentNames: pNames,
+        parentNames: new Map(),
         contactRecords: cRecords,
         accountRecords: aRecords,
         timestamp: Date.now(),
@@ -720,44 +449,17 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     } finally {
       setLoading(false)
     }
-  }, [recordId, objectApiName, rollupFromProperty, record, isSupported, connectionFields, connectionFieldsByObject])
+  }, [recordId, objectApiName, record, isSupported, connectionFields])
 
   useEffect(() => {
-    fetchTeamMembers()
-  }, [fetchTeamMembers])
-
-  // Refetch when the shared TM pool reports a version bump (slot writes/deletes).
-  useEffect(() => {
-    if (!tmPool || !recordId) return
-    // Invalidate cache so fetchTeamMembers re-fetches fresh.
-    const key = cacheKey(objectApiName, recordId, !!rollupFromProperty)
-    teamMembersCache.delete(key)
-    fetchTeamMembers()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tmPool?.version])
-
-  // Refetch on the global TeamMember-changed channel — covers view mode where
-  // there's no PendingTeamMemberPoolProvider for slot writes to bump.
-  useEffect(() => {
-    if (!recordId) return
-    return subscribeTeamMembersChanged(() => {
-      const key = cacheKey(objectApiName, recordId, !!rollupFromProperty)
-      teamMembersCache.delete(key)
-      fetchTeamMembers()
-    })
-  }, [recordId, objectApiName, rollupFromProperty, fetchTeamMembers])
+    fetchConnections()
+  }, [fetchConnections])
 
   // ── 5c: De-duplication & merge ──
-  const currentField = OBJECT_TO_FIELD[objectApiName] ?? ''
-
-  // Combine real and pending members for the merge logic
-  const visibleRawMembers = useMemo(
+  // Cache entries created by older widget versions may contain TeamMember rows.
+  const allMembers = useMemo(
     () => rawMembers.filter(member => isConnectionFieldPlaced(member, connectionFieldsByObject)),
     [rawMembers, connectionFieldsByObject],
-  )
-  const allMembers = useMemo(
-    () => [...visibleRawMembers, ...pendingMembers],
-    [visibleRawMembers, pendingMembers],
   )
 
   const { mergedContacts, mergedAccounts, allRoles } = useMemo(() => {
@@ -779,24 +481,19 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         getStr(member, 'accountName') ||
         getStr(member, 'TeamMember__accountName')
       const explicitRole = getStr(member, 'role').trim()
-      const isLookupConnection = getField(member, 'isLookupConnection') === true
-        || getField(member, 'isLookupConnection') === 'true'
       const useConnectedRecordType = getField(member, 'useConnectedRecordType') === true
         || getField(member, 'useConnectedRecordType') === 'true'
       const connectionTarget = getStr(member, 'connectionTarget')
-      const connectedType = isLookupConnection && useConnectedRecordType
+      const connectedType = useConnectedRecordType
         ? contactId
           ? getConnectedRecordTypeLabel(contactRecords, contactId, connectionTarget)
           : accountId
             ? getConnectedRecordTypeLabel(accountRecords, accountId, connectionTarget)
             : ''
         : ''
-      const connectionFieldLabel = isLookupConnection ? getStr(member, 'connectionFieldLabel').trim() : ''
+      const connectionFieldLabel = getStr(member, 'connectionFieldLabel').trim()
       const role = explicitRole || connectedType || connectionFieldLabel
-      const memberRoles = Array.from(new Set([
-        role,
-        useConnectedRecordType ? connectionFieldLabel : '',
-      ].filter(Boolean)))
+      const memberRoles = Array.from(new Set([role, useConnectedRecordType ? connectionFieldLabel : ''].filter(Boolean)))
       const isPrimary = getField(member, 'primaryContact') === true || getField(member, 'primaryContact') === 'true'
       const isContractHolder = getField(member, 'contractHolder') === true || getField(member, 'contractHolder') === 'true'
       const isQuoteRecipient = getField(member, 'quoteRecipient') === true || getField(member, 'quoteRecipient') === 'true'
@@ -943,111 +640,6 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const totalCount = mergedContacts.length + mergedAccounts.length
   const showSearchBar = totalCount > 5
 
-  // ── 5h: Inline Edit handlers ──
-  const startEdit = (memberId: string) => {
-    const member = rawMembers.find(m => String(m.id) === memberId)
-    if (!member) return
-    setEditingId(memberId)
-    setEditRole(getStr(member, 'role'))
-    setEditPrimary(getField(member, 'primaryContact') === true || getField(member, 'primaryContact') === 'true')
-    setEditContractHolder(getField(member, 'contractHolder') === true || getField(member, 'contractHolder') === 'true')
-    setEditQuoteRecipient(getField(member, 'quoteRecipient') === true || getField(member, 'quoteRecipient') === 'true')
-  }
-
-  const saveEdit = async () => {
-    if (!editingId) return
-    setSaving(true)
-    if (_cacheKey) teamMembersCache.delete(_cacheKey) // invalidate before refetch
-    try {
-      await apiClient.put(`/objects/TeamMember/records/${editingId}`, {
-        data: {
-          role: editRole,
-          primaryContact: editPrimary,
-          contractHolder: editContractHolder,
-          quoteRecipient: editQuoteRecipient,
-        },
-      })
-      setEditingId(null)
-      await fetchTeamMembers()
-      tmPool?.bumpVersion()
-      notifyTeamMembersChanged()
-    } catch {
-      // keep editing on failure
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const cancelEdit = () => {
-    setEditingId(null)
-  }
-
-  // ── Inline-add handler ──
-  // Routes a new connection from InlineAddConnectionRow either to the
-  // pending-pool (create mode) or directly to the API (edit mode), then
-  // invalidates the module-level cache and broadcasts so other widgets
-  // (e.g. Slot pickers) re-sync.
-  const handleInlineAdd = useCallback(
-    async (payload: InlineAddConnectionPayload) => {
-      const data: Record<string, unknown> = {
-        role: payload.role,
-        primaryContact: payload.primaryContact,
-        contractHolder: payload.contractHolder,
-        quoteRecipient: payload.quoteRecipient,
-      }
-      if (payload.contactId) data.contact = payload.contactId
-      if (payload.contactName) data.contactName = payload.contactName
-      if (payload.accountId) data.account = payload.accountId
-      if (payload.accountName) data.accountName = payload.accountName
-
-      if (isCreateMode) {
-        addPendingMember(data)
-        return
-      }
-
-      const parentField = OBJECT_TO_FIELD[objectApiName]
-      if (!parentField || !recordId) {
-        throw new Error('No parent record to attach connection to.')
-      }
-
-      // POST first; only invalidate the cache on success so a failure leaves
-      // the previously-cached data visible rather than triggering a skeleton
-      // re-fetch over a row that wasn't actually added.
-      await apiClient.post('/objects/TeamMember/records', {
-        data: { [parentField]: recordId, ...data },
-      })
-      if (_cacheKey) teamMembersCache.delete(_cacheKey)
-      await fetchTeamMembers()
-      tmPool?.bumpVersion()
-      notifyTeamMembersChanged()
-    },
-    [isCreateMode, addPendingMember, objectApiName, recordId, _cacheKey, fetchTeamMembers, tmPool],
-  )
-
-  // ── 5i: Delete handler ──
-  const handleDelete = async (memberId: string) => {
-    // In create mode, remove from pending list instead of API
-    if (isCreateMode && memberId.startsWith('pending-')) {
-      removePendingMember(memberId)
-      setDeleteTarget(null)
-      return
-    }
-
-    setDeletingId(memberId)
-    if (_cacheKey) teamMembersCache.delete(_cacheKey) // invalidate before refetch
-    try {
-      await apiClient.delete(`/objects/TeamMember/records/${memberId}`)
-      setDeleteTarget(null)
-      await fetchTeamMembers()
-      tmPool?.bumpVersion()
-      notifyTeamMembersChanged()
-    } catch {
-      // ignore
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
   // ── 5a: Supported object check (after all hooks) ──
   // The rollup widget is for parent objects with TeamMember children
   // (Property, Opportunity, Project, WorkOrder, Installation, Lead). When
@@ -1072,8 +664,6 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
   const widgetLabel = (label as string) || 'Connections'
 
-  // Friendly record name for the inline-add chip — e.g. "PRJ-1234" or address.
-  const parentRecordName = record ? getRecordName(record as Record<string, unknown>) : undefined
   const parentObjectLabel = object.label || objectApiName
 
 
@@ -1087,17 +677,6 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           <span className="text-[11px] text-brand-gray tabular-nums">
             {totalCount} connection{totalCount !== 1 ? 's' : ''}
           </span>
-          {!isCreateMode && (
-            <button
-              type="button"
-              onClick={() => setShowCopyModal(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-brand-gray hover:text-brand-dark hover:bg-gray-50 transition-colors"
-              title="Copy team from another record"
-            >
-              <Copy className="w-3 h-3" />
-              Copy
-            </button>
-          )}
         </div>
 
         {/* ── Search & Filter bar ── */}
@@ -1130,21 +709,9 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
         {/* ── Body: Two-column grid ── */}
         {totalCount === 0 ? (
-          <div className="p-4 space-y-3">
-            <div className="text-center py-6">
-              <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-              <p className="text-xs text-brand-gray">
-                No one&apos;s connected to this {parentObjectLabel.toLowerCase()} yet.
-              </p>
-            </div>
-            <InlineAddConnectionRow
-              parentObjectApiName={objectApiName}
-              parentObjectLabel={parentObjectLabel}
-              parentRecordName={parentRecordName}
-              pendingMode={isCreateMode}
-              onAdd={handleInlineAdd}
-              onAdvanced={() => setShowAddModal(true)}
-            />
+          <div className="p-8 text-center">
+            <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+            <p className="text-xs text-brand-gray">No connections on this {parentObjectLabel.toLowerCase()}.</p>
           </div>
         ) : (
           <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1163,20 +730,20 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
                       key={c.contactId}
                       contact={c}
                       displayFields={contactDisplayFields}
-                      editingId={editingId}
-                      editRole={editRole}
-                      editPrimary={editPrimary}
-                      editContractHolder={editContractHolder}
-                      editQuoteRecipient={editQuoteRecipient}
-                      saving={saving}
-                      onStartEdit={startEdit}
-                      onSaveEdit={saveEdit}
-                      onCancelEdit={cancelEdit}
-                      onSetEditRole={setEditRole}
-                      onSetEditPrimary={setEditPrimary}
-                      onSetEditContractHolder={setEditContractHolder}
-                      onSetEditQuoteRecipient={setEditQuoteRecipient}
-                      onDelete={setDeleteTarget}
+                      editingId={null}
+                      editRole=""
+                      editPrimary={false}
+                      editContractHolder={false}
+                      editQuoteRecipient={false}
+                      saving={false}
+                      onStartEdit={() => {}}
+                      onSaveEdit={() => {}}
+                      onCancelEdit={() => {}}
+                      onSetEditRole={() => {}}
+                      onSetEditPrimary={() => {}}
+                      onSetEditContractHolder={() => {}}
+                      onSetEditQuoteRecipient={() => {}}
+                      onDelete={() => {}}
                     />
                   ))}
                 </div>
@@ -1198,20 +765,20 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
                       key={a.accountId}
                       account={a}
                       displayFields={accountDisplayFields}
-                      editingId={editingId}
-                      editRole={editRole}
-                      editPrimary={editPrimary}
-                      editContractHolder={editContractHolder}
-                      editQuoteRecipient={editQuoteRecipient}
-                      saving={saving}
-                      onStartEdit={startEdit}
-                      onSaveEdit={saveEdit}
-                      onCancelEdit={cancelEdit}
-                      onSetEditRole={setEditRole}
-                      onSetEditPrimary={setEditPrimary}
-                      onSetEditContractHolder={setEditContractHolder}
-                      onSetEditQuoteRecipient={setEditQuoteRecipient}
-                      onDelete={setDeleteTarget}
+                      editingId={null}
+                      editRole=""
+                      editPrimary={false}
+                      editContractHolder={false}
+                      editQuoteRecipient={false}
+                      saving={false}
+                      onStartEdit={() => {}}
+                      onSaveEdit={() => {}}
+                      onCancelEdit={() => {}}
+                      onSetEditRole={() => {}}
+                      onSetEditPrimary={() => {}}
+                      onSetEditContractHolder={() => {}}
+                      onSetEditQuoteRecipient={() => {}}
+                      onDelete={() => {}}
                     />
                   ))}
                 </div>
@@ -1220,70 +787,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           </div>
         )}
 
-        {/* ── Inline-add row (always available when populated) ── */}
-        {totalCount > 0 && (
-          <div className="p-3 border-t border-gray-100">
-            <InlineAddConnectionRow
-              parentObjectApiName={objectApiName}
-              parentObjectLabel={parentObjectLabel}
-              parentRecordName={parentRecordName}
-              pendingMode={isCreateMode}
-              onAdd={handleInlineAdd}
-              onAdvanced={() => setShowAddModal(true)}
-            />
-          </div>
-        )}
       </div>
-
-      {/* ── Delete Confirmation ── */}
-      {deleteTarget && (
-        <ModalOverlay onClose={() => setDeleteTarget(null)}>
-          <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white shadow-xl p-5 space-y-4">
-            <p className="text-sm font-semibold text-brand-dark">Remove connection?</p>
-            <p className="text-xs text-brand-gray">This removes the connection from this record. The contact/account itself is not affected.</p>
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-brand-gray hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={deletingId === deleteTarget}
-                onClick={() => handleDelete(deleteTarget)}
-                className="px-3 py-1.5 rounded-lg bg-red-600 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {deletingId === deleteTarget ? 'Removing...' : 'Remove'}
-              </button>
-            </div>
-          </div>
-        </ModalOverlay>
-      )}
-
-      {/* ── Add Team Member Modal ── */}
-      {showAddModal && (
-        <AddTeamMemberModal
-          objectApiName={objectApiName}
-          recordId={recordId ?? ''}
-          onClose={() => setShowAddModal(false)}
-          onSaved={() => { setShowAddModal(false); fetchTeamMembers(); tmPool?.bumpVersion(); notifyTeamMembersChanged() }}
-          pendingMode={isCreateMode}
-          onAddPending={isCreateMode ? (data) => { addPendingMember(data); setShowAddModal(false) } : undefined}
-        />
-      )}
-
-      {/* ── Copy Team Modal ── */}
-      {!isCreateMode && showCopyModal && (
-        <CopyTeamModal
-          objectApiName={objectApiName}
-          recordId={recordId!}
-          existingMemberIds={rawMembers.map(m => String(m.id))}
-          onClose={() => setShowCopyModal(false)}
-          onSaved={() => { setShowCopyModal(false); fetchTeamMembers(); tmPool?.bumpVersion(); notifyTeamMembersChanged() }}
-        />
-      )}
     </>
   )
 }

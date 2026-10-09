@@ -1,30 +1,24 @@
 'use client'
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
   Network, Edit2, Trash2, Check, X, Home, CornerDownRight,
-  ChevronDown, ChevronRight, Search, Plus,
+  ChevronDown, ChevronRight, Search,
   Target, Briefcase, Wrench, Truck, Megaphone,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
-import { getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, isConnectionFieldType, type FieldDef, type TeamMemberAssociationsConfig } from '@/lib/schema'
+import { getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, type FieldDef, type TeamMemberAssociationsConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
 import { useAuth } from '@/lib/auth-context'
 import { getPageLayoutFieldApiNames } from '@/lib/layout-migration'
 import { resolveLayoutForUser } from '@/lib/layout-resolver'
-import { FieldDisplay, getFieldValue } from '../shared/FieldDisplay'
+import { FieldDisplay } from '../shared/FieldDisplay'
 import { ConnectionBadges } from '../shared/ConnectionBadges'
-import { InlineConnectToRecordRow } from '../shared/InlineConnectToRecordRow'
 import { getRecordName } from '../shared/recordName'
 
 // ── Types ──────────────────────────────────────────────────────────────
-
-interface TeamMemberRecord {
-  id: string
-  data: Record<string, unknown>
-}
 
 interface AssociationRow {
   memberId: string
@@ -53,17 +47,6 @@ type DisplayFieldsConfig = NonNullable<TeamMemberAssociationsConfig['displayFiel
 // ── Constants ──────────────────────────────────────────────────────────
 
 const SUPPORTED_OBJECTS = ['Contact', 'Account']
-
-const CHILD_FIELD_MAP: Array<{ objectApiName: string; fieldName: string; label: string }> = [
-  { objectApiName: 'Opportunity',  fieldName: 'opportunity',  label: 'Opportunity' },
-  { objectApiName: 'Project',      fieldName: 'project',      label: 'Project' },
-  { objectApiName: 'WorkOrder',    fieldName: 'workOrder',    label: 'Work Order' },
-  { objectApiName: 'Installation', fieldName: 'installation', label: 'Installation' },
-  // Lead-attached connections render under the "Other" section since Leads have
-  // no parent Property — but they still need to be resolved by this map so
-  // fetchAssociations doesn't silently drop them.
-  { objectApiName: 'Lead',         fieldName: 'lead',         label: 'Lead' },
-]
 
 const OBJECT_LABELS: Record<string, string> = {
   Property:     'Property',
@@ -119,27 +102,6 @@ function recordUrl(objectApiName: string, recordId: string) {
 // ── Generic field helpers ──────────────────────────────────────────────
 
 /** Extract a field from any record shape (plain or with .data blob), tolerating prefixed keys */
-function getField(raw: Record<string, unknown>, field: string): unknown {
-  return getFieldValue(raw, field)
-}
-
-function getLookupId(raw: Record<string, unknown>, field: string): string {
-  const v = getField(raw, field)
-  if (!v) return ''
-  if (typeof v === 'object' && v !== null && 'id' in v) return String((v as { id: unknown }).id)
-  return String(v)
-}
-
-function getStr(raw: Record<string, unknown>, field: string): string {
-  const v = getField(raw, field)
-  return v != null ? String(v) : ''
-}
-
-function getBool(raw: Record<string, unknown>, field: string): boolean {
-  const v = getField(raw, field)
-  return v === true || v === 'true'
-}
-
 /**
  * Robustly extract the Property ID from a child record (Opportunity, Project, etc.).
  * The same field can be stored under multiple key variants depending on how the
@@ -375,7 +337,7 @@ function AssocRow({
           )}
         </div>
 
-        {!isEditing && !assoc.isLookupConnection && (
+        {!isEditing && (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
@@ -520,7 +482,7 @@ function FlatTile({
           )}
         </div>
 
-        {!isEditing && !assoc.isLookupConnection && (
+        {!isEditing && (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               type="button"
@@ -552,47 +514,34 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   const { label } = typedConfig
   const displayFields: DisplayFieldsConfig = typedConfig.displayFields ?? {}
   const objectApiName = object.apiName
+  const recordData = record?.data && typeof record.data === 'object'
+    ? record.data as Record<string, unknown>
+    : record as Record<string, unknown> | undefined
+  const connectionTypeField = objectApiName === 'Contact' ? 'contactType' : 'accountType'
+  const connectedRecordType = String(
+    recordData?.[`${objectApiName}__${connectionTypeField}`]
+    ?? recordData?.[connectionTypeField]
+    ?? '',
+  ).trim()
   const recordId = record?.id ? String(record.id) : null
-  const rootRecord = record as Record<string, unknown> | undefined
-  const rootData = rootRecord?.data && typeof rootRecord.data === 'object'
-    ? rootRecord.data as Record<string, unknown>
-    : rootRecord ?? {}
-  const connectionTypeField = objectApiName === 'Contact' ? 'contactType' : objectApiName === 'Account' ? 'accountType' : ''
-  const connectedRecordType = connectionTypeField
-    ? String(rootData[`${objectApiName}__${connectionTypeField}`] ?? rootData[connectionTypeField] ?? '').trim()
-    : ''
   const isSupported = SUPPORTED_OBJECTS.includes(objectApiName)
   const schema = useSchemaStore(state => state.schema)
   const { user } = useAuth()
-  const connectionFields = useMemo(() => (schema?.objects ?? []).flatMap(sourceObject => (
-    (() => {
-      const resolved = resolveLayoutForUser(sourceObject, { profileId: user?.profileId ?? null })
-      const placedFields = resolved.kind === 'resolved' ? getPageLayoutFieldApiNames(resolved.layout) : new Set<string>()
-      return sourceObject.fields
-        .filter((field: FieldDef) => placedFields.has(field.apiName)
-          && isConnectionFieldType(field.type)
-          && getConnectionTargetObject(field.type, field.lookupObject) === objectApiName)
-        .map((field: FieldDef) => ({ sourceApiName: sourceObject.apiName, field }))
-    })()
-  )), [schema, objectApiName, user?.profileId])
+  const connectionFields = useMemo(() => (schema?.objects ?? []).flatMap(sourceObject => {
+    const resolved = resolveLayoutForUser(sourceObject, { profileId: user?.profileId ?? null })
+    const placedFields = resolved.kind === 'resolved' ? getPageLayoutFieldApiNames(resolved.layout) : new Set<string>()
+    return sourceObject.fields
+      .filter((field: FieldDef) => placedFields.has(field.apiName)
+        && (field.type === 'ConnectionContact' || field.type === 'ConnectionAccount')
+        && getConnectionTargetObject(field.type, field.lookupObject) === objectApiName)
+      .map((field: FieldDef) => ({ sourceApiName: sourceObject.apiName, field }))
+  }), [schema, objectApiName, user?.profileId])
 
   // ── State ──
   const [propertyGroups, setPropertyGroups] = useState<PropertyGroup[]>([])
   const [flatTiles, setFlatTiles] = useState<AssociationRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  // Inline-edit state
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editRole, setEditRole] = useState('')
-  const [editPrimary, setEditPrimary] = useState(false)
-  const [editContractHolder, setEditContractHolder] = useState(false)
-  const [editQuoteRecipient, setEditQuoteRecipient] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  // Delete state
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // Search / filter
   const [search, setSearch] = useState('')
@@ -602,23 +551,6 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [collapseInitialised, setCollapseInitialised] = useState(false)
 
-  // Connect-to-record inline-add row visibility + focus management for it.
-  const [showConnectRow, setShowConnectRow] = useState(false)
-  const connectButtonRef = useRef<HTMLButtonElement | null>(null)
-  const restoreConnectFocusRef = useRef(false)
-
-  useEffect(() => {
-    if (!showConnectRow && restoreConnectFocusRef.current) {
-      restoreConnectFocusRef.current = false
-      requestAnimationFrame(() => connectButtonRef.current?.focus())
-    }
-  }, [showConnectRow])
-
-  // After a delete completes the deleted row's button is gone. Restore focus
-  // to the "+ Connect to record" button so the user has a sensible anchor
-  // (covers both populated and now-empty list cases).
-  const restoreFocusAfterDeleteRef = useRef(false)
-
   // ── 3-phase data fetch ──
   const fetchAssociations = useCallback(async () => {
     if (!recordId || !isSupported) return
@@ -626,128 +558,40 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     setError(null)
 
     try {
-      // ── Phase 1: Fetch TeamMember records for this contact/account ──
-      const linkField = objectApiName === 'Contact' ? 'contact' : 'account'
-      const [plain, prefixed] = await Promise.all([
-        apiClient.get<TeamMemberRecord[]>(
-          `/objects/TeamMember/records?filter[${linkField}]=${encodeURIComponent(recordId)}&limit=200`
-        ).catch(() => [] as TeamMemberRecord[]),
-        apiClient.get<TeamMemberRecord[]>(
-          `/objects/TeamMember/records?filter[TeamMember__${linkField}]=${encodeURIComponent(recordId)}&limit=200`
-        ).catch(() => [] as TeamMemberRecord[]),
-      ])
-
-      // Deduplicate
-      const seen = new Set<string>()
-      const members: TeamMemberRecord[] = []
-      for (const m of [
-        ...(Array.isArray(plain) ? plain : []),
-        ...(Array.isArray(prefixed) ? prefixed : []),
-      ]) {
-        if (!seen.has(String(m.id))) { seen.add(String(m.id)); members.push(m) }
-      }
-
-      // Connection fields are single lookups on other objects that point at
-      // this Contact/Account. Surface each referencing record as a read-only
-      // connection alongside the existing editable TeamMember associations.
-      const connectionRecordResults = await Promise.allSettled(connectionFields.map(async ({ sourceApiName, field }) => {
-        const query = new URLSearchParams({
-          [`filter[${field.apiName}]`]: recordId,
-          limit: '200',
-        })
-        const records = await apiClient.get<TeamMemberRecord[]>(
+      const connectionResults = await Promise.allSettled(connectionFields.map(async ({ sourceApiName, field }) => {
+        const query = new URLSearchParams({ [`filter[${field.apiName}]`]: recordId, limit: '200' })
+        const records = await apiClient.get<Record<string, unknown>[]>(
           `/objects/${encodeURIComponent(sourceApiName)}/records?${query.toString()}`,
         )
         return records.map(connectedRecord => ({ sourceApiName, field, connectedRecord }))
       }))
-      const lookupConnections = connectionRecordResults.flatMap(result => (
+      const lookupConnections = connectionResults.flatMap(result => (
         result.status === 'fulfilled' ? result.value : []
       ))
 
-      // ── Phase 2: Resolve child records to find their parent Property ──
-      type DirectEntry = { member: TeamMemberRecord; propertyId: string }
-      type ChildEntry  = {
-        member: TeamMemberRecord
-        objectApiName: string
-        fieldName: string
-        childRecordId: string
-      }
-
-      const directEntries: DirectEntry[] = []
-      const childEntries: ChildEntry[] = []
-
-      for (const member of members) {
-        const raw = member as unknown as Record<string, unknown>
-        const propertyId = getLookupId(raw, 'property')
-        if (propertyId) {
-          directEntries.push({ member, propertyId })
-          continue
-        }
-        for (const { objectApiName: childType, fieldName } of CHILD_FIELD_MAP) {
-          const childId = getLookupId(raw, fieldName)
-          if (childId) {
-            childEntries.push({ member, objectApiName: childType, fieldName, childRecordId: childId })
-            break
-          }
-        }
-      }
-
-      // Fetch each child record to get its property link, display name, and full data
-      const childRecordResults = await Promise.allSettled(
-        childEntries.map(entry =>
-          apiClient
-            .get<Record<string, unknown>>(`/objects/${entry.objectApiName}/records/${entry.childRecordId}`)
-            .then(data => ({ entry, data }))
-            .catch(() => ({ entry, data: null as Record<string, unknown> | null }))
-        )
-      )
-
-      // Build map: childRecordId → { propertyId, recordName, recordData }
-      const childMeta = new Map<string, {
-        propertyId: string
-        recordName: string
-        recordData: Record<string, unknown>
-      }>()
-      for (const result of childRecordResults) {
-        if (result.status === 'fulfilled' && result.value.data) {
-          const { entry, data } = result.value
-          const propertyId = resolvePropertyId(data, entry.objectApiName)
-          const recordName = getRecordName(data)
-          childMeta.set(entry.childRecordId, { propertyId, recordName, recordData: data })
-        }
-      }
-
-      // ── Phase 3: Batch-resolve Property display names and data ──
       const propertyIds = new Set<string>()
-      for (const { propertyId } of directEntries) propertyIds.add(propertyId)
-      for (const meta of childMeta.values()) {
-        if (meta.propertyId) propertyIds.add(meta.propertyId)
-      }
-      const lookupConnectionPropertyIds = lookupConnections.map(({ sourceApiName, connectedRecord }) =>
-        resolvePropertyId(connectedRecord as unknown as Record<string, unknown>, sourceApiName)
-      )
-      for (const propertyId of lookupConnectionPropertyIds) {
+      const propertyIdByConnection = lookupConnections.map(({ sourceApiName, connectedRecord }) => {
+        const propertyId = sourceApiName === 'Property'
+          ? String(connectedRecord.id ?? '')
+          : resolvePropertyId(connectedRecord, sourceApiName)
         if (propertyId) propertyIds.add(propertyId)
-      }
+        return propertyId
+      })
 
       const propertyNames = new Map<string, string>()
       const propertyDataMap = new Map<string, Record<string, unknown>>()
-
       await Promise.allSettled(
         Array.from(propertyIds).map(pid =>
           apiClient
             .get<Record<string, unknown>>(`/objects/Property/records/${pid}`)
             .then(data => {
-              const d = data as Record<string, unknown>
-              propertyNames.set(pid, getRecordName(d) || pid)
-              propertyDataMap.set(pid, d)
+              propertyNames.set(pid, getRecordName(data) || pid)
+              propertyDataMap.set(pid, data)
             })
         )
       )
 
-      // ── Build PropertyGroup map ──
       const groupMap = new Map<string, PropertyGroup>()
-
       const getOrCreate = (propertyId: string): PropertyGroup => {
         if (!groupMap.has(propertyId)) {
           groupMap.set(propertyId, {
@@ -760,56 +604,11 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
         }
         return groupMap.get(propertyId)!
       }
-
-      // Direct property associations
-      for (const { member, propertyId } of directEntries) {
-        const raw = member as unknown as Record<string, unknown>
-        const group = getOrCreate(propertyId)
-        group.direct = {
-          memberId: String(member.id),
-          objectApiName: 'Property',
-          parentRecordId: propertyId,
-          parentRecordName: propertyNames.get(propertyId) ?? propertyId,
-          parentRecordData: propertyDataMap.get(propertyId) ?? {},
-          role: getStr(raw, 'role'),
-          isPrimary: getBool(raw, 'primaryContact'),
-          isContractHolder: getBool(raw, 'contractHolder'),
-          isQuoteRecipient: getBool(raw, 'quoteRecipient'),
-        }
-      }
-
-      // Child associations
       const newFlatTiles: AssociationRow[] = []
-      for (const entry of childEntries) {
-        const raw = entry.member as unknown as Record<string, unknown>
-        const meta = childMeta.get(entry.childRecordId)
-        const recordName = meta?.recordName ?? entry.childRecordId
-        const propertyId = meta?.propertyId ?? ''
-
-        const row: AssociationRow = {
-          memberId: String(entry.member.id),
-          objectApiName: entry.objectApiName,
-          parentRecordId: entry.childRecordId,
-          parentRecordName: recordName,
-          parentRecordData: meta?.recordData ?? {},
-          role: getStr(raw, 'role'),
-          isPrimary: getBool(raw, 'primaryContact'),
-          isContractHolder: getBool(raw, 'contractHolder'),
-          isQuoteRecipient: getBool(raw, 'quoteRecipient'),
-        }
-
-        if (propertyId) {
-          getOrCreate(propertyId).children.push(row)
-        } else {
-          newFlatTiles.push(row)
-        }
-      }
-
       for (const [index, { sourceApiName, field, connectedRecord }] of lookupConnections.entries()) {
         const recordData = connectedRecord.data && typeof connectedRecord.data === 'object'
-          ? connectedRecord.data
-          : connectedRecord as unknown as Record<string, unknown>
-        const propertyId = lookupConnectionPropertyIds[index] ?? ''
+          ? connectedRecord.data as Record<string, unknown>
+          : connectedRecord
         const roleApiName = getConnectionRoleFieldApiName(field.apiName)
         const roleBareName = getConnectionRoleFieldBareName(field.apiName)
         const savedRole = recordData[roleApiName] ?? recordData[roleBareName]
@@ -818,24 +617,27 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           : (field.type === 'ConnectionContact' || field.type === 'ConnectionAccount') && connectedRecordType
             ? connectedRecordType
             : field.label
-        const roles = (field.type === 'ConnectionContact' || field.type === 'ConnectionAccount') && connectedRecordType
-          ? Array.from(new Set([role, field.label].filter(Boolean)))
-          : [role]
         const row: AssociationRow = {
-          memberId: `connection:${sourceApiName}:${field.apiName}:${connectedRecord.id}`,
+          memberId: `connection:${sourceApiName}:${field.apiName}:${String(connectedRecord.id)}`,
           objectApiName: sourceApiName,
-          parentRecordId: String(connectedRecord.id),
-          parentRecordName: getRecordName(connectedRecord as unknown as Record<string, unknown>),
+          parentRecordId: String(connectedRecord.id ?? ''),
+          parentRecordName: getRecordName(connectedRecord),
           parentRecordData: recordData,
           role,
-          roles,
+          roles: (field.type === 'ConnectionContact' || field.type === 'ConnectionAccount') && connectedRecordType
+            ? Array.from(new Set([role, field.label].filter(Boolean)))
+            : [role],
           isPrimary: false,
           isContractHolder: false,
           isQuoteRecipient: false,
           isLookupConnection: true,
         }
-        if (propertyId) getOrCreate(propertyId).children.push(row)
-        else newFlatTiles.push(row)
+        const propertyId = propertyIdByConnection[index] ?? ''
+        if (propertyId) {
+          getOrCreate(propertyId).children.push(row)
+        } else {
+          newFlatTiles.push(row)
+        }
       }
 
       // Sort groups alphabetically by property name
@@ -850,82 +652,28 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     } finally {
       setLoading(false)
     }
-  }, [recordId, objectApiName, isSupported, connectionFields, connectedRecordType])
+  }, [recordId, objectApiName, isSupported])
 
   useEffect(() => {
     fetchAssociations()
   }, [fetchAssociations])
 
-  // ── Edit handlers ──
-  const startEdit = (assoc: AssociationRow) => {
-    setEditingId(assoc.memberId)
-    setEditRole(assoc.role)
-    setEditPrimary(assoc.isPrimary)
-    setEditContractHolder(assoc.isContractHolder)
-    setEditQuoteRecipient(assoc.isQuoteRecipient)
-  }
-
-  const saveEdit = async () => {
-    if (!editingId) return
-    setSaving(true)
-    try {
-      await apiClient.put(`/objects/TeamMember/records/${editingId}`, {
-        data: {
-          role: editRole,
-          primaryContact: editPrimary,
-          contractHolder: editContractHolder,
-          quoteRecipient: editQuoteRecipient,
-        },
-      })
-      setEditingId(null)
-      await fetchAssociations()
-    } catch {
-      // keep editing open on failure
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // ── Delete handler ──
-  const handleDelete = async (memberId: string) => {
-    setDeletingId(memberId)
-    try {
-      await apiClient.delete(`/objects/TeamMember/records/${memberId}`)
-      setDeleteTarget(null)
-      restoreFocusAfterDeleteRef.current = true
-      await fetchAssociations()
-    } catch {
-      // ignore
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
-  // After a delete finishes (the refetch resolves and propertyGroups updates),
-  // pop focus to the connect-to-record button so the user keeps a tab anchor.
-  useEffect(() => {
-    if (!restoreFocusAfterDeleteRef.current) return
-    if (loading) return
-    restoreFocusAfterDeleteRef.current = false
-    requestAnimationFrame(() => connectButtonRef.current?.focus())
-  }, [loading, propertyGroups, flatTiles])
-
   // ── Shared edit props passed down to every row ──
   const editHandlers: EditHandlers = {
-    editingId,
-    editRole,
-    editPrimary,
-    editContractHolder,
-    editQuoteRecipient,
-    saving,
-    onStartEdit: startEdit,
-    onSaveEdit: saveEdit,
-    onCancelEdit: () => setEditingId(null),
-    onEditRole: setEditRole,
-    onEditPrimary: setEditPrimary,
-    onEditContractHolder: setEditContractHolder,
-    onEditQuoteRecipient: setEditQuoteRecipient,
-    onDelete: setDeleteTarget,
+    editingId: null,
+    editRole: '',
+    editPrimary: false,
+    editContractHolder: false,
+    editQuoteRecipient: false,
+    saving: false,
+    onStartEdit: () => {},
+    onSaveEdit: () => {},
+    onCancelEdit: () => {},
+    onEditRole: () => {},
+    onEditPrimary: () => {},
+    onEditContractHolder: () => {},
+    onEditQuoteRecipient: () => {},
+    onDelete: () => {},
   }
 
   const totalCount =
@@ -1004,12 +752,6 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
 
   const widgetLabel = label || 'Connections'
   const showSearchBar = totalCount > 5
-  const showsConnectButton = recordId && isSupported
-
-  // Friendly name of the current Contact/Account profile we're on. Used in the
-  // implicit-person chip on the connect-to-record inline row.
-  const personName = record ? getRecordName(record as Record<string, unknown>) : ''
-
   return (
     <>
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
@@ -1020,40 +762,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           <span className="text-[11px] text-brand-gray tabular-nums">
             {totalCount} connection{totalCount !== 1 ? 's' : ''}
           </span>
-          {showsConnectButton && !showConnectRow && (
-            <button
-              type="button"
-              ref={connectButtonRef}
-              onClick={() => setShowConnectRow(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-brand-navy text-white text-[11px] font-semibold hover:bg-brand-navy/90 focus-visible:ring-2 focus-visible:ring-brand-navy/30 focus-visible:outline-none transition-colors"
-            >
-              <Plus className="w-3 h-3" aria-hidden />
-              Connect to record
-            </button>
-          )}
         </div>
-
-        {/* ── Inline-add: connect this person to a new record ── */}
-        {showConnectRow && showsConnectButton && (
-          <div className="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-surface-alt dark:bg-brand-dark">
-            <InlineConnectToRecordRow
-              // Cast is safe: the surrounding `showsConnectButton` guard
-              // requires `isSupported`, which restricts to SUPPORTED_OBJECTS.
-              personObjectApiName={objectApiName as 'Contact' | 'Account'}
-              personRecordId={recordId!}
-              personName={personName}
-              onAdded={async () => {
-                restoreConnectFocusRef.current = true
-                setShowConnectRow(false)
-                await fetchAssociations()
-              }}
-              onCancel={() => {
-                restoreConnectFocusRef.current = true
-                setShowConnectRow(false)
-              }}
-            />
-          </div>
-        )}
 
         {/* ── Search bar ── */}
         {showSearchBar && (
@@ -1129,37 +838,6 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
         )}
       </div>
 
-      {/* ── Delete Confirmation ── */}
-      {deleteTarget && (
-        <>
-          <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setDeleteTarget(null)} />
-          <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
-            <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white shadow-xl p-5 space-y-4">
-              <p className="text-sm font-semibold text-brand-dark">Remove connection?</p>
-              <p className="text-xs text-brand-gray">
-                This removes the connection from the related record. The record itself is not affected.
-              </p>
-              <div className="flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(null)}
-                  className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-brand-gray hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={deletingId === deleteTarget}
-                  onClick={() => handleDelete(deleteTarget)}
-                  className="px-3 py-1.5 rounded-lg bg-red-600 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                >
-                  {deletingId === deleteTarget ? 'Removing…' : 'Remove'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
     </>
   )
 }
