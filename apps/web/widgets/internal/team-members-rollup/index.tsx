@@ -68,6 +68,7 @@ interface MergedAccount {
 // ── Constants ──────────────────────────────────────────────────────────
 
 const SUPPORTED_OBJECTS = ['Property', 'Opportunity', 'Project', 'WorkOrder', 'Installation', 'Lead']
+const PROPERTY_ROLLUP_CHILD_OBJECTS = ['Opportunity', 'Project', 'WorkOrder', 'Installation']
 
 /** Plain field name used in TeamMember data to reference the parent */
 const OBJECT_TO_FIELD: Record<string, string> = {
@@ -206,6 +207,52 @@ function getConnectionFieldValue(record: Record<string, unknown>, apiName: strin
   return undefined
 }
 
+function getLookupValueId(value: unknown): string {
+  if (typeof value === 'string') return value.trim()
+  if (value && typeof value === 'object') {
+    const lookup = value as Record<string, unknown>
+    return String(lookup.id ?? lookup.lookup ?? lookup.value ?? '').trim()
+  }
+  return ''
+}
+
+function getPropertyIdFromRecord(record: Record<string, unknown>, objectApiName: string): string {
+  if (objectApiName === 'Property') return String(record.id ?? '')
+
+  for (const apiName of [
+    `${objectApiName}__property`,
+    `${objectApiName}__propertyId`,
+    'property',
+    'propertyId',
+    'PropertyId',
+    'property_id',
+  ]) {
+    const id = getLookupValueId(getConnectionFieldValue(record, apiName))
+    if (id) return id
+  }
+  return ''
+}
+
+async function fetchRecordsLinkedToProperty(
+  objectApiName: string,
+  propertyId: string,
+): Promise<Record<string, unknown>[]> {
+  const plainField = OBJECT_TO_FIELD.Property
+  const lookupField = FIELD_TO_LOOKUP[plainField]
+  const queryFields = Array.from(new Set([plainField, `${objectApiName}__${plainField}`, lookupField]))
+  const batches = await Promise.all(queryFields.map(field =>
+    apiClient.get<Record<string, unknown>[]>(
+      `/objects/${encodeURIComponent(objectApiName)}/records?filter[${encodeURIComponent(field)}]=${encodeURIComponent(propertyId)}&limit=200`,
+    ).catch(() => [] as Record<string, unknown>[]),
+  ))
+  const unique = new Map<string, Record<string, unknown>>()
+  for (const record of batches.flat()) {
+    const id = String(record.id ?? '')
+    if (id) unique.set(id, record)
+  }
+  return Array.from(unique.values())
+}
+
 function connectionMembersForRecord(
   sourceApiName: string,
   sourceRecord: Record<string, unknown>,
@@ -233,6 +280,7 @@ function connectionMembersForRecord(
     const roleBareName = getConnectionRoleFieldBareName(field.apiName)
     const roleValue = getConnectionFieldValue(sourceRecord, roleApiName)
       ?? getConnectionFieldValue(sourceRecord, roleBareName)
+    const parentField = OBJECT_TO_FIELD[sourceApiName]
     return [{
       id: `connection:${sourceApiName}:${sourceId}:${field.apiName}`,
       data: {
@@ -244,6 +292,7 @@ function connectionMembersForRecord(
         useConnectedRecordType: field.type === 'ConnectionContact' || field.type === 'ConnectionAccount',
         connectionTarget: targetObject,
         connectionFieldLabel: field.label,
+        ...(parentField ? { [parentField]: { id: sourceId, name: getRecordName(sourceRecord) } } : {}),
       },
     }]
   })
@@ -359,7 +408,11 @@ function Skeleton() {
 // ── Main Widget ────────────────────────────────────────────────────────
 
 export default function TeamMembersRollupWidget({ config, record, object }: WidgetProps) {
-  const { label, displayFields: configDisplayFields } = config as TeamMembersRollupConfig
+  const {
+    label,
+    displayFields: configDisplayFields,
+    rollupFromProperty = false,
+  } = config as TeamMembersRollupConfig
 
   const contactDisplayFields = configDisplayFields?.Contact ?? []
   const accountDisplayFields = configDisplayFields?.Account ?? []
@@ -387,7 +440,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   )
 
   // ── Cache-aware state init ──
-  const _cacheKey = recordId ? cacheKey(objectApiName, recordId, false) : null
+  const _cacheKey = recordId ? cacheKey(objectApiName, recordId, rollupFromProperty) : null
   const _cached = _cacheKey ? teamMembersCache.get(_cacheKey) : null
 
   const [rawMembers, setRawMembers] = useState<TeamMemberRecord[]>(_cached?.rawMembers ?? [])
@@ -403,15 +456,50 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const [roleFilter, setRoleFilter] = useState<string>('')
   const fetchConnections = useCallback(async () => {
     if (!recordId || !isSupported) return
-    const k = cacheKey(objectApiName, recordId, false)
+    const k = cacheKey(objectApiName, recordId, rollupFromProperty)
     if (!teamMembersCache.has(k)) setLoading(true)
     setError(null)
 
     try {
-      const members = connectionMembersForRecord(
-        objectApiName,
-        record as Record<string, unknown>,
-        connectionFields,
+      const currentRecord = record as Record<string, unknown>
+      const sourceRecords = new Map<string, { objectApiName: string; record: Record<string, unknown> }>()
+      const addSourceRecord = (sourceObjectApiName: string, sourceRecord: Record<string, unknown>) => {
+        const sourceId = String(sourceRecord.id ?? '')
+        if (sourceId) sourceRecords.set(`${sourceObjectApiName}:${sourceId}`, { objectApiName: sourceObjectApiName, record: sourceRecord })
+      }
+      addSourceRecord(objectApiName, currentRecord)
+
+      if (rollupFromProperty) {
+        const propertyId = getPropertyIdFromRecord(currentRecord, objectApiName)
+        if (propertyId) {
+          if (objectApiName !== 'Property') {
+            try {
+              const propertyRecord = await apiClient.get<Record<string, unknown>>(
+                `/objects/Property/records/${encodeURIComponent(propertyId)}`,
+              )
+              addSourceRecord('Property', propertyRecord)
+            } catch {
+              // Continue with any related records that can still be fetched.
+            }
+          }
+
+          const childBatches = await Promise.all(PROPERTY_ROLLUP_CHILD_OBJECTS.map(childObjectApiName =>
+            fetchRecordsLinkedToProperty(childObjectApiName, propertyId),
+          ))
+          for (let index = 0; index < childBatches.length; index++) {
+            for (const childRecord of childBatches[index] ?? []) {
+              addSourceRecord(PROPERTY_ROLLUP_CHILD_OBJECTS[index]!, childRecord)
+            }
+          }
+        }
+      }
+
+      const members = Array.from(sourceRecords.values()).flatMap(({ objectApiName: sourceObjectApiName, record: sourceRecord }) =>
+        connectionMembersForRecord(
+          sourceObjectApiName,
+          sourceRecord,
+          connectionFieldsByObject.get(sourceObjectApiName) ?? [],
+        ),
       )
 
       const contactIds = new Set<string>()
@@ -441,7 +529,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       setAccountRecords(aRecords)
 
       // Persist to module-level cache for instant restore on remount
-      const ck = cacheKey(objectApiName, recordId, false)
+      const ck = cacheKey(objectApiName, recordId, rollupFromProperty)
       teamMembersCache.delete(ck) // refresh insertion order (LRU)
       teamMembersCache.set(ck, {
         rawMembers: members,
@@ -458,7 +546,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     } finally {
       setLoading(false)
     }
-  }, [recordId, objectApiName, record, isSupported, connectionFields])
+  }, [recordId, objectApiName, record, isSupported, rollupFromProperty, connectionFieldsByObject])
 
   useEffect(() => {
     fetchConnections()
