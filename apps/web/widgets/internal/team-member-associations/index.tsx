@@ -11,6 +11,9 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import { getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, isConnectionFieldType, type FieldDef, type TeamMemberAssociationsConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
+import { useAuth } from '@/lib/auth-context'
+import { getPageLayoutFieldApiNames } from '@/lib/layout-migration'
+import { resolveLayoutForUser } from '@/lib/layout-resolver'
 import { FieldDisplay, getFieldValue } from '../shared/FieldDisplay'
 import { ConnectionBadges } from '../shared/ConnectionBadges'
 import { InlineConnectToRecordRow } from '../shared/InlineConnectToRecordRow'
@@ -560,11 +563,18 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     : ''
   const isSupported = SUPPORTED_OBJECTS.includes(objectApiName)
   const schema = useSchemaStore(state => state.schema)
+  const { user } = useAuth()
   const connectionFields = useMemo(() => (schema?.objects ?? []).flatMap(sourceObject => (
-    sourceObject.fields
-      .filter((field: FieldDef) => isConnectionFieldType(field.type) && getConnectionTargetObject(field.type, field.lookupObject) === objectApiName)
-      .map((field: FieldDef) => ({ sourceApiName: sourceObject.apiName, field }))
-  )), [schema, objectApiName])
+    (() => {
+      const resolved = resolveLayoutForUser(sourceObject, { profileId: user?.profileId ?? null })
+      const placedFields = resolved.kind === 'resolved' ? getPageLayoutFieldApiNames(resolved.layout) : new Set<string>()
+      return sourceObject.fields
+        .filter((field: FieldDef) => placedFields.has(field.apiName)
+          && isConnectionFieldType(field.type)
+          && getConnectionTargetObject(field.type, field.lookupObject) === objectApiName)
+        .map((field: FieldDef) => ({ sourceApiName: sourceObject.apiName, field }))
+    })()
+  )), [schema, objectApiName, user?.profileId])
 
   // ── State ──
   const [propertyGroups, setPropertyGroups] = useState<PropertyGroup[]>([])

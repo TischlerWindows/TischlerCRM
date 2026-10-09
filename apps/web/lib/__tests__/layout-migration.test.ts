@@ -1,4 +1,4 @@
-import { migrateLegacyLayout, isLegacyLayout } from '@/lib/layout-migration';
+import { getPageLayoutFieldApiNames, migrateLegacyLayout, isLegacyLayout } from '@/lib/layout-migration';
 import type { LegacyPageLayout } from '@/lib/schema';
 
 function makeLegacyLayout(overrides: Partial<LegacyPageLayout> = {}): LegacyPageLayout {
@@ -33,6 +33,11 @@ function makeLegacyLayout(overrides: Partial<LegacyPageLayout> = {}): LegacyPage
 }
 
 describe('migrateLegacyLayout', () => {
+  it('collects only rendered real fields from a page layout', () => {
+    const layout = migrateLegacyLayout(makeLegacyLayout());
+    expect(getPageLayoutFieldApiNames(layout)).toEqual(new Set(['Name', 'Email']));
+  });
+
   it('preserves tab visibility rules and OR logic from editor tabs', () => {
     const legacy = makeLegacyLayout({
       extensions: {

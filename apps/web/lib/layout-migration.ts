@@ -338,3 +338,31 @@ export function migrateLegacyLayout(legacy: LegacyPageLayout): PageLayout {
     extensions: legacy.extensions,
   };
 }
+
+export function getPageLayoutFieldApiNames(layoutInput: PageLayout | LegacyPageLayout): Set<string> {
+  const layout = isLegacyLayout(layoutInput) ? migrateLegacyLayout(layoutInput as LegacyPageLayout) : layoutInput as PageLayout;
+  const extensionTabs = layout.extensions && typeof layout.extensions === 'object'
+    ? (layout.extensions as Record<string, unknown>).editorTabs
+    : undefined;
+  const tabs = Array.isArray(extensionTabs) && extensionTabs.length > 0
+    ? extensionTabs as LayoutTab[]
+    : layout.tabs;
+  const fieldApiNames = new Set<string>();
+
+  for (const tab of tabs ?? []) {
+    if (tab.hideOnView) continue;
+    for (const region of tab.regions ?? []) {
+      if (region.hidden || region.hideOnView || region.hideOnExisting) continue;
+      for (const panel of region.panels ?? []) {
+        if (panel.hidden || panel.hideOnView || panel.hideOnExisting) continue;
+        for (const field of panel.fields ?? []) {
+          if (field.kind && field.kind !== 'field') continue;
+          if (field.behavior === 'hidden' || field.hideOnView || field.hideOnExisting) continue;
+          if (field.fieldApiName) fieldApiNames.add(field.fieldApiName);
+        }
+      }
+    }
+  }
+
+  return fieldApiNames;
+}

@@ -10,6 +10,9 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import { getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, isConnectionFieldType, type FieldDef, type TeamMembersRollupConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
+import { useAuth } from '@/lib/auth-context'
+import { getPageLayoutFieldApiNames } from '@/lib/layout-migration'
+import { resolveLayoutForUser } from '@/lib/layout-resolver'
 import { FieldDisplay } from '../shared/FieldDisplay'
 import { ConnectionBadges } from '../shared/ConnectionBadges'
 import { InlineAddConnectionRow, type InlineAddConnectionPayload } from '../shared/InlineAddConnectionRow'
@@ -402,14 +405,18 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const recordId = record?.id ? String(record.id) : null
   const isSupported = SUPPORTED_OBJECTS.includes(objectApiName)
   const schema = useSchemaStore(state => state.schema)
+  const { user } = useAuth()
   const connectionFieldsByObject = useMemo(() => new Map(
-    (schema?.objects ?? []).map(schemaObject => [
-      schemaObject.apiName,
-      schemaObject.fields.filter((field: FieldDef) =>
-        isConnectionFieldType(field.type) && ['Contact', 'Account'].includes(getConnectionTargetObject(field.type, field.lookupObject) ?? ''),
-      ),
-    ]),
-  ), [schema])
+    (schema?.objects ?? []).map(schemaObject => {
+      const resolved = resolveLayoutForUser(schemaObject, { profileId: user?.profileId ?? null })
+      const placedFields = resolved.kind === 'resolved' ? getPageLayoutFieldApiNames(resolved.layout) : new Set<string>()
+      return [schemaObject.apiName, schemaObject.fields.filter((field: FieldDef) =>
+        placedFields.has(field.apiName)
+        && isConnectionFieldType(field.type)
+        && ['Contact', 'Account'].includes(getConnectionTargetObject(field.type, field.lookupObject) ?? ''),
+      )]
+    }),
+  ), [schema, user?.profileId])
   const connectionFields = useMemo(
     () => connectionFieldsByObject.get(objectApiName) ?? [],
     [connectionFieldsByObject, objectApiName],
