@@ -108,8 +108,9 @@ export default function FieldVisibilityRuleEditor({
   allUsers.forEach(u => { userNameMap[u.id] = u.name || u.email; });
 
   const handleAddCondition = () => {
-    if (newCondition.left && newCondition.op && newCondition.right !== '' &&
-        !(Array.isArray(newCondition.right) && newCondition.right.length === 0)) {
+    const isNoValueOperator = newCondition.op === 'IS_NOT_BLANK';
+    if (newCondition.left && newCondition.op && (isNoValueOperator || (newCondition.right !== '' &&
+      !(Array.isArray(newCondition.right) && newCondition.right.length === 0)))) {
       setConditions([...conditions, newCondition as ConditionExpr]);
       setNewCondition({ left: '', op: '==', right: '' });
       setSelectedIncludesValues([]);
@@ -247,11 +248,12 @@ export default function FieldVisibilityRuleEditor({
             <option value="INCLUDES">Includes (Multi-Select)</option>
             <option value="CONTAINS">Contains (Text)</option>
             <option value="STARTS_WITH">Starts With</option>
+            <option value="IS_NOT_BLANK">Is not blank</option>
           </select>
         </div>
 
         {/* Value Input */}
-        <div>
+        {newCondition.op !== 'IS_NOT_BLANK' && <div>
           <Label htmlFor="condition-value" className="text-xs">Value:</Label>
           {(() => {
             const selectedField = availableFields.find(f => f.apiName === newCondition.left);
@@ -425,7 +427,7 @@ export default function FieldVisibilityRuleEditor({
               />
             );
           })()}
-        </div>
+        </div>}
       </div>
 
       {/* Visibility by User */}
@@ -543,7 +545,7 @@ export default function FieldVisibilityRuleEditor({
             const rightFilled = Array.isArray(newCondition.right)
               ? newCondition.right.length > 0
               : newCondition.right !== '' && newCondition.right !== undefined;
-            if (newCondition.left && newCondition.op && rightFilled) {
+            if (newCondition.left && newCondition.op && (newCondition.op === 'IS_NOT_BLANK' || rightFilled)) {
               finalConditions = [...finalConditions, newCondition as ConditionExpr];
             }
 

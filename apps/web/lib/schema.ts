@@ -934,7 +934,7 @@ export interface OrgSchema {
 
 export type ConditionExpr = { 
   left: string; 
-  op: "==" | "!=" | ">" | "<" | ">=" | "<=" | "IN" | "INCLUDES" | "CONTAINS" | "STARTS_WITH"; 
+  op: "==" | "!=" | ">" | "<" | ">=" | "<=" | "IN" | "INCLUDES" | "CONTAINS" | "STARTS_WITH" | "IS_NOT_BLANK";
   right: any;
 };
 

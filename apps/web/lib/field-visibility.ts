@@ -10,6 +10,14 @@ export interface VisibilityContext {
   currentUserId?: string;
 }
 
+function hasFieldValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.some(hasFieldValue);
+  if (typeof value === 'object') return Object.values(value).some(hasFieldValue);
+  return true;
+}
+
 /**
  * Evaluates whether a field should be visible based on visibility conditions
  * @param conditions - Array of condition expressions
@@ -70,6 +78,9 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
     rightIsNumeric && left !== undefined && left !== null && left !== '' && Number(left) === Number(right);
 
   switch (condition.op) {
+    case 'IS_NOT_BLANK':
+      return leftParts ? leftParts.some(hasFieldValue) : hasFieldValue(leftValue);
+
     case '==':
       if (leftParts) {
         // Multi-picklist: true if ANY selected value matches any target
@@ -180,12 +191,15 @@ export function formatCondition(condition: ConditionExpr, fieldLabel: string, us
     'IN': 'is in',
     'INCLUDES': 'includes',
     'CONTAINS': 'contains',
-    'STARTS_WITH': 'starts with'
+    'STARTS_WITH': 'starts with',
+    'IS_NOT_BLANK': 'is not blank',
   };
 
   const rightDisplay = Array.isArray(condition.right) 
     ? condition.right.join(', ')
     : condition.right;
 
-  return `${fieldLabel} ${operatorLabels[condition.op]} ${rightDisplay}`;
+  return condition.op === 'IS_NOT_BLANK'
+    ? `${fieldLabel} ${operatorLabels[condition.op]}`
+    : `${fieldLabel} ${operatorLabels[condition.op]} ${rightDisplay}`;
 }
