@@ -250,11 +250,20 @@ export function renderValue(
 
   // Lookup → clickable link showing resolved label (not raw UUID)
   const lookupTarget = fieldDef ? getConnectionTargetObject(fieldType, fieldDef.lookupObject) : undefined;
-  if ((fieldType === 'Lookup' || isConnectionFieldType(fieldType)) && lookupTarget) {
+  if ((fieldType === 'Lookup' || fieldType === 'ExternalLookup' || isConnectionFieldType(fieldType)) && lookupTarget) {
+    const lookupLabels = record?.lookupLabels as Record<string, { label: string; objectApiName: string; canRead: boolean }> | undefined;
+    const lookupMeta = lookupLabels?.[fieldDef?.apiName ?? apiName]
+      ?? lookupLabels?.[(fieldDef?.apiName ?? apiName).replace(/^[A-Za-z]+__/, '')];
+    const lookupId = value && typeof value === 'object'
+      ? String(value.id ?? value.lookup ?? value.value ?? '')
+      : String(value);
     const route = LOOKUP_ROUTE_MAP[lookupTarget];
-    const displayLabel = resolveLookupDisplayName(value, lookupTarget);
+    const displayLabel = lookupMeta?.label || resolveLookupDisplayName(lookupId, lookupTarget);
+    if (lookupMeta && !lookupMeta.canRead) {
+      return <span>{displayLabel}</span>;
+    }
     const link = route ? (
-      <Link href={`/${route}/${value}`} className="text-brand-navy hover:underline underline-offset-2">
+      <Link href={`/${route}/${lookupId}`} className="text-brand-navy hover:underline underline-offset-2">
         {displayLabel}
       </Link>
     ) : displayLabel;
@@ -276,7 +285,7 @@ export function renderValue(
       return (
         <div className="min-w-0">
           {route ? (
-            <Link href={`/${route}/${value}`} className="text-brand-navy hover:underline underline-offset-2">
+            <Link href={`/${route}/${lookupId}`} className="text-brand-navy hover:underline underline-offset-2">
               {displayLabel}
             </Link>
           ) : displayLabel}
@@ -428,8 +437,11 @@ export function renderValue(
     let lookupPart: React.ReactNode = '';
     if (value.lookup && lookupTarget) {
       const route = LOOKUP_ROUTE_MAP[lookupTarget];
-      const displayLabel = resolveLookupDisplayName(value.lookup, lookupTarget);
-      lookupPart = route ? (
+      const lookupLabels = record?.lookupLabels as Record<string, { label: string; objectApiName: string; canRead: boolean }> | undefined;
+      const lookupMeta = lookupLabels?.[fieldDef?.apiName ?? apiName]
+        ?? lookupLabels?.[(fieldDef?.apiName ?? apiName).replace(/^[A-Za-z]+__/, '')];
+      const displayLabel = lookupMeta?.label || resolveLookupDisplayName(value.lookup, lookupTarget);
+      lookupPart = route && lookupMeta?.canRead !== false ? (
         <Link href={`/${route}/${value.lookup}`} className="text-brand-navy hover:underline underline-offset-2">
           {displayLabel}
         </Link>

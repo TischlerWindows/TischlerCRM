@@ -18,6 +18,7 @@ export interface RecordData {
   };
   createdAt: string;
   updatedAt: string;
+  lookupLabels?: Record<string, { label: string; objectApiName: string; canRead: boolean }>;
 }
 
 export interface CreateRecordInput {
@@ -147,6 +148,7 @@ class RecordsService {
 
     return {
       ...stripped,
+      lookupLabels: record.lookupLabels,
       // DB-level fields MUST override anything from the data blob
       id: record.id,
       // Convenience keys for list/table columns

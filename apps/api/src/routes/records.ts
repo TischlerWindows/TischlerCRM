@@ -74,6 +74,158 @@ function canManageClockInRecord(
   return typeof owner === 'string' && owner === userId;
 }
 
+function normalizeLookupApiName(value: string): string {
+  return value.replace(/^[A-Za-z]+__/, '').replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+}
+
+function getLookupDataValue(data: Record<string, unknown>, apiName: string): unknown {
+  const bareName = apiName.replace(/^[A-Za-z]+__/, '');
+  const direct = data[apiName] ?? data[bareName];
+  if (direct !== undefined && direct !== null) return direct;
+  const normalizedName = normalizeLookupApiName(apiName);
+  const entry = Object.entries(data).find(([key, value]) =>
+    value !== undefined && value !== null && normalizeLookupApiName(key) === normalizedName,
+  );
+  return entry?.[1];
+}
+
+function getLookupRecordId(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (value && typeof value === 'object') {
+    const lookup = value as Record<string, unknown>;
+    return String(lookup.id ?? lookup.lookup ?? lookup.value ?? '').trim();
+  }
+  return '';
+}
+
+function stringifyLookupName(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (!value || typeof value !== 'object') return '';
+  const parts = value as Record<string, unknown>;
+  const read = (pattern: RegExp) => {
+    const entry = Object.entries(parts).find(([key, item]) => pattern.test(key) && typeof item === 'string' && item.trim());
+    return typeof entry?.[1] === 'string' ? entry[1].trim() : '';
+  };
+  const compositeName = [read(/salutation/i), read(/first.?name/i), read(/last.?name/i)].filter(Boolean).join(' ');
+  if (compositeName) return compositeName;
+  return Object.values(parts).filter((item): item is string => typeof item === 'string' && !!item.trim()).join(' ');
+}
+
+function getLookupDisplayName(
+  objectApiName: string,
+  objectLabel: string,
+  data: Record<string, unknown>,
+  fields: Array<{ apiName: string; label: string }>,
+): string {
+  const lowerName = objectApiName.charAt(0).toLowerCase() + objectApiName.slice(1);
+  const nameCandidates = objectApiName === 'Property'
+    ? ['Property__address_search', 'address_search', 'Property__address', 'address']
+    : [`${objectApiName}__${lowerName}Name`, `${lowerName}Name`, `${objectApiName}__name`, 'name', 'subject'];
+  let name = '';
+  for (const candidate of nameCandidates) {
+    name = stringifyLookupName(getLookupDataValue(data, candidate));
+    if (name) break;
+  }
+  if (!name) {
+    const schemaNameField = fields.find(({ apiName }) => /(?:^|__)name$/i.test(apiName) || /(?:^|__)\w+name$/i.test(apiName));
+    if (schemaNameField) name = stringifyLookupName(getLookupDataValue(data, schemaNameField.apiName));
+  }
+
+  const numberCandidates = [`${objectApiName}__${lowerName}Number`, `${lowerName}Number`, `${objectApiName}Number`];
+  let number = '';
+  for (const candidate of numberCandidates) {
+    number = stringifyLookupName(getLookupDataValue(data, candidate));
+    if (number) break;
+  }
+  if (number && name && number !== name) return `${number} (${name})`;
+  return name || number || `Unnamed ${objectLabel}`;
+}
+
+async function buildLookupLabels(
+  sourceObjectApiName: string,
+  sourceData: unknown,
+  userId: string,
+  userRole: string,
+): Promise<Record<string, { label: string; objectApiName: string; canRead: boolean }>> {
+  if (!sourceData || typeof sourceData !== 'object' || Array.isArray(sourceData)) return {};
+  const schemaRow = await prisma.setting.findUnique({ where: { key: 'tces-object-manager-schema' } });
+  const schema = schemaRow?.value as { objects?: Array<{ apiName: string; label: string; fields?: Array<Record<string, unknown>> }> } | undefined;
+  const sourceObject = schema?.objects?.find((object) => object.apiName.toLowerCase() === sourceObjectApiName.toLowerCase());
+  if (!sourceObject) return {};
+
+  const data = sourceData as Record<string, unknown>;
+  const lookupFields = (sourceObject.fields ?? []).filter((field) =>
+    ['Lookup', 'Connection', 'ConnectionContact', 'ConnectionAccount', 'ExternalLookup', 'PicklistLookup'].includes(String(field.type)),
+  );
+  const descriptors: Array<{ apiName: string; targetApiName: string; recordId: string; embeddedLabel?: string }> = [];
+  for (const field of lookupFields) {
+    const type = String(field.type);
+    const targetApiName = type === 'ConnectionContact'
+      ? 'Contact'
+      : type === 'ConnectionAccount'
+        ? 'Account'
+        : String(field.lookupObject ?? '');
+    if (!targetApiName) continue;
+    const rawValue = getLookupDataValue(data, String(field.apiName));
+    const nestedValue = rawValue && typeof rawValue === 'object' ? rawValue as Record<string, unknown> : undefined;
+    const recordId = getLookupRecordId(rawValue);
+    if (!recordId) continue;
+    const embeddedLabel = typeof nestedValue?.name === 'string'
+      ? nestedValue.name
+      : typeof nestedValue?.label === 'string'
+        ? nestedValue.label
+        : undefined;
+    descriptors.push({ apiName: String(field.apiName), targetApiName, recordId, embeddedLabel });
+  }
+
+  const targetApiNames = Array.from(new Set(descriptors.map((descriptor) => descriptor.targetApiName)));
+  const targets = await Promise.all(targetApiNames.map(async (targetApiName) => {
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: targetApiName, mode: 'insensitive' } },
+      include: { fields: { where: { isActive: true }, select: { apiName: true, label: true } } },
+    });
+    return [targetApiName, object] as const;
+  }));
+  const targetObjectMap = new Map(targets.filter((entry) => entry[1]).map(([apiName, object]) => [apiName, object!]));
+  const recordsByTarget = new Map<string, Map<string, Record<string, unknown>>>();
+
+  await Promise.all(targetApiNames.map(async (targetApiName) => {
+    const targetObject = targetObjectMap.get(targetApiName);
+    if (!targetObject) return;
+    const ids = Array.from(new Set(descriptors
+      .filter((descriptor) => descriptor.targetApiName === targetApiName)
+      .map((descriptor) => descriptor.recordId)));
+    const records = await prisma.record.findMany({
+      where: { objectId: targetObject.id, id: { in: ids }, deletedAt: null },
+      select: { id: true, data: true },
+    });
+    recordsByTarget.set(targetApiName, new Map(records.map((record) => [
+      record.id,
+      record.data && typeof record.data === 'object' ? record.data as Record<string, unknown> : {},
+    ])));
+  }));
+
+  const permissions = await Promise.all(targetApiNames.map(async (targetApiName) => [
+    targetApiName,
+    await checkObjectPermission(userId, userRole, targetApiName, 'read'),
+  ] as const));
+  const canReadByTarget = new Map(permissions);
+  const labels: Record<string, { label: string; objectApiName: string; canRead: boolean }> = {};
+  for (const descriptor of descriptors) {
+    const targetObject = targetObjectMap.get(descriptor.targetApiName);
+    const targetData = recordsByTarget.get(descriptor.targetApiName)?.get(descriptor.recordId);
+    if (!descriptor.embeddedLabel && (!targetObject || !targetData)) continue;
+    labels[descriptor.apiName] = {
+      label: descriptor.embeddedLabel || (targetObject && targetData
+        ? getLookupDisplayName(descriptor.targetApiName, targetObject.label, targetData, targetObject.fields)
+        : `Unnamed ${targetObject?.label ?? descriptor.targetApiName}`),
+      objectApiName: descriptor.targetApiName,
+      canRead: canReadByTarget.get(descriptor.targetApiName) ?? false,
+    };
+  }
+  return labels;
+}
+
 export async function recordRoutes(app: FastifyInstance) {
   // ── Global search across all search-enabled objects ──────────────────
 
@@ -450,7 +602,14 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Record not found' });
     }
 
-    reply.send(record);
+    let lookupLabels: Awaited<ReturnType<typeof buildLookupLabels>> = {};
+    try {
+      lookupLabels = await buildLookupLabels(apiName, record.data, userId, userRole);
+    } catch (err) {
+      req.log.warn({ err, apiName, recordId: record.id }, 'Could not resolve lookup display labels');
+    }
+
+    reply.send({ ...record, lookupLabels });
   });
 
   // Create new record
