@@ -272,6 +272,8 @@ function connectionMembersForRecord(
         [linkField]: lookupId,
         role: typeof roleValue === 'string' ? roleValue.trim() : '',
         isLookupConnection: true,
+        connectionSourceObject: sourceApiName,
+        connectionFieldApiName: field.apiName,
         useConnectedRecordType: field.type === 'ConnectionContact' || field.type === 'ConnectionAccount',
         connectionTarget,
         connectionFieldLabel: field.label,
@@ -279,6 +281,20 @@ function connectionMembersForRecord(
       },
     }]
   })
+}
+
+function isConnectionFieldPlaced(
+  member: TeamMemberRecord,
+  fieldsByObject: Map<string, FieldDef[]>,
+): boolean {
+  const isLookupConnection = getField(member, 'isLookupConnection') === true
+    || getField(member, 'isLookupConnection') === 'true'
+  if (!isLookupConnection) return true
+
+  const idParts = String(member.id).split(':')
+  const sourceApiName = getStr(member, 'connectionSourceObject') || idParts[1] || ''
+  const fieldApiName = getStr(member, 'connectionFieldApiName') || idParts.slice(3).join(':')
+  return fieldsByObject.get(sourceApiName)?.some(field => field.apiName === fieldApiName) ?? false
 }
 
 function getConnectedRecordTypeLabel(
@@ -735,9 +751,13 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const currentField = OBJECT_TO_FIELD[objectApiName] ?? ''
 
   // Combine real and pending members for the merge logic
+  const visibleRawMembers = useMemo(
+    () => rawMembers.filter(member => isConnectionFieldPlaced(member, connectionFieldsByObject)),
+    [rawMembers, connectionFieldsByObject],
+  )
   const allMembers = useMemo(
-    () => [...rawMembers, ...pendingMembers],
-    [rawMembers, pendingMembers],
+    () => [...visibleRawMembers, ...pendingMembers],
+    [visibleRawMembers, pendingMembers],
   )
 
   const { mergedContacts, mergedAccounts, allRoles } = useMemo(() => {
