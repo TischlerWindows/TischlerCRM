@@ -866,6 +866,15 @@ class ApiClient {
     }>(`/places/details?${params}`);
   }
 
+  async geocodeAddress(address: string, sessionToken: string): Promise<{ lat: number | null; lng: number | null } | null> {
+    const { predictions } = await this.placesAutocomplete(address, sessionToken);
+    const placeId = predictions[0]?.place_id;
+    if (!placeId) return null;
+    const { address: details } = await this.placeDetails(placeId, sessionToken);
+    if (details.lat == null || details.lng == null) return null;
+    return { lat: details.lat, lng: details.lng };
+  }
+
   async reverseGeocode(lat: number, lng: number) {
     const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
     return this.request<{ address: string | null }>(`/places/reverse-geocode?${params}`);

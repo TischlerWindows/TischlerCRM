@@ -14,6 +14,7 @@ import type { FieldDef, ObjectDef } from '@/lib/schema';
 import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
+  geocodeMissingPropertyCoordinates,
   isSalesforceProjectAddressColumn,
 } from '@/lib/salesforce-opportunity-property';
 
@@ -452,13 +453,22 @@ export default function SalesforceImportPage() {
 
       if (objectApiName === 'Opportunity') {
         const propertyRows: Array<{ opportunityRowIndex: number; token: string; record: Record<string, unknown> }> = [];
-        entry.rows.forEach((row, opportunityRowIndex) => {
-          const property = buildPropertyImportDataFromOpportunity(row);
-          if (property.status === 'empty') return;
+        for (const [opportunityRowIndex, row] of entry.rows.entries()) {
+          const property = await geocodeMissingPropertyCoordinates(
+            buildPropertyImportDataFromOpportunity(row),
+            (address, sessionToken) => apiClient.geocodeAddress(address, sessionToken),
+          );
+          if (property.status === 'empty') continue;
           if (property.status === 'invalid') {
             failedPropertyRows.set(opportunityRowIndex, property.error);
             generatedPropertyErrors.push({ row: opportunityRowIndex + 1, error: property.error });
-            return;
+            continue;
+          }
+          if (property.geocodingWarning) {
+            generatedPropertyErrors.push({
+              row: opportunityRowIndex + 1,
+              error: `Property created without map coordinates: ${property.geocodingWarning}`,
+            });
           }
           const token = `generated-property-${crypto.randomUUID()}`;
           propertyRows.push({
@@ -466,7 +476,7 @@ export default function SalesforceImportPage() {
             token,
             record: { ...property.data, __sfId: token },
           });
-        });
+        }
 
         const PROPERTY_BATCH_SIZE = 500;
         for (let offset = 0; offset < propertyRows.length; offset += PROPERTY_BATCH_SIZE) {
@@ -936,7 +946,7 @@ export default function SalesforceImportPage() {
                 <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-gray-800">Generated Property records</h3>
-                    <p className="mt-1 text-sm text-gray-500">Created from Project Address fields in each Opportunity and linked before Opportunity import.</p>
+                    <p className="mt-1 text-sm text-gray-500">Created from Project Address fields in each Opportunity and linked before Opportunity import. Missing coordinates are looked up with the configured Google Maps integration; failed lookups are reported without blocking the import.</p>
                   </div>
                   <span className="text-sm text-gray-500">{generatedPropertyAddressCounts.ready} generated</span>
                 </div>

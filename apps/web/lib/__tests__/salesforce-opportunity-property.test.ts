@@ -1,5 +1,6 @@
 import {
   buildPropertyImportDataFromOpportunity,
+  geocodeMissingPropertyCoordinates,
   isSalesforceProjectAddressColumn,
 } from '../salesforce-opportunity-property'
 
@@ -72,6 +73,51 @@ describe('Salesforce Opportunity Property address mapping', () => {
     })).toEqual({
       status: 'invalid',
       error: 'Missing required Property address fields: Postal Code',
+    })
+  })
+
+  it('geocodes a complete address when Salesforce coordinates are absent', async () => {
+    const property = buildPropertyImportDataFromOpportunity({
+      Project_Addresses__Street__s: '581 Henry Street',
+      Project_Addresses__City__s: 'Brooklyn',
+      Project_Addresses__PostalCode__s: '11231',
+      Project_Addresses__StateCode__s: 'NY',
+      Project_Addresses__CountryCode__s: 'US',
+    })
+    const geocode = jest.fn().mockResolvedValue({ lat: 40.6764, lng: -73.9992 })
+    if (property.status !== 'ready') throw new Error('Expected complete Property address')
+
+    const resolved = await geocodeMissingPropertyCoordinates(property, geocode)
+
+    expect(geocode).toHaveBeenCalledWith('581 Henry Street, Brooklyn, NY, 11231, US', expect.any(String))
+    expect(resolved).toMatchObject({
+      status: 'ready',
+      data: {
+        Property__address: { lat: 40.6764, lng: -73.9992 },
+        Property__address_search: { lat: 40.6764, lng: -73.9992 },
+        Property__latitude: 40.6764,
+        Property__longitude: -73.9992,
+      },
+    })
+  })
+
+  it('keeps the Property import usable and reports a warning when geocoding fails', async () => {
+    const property = buildPropertyImportDataFromOpportunity({
+      Project_Addresses__Street__s: '581 Henry Street',
+      Project_Addresses__City__s: 'Brooklyn',
+      Project_Addresses__PostalCode__s: '11231',
+      Project_Addresses__StateCode__s: 'NY',
+    })
+    if (property.status !== 'ready') throw new Error('Expected complete Property address')
+
+    const resolved = await geocodeMissingPropertyCoordinates(property, async () => {
+      throw new Error('Google Maps integration is unavailable')
+    })
+
+    expect(resolved).toMatchObject({
+      status: 'ready',
+      geocodingWarning: 'Google Maps could not geocode this address.',
+      data: { Property__address: { street: '581 Henry Street' } },
     })
   })
 })

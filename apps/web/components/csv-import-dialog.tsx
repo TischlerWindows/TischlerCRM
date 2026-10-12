@@ -11,6 +11,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
+  geocodeMissingPropertyCoordinates,
   isSalesforceProjectAddressColumn,
 } from '@/lib/salesforce-opportunity-property';
 
@@ -283,12 +284,18 @@ export default function CsvImportDialog({
 
     if (objectApiName === 'Opportunity') {
       const propertyRows: Array<{ sourceRow: number; token: string; record: Record<string, unknown> }> = [];
-      csvRows.forEach((row, sourceRow) => {
-        const property = buildPropertyImportDataFromOpportunity(row);
+      for (const [sourceRow, row] of csvRows.entries()) {
+        const property = await geocodeMissingPropertyCoordinates(
+          buildPropertyImportDataFromOpportunity(row),
+          (address, sessionToken) => apiClient.geocodeAddress(address, sessionToken),
+        );
         if (property.status === 'ready') {
+          if (property.geocodingWarning) {
+            allErrors.push({ row: sourceRow + 1, error: `Property created without map coordinates: ${property.geocodingWarning}` });
+          }
           const token = `generated-property-${crypto.randomUUID()}`;
           propertyRows.push({ sourceRow, token, record: { ...property.data, __sfId: token } });
-          return;
+          continue;
         }
 
         failedPropertyRows.add(sourceRow);
@@ -296,7 +303,7 @@ export default function CsvImportDialog({
           ? 'No Project Address values were provided.'
           : property.error;
         allErrors.push({ row: sourceRow + 1, error: `Opportunity skipped: Property creation failed. ${reason}` });
-      });
+      }
 
       const PROPERTY_BATCH_SIZE = 200;
       for (let offset = 0; offset < propertyRows.length; offset += PROPERTY_BATCH_SIZE) {
@@ -575,7 +582,7 @@ export default function CsvImportDialog({
                 <div role="tabpanel" className="overflow-hidden rounded-lg border border-gray-200">
                   <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
                     <h3 className="text-sm font-semibold text-gray-900">Generated Property records</h3>
-                    <p className="mt-1 text-xs text-gray-500">Created from each Opportunity&apos;s Project Address and linked automatically before the Opportunity is imported.</p>
+                    <p className="mt-1 text-xs text-gray-500">Created from each Opportunity&apos;s Project Address and linked automatically. Missing coordinates are looked up with the configured Google Maps integration; failed lookups are reported without blocking the import.</p>
                   </div>
                   <div className="divide-y divide-gray-200">
                     {GENERATED_PROPERTY_FIELD_MAPPINGS.map((mapping) => (

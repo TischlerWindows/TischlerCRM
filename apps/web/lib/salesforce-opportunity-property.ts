@@ -3,7 +3,7 @@ type ImportRow = Record<string, string>
 type PropertyAddressResult =
   | { status: 'empty' }
   | { status: 'invalid'; error: string }
-  | { status: 'ready'; data: Record<string, unknown> }
+  | { status: 'ready'; data: Record<string, unknown>; geocodingWarning?: string }
 
 export const GENERATED_PROPERTY_FIELD_MAPPINGS = [
   { source: 'Project_Addresses__Street__s', target: 'Address Street' },
@@ -47,6 +47,62 @@ function parseCoordinate(value: string): number | undefined {
   if (!value) return undefined
   const coordinate = Number(value)
   return Number.isFinite(coordinate) ? coordinate : undefined
+}
+
+function readNumericCoordinate(value: unknown, minimum: number, maximum: number): number | undefined {
+  if (typeof value !== 'number' && typeof value !== 'string') return undefined
+  if (typeof value === 'string' && !value.trim()) return undefined
+  const coordinate = Number(value)
+  return Number.isFinite(coordinate) && coordinate >= minimum && coordinate <= maximum
+    ? coordinate
+    : undefined
+}
+
+export async function geocodeMissingPropertyCoordinates(
+  result: PropertyAddressResult,
+  geocodeAddress: (query: string, sessionToken: string) => Promise<{ lat: number | null; lng: number | null } | null>,
+): Promise<PropertyAddressResult> {
+  if (result.status !== 'ready') return result
+
+  const address = result.data.Property__address as Record<string, unknown>
+  const latitude = readNumericCoordinate(address.lat ?? result.data.Property__latitude, -90, 90)
+  const longitude = readNumericCoordinate(address.lng ?? result.data.Property__longitude, -180, 180)
+  if (latitude !== undefined && longitude !== undefined) return result
+
+  const query = [address.street, address.city, address.state, address.postalCode, address.country]
+    .filter((part): part is string => typeof part === 'string' && !!part.trim())
+    .join(', ')
+  if (!query) return { ...result, geocodingWarning: 'No address was available for map geocoding.' }
+
+  const sessionToken = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  try {
+    const coordinates = await geocodeAddress(query, sessionToken)
+    const geocodedLatitude = readNumericCoordinate(coordinates?.lat, -90, 90)
+    const geocodedLongitude = readNumericCoordinate(coordinates?.lng, -180, 180)
+    if (geocodedLatitude === undefined || geocodedLongitude === undefined) {
+      return { ...result, geocodingWarning: 'Google Maps could not find coordinates for this address.' }
+    }
+
+    const mergedAddress = {
+      ...address,
+      lat: latitude ?? geocodedLatitude,
+      lng: longitude ?? geocodedLongitude,
+    }
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        Property__address: mergedAddress,
+        Property__address_search: mergedAddress,
+        Property__latitude: mergedAddress.lat,
+        Property__longitude: mergedAddress.lng,
+      },
+    }
+  } catch {
+    return { ...result, geocodingWarning: 'Google Maps could not geocode this address.' }
+  }
 }
 
 export function buildPropertyImportDataFromOpportunity(row: ImportRow): PropertyAddressResult {
