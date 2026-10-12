@@ -35,6 +35,16 @@ const IMPORT_ORDER = [
   'WorkOrder',
 ];
 
+const GENERATED_PROPERTY_FIELD_MAPPINGS = [
+  { source: 'Project_Addresses__City__s', target: 'Property City' },
+  { source: 'Project_Addresses__PostalCode__s', target: 'Property Zip/Postal Code' },
+  { source: 'Project_Addresses__StateCode__s', target: 'Property State/Province' },
+  { source: 'Project_Addresses__CountryCode__s', target: 'Address Country' },
+  { source: 'Project_Addresses__Latitude__s', target: 'Address Latitude' },
+  { source: 'Project_Addresses__Longitude__s', target: 'Address Longitude' },
+  { source: 'Project_Addresses__GeocodeAccuracy__s', target: 'Address Geocode Accuracy' },
+]
+
 /**
  * Common Salesforce → CRM field name synonyms used for auto-mapping.
  */
@@ -245,6 +255,7 @@ export default function SalesforceImportPage() {
   const [step, setStep] = useState<WizardStep>('upload');
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [activeFileIdx, setActiveFileIdx] = useState(0);
+  const [showGeneratedPropertyTab, setShowGeneratedPropertyTab] = useState(false);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [importProgress, setImportProgress] = useState<Record<string, number>>({});
   const [results, setResults] = useState<ObjectResult[]>([]);
@@ -631,6 +642,24 @@ export default function SalesforceImportPage() {
   const totalRows = files.reduce((sum, f) => sum + f.rows.length, 0);
 
   const activeEntry = files[activeFileIdx];
+  const opportunityEntries = useMemo(
+    () => files.filter((entry) => entry.detectedObject === 'Opportunity'),
+    [files],
+  );
+  const generatedPropertyAddressCounts = useMemo(() => {
+    let ready = 0;
+    let invalid = 0;
+    let empty = 0;
+    for (const entry of opportunityEntries) {
+      for (const row of entry.rows) {
+        const property = buildPropertyImportDataFromOpportunity(row);
+        if (property.status === 'ready') ready += 1;
+        else if (property.status === 'invalid') invalid += 1;
+        else empty += 1;
+      }
+    }
+    return { ready, invalid, empty };
+  }, [opportunityEntries]);
   const activeObjectDef = activeEntry?.detectedObject
     ? crmObjects.find((o) => o.apiName === activeEntry.detectedObject)
     : undefined;
@@ -883,9 +912,9 @@ export default function SalesforceImportPage() {
               {files.map((entry, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setActiveFileIdx(idx)}
+                  onClick={() => { setShowGeneratedPropertyTab(false); setActiveFileIdx(idx) }}
                   className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    activeFileIdx === idx
+                    !showGeneratedPropertyTab && activeFileIdx === idx
                       ? 'bg-brand-navy text-white'
                       : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
                   }`}
@@ -894,9 +923,62 @@ export default function SalesforceImportPage() {
                   <span className="ml-2 text-xs opacity-60">{entry.rows.length.toLocaleString()} rows</span>
                 </button>
               ))}
+              {opportunityEntries.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowGeneratedPropertyTab(true)}
+                  aria-pressed={showGeneratedPropertyTab}
+                  className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    showGeneratedPropertyTab
+                      ? 'bg-brand-navy text-white'
+                      : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Property
+                  <span className="ml-2 text-xs opacity-60">{generatedPropertyAddressCounts.ready.toLocaleString()} generated</span>
+                </button>
+              )}
             </div>
 
-            {activeEntry && (
+            {showGeneratedPropertyTab ? (
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-gray-800">Generated Property records</h3>
+                    <p className="mt-1 text-sm text-gray-500">Created from Project Address fields in each Opportunity and linked before Opportunity import.</p>
+                  </div>
+                  <span className="text-sm text-gray-500">{generatedPropertyAddressCounts.ready} generated</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600">Salesforce Opportunity column</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600">Generated Property field</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {GENERATED_PROPERTY_FIELD_MAPPINGS.map((mapping) => (
+                        <tr key={mapping.source}>
+                          <td className="px-4 py-2.5 font-mono text-xs text-gray-700">{mapping.source}</td>
+                          <td className="px-4 py-2.5 text-sm text-gray-700">{mapping.target}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {(generatedPropertyAddressCounts.invalid > 0 || generatedPropertyAddressCounts.empty > 0) && (
+                  <div className="border-t border-gray-100 px-6 py-3 text-sm text-gray-600">
+                    {generatedPropertyAddressCounts.invalid > 0 && (
+                      <p className="text-amber-700">{generatedPropertyAddressCounts.invalid} address rows are missing a required city, state, or postal code and their Opportunities will be skipped.</p>
+                    )}
+                    {generatedPropertyAddressCounts.empty > 0 && (
+                      <p>{generatedPropertyAddressCounts.empty} Opportunities have no Project Address and will import without a Property link.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : activeEntry ? (
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
                   <span className="font-medium text-gray-800">{activeEntry.file.name}</span>
@@ -969,7 +1051,7 @@ export default function SalesforceImportPage() {
                   </table>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
