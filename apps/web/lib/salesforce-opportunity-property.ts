@@ -86,6 +86,7 @@ export function buildPropertyImportDataFromOpportunity(row: ImportRow): Property
     status: 'ready',
     data: {
       Property__address: address,
+      Property__address_search: address,
       Property__city: city,
       Property__state: state,
       Property__zipCode: postalCode,
