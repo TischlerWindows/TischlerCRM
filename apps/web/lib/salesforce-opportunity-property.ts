@@ -93,6 +93,8 @@ export function buildPropertyImportDataFromOpportunity(row: ImportRow): Property
       Property__city: city,
       Property__state: state,
       Property__zipCode: postalCode,
+      ...(parsedLatitude !== undefined ? { Property__latitude: parsedLatitude } : {}),
+      ...(parsedLongitude !== undefined ? { Property__longitude: parsedLongitude } : {}),
     },
   }
 }

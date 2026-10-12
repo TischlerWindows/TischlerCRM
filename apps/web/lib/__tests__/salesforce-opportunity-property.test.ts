@@ -40,6 +40,8 @@ describe('Salesforce Opportunity Property address mapping', () => {
         Property__city: 'Delray Beach',
         Property__state: 'FL',
         Property__zipCode: '33444',
+        Property__latitude: 26.4615,
+        Property__longitude: -80.0728,
       },
     })
   })

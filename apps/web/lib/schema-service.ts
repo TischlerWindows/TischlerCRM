@@ -1,5 +1,6 @@
 import { OrgSchema, ObjectDef, FieldDef, generateId, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS, cloneSystemFields, normalizeFieldType, PageLayout, LayoutSection, PanelField } from './schema';
 import { apiClient } from './api-client';
+import { ensurePropertyOpportunityRelatedLists } from './property-opportunity-related-list';
 
 const STORAGE_KEY = 'tces-object-manager-schema';
 const VERSIONS_KEY = 'tces-object-manager-versions';
@@ -803,11 +804,7 @@ class LocalStorageSchemaService implements SchemaService {
   }
 
   private ensurePropertyWoodLayout(schema: OrgSchema): OrgSchema {
-    // No-op: Hard-coded template layouts are no longer auto-injected.
-    // The universal ensureAllObjectsHavePopulatedLayout method will
-    // generate a layout if the object has none. Users may delete
-    // templates via the Page Editor without them reappearing.
-    return schema;
+    return ensurePropertyOpportunityRelatedLists(schema);
   }
 
   private ensureContactTemplateLayout(schema: OrgSchema): OrgSchema {
