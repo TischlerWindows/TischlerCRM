@@ -6,6 +6,7 @@ type PropertyAddressResult =
   | { status: 'ready'; data: Record<string, unknown> }
 
 export const GENERATED_PROPERTY_FIELD_MAPPINGS = [
+  { source: 'Project_Addresses__Street__s', target: 'Address Street' },
   { source: 'Project_Addresses__City__s', target: 'Property City' },
   { source: 'Project_Addresses__PostalCode__s', target: 'Property Zip/Postal Code' },
   { source: 'Project_Addresses__StateCode__s', target: 'Property State/Province' },
@@ -16,6 +17,7 @@ export const GENERATED_PROPERTY_FIELD_MAPPINGS = [
 ]
 
 const SALESFORCE_ADDRESS_FIELDS = {
+  street: 'projectaddresses__street__s',
   city: 'projectaddresses__city__s',
   postalCode: 'projectaddresses__postalcode__s',
   stateCode: 'projectaddresses__statecode__s',
@@ -48,6 +50,7 @@ function parseCoordinate(value: string): number | undefined {
 }
 
 export function buildPropertyImportDataFromOpportunity(row: ImportRow): PropertyAddressResult {
+  const street = readAddressPart(row, SALESFORCE_ADDRESS_FIELDS.street)
   const city = readAddressPart(row, SALESFORCE_ADDRESS_FIELDS.city)
   const postalCode = readAddressPart(row, SALESFORCE_ADDRESS_FIELDS.postalCode)
   const state = readAddressPart(row, SALESFORCE_ADDRESS_FIELDS.stateCode)
@@ -56,7 +59,7 @@ export function buildPropertyImportDataFromOpportunity(row: ImportRow): Property
   const longitude = readAddressPart(row, SALESFORCE_ADDRESS_FIELDS.longitude)
   const geocodeAccuracy = readAddressPart(row, SALESFORCE_ADDRESS_FIELDS.geocodeAccuracy)
 
-  if (![city, postalCode, state, country, latitude, longitude, geocodeAccuracy].some(Boolean)) {
+  if (![street, city, postalCode, state, country, latitude, longitude, geocodeAccuracy].some(Boolean)) {
     return { status: 'empty' }
   }
 
@@ -70,7 +73,7 @@ export function buildPropertyImportDataFromOpportunity(row: ImportRow): Property
   }
 
   const address: Record<string, unknown> = {
-    street: '',
+    street,
     city,
     state,
     postalCode,

@@ -6,6 +6,7 @@ import {
 describe('Salesforce Opportunity Property address mapping', () => {
   it('builds required Property fields and preserves Salesforce geocoding data', () => {
     expect(buildPropertyImportDataFromOpportunity({
+      Project_Addresses__Street__s: '123 Main Street',
       Project_Addresses__City__s: 'Delray Beach',
       Project_Addresses__PostalCode__s: '33444',
       Project_Addresses__StateCode__s: 'FL',
@@ -17,7 +18,7 @@ describe('Salesforce Opportunity Property address mapping', () => {
       status: 'ready',
       data: {
         Property__address: {
-          street: '',
+          street: '123 Main Street',
           city: 'Delray Beach',
           state: 'FL',
           postalCode: '33444',
@@ -27,7 +28,7 @@ describe('Salesforce Opportunity Property address mapping', () => {
           geocodeAccuracy: 'Rooftop',
         },
         Property__address_search: {
-          street: '',
+          street: '123 Main Street',
           city: 'Delray Beach',
           state: 'FL',
           postalCode: '33444',
@@ -53,6 +54,7 @@ describe('Salesforce Opportunity Property address mapping', () => {
 
   it('recognizes Project Address columns for exclusion from generic Opportunity mapping', () => {
     expect(isSalesforceProjectAddressColumn('Project_Addresses__City__s')).toBe(true)
+    expect(isSalesforceProjectAddressColumn('Project_Addresses__Street__s')).toBe(true)
     expect(isSalesforceProjectAddressColumn('Opportunity.Project_Addresses__Latitude__s')).toBe(true)
     expect(isSalesforceProjectAddressColumn('Name')).toBe(false)
   })
