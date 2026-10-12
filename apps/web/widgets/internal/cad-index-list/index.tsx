@@ -263,6 +263,27 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     if (focus) focusGridCell(coordinate)
   }
 
+  const handleGridCellMouseDown = (event: React.MouseEvent<HTMLElement>, row: number, column: number) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('[data-grid-ignore-selection]')) return
+    const coordinate = { row, column }
+    setSelection((current) => event.shiftKey && current
+      ? { ...current, focus: coordinate }
+      : { anchor: coordinate, focus: coordinate })
+    selectingCellsRef.current = true
+    if (!(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
+      event.preventDefault()
+      event.currentTarget.focus()
+    }
+  }
+
+  const handleGridCellMouseEnter = (row: number, column: number) => {
+    if (!selectingCellsRef.current) return
+    const coordinate = { row, column }
+    setSelection((current) => current
+      ? { ...current, focus: coordinate }
+      : { anchor: coordinate, focus: coordinate })
+  }
+
   const navigateGrid = (row: number, column: number, direction: 'left' | 'right' | 'up' | 'down', extend = false) => {
     let nextRow = row
     let nextColumn = column
@@ -958,23 +979,10 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                         data-grid-column={colIndex}
                         tabIndex={selection?.focus.row === rowIndex && selection.focus.column === colIndex ? 0 : -1}
                         aria-selected={selection ? isInGridSelection(rowIndex, colIndex, selection) : false}
-                        onMouseDown={(event) => {
-                          if (event.button !== 0) return
-                          const coordinate = { row: rowIndex, column: colIndex }
-                          setSelection((current) => event.shiftKey && current
-                            ? { ...current, focus: coordinate }
-                            : { anchor: coordinate, focus: coordinate })
-                          selectingCellsRef.current = true
-                          if (!(event.target instanceof HTMLInputElement)) {
-                            event.preventDefault()
-                            event.currentTarget.focus()
-                          }
-                        }}
+                        onMouseDown={(event) => handleGridCellMouseDown(event, rowIndex, colIndex)}
                         onMouseEnter={() => {
                           handleFillDragEnter(rowIndex, colIndex)
-                          if (selectingCellsRef.current) setSelection((current) => current
-                            ? { ...current, focus: { row: rowIndex, column: colIndex } }
-                            : { anchor: { row: rowIndex, column: colIndex }, focus: { row: rowIndex, column: colIndex } })
+                          handleGridCellMouseEnter(rowIndex, colIndex)
                         }}
                         onKeyDown={(event) => handleGridKeyDown(event, rowIndex, colIndex)}
                         className={`relative border-b border-gray-100 px-1.5 py-1 align-top outline-none ${

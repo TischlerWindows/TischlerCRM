@@ -366,6 +366,27 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     focusGridCell(coordinate)
   }
 
+  const handleGridCellMouseDown = (event: React.MouseEvent<HTMLElement>, row: number, column: number) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('[data-grid-ignore-selection]')) return
+    const coordinate = { row, column }
+    setSelection((current) => event.shiftKey && current
+      ? { ...current, focus: coordinate }
+      : { anchor: coordinate, focus: coordinate })
+    selectingCellsRef.current = true
+    if (!(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLTextAreaElement)) {
+      event.preventDefault()
+      event.currentTarget.focus()
+    }
+  }
+
+  const handleGridCellMouseEnter = (row: number, column: number) => {
+    if (!selectingCellsRef.current) return
+    const coordinate = { row, column }
+    setSelection((current) => current
+      ? { ...current, focus: coordinate }
+      : { anchor: coordinate, focus: coordinate })
+  }
+
   const navigateGrid = (row: number, column: number, direction: NavDirection, extend = false) => {
     let nextRow = row + (direction === 'down' ? 1 : direction === 'up' ? -1 : 0)
     let nextColumn = column + (direction === 'right' ? 1 : direction === 'left' ? -1 : 0)
@@ -838,17 +859,10 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                       data-grid-column={colIndex}
                       tabIndex={selection?.focus.row === i && selection.focus.column === colIndex ? 0 : -1}
                       aria-selected={selection ? isInGridSelection(i, colIndex, selection) : false}
-                      onMouseDown={(event) => {
-                        if (event.button !== 0) return
-                        const coordinate = { row: i, column: colIndex }
-                        setSelection((current) => event.shiftKey && current ? { ...current, focus: coordinate } : { anchor: coordinate, focus: coordinate })
-                        selectingCellsRef.current = true
-                      }}
+                      onMouseDown={(event) => handleGridCellMouseDown(event, i, colIndex)}
                       onMouseEnter={() => handleFillDragEnter(i, colIndex)}
                       onMouseEnterCapture={() => {
-                        if (selectingCellsRef.current) setSelection((current) => current
-                          ? { ...current, focus: { row: i, column: colIndex } }
-                          : { anchor: { row: i, column: colIndex }, focus: { row: i, column: colIndex } })
+                        handleGridCellMouseEnter(i, colIndex)
                       }}
                       onKeyDown={(event) => handleGridKeyDown(event, i, colIndex)}
                       className={`relative px-1.5 py-1 border-b border-gray-100 align-top whitespace-normal break-words ${selection && isInGridSelection(i, colIndex, selection) ? 'bg-[#e2f0d9]' : ''} ${gridFillClassName(i, colIndex)}`}
@@ -914,17 +928,10 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                   data-grid-column={colIndex}
                   tabIndex={selection?.focus.row === rowIndex && selection.focus.column === colIndex ? 0 : -1}
                   aria-selected={selection ? isInGridSelection(rowIndex, colIndex, selection) : false}
-                  onMouseDown={(event) => {
-                    if (event.button !== 0) return
-                    const coordinate = { row: rowIndex, column: colIndex }
-                    setSelection((current) => event.shiftKey && current ? { ...current, focus: coordinate } : { anchor: coordinate, focus: coordinate })
-                    selectingCellsRef.current = true
-                  }}
+                  onMouseDown={(event) => handleGridCellMouseDown(event, rowIndex, colIndex)}
                   onMouseEnter={() => handleFillDragEnter(rowIndex, colIndex)}
                   onMouseEnterCapture={() => {
-                    if (selectingCellsRef.current) setSelection((current) => current
-                      ? { ...current, focus: { row: rowIndex, column: colIndex } }
-                      : { anchor: { row: rowIndex, column: colIndex }, focus: { row: rowIndex, column: colIndex } })
+                    handleGridCellMouseEnter(rowIndex, colIndex)
                   }}
                   onKeyDown={(event) => handleGridKeyDown(event, rowIndex, colIndex)}
                   className={`${getMobileRowWidthClass(field)} relative shrink-0 ${selection && isInGridSelection(rowIndex, colIndex, selection) ? 'bg-[#e2f0d9]' : ''} ${gridFillClassName(rowIndex, colIndex)}`}
