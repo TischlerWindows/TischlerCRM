@@ -1063,7 +1063,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
       <GridRangeStyles />
       {rowContextMenu && createPortal(
         <>
-          <button type="button" aria-label="Close row menu" onClick={() => setRowContextMenu(null)} className="fixed inset-0 z-40 cursor-default" />
+          <button type="button" aria-label="Close row menu" onClick={() => setRowContextMenu(null)} onContextMenu={(event) => event.preventDefault()} className="fixed inset-0 z-40 cursor-default" />
           <div role="menu" data-grid-row-menu onContextMenu={(event) => event.preventDefault()} style={{ position: 'fixed', left: rowContextMenu.x, top: rowContextMenu.y }} className="z-50 min-w-40 rounded border border-gray-200 bg-white py-1 text-sm shadow-lg">
             <button type="button" role="menuitem" disabled={creating} onClick={() => { void handleInsertRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50">Insert Row Above</button>
             <button type="button" role="menuitem" onClick={() => { void copyRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Copy Row</button>
