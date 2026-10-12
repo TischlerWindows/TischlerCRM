@@ -298,10 +298,27 @@ export function renderValue(
 
     if (isPersonConnection) {
       const read = (primaryKey: string, fallbackKey: string) => {
+        const toDisplayValue = (value: unknown, isPhone: boolean): string => {
+          let resolved = value;
+          if (isPhone && typeof resolved === 'string' && resolved.trim().startsWith('{')) {
+            try { resolved = JSON.parse(resolved); } catch { /* Keep a malformed legacy value readable. */ }
+          }
+          if (typeof resolved === 'string') return resolved.trim();
+          if (typeof resolved === 'number' && Number.isFinite(resolved)) return String(resolved);
+          if (isPhone && resolved && typeof resolved === 'object' && !Array.isArray(resolved)) {
+            const phoneValue = resolved as Record<string, unknown>;
+            const phone = typeof phoneValue.phone === 'string' || typeof phoneValue.phone === 'number'
+              ? String(phoneValue.phone).trim()
+              : '';
+            const prefix = typeof phoneValue.prefix === 'string' ? phoneValue.prefix.trim() : '';
+            return [phone, prefix].filter(Boolean).join(' — ');
+          }
+          return '';
+        };
         const find = (key: string) => {
           const bareKey = key.replace(/^[A-Za-z]+__/, '');
           const fieldValue = connectedData[key] ?? connectedData[bareKey] ?? connectedData[`${lookupTarget}__${bareKey}`];
-          return typeof fieldValue === 'string' ? fieldValue.trim() : '';
+          return toDisplayValue(fieldValue, /phone/i.test(bareKey));
         };
         return find(primaryKey) || find(fallbackKey) || '—';
       };
