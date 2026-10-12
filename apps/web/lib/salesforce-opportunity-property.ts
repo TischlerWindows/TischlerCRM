@@ -5,6 +5,16 @@ type PropertyAddressResult =
   | { status: 'invalid'; error: string }
   | { status: 'ready'; data: Record<string, unknown> }
 
+export const GENERATED_PROPERTY_FIELD_MAPPINGS = [
+  { source: 'Project_Addresses__City__s', target: 'Property City' },
+  { source: 'Project_Addresses__PostalCode__s', target: 'Property Zip/Postal Code' },
+  { source: 'Project_Addresses__StateCode__s', target: 'Property State/Province' },
+  { source: 'Project_Addresses__CountryCode__s', target: 'Address Country' },
+  { source: 'Project_Addresses__Latitude__s', target: 'Address Latitude' },
+  { source: 'Project_Addresses__Longitude__s', target: 'Address Longitude' },
+  { source: 'Project_Addresses__GeocodeAccuracy__s', target: 'Address Geocode Accuracy' },
+]
+
 const SALESFORCE_ADDRESS_FIELDS = {
   city: 'projectaddresses__city__s',
   postalCode: 'projectaddresses__postalcode__s',

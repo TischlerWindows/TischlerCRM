@@ -8,6 +8,11 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
+import {
+  buildPropertyImportDataFromOpportunity,
+  GENERATED_PROPERTY_FIELD_MAPPINGS,
+  isSalesforceProjectAddressColumn,
+} from '@/lib/salesforce-opportunity-property';
 
 interface CsvImportDialogProps {
   open: boolean;
@@ -21,6 +26,7 @@ type Step = 'upload' | 'mapping' | 'preview' | 'importing' | 'results';
 
 interface ImportResult {
   created: number;
+  propertiesCreated: number;
   errors: Array<{ row: number; error: string }>;
 }
 
@@ -35,6 +41,7 @@ export default function CsvImportDialog({
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+  const [showPropertyMapping, setShowPropertyMapping] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState(0);
@@ -62,6 +69,7 @@ export default function CsvImportDialog({
     setCsvHeaders([]);
     setCsvRows([]);
     setColumnMapping({});
+    setShowPropertyMapping(false);
     setImportResult(null);
     setParseError(null);
     setImportProgress(0);
@@ -78,6 +86,7 @@ export default function CsvImportDialog({
     const mapping: Record<string, string> = {};
 
     for (const header of headers) {
+      if (objectApiName === 'Opportunity' && isSalesforceProjectAddressColumn(header)) continue;
       const headerLower = header.toLowerCase().replace(/[^a-z0-9]/g, '');
 
       // Try exact match first
@@ -150,7 +159,7 @@ export default function CsvImportDialog({
     }
 
     return mapping;
-  }, [targetFields]);
+  }, [objectApiName, targetFields]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -248,12 +257,96 @@ export default function CsvImportDialog({
     return labels;
   }, [columnMapping, targetFields]);
 
+  const propertyAddressCounts = useMemo(() => {
+    let ready = 0;
+    let invalid = 0;
+    let empty = 0;
+    if (objectApiName === 'Opportunity') {
+      for (const row of csvRows) {
+        const property = buildPropertyImportDataFromOpportunity(row);
+        if (property.status === 'ready') ready += 1;
+        else if (property.status === 'invalid') invalid += 1;
+        else empty += 1;
+      }
+    }
+    return { ready, invalid, empty };
+  }, [csvRows, objectApiName]);
+
   const handleImport = async () => {
     setStep('importing');
     setImportProgress(0);
 
+    const allErrors: Array<{ row: number; error: string }> = [];
+    const propertyIdsByRow = new Map<number, string>();
+    const failedPropertyRows = new Set<number>();
+    let propertiesCreated = 0;
+
+    if (objectApiName === 'Opportunity') {
+      const propertyRows: Array<{ sourceRow: number; token: string; record: Record<string, unknown> }> = [];
+      csvRows.forEach((row, sourceRow) => {
+        const property = buildPropertyImportDataFromOpportunity(row);
+        if (property.status === 'ready') {
+          const token = `generated-property-${crypto.randomUUID()}`;
+          propertyRows.push({ sourceRow, token, record: { ...property.data, __sfId: token } });
+          return;
+        }
+
+        failedPropertyRows.add(sourceRow);
+        const reason = property.status === 'empty'
+          ? 'No Project Address values were provided.'
+          : property.error;
+        allErrors.push({ row: sourceRow + 1, error: `Opportunity skipped: Property creation failed. ${reason}` });
+      });
+
+      const PROPERTY_BATCH_SIZE = 200;
+      for (let offset = 0; offset < propertyRows.length; offset += PROPERTY_BATCH_SIZE) {
+        const batch = propertyRows.slice(offset, offset + PROPERTY_BATCH_SIZE);
+        try {
+          const result = await apiClient.importRecords('Property', batch.map(({ record }) => record));
+          propertiesCreated += result.created;
+          const importedRows = new Set<number>();
+          for (const [token, propertyId] of Object.entries(result.idMap ?? {})) {
+            const imported = batch.find((item) => item.token === token);
+            if (!imported) continue;
+            propertyIdsByRow.set(imported.sourceRow, propertyId);
+            importedRows.add(imported.sourceRow);
+          }
+          for (const error of result.errors) {
+            const imported = batch[error.row - 1];
+            if (!imported) continue;
+            failedPropertyRows.add(imported.sourceRow);
+            allErrors.push({
+              row: imported.sourceRow + 1,
+              error: `Opportunity skipped: Property creation failed. ${error.error}`,
+            });
+          }
+          for (const imported of batch) {
+            if (importedRows.has(imported.sourceRow) || failedPropertyRows.has(imported.sourceRow)) continue;
+            failedPropertyRows.add(imported.sourceRow);
+            allErrors.push({
+              row: imported.sourceRow + 1,
+              error: 'Opportunity skipped: Property import returned no Property ID.',
+            });
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Property import batch failed';
+          for (const imported of batch) {
+            failedPropertyRows.add(imported.sourceRow);
+            allErrors.push({
+              row: imported.sourceRow + 1,
+              error: `Opportunity skipped: Property creation failed. ${message}`,
+            });
+          }
+        }
+          setImportProgress(Math.round(((offset + batch.length) / csvRows.length) * 50));
+      }
+    }
+
     // Build the records using the column mapping
-    const records = csvRows.map(row => {
+    const sourceRows = csvRows
+      .map((row, sourceRow) => ({ row, sourceRow }))
+      .filter(({ sourceRow }) => !failedPropertyRows.has(sourceRow));
+    const records = sourceRows.map(({ row, sourceRow }) => {
       const mapped: Record<string, any> = {};
       for (const [csvCol, targetField] of Object.entries(columnMapping)) {
         if (targetField && targetField !== '__skip__') {
@@ -263,14 +356,17 @@ export default function CsvImportDialog({
           }
         }
       }
+      const propertyId = propertyIdsByRow.get(sourceRow);
+      if (propertyId) mapped['Opportunity__property'] = propertyId;
       return mapped;
     });
 
     // Send in batches of 200
     const BATCH_SIZE = 200;
     let totalCreated = 0;
-    const allErrors: Array<{ row: number; error: string }> = [];
     const totalBatches = Math.ceil(records.length / BATCH_SIZE);
+    const progressOffset = objectApiName === 'Opportunity' ? 50 : 0;
+    const progressScale = objectApiName === 'Opportunity' ? 50 : 100;
 
     for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
       const batch = records.slice(batchIdx * BATCH_SIZE, (batchIdx + 1) * BATCH_SIZE);
@@ -281,19 +377,22 @@ export default function CsvImportDialog({
         totalCreated += result.created;
         // Adjust row numbers to be global
         for (const err of result.errors) {
-          allErrors.push({ row: err.row + offset, error: err.error });
+          const sourceRow = sourceRows[offset + err.row - 1]?.sourceRow ?? offset + err.row - 1;
+          allErrors.push({ row: sourceRow + 1, error: err.error });
         }
       } catch (err: any) {
         // If the entire batch fails, add errors for all rows
         for (let i = 0; i < batch.length; i++) {
-          allErrors.push({ row: offset + i + 1, error: err.message || 'Batch failed' });
+          const sourceRow = sourceRows[offset + i]?.sourceRow ?? offset + i;
+          allErrors.push({ row: sourceRow + 1, error: err.message || 'Batch failed' });
         }
       }
 
-      setImportProgress(Math.round(((batchIdx + 1) / totalBatches) * 100));
+      setImportProgress(progressOffset + Math.round(((batchIdx + 1) / totalBatches) * progressScale));
     }
 
-    setImportResult({ created: totalCreated, errors: allErrors });
+    if (totalBatches === 0) setImportProgress(100);
+    setImportResult({ created: totalCreated, propertiesCreated, errors: allErrors });
     setStep('results');
     if (totalCreated > 0) onImportComplete();
   };
@@ -432,20 +531,72 @@ export default function CsvImportDialog({
           {/* ── Mapping Step ── */}
           {step === 'mapping' && (
             <div className="space-y-6">
+              {objectApiName === 'Opportunity' && (
+                <div role="tablist" aria-label="Opportunity import objects" className="flex gap-2 border-b border-gray-200">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={!showPropertyMapping}
+                    onClick={() => setShowPropertyMapping(false)}
+                    className={`border-b-2 px-4 py-2 text-sm font-medium ${showPropertyMapping ? 'border-transparent text-gray-500 hover:text-gray-700' : 'border-brand-navy text-brand-navy'}`}
+                  >
+                    Opportunity
+                    <span className="ml-2 text-xs opacity-70">{csvRows.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={showPropertyMapping}
+                    onClick={() => setShowPropertyMapping(true)}
+                    className={`border-b-2 px-4 py-2 text-sm font-medium ${showPropertyMapping ? 'border-brand-navy text-brand-navy' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Property
+                    <span className="ml-2 text-xs opacity-70">{propertyAddressCounts.ready} generated</span>
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-600">
                   <strong>{csvRows.length}</strong> rows found with <strong>{csvHeaders.length}</strong> columns.
                   {' '}<strong>{mappedCount}</strong> columns mapped.
                 </p>
-                <button
-                  onClick={() => setColumnMapping(autoMapColumns(csvHeaders))}
-                  className="text-sm text-brand-navy hover:text-brand-dark font-medium"
-                >
-                  Auto-map columns
-                </button>
+                {!showPropertyMapping && (
+                  <button
+                    onClick={() => setColumnMapping(autoMapColumns(csvHeaders))}
+                    className="text-sm text-brand-navy hover:text-brand-dark font-medium"
+                  >
+                    Auto-map columns
+                  </button>
+                )}
               </div>
 
-              <div className="border border-gray-200 rounded-lg divide-y divide-gray-200">
+              {showPropertyMapping ? (
+                <div role="tabpanel" className="overflow-hidden rounded-lg border border-gray-200">
+                  <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Generated Property records</h3>
+                    <p className="mt-1 text-xs text-gray-500">Created from each Opportunity&apos;s Project Address and linked automatically before the Opportunity is imported.</p>
+                  </div>
+                  <div className="divide-y divide-gray-200">
+                    {GENERATED_PROPERTY_FIELD_MAPPINGS.map((mapping) => (
+                      <div key={mapping.source} className="grid grid-cols-2 gap-4 px-4 py-3 text-sm">
+                        <span className="font-mono text-xs text-gray-700">{mapping.source}</span>
+                        <span className="text-gray-700">{mapping.target}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-1 border-t border-gray-100 px-4 py-3 text-xs text-gray-600">
+                    <p>{propertyAddressCounts.ready} Properties will be created and linked.</p>
+                    {propertyAddressCounts.invalid > 0 && (
+                      <p className="text-amber-700">{propertyAddressCounts.invalid} rows have incomplete addresses; their Opportunities will be skipped.</p>
+                    )}
+                    {propertyAddressCounts.empty > 0 && (
+                      <p className="text-amber-700">{propertyAddressCounts.empty} rows have no Project Address; their Opportunities will be skipped.</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+              <div role="tabpanel" className="border border-gray-200 rounded-lg divide-y divide-gray-200">
                 {csvHeaders.map(header => {
                   const sampleValues = csvRows.slice(0, 3).map(r => r[header]).filter(Boolean);
                   return (
@@ -484,8 +635,9 @@ export default function CsvImportDialog({
                   );
                 })}
               </div>
+              )}
 
-              {!requiredMapped && (
+              {!showPropertyMapping && !requiredMapped && (
                 <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   Some required fields are not mapped. Records missing these values will fail to import.
@@ -549,13 +701,16 @@ export default function CsvImportDialog({
           {/* ── Results Step ── */}
           {step === 'results' && importResult && (
             <div className="space-y-6">
-              {importResult.created > 0 && (
+              {(importResult.created > 0 || importResult.propertiesCreated > 0) && (
                 <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
                   <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
                   <div>
                     <h3 className="font-medium text-green-900">
-                      Successfully imported {importResult.created} record{importResult.created !== 1 ? 's' : ''}
+                      Successfully imported {importResult.created} {objectLabel} record{importResult.created !== 1 ? 's' : ''}
                     </h3>
+                    {importResult.propertiesCreated > 0 && (
+                      <p className="text-sm text-green-700 mt-0.5">Created {importResult.propertiesCreated} linked Property record{importResult.propertiesCreated !== 1 ? 's' : ''}.</p>
+                    )}
                     {importResult.errors.length > 0 && (
                       <p className="text-sm text-green-700 mt-0.5">
                         {importResult.errors.length} row{importResult.errors.length !== 1 ? 's' : ''} had errors.
@@ -565,7 +720,7 @@ export default function CsvImportDialog({
                 </div>
               )}
 
-              {importResult.created === 0 && (
+              {importResult.created === 0 && importResult.propertiesCreated === 0 && (
                 <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
                   <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
                   <div>
