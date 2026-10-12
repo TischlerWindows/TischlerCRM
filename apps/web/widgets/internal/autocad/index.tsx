@@ -369,8 +369,17 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setRowContextMenu(null)
     }
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (event.button !== 2 && !(event.target as HTMLElement).closest('[data-grid-row-menu]')) {
+        setRowContextMenu(null)
+      }
+    }
     window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
+    document.addEventListener('pointerdown', closeOnPointerDown)
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('pointerdown', closeOnPointerDown)
+    }
   }, [rowContextMenu])
 
   const focusGridCell = (coordinate: GridCoordinate) => {
@@ -714,6 +723,9 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   const openRowContextMenu = (event: React.MouseEvent<HTMLElement>, rowIndex: number) => {
     event.preventDefault()
     event.stopPropagation()
+    selectingCellsRef.current = false
+    setEditingCellId(null)
+    setSelection({ anchor: { row: rowIndex, column: 0 }, focus: { row: rowIndex, column: ALL_FIELDS.length - 1 } })
     setRowContextMenu({ rowIndex, x: event.clientX, y: event.clientY })
   }
 
@@ -925,8 +937,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
             </thead>
             <tbody>
               {rows.map((row, i) => (
-                <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <th scope="row" onContextMenu={(event) => openRowContextMenu(event, i)} className="sticky left-0 z-10 w-9 cursor-context-menu border-b border-r border-gray-100 bg-gray-50 px-1 py-1 text-center font-normal tabular-nums text-gray-400">{i + 1}</th>
+                <tr key={row.id} onContextMenu={(event) => openRowContextMenu(event, i)} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <th scope="row" className={`sticky left-0 z-10 w-9 cursor-context-menu border-b border-r border-gray-100 px-1 py-1 text-center font-normal tabular-nums ${rowContextMenu?.rowIndex === i ? 'bg-[#e2f0d9] text-gray-700' : 'bg-gray-50 text-gray-400'}`}>{i + 1}</th>
                   {ALL_FIELDS.map((f, colIndex) => {
                     const cellId = `${row.id}:${f.key}`
                     const selectedBounds = selection ? getGridSelectionBounds(selection) : null
@@ -995,8 +1007,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
       {!loading && rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-gray-200 md:hidden">
           {rows.map((row, rowIndex) => (
-            <article key={row.id} className="flex min-w-[48rem] items-center gap-2 border-b border-gray-100 bg-white px-2 py-2 last:border-b-0">
-              <div aria-hidden="true" onContextMenu={(event) => openRowContextMenu(event, rowIndex)} className="sticky left-0 z-10 flex w-8 shrink-0 cursor-context-menu items-center justify-center self-stretch border-r border-gray-100 bg-gray-50 text-xs tabular-nums text-gray-400">{rowIndex + 1}</div>
+            <article key={row.id} onContextMenu={(event) => openRowContextMenu(event, rowIndex)} className="flex min-w-[48rem] items-center gap-2 border-b border-gray-100 bg-white px-2 py-2 last:border-b-0">
+              <div aria-hidden="true" className={`sticky left-0 z-10 flex w-8 shrink-0 cursor-context-menu items-center justify-center self-stretch border-r border-gray-100 text-xs tabular-nums ${rowContextMenu?.rowIndex === rowIndex ? 'bg-[#e2f0d9] text-gray-700' : 'bg-gray-50 text-gray-400'}`}>{rowIndex + 1}</div>
               {ALL_FIELDS.map((field, colIndex) => {
                 const cellId = `${row.id}:${field.key}`
                 const selectedBounds = selection ? getGridSelectionBounds(selection) : null
@@ -1062,16 +1074,13 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
       </div>
       <GridRangeStyles />
       {rowContextMenu && createPortal(
-        <>
-          <button type="button" aria-label="Close row menu" onClick={() => setRowContextMenu(null)} onContextMenu={(event) => event.preventDefault()} className="fixed inset-0 z-40 cursor-default" />
           <div role="menu" data-grid-row-menu onContextMenu={(event) => event.preventDefault()} style={{ position: 'fixed', left: rowContextMenu.x, top: rowContextMenu.y }} className="z-50 min-w-40 rounded border border-gray-200 bg-white py-1 text-sm shadow-lg">
             <button type="button" role="menuitem" disabled={creating} onClick={() => { void handleInsertRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50">Insert Row Above</button>
             <button type="button" role="menuitem" onClick={() => { void copyRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Copy Row</button>
             <button type="button" role="menuitem" onClick={() => { void copyRow(rowContextMenu.rowIndex, true); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Cut Row</button>
             <button type="button" role="menuitem" disabled={creating} onClick={() => { void pasteRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50">Paste Row</button>
             <button type="button" role="menuitem" onClick={() => { const row = rows[rowContextMenu.rowIndex]; if (row) void handleDelete(row); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50">Delete Row</button>
-          </div>
-        </>,
+          </div>,
         document.body,
       )}
     </div>

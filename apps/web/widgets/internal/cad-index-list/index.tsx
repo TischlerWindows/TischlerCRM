@@ -227,8 +227,17 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setRowContextMenu(null)
     }
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (event.button !== 2 && !(event.target as HTMLElement).closest('[data-grid-row-menu]')) {
+        setRowContextMenu(null)
+      }
+    }
     window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
+    document.addEventListener('pointerdown', closeOnPointerDown)
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('pointerdown', closeOnPointerDown)
+    }
   }, [rowContextMenu])
 
   useEffect(() => { setColumnOrder(record?.cadIndexColumnOrder) }, [projectId, record?.cadIndexColumnOrder])
@@ -771,6 +780,9 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const openRowContextMenu = (event: React.MouseEvent<HTMLElement>, rowIndex: number) => {
     event.preventDefault()
     event.stopPropagation()
+    selectingCellsRef.current = false
+    setEditingCellId(null)
+    setSelection({ anchor: { row: rowIndex, column: 0 }, focus: { row: rowIndex, column: columns.length - 1 } })
     setRowContextMenu({ rowIndex, x: event.clientX, y: event.clientY })
   }
 
@@ -1042,8 +1054,8 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
                 </tr>
               )}
               {activeRows.map((row, rowIndex) => (
-                <tr key={row.id} className="hover:bg-brand-navy/5">
-                  <th scope="row" onContextMenu={(event) => openRowContextMenu(event, rowIndex)} className="sticky left-0 z-10 w-9 cursor-context-menu border-b border-r border-gray-100 bg-gray-50 px-1 py-1 text-center font-normal tabular-nums text-gray-400">{rowIndex + 1}</th>
+                <tr key={row.id} onContextMenu={(event) => openRowContextMenu(event, rowIndex)} className="hover:bg-brand-navy/5">
+                  <th scope="row" className={`sticky left-0 z-10 w-9 cursor-context-menu border-b border-r border-gray-100 px-1 py-1 text-center font-normal tabular-nums ${rowContextMenu?.rowIndex === rowIndex ? 'bg-[#e2f0d9] text-gray-700' : 'bg-gray-50 text-gray-400'}`}>{rowIndex + 1}</th>
                   {columns.map((col, colIndex) => {
                     const cellId = `${row.id}:${col.key}`
                     return (
@@ -1162,16 +1174,13 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
       )}
       <GridRangeStyles />
       {rowContextMenu && createPortal(
-        <>
-          <button type="button" aria-label="Close row menu" onClick={() => setRowContextMenu(null)} onContextMenu={(event) => event.preventDefault()} className="fixed inset-0 z-40 cursor-default" />
           <div role="menu" data-grid-row-menu onContextMenu={(event) => event.preventDefault()} style={{ position: 'fixed', left: rowContextMenu.x, top: rowContextMenu.y }} className="z-50 min-w-40 rounded border border-gray-200 bg-white py-1 text-sm shadow-lg">
             <button type="button" role="menuitem" disabled={creating} onClick={() => { void handleInsertRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50">Insert Row Above</button>
             <button type="button" role="menuitem" onClick={() => { void copyRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Copy Row</button>
             <button type="button" role="menuitem" onClick={() => { void copyRow(rowContextMenu.rowIndex, true); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Cut Row</button>
             <button type="button" role="menuitem" disabled={creating} onClick={() => { void pasteRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50">Paste Row</button>
             <button type="button" role="menuitem" onClick={() => { const row = activeRows[rowContextMenu.rowIndex]; if (row) void handleDeleteRow(row); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50">Delete Row</button>
-          </div>
-        </>,
+          </div>,
         document.body,
       )}
     </div>
