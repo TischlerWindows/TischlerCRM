@@ -224,34 +224,37 @@ export function useEditorLifecycle(): EditorLifecycle {
     const sessionId = getLayoutLockSessionId();
     let cancelled = false;
     let ownsLock = false;
-    let heartbeat: number | undefined;
+    let requestPending = false;
     const releaseLayoutLock = () => {
       void apiClient.post(`/layouts/${encodeURIComponent(layoutId)}/unlock`, { sessionId }).catch(() => {});
     };
     const acquireOrRenew = async () => {
-      const result = await requestLayoutLock();
-      // A pending acquisition may resolve after unmount; leave its lease to
-      // expire rather than risk releasing a newer mount's same-session lock.
-      if (cancelled) return;
-      if (!result.ok) {
-        ownsLock = false;
-        setLayoutLock({
-          routeKey,
-          status: result.message.includes('currently being edited by') ? 'locked' : 'error',
-          message: result.message,
-        });
-        return;
+      if (cancelled || requestPending) return;
+      requestPending = true;
+      try {
+        const result = await requestLayoutLock();
+        // A pending acquisition may resolve after unmount; leave its lease to
+        // expire rather than risk releasing a newer mount's same-session lock.
+        if (cancelled) return;
+        if (!result.ok) {
+          ownsLock = false;
+          setLayoutLock({
+            routeKey,
+            status: result.message.includes('currently being edited by') ? 'locked' : 'error',
+            message: result.message,
+          });
+          return;
+        }
+        ownsLock = true;
+        setLayoutLock({ routeKey, status: 'held', message: null });
+      } finally {
+        requestPending = false;
       }
-      ownsLock = true;
-      setLayoutLock({ routeKey, status: 'held', message: null });
     };
 
     setLayoutLock({ routeKey, status: 'checking', message: null });
-    void acquireOrRenew().then(() => {
-      if (!cancelled && ownsLock && heartbeat === undefined) {
-        heartbeat = window.setInterval(() => { void acquireOrRenew(); }, 30_000);
-      }
-    });
+    void acquireOrRenew();
+    const heartbeat = window.setInterval(() => { void acquireOrRenew(); }, 30_000);
 
     const release = () => {
       if (ownsLock) releaseLayoutLock();

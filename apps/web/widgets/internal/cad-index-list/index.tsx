@@ -14,6 +14,7 @@
  * renderer shared by all reports, not one hardcoded layout per report).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertCircle, ChevronLeft, ChevronRight, FileText, GripVertical, ListChecks, Loader2, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
@@ -62,6 +63,8 @@ const REPORT_TYPES = [
 ] as const
 
 type ReportType = typeof REPORT_TYPES[number]
+
+const GRID_ROW_ORDER_KEY = '__gridOrder'
 
 const BASE_UNIT_COLUMNS: ColumnDef[] = [
   { key: 'unit', label: 'Unit', type: 'text' },
@@ -214,8 +217,19 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
   const selectingCellsRef = useRef(false)
   const [selection, setSelection] = useState<GridSelection | null>(null)
   const [copiedSelection, setCopiedSelection] = useState<GridSelection | null>(null)
+  const [rowContextMenu, setRowContextMenu] = useState<{ rowIndex: number; x: number; y: number } | null>(null)
+  const [rowClipboard, setRowClipboard] = useState<string[][] | null>(null)
   const { pushUndo, popUndo, clearUndo } = useGridUndo<RecordData[]>()
   const [editSeed, setEditSeed] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!rowContextMenu) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setRowContextMenu(null)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [rowContextMenu])
 
   useEffect(() => { setColumnOrder(record?.cadIndexColumnOrder) }, [projectId, record?.cadIndexColumnOrder])
   useEffect(() => { setComments(parseCadIndexComments(record?.cadIndexComments)) }, [projectId, record?.cadIndexComments])
@@ -238,7 +252,14 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
 
   const columns = orderedColumns(activeReportType, REPORT_COLUMNS[activeReportType], columnOrder)
   const activeRows = useMemo(
-    () => rows.filter((r) => r.data?.reportType === activeReportType),
+    () => rows.filter((r) => r.data?.reportType === activeReportType).sort((left, right) => {
+      const leftOrder = left.data?.[GRID_ROW_ORDER_KEY]
+      const rightOrder = right.data?.[GRID_ROW_ORDER_KEY]
+      if (typeof leftOrder === 'number' && typeof rightOrder === 'number') return leftOrder - rightOrder
+      if (typeof leftOrder === 'number') return -1
+      if (typeof rightOrder === 'number') return 1
+      return right.createdAt.localeCompare(left.createdAt)
+    }),
     [rows, activeReportType],
   )
 
@@ -720,6 +741,60 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
     }
   }
 
+  const handleInsertRow = async (rowIndex: number) => {
+    if (!projectId) return
+    pushUndo(snapshotGridRows(rows))
+    setCreating(true)
+    setError(null)
+    try {
+      const created = await recordsService.createRecord('CadIndexItem', {
+        data: { project: projectId, reportType: activeReportType },
+      })
+      if (!created) throw new Error('Failed to insert CAD Index row')
+      const nextRows = [...activeRows]
+      nextRows.splice(rowIndex, 0, created)
+      const orderedRows = await Promise.all(nextRows.map(async (row, index) => {
+        const updated = await recordsService.updateRecord('CadIndexItem', row.id, { data: { [GRID_ROW_ORDER_KEY]: index } })
+        if (!updated) throw new Error('Failed to save CAD Index row order')
+        return updated
+      }))
+      const activeRowIds = new Set(activeRows.map((row) => row.id))
+      setRows((previous) => [...previous.filter((row) => !activeRowIds.has(row.id)), ...orderedRows])
+      setSelection(null)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to insert CAD Index row')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const openRowContextMenu = (event: React.MouseEvent<HTMLElement>, rowIndex: number) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setRowContextMenu({ rowIndex, x: event.clientX, y: event.clientY })
+  }
+
+  const copyRow = async (rowIndex: number, cut = false) => {
+    const row = activeRows[rowIndex]
+    if (!row) return
+    const matrix = [columns.map((column) => {
+      const value = row.data?.[column.key]
+      return value === null || value === undefined ? '' : String(value)
+    })]
+    setRowClipboard(matrix)
+    try { await navigator.clipboard.writeText(serializeGridClipboard(matrix)) } catch { /* Keep the in-widget clipboard available. */ }
+    if (cut) void applyClipboardMatrix({ row: rowIndex, column: 0 }, [columns.map(() => '')])
+  }
+
+  const pasteRow = async (rowIndex: number) => {
+    let matrix = rowClipboard
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) matrix = parseGridClipboard(text)
+    } catch { /* Use the last row copied inside this widget. */ }
+    if (matrix?.length) void applyClipboardMatrix({ row: rowIndex, column: 0 }, matrix)
+  }
+
   const handleDeleteRow = async (row: RecordData) => {
     if (!window.confirm('Delete this row? This cannot be undone.')) return
     clearUndo()
@@ -968,7 +1043,7 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
               )}
               {activeRows.map((row, rowIndex) => (
                 <tr key={row.id} className="hover:bg-brand-navy/5">
-                  <th scope="row" className="sticky left-0 z-10 w-9 border-b border-r border-gray-100 bg-gray-50 px-1 py-1 text-center font-normal tabular-nums text-gray-400">{rowIndex + 1}</th>
+                  <th scope="row" onContextMenu={(event) => openRowContextMenu(event, rowIndex)} className="sticky left-0 z-10 w-9 cursor-context-menu border-b border-r border-gray-100 bg-gray-50 px-1 py-1 text-center font-normal tabular-nums text-gray-400">{rowIndex + 1}</th>
                   {columns.map((col, colIndex) => {
                     const cellId = `${row.id}:${col.key}`
                     return (
@@ -1086,6 +1161,19 @@ export default function CadIndexListWidget({ record, object }: WidgetProps) {
         </label>
       )}
       <GridRangeStyles />
+      {rowContextMenu && createPortal(
+        <>
+          <button type="button" aria-label="Close row menu" onClick={() => setRowContextMenu(null)} className="fixed inset-0 z-40 cursor-default" />
+          <div role="menu" data-grid-row-menu onContextMenu={(event) => event.preventDefault()} style={{ position: 'fixed', left: rowContextMenu.x, top: rowContextMenu.y }} className="z-50 min-w-40 rounded border border-gray-200 bg-white py-1 text-sm shadow-lg">
+            <button type="button" role="menuitem" disabled={creating} onClick={() => { void handleInsertRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50">Insert Row Above</button>
+            <button type="button" role="menuitem" onClick={() => { void copyRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Copy Row</button>
+            <button type="button" role="menuitem" onClick={() => { void copyRow(rowContextMenu.rowIndex, true); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Cut Row</button>
+            <button type="button" role="menuitem" disabled={creating} onClick={() => { void pasteRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50">Paste Row</button>
+            <button type="button" role="menuitem" onClick={() => { const row = activeRows[rowContextMenu.rowIndex]; if (row) void handleDeleteRow(row); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50">Delete Row</button>
+          </div>
+        </>,
+        document.body,
+      )}
     </div>
   )
 }

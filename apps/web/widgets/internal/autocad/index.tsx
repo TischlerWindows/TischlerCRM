@@ -105,6 +105,19 @@ const ALL_FIELDS: FieldDef[] = [
   { key: 'totalQty', label: 'Total QTY', type: 'number' },
 ]
 
+const GRID_ROW_ORDER_KEY = '__gridOrder'
+
+function sortAutoCadRows(rows: RecordData[]): RecordData[] {
+  return [...rows].sort((left, right) => {
+    const leftOrder = left.data?.[GRID_ROW_ORDER_KEY]
+    const rightOrder = right.data?.[GRID_ROW_ORDER_KEY]
+    if (typeof leftOrder === 'number' && typeof rightOrder === 'number') return leftOrder - rightOrder
+    if (typeof leftOrder === 'number') return -1
+    if (typeof rightOrder === 'number') return 1
+    return right.createdAt.localeCompare(left.createdAt)
+  })
+}
+
 /** Fixed column widths for the desktop table (via <colgroup>) — with
  * `table-layout: fixed`, columns never resize when a cell's content swaps
  * between its display value and an inline-edit input/select. */
@@ -345,9 +358,20 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
   const [fillDrag, setFillDrag] = useState<FillDrag | null>(null)
   const [selection, setSelection] = useState<GridSelection | null>(null)
   const [copiedSelection, setCopiedSelection] = useState<GridSelection | null>(null)
+  const [rowContextMenu, setRowContextMenu] = useState<{ rowIndex: number; x: number; y: number } | null>(null)
+  const [rowClipboard, setRowClipboard] = useState<string[][] | null>(null)
   const { pushUndo, popUndo, clearUndo } = useGridUndo<RecordData[]>()
   const gridRootRef = useRef<HTMLDivElement>(null)
   const selectingCellsRef = useRef(false)
+
+  useEffect(() => {
+    if (!rowContextMenu) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setRowContextMenu(null)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [rowContextMenu])
 
   const focusGridCell = (coordinate: GridCoordinate) => {
     requestAnimationFrame(() => {
@@ -552,7 +576,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     setLoading(true)
     setError(null)
     try {
-      setRows(await recordsService.getRecords('AutoCad', { filter: { project: recordId } }))
+      setRows(sortAutoCadRows(await recordsService.getRecords('AutoCad', { filter: { project: recordId } })))
       clearUndo()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load AutoCad items')
@@ -655,12 +679,63 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
     setError(null)
     try {
       const created = await recordsService.createRecord('AutoCad', { data: { project: recordId } })
-      if (created) setRows((prev) => [...prev, created])
+      if (created) setRows((prev) => sortAutoCadRows([...prev, created]))
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to add AutoCad row')
     } finally {
       setCreating(false)
     }
+  }
+
+  const handleInsertRow = async (rowIndex: number) => {
+    if (!recordId) return
+    pushUndo(snapshotGridRows(rows))
+    setCreating(true)
+    setError(null)
+    try {
+      const created = await recordsService.createRecord('AutoCad', { data: { project: recordId } })
+      if (!created) throw new Error('Failed to insert AutoCad row')
+      const nextRows = [...rows]
+      nextRows.splice(rowIndex, 0, created)
+      const orderedRows = await Promise.all(nextRows.map(async (row, index) => {
+        const updated = await recordsService.updateRecord('AutoCad', row.id, { data: { [GRID_ROW_ORDER_KEY]: index } })
+        if (!updated) throw new Error('Failed to save AutoCad row order')
+        return updated
+      }))
+      setRows(sortAutoCadRows(orderedRows))
+      setSelection(null)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to insert AutoCad row')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const openRowContextMenu = (event: React.MouseEvent<HTMLElement>, rowIndex: number) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setRowContextMenu({ rowIndex, x: event.clientX, y: event.clientY })
+  }
+
+  const copyRow = async (rowIndex: number, cut = false) => {
+    const row = rows[rowIndex]
+    if (!row) return
+    const matrix = [ALL_FIELDS.map((field) => {
+      const value = row.data?.[field.key]
+      return value === null || value === undefined ? '' : String(value)
+    })]
+    setRowClipboard(matrix)
+    try { await navigator.clipboard.writeText(serializeGridClipboard(matrix)) } catch { /* Keep the in-widget clipboard available. */ }
+    if (cut) void applyClipboardMatrix({ row: rowIndex, column: 0 }, [ALL_FIELDS.map(() => '')])
+  }
+
+  const pasteRow = async (rowIndex: number) => {
+    let matrix = rowClipboard
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) matrix = parseGridClipboard(text)
+    } catch { /* Use the last row copied inside this widget. */ }
+    if (matrix?.length) void applyClipboardMatrix({ row: rowIndex, column: 0 }, matrix)
   }
 
   const handleDelete = async (row: RecordData) => {
@@ -851,7 +926,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
             <tbody>
               {rows.map((row, i) => (
                 <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                  <th scope="row" className="sticky left-0 z-10 w-9 border-b border-r border-gray-100 bg-gray-50 px-1 py-1 text-center font-normal tabular-nums text-gray-400">{i + 1}</th>
+                  <th scope="row" onContextMenu={(event) => openRowContextMenu(event, i)} className="sticky left-0 z-10 w-9 cursor-context-menu border-b border-r border-gray-100 bg-gray-50 px-1 py-1 text-center font-normal tabular-nums text-gray-400">{i + 1}</th>
                   {ALL_FIELDS.map((f, colIndex) => {
                     const cellId = `${row.id}:${f.key}`
                     const selectedBounds = selection ? getGridSelectionBounds(selection) : null
@@ -921,7 +996,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
         <div className="overflow-x-auto rounded-lg border border-gray-200 md:hidden">
           {rows.map((row, rowIndex) => (
             <article key={row.id} className="flex min-w-[48rem] items-center gap-2 border-b border-gray-100 bg-white px-2 py-2 last:border-b-0">
-              <div aria-hidden="true" className="sticky left-0 z-10 flex w-8 shrink-0 items-center justify-center self-stretch border-r border-gray-100 bg-gray-50 text-xs tabular-nums text-gray-400">{rowIndex + 1}</div>
+              <div aria-hidden="true" onContextMenu={(event) => openRowContextMenu(event, rowIndex)} className="sticky left-0 z-10 flex w-8 shrink-0 cursor-context-menu items-center justify-center self-stretch border-r border-gray-100 bg-gray-50 text-xs tabular-nums text-gray-400">{rowIndex + 1}</div>
               {ALL_FIELDS.map((field, colIndex) => {
                 const cellId = `${row.id}:${field.key}`
                 const selectedBounds = selection ? getGridSelectionBounds(selection) : null
@@ -986,6 +1061,19 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
         <span>{savingRowId ? 'Saving…' : ' '}</span>
       </div>
       <GridRangeStyles />
+      {rowContextMenu && createPortal(
+        <>
+          <button type="button" aria-label="Close row menu" onClick={() => setRowContextMenu(null)} className="fixed inset-0 z-40 cursor-default" />
+          <div role="menu" data-grid-row-menu onContextMenu={(event) => event.preventDefault()} style={{ position: 'fixed', left: rowContextMenu.x, top: rowContextMenu.y }} className="z-50 min-w-40 rounded border border-gray-200 bg-white py-1 text-sm shadow-lg">
+            <button type="button" role="menuitem" disabled={creating} onClick={() => { void handleInsertRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50">Insert Row Above</button>
+            <button type="button" role="menuitem" onClick={() => { void copyRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Copy Row</button>
+            <button type="button" role="menuitem" onClick={() => { void copyRow(rowContextMenu.rowIndex, true); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100">Cut Row</button>
+            <button type="button" role="menuitem" disabled={creating} onClick={() => { void pasteRow(rowContextMenu.rowIndex); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left hover:bg-gray-100 disabled:opacity-50">Paste Row</button>
+            <button type="button" role="menuitem" onClick={() => { const row = rows[rowContextMenu.rowIndex]; if (row) void handleDelete(row); setRowContextMenu(null) }} className="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50">Delete Row</button>
+          </div>
+        </>,
+        document.body,
+      )}
     </div>
   )
 }
