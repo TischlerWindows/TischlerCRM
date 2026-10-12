@@ -225,8 +225,15 @@ export function useEditorLifecycle(): EditorLifecycle {
     let cancelled = false;
     let ownsLock = false;
     let requestPending = false;
+    let releaseRequested = false;
     const releaseLayoutLock = () => {
-      void apiClient.post(`/layouts/${encodeURIComponent(layoutId)}/unlock`, { sessionId }).catch(() => {});
+      if (releaseRequested) return;
+      releaseRequested = true;
+      void apiClient.post(
+        `/layouts/${encodeURIComponent(layoutId)}/unlock`,
+        { sessionId },
+        { keepalive: true },
+      ).catch(() => {});
     };
     const acquireOrRenew = async () => {
       if (cancelled || requestPending) return;

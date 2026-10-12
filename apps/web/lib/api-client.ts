@@ -280,8 +280,9 @@ class ApiClient {
     return this.request<T>(endpoint);
   }
 
-  async post<T = any>(endpoint: string, body?: any): Promise<T> {
+  async post<T = any>(endpoint: string, body?: any, options: Pick<RequestInit, 'keepalive'> = {}): Promise<T> {
     return this.request<T>(endpoint, {
+      ...options,
       method: 'POST',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
