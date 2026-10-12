@@ -860,8 +860,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                       tabIndex={selection?.focus.row === i && selection.focus.column === colIndex ? 0 : -1}
                       aria-selected={selection ? isInGridSelection(i, colIndex, selection) : false}
                       onMouseDown={(event) => handleGridCellMouseDown(event, i, colIndex)}
-                      onMouseEnter={() => handleFillDragEnter(i, colIndex)}
-                      onMouseEnterCapture={() => {
+                      onMouseEnter={() => {
+                        handleFillDragEnter(i, colIndex)
                         handleGridCellMouseEnter(i, colIndex)
                       }}
                       onKeyDown={(event) => handleGridKeyDown(event, i, colIndex)}
@@ -929,8 +929,8 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
                   tabIndex={selection?.focus.row === rowIndex && selection.focus.column === colIndex ? 0 : -1}
                   aria-selected={selection ? isInGridSelection(rowIndex, colIndex, selection) : false}
                   onMouseDown={(event) => handleGridCellMouseDown(event, rowIndex, colIndex)}
-                  onMouseEnter={() => handleFillDragEnter(rowIndex, colIndex)}
-                  onMouseEnterCapture={() => {
+                  onMouseEnter={() => {
+                    handleFillDragEnter(rowIndex, colIndex)
                     handleGridCellMouseEnter(rowIndex, colIndex)
                   }}
                   onKeyDown={(event) => handleGridKeyDown(event, rowIndex, colIndex)}
