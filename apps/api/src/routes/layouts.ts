@@ -165,7 +165,7 @@ export async function layoutRoutes(app: FastifyInstance) {
 
     try {
       const result = await prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${LAYOUT_EDITOR_LOCK_KEY}), hashtext(${layoutId}))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${LAYOUT_EDITOR_LOCK_KEY}), hashtext(${layoutId}))`;
 
         const setting = await tx.setting.findUnique({ where: { key: LAYOUT_EDITOR_LOCK_KEY } });
         const locks = readLayoutEditorLocks(setting?.value);
@@ -215,7 +215,7 @@ export async function layoutRoutes(app: FastifyInstance) {
 
     try {
       await prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${LAYOUT_EDITOR_LOCK_KEY}), hashtext(${layoutId}))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${LAYOUT_EDITOR_LOCK_KEY}), hashtext(${layoutId}))`;
 
         const setting = await tx.setting.findUnique({ where: { key: LAYOUT_EDITOR_LOCK_KEY } });
         const locks = readLayoutEditorLocks(setting?.value);
