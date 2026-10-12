@@ -831,6 +831,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
         <div className="hidden overflow-x-auto rounded-lg border border-gray-200 md:block">
           <table role="grid" aria-label="AutoCad fastener spreadsheet" aria-multiselectable="true" className="w-full table-fixed text-sm border-collapse">
             <colgroup>
+              <col style={{ width: '2.25rem' }} />
               {ALL_FIELDS.map((f) => (
                 <col key={f.key} style={{ width: getColWidthRem(f.key) }} />
               ))}
@@ -838,6 +839,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
             </colgroup>
             <thead className="bg-gray-100">
               <tr>
+                <th scope="col" className="sticky left-0 z-20 w-9 border-b border-r border-gray-200 bg-gray-100 px-1 py-1 text-center font-medium text-gray-400">#</th>
                 {ALL_FIELDS.map((f) => (
                   <th key={f.key} className="px-1.5 py-1 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-normal break-words">
                     {f.label}
@@ -849,6 +851,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
             <tbody>
               {rows.map((row, i) => (
                 <tr key={row.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <th scope="row" className="sticky left-0 z-10 w-9 border-b border-r border-gray-100 bg-gray-50 px-1 py-1 text-center font-normal tabular-nums text-gray-400">{i + 1}</th>
                   {ALL_FIELDS.map((f, colIndex) => {
                     const cellId = `${row.id}:${f.key}`
                     const selectedBounds = selection ? getGridSelectionBounds(selection) : null
@@ -918,6 +921,7 @@ export default function AutoCadWidget({ record, object }: WidgetProps) {
         <div className="overflow-x-auto rounded-lg border border-gray-200 md:hidden">
           {rows.map((row, rowIndex) => (
             <article key={row.id} className="flex min-w-[48rem] items-center gap-2 border-b border-gray-100 bg-white px-2 py-2 last:border-b-0">
+              <div aria-hidden="true" className="sticky left-0 z-10 flex w-8 shrink-0 items-center justify-center self-stretch border-r border-gray-100 bg-gray-50 text-xs tabular-nums text-gray-400">{rowIndex + 1}</div>
               {ALL_FIELDS.map((field, colIndex) => {
                 const cellId = `${row.id}:${field.key}`
                 const selectedBounds = selection ? getGridSelectionBounds(selection) : null
