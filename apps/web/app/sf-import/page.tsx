@@ -11,6 +11,10 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import type { FieldDef, ObjectDef } from '@/lib/schema';
+import {
+  buildPropertyImportDataFromOpportunity,
+  isSalesforceProjectAddressColumn,
+} from '@/lib/salesforce-opportunity-property';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -170,6 +174,7 @@ function autoMap(
   const usedApiNames = new Set<string>();
 
   for (const header of headers) {
+    if (objectApiName === 'Opportunity' && isSalesforceProjectAddressColumn(header)) continue;
     const key = header.toLowerCase().replace(/[^a-z0-9]/g, '');
 
     // First: try to match against CompositeText sub-fields (exact on bare apiName or label)
@@ -438,8 +443,88 @@ export default function SalesforceImportPage() {
 
       setImportProgress((prev) => ({ ...prev, [objectApiName]: 0 }));
 
+      const generatedPropertyIds = new Map<number, string>();
+      const failedPropertyRows = new Map<number, string>();
+      const generatedPropertyErrors: Array<{ row: number; error: string }> = [];
+      let generatedProperties = 0;
+
+      if (objectApiName === 'Opportunity') {
+        const propertyRows: Array<{ opportunityRowIndex: number; token: string; record: Record<string, unknown> }> = [];
+        entry.rows.forEach((row, opportunityRowIndex) => {
+          const property = buildPropertyImportDataFromOpportunity(row);
+          if (property.status === 'empty') return;
+          if (property.status === 'invalid') {
+            failedPropertyRows.set(opportunityRowIndex, property.error);
+            generatedPropertyErrors.push({ row: opportunityRowIndex + 1, error: property.error });
+            return;
+          }
+          const token = `generated-property-${crypto.randomUUID()}`;
+          propertyRows.push({
+            opportunityRowIndex,
+            token,
+            record: { ...property.data, __sfId: token },
+          });
+        });
+
+        const PROPERTY_BATCH_SIZE = 500;
+        for (let offset = 0; offset < propertyRows.length; offset += PROPERTY_BATCH_SIZE) {
+          const batch = propertyRows.slice(offset, offset + PROPERTY_BATCH_SIZE);
+          try {
+            const result = await apiClient.importRecords('Property', batch.map(({ record }) => record));
+            generatedProperties += result.created;
+            const importedRows = new Set<number>();
+            for (const [token, propertyId] of Object.entries(result.idMap ?? {})) {
+              const imported = batch.find((item) => item.token === token);
+              if (!imported) continue;
+              generatedPropertyIds.set(imported.opportunityRowIndex, propertyId);
+              importedRows.add(imported.opportunityRowIndex);
+            }
+            for (const error of result.errors) {
+              const imported = batch[error.row - 1];
+              if (!imported) continue;
+              const message = `Property creation failed: ${error.error}`;
+              failedPropertyRows.set(imported.opportunityRowIndex, message);
+              generatedPropertyErrors.push({ row: imported.opportunityRowIndex + 1, error: message });
+            }
+            for (const imported of batch) {
+              if (importedRows.has(imported.opportunityRowIndex) || failedPropertyRows.has(imported.opportunityRowIndex)) continue;
+              const message = 'Property creation failed: no imported Property ID was returned';
+              failedPropertyRows.set(imported.opportunityRowIndex, message);
+              generatedPropertyErrors.push({ row: imported.opportunityRowIndex + 1, error: message });
+            }
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Property import batch failed';
+            for (const imported of batch) {
+              failedPropertyRows.set(imported.opportunityRowIndex, `Property creation failed: ${message}`);
+              generatedPropertyErrors.push({ row: imported.opportunityRowIndex + 1, error: `Property creation failed: ${message}` });
+            }
+          }
+        }
+
+        if (propertyRows.length || generatedPropertyErrors.length) {
+          const propertyResult = allResults.find((result) => result.objectApiName === 'Property');
+          if (propertyResult) {
+            propertyResult.created += generatedProperties;
+            propertyResult.errors.push(...generatedPropertyErrors);
+          } else {
+            const propertyDef = crmObjects.find((object) => object.apiName === 'Property');
+            allResults.push({
+              objectApiName: 'Property',
+              objectLabel: propertyDef?.label ?? 'Property',
+              created: generatedProperties,
+              errors: generatedPropertyErrors,
+              idMap: {},
+            });
+          }
+          setImportProgress((prev) => ({ ...prev, Property: 100 }));
+        }
+      }
+
       // Build records — apply column mapping and substitute SF ids with CRM ids
-      const records = entry.rows.map((row) => {
+      const sourceRows = entry.rows
+        .map((row, sourceIndex) => ({ row, sourceIndex }))
+        .filter(({ sourceIndex }) => !failedPropertyRows.has(sourceIndex));
+      const records = sourceRows.map(({ row, sourceIndex }) => {
         const mapped: Record<string, any> = {};
         for (const [csvCol, targetField] of Object.entries(entry.columnMapping)) {
           if (!targetField || targetField === '__skip__') continue;
@@ -477,6 +562,8 @@ export default function SalesforceImportPage() {
             : val;              // raw value (CRM UUID, text, etc.)
           mapped[`${objectApiName}__${targetField}`] = resolvedVal;
         }
+        const generatedPropertyId = generatedPropertyIds.get(sourceIndex);
+        if (generatedPropertyId) mapped['Opportunity__property'] = generatedPropertyId;
         return mapped;
       });
 
@@ -484,19 +571,22 @@ export default function SalesforceImportPage() {
       const BATCH_SIZE = 500;
       const totalBatches = Math.ceil(records.length / BATCH_SIZE);
       let totalCreated = 0;
-      const allErrors: Array<{ row: number; error: string }> = [];
+      const allErrors: Array<{ row: number; error: string }> = Array.from(failedPropertyRows, ([rowIndex, error]) => ({
+        row: rowIndex + 1,
+        error: `Opportunity skipped: ${error}`,
+      }));
 
       for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
         const batch = records.slice(batchIdx * BATCH_SIZE, (batchIdx + 1) * BATCH_SIZE);
         const offset = batchIdx * BATCH_SIZE;
 
         // Build the corresponding raw rows for this batch to extract SF ids
-        const rawBatch = entry.rows.slice(offset, offset + batch.length);
+        const rawBatch = sourceRows.slice(offset, offset + batch.length);
 
         // Add sfId → row mapping so the API can return idMap
         if (entry.sfIdColumn) {
           batch.forEach((rec, i) => {
-            const sfId = rawBatch[i]?.[entry.sfIdColumn!];
+            const sfId = rawBatch[i]?.row[entry.sfIdColumn!];
             if (sfId) (rec as any).__sfId = sfId;
           });
         }
@@ -511,11 +601,13 @@ export default function SalesforceImportPage() {
           }
 
           for (const err of result.errors) {
-            allErrors.push({ row: err.row + offset, error: err.error });
+            const sourceIndex = sourceRows[offset + err.row - 1]?.sourceIndex ?? offset + err.row - 1;
+            allErrors.push({ row: sourceIndex + 1, error: err.error });
           }
         } catch (err: any) {
           for (let i = 0; i < batch.length; i++) {
-            allErrors.push({ row: offset + i + 1, error: err.message || 'Batch failed' });
+            const sourceIndex = sourceRows[offset + i]?.sourceIndex ?? offset + i;
+            allErrors.push({ row: sourceIndex + 1, error: err.message || 'Batch failed' });
           }
         }
 
@@ -625,7 +717,7 @@ export default function SalesforceImportPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-1">Upload Salesforce CSV Exports</h2>
               <p className="text-sm text-gray-500 mb-6">
-                Upload one CSV per Salesforce object (Account, Contact, Opportunity, etc.). Each file must include the Salesforce <code className="bg-gray-100 px-1 rounded">Id</code> column so related records can be linked.
+                Upload one CSV per Salesforce object (Account, Contact, Opportunity, etc.). Each file must include the Salesforce <code className="bg-gray-100 px-1 rounded">Id</code> column so related records can be linked. Opportunity exports with Project Addresses city, postal code, state, country, and geocoding fields automatically create and link a Property record.
               </p>
 
               <div
