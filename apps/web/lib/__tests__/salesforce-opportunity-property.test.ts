@@ -1,10 +1,18 @@
 import {
   buildPropertyImportDataFromOpportunity,
+  GENERATED_PROPERTY_FIELD_MAPPINGS,
   geocodeMissingPropertyCoordinates,
   isSalesforceProjectAddressColumn,
 } from '../salesforce-opportunity-property'
 
 describe('Salesforce Opportunity Property address mapping', () => {
+  it('shows the generated Property lookup as the final mapping row', () => {
+    expect(GENERATED_PROPERTY_FIELD_MAPPINGS.at(-1)).toEqual({
+      source: 'Generated Property',
+      target: 'Opportunity Property lookup (Opportunity__property)',
+    })
+  })
+
   it('builds required Property fields and preserves Salesforce geocoding data', () => {
     expect(buildPropertyImportDataFromOpportunity({
       Project_Addresses__Street__s: '123 Main Street',

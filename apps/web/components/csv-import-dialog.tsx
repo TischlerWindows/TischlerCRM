@@ -582,7 +582,7 @@ export default function CsvImportDialog({
                 <div role="tabpanel" className="overflow-hidden rounded-lg border border-gray-200">
                   <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
                     <h3 className="text-sm font-semibold text-gray-900">Generated Property records</h3>
-                    <p className="mt-1 text-xs text-gray-500">Created from each Opportunity&apos;s Project Address and linked automatically. Missing coordinates are looked up with the configured Google Maps integration; failed lookups are reported without blocking the import.</p>
+                    <p className="mt-1 text-xs text-gray-500">Created from each Opportunity&apos;s Project Address. The generated Property is written to the Opportunity&apos;s Property lookup. Missing coordinates are looked up with the configured Google Maps integration; failed lookups are reported without blocking the import.</p>
                   </div>
                   <div className="divide-y divide-gray-200">
                     {GENERATED_PROPERTY_FIELD_MAPPINGS.map((mapping) => (

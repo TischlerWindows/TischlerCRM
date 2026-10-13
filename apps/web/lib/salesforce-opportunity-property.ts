@@ -14,6 +14,7 @@ export const GENERATED_PROPERTY_FIELD_MAPPINGS = [
   { source: 'Project_Addresses__Latitude__s', target: 'Address Latitude' },
   { source: 'Project_Addresses__Longitude__s', target: 'Address Longitude' },
   { source: 'Project_Addresses__GeocodeAccuracy__s', target: 'Address Geocode Accuracy' },
+  { source: 'Generated Property', target: 'Opportunity Property lookup (Opportunity__property)' },
 ]
 
 const SALESFORCE_ADDRESS_FIELDS = {

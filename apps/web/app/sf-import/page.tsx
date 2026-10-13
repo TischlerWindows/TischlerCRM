@@ -946,7 +946,7 @@ export default function SalesforceImportPage() {
                 <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
                   <div>
                     <h3 className="font-medium text-gray-800">Generated Property records</h3>
-                    <p className="mt-1 text-sm text-gray-500">Created from Project Address fields in each Opportunity and linked before Opportunity import. Missing coordinates are looked up with the configured Google Maps integration; failed lookups are reported without blocking the import.</p>
+                    <p className="mt-1 text-sm text-gray-500">Created from Project Address fields in each Opportunity. The generated Property is written to the Opportunity&apos;s Property lookup. Missing coordinates are looked up with the configured Google Maps integration; failed lookups are reported without blocking the import.</p>
                   </div>
                   <span className="text-sm text-gray-500">{generatedPropertyAddressCounts.ready} generated</span>
                 </div>
@@ -954,7 +954,7 @@ export default function SalesforceImportPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b border-gray-100">
                       <tr>
-                        <th className="px-4 py-3 text-left font-medium text-gray-600">Salesforce Opportunity column</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600">Source / generated record</th>
                         <th className="px-4 py-3 text-left font-medium text-gray-600">Generated Property field</th>
                       </tr>
                     </thead>
