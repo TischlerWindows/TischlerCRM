@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useMemo, useCallback } from 'react';
-                    <option value={ACCOUNT_TYPE_LEAVE_BLANK}>Leave blank</option>
 import Papa from 'papaparse';
 import {
   X, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, Check,
@@ -9,14 +8,16 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
+import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
+import { PicklistValueMapping } from '@/components/picklist-value-mapping';
+import { SalesforceImportTemplateControls } from '@/components/salesforce-import-template-controls';
 import {
-  ACCOUNT_TYPE_LEAVE_BLANK,
-  getDefaultAccountTypeMapping,
-  getMappedSalesforceAccountTypeValue,
-  getSalesforceAccountTypeValues,
-  getSalesforceAccountTypeTarget,
-  mirrorAccountTypeImportAliases,
-} from '@/lib/salesforce-account-import';
+  getDefaultPicklistTarget,
+  getDistinctPicklistSourceValues,
+  PICKLIST_LEAVE_BLANK,
+  resolvePicklistImportValue,
+  type SalesforceImportTemplateConfig,
+} from '@/lib/salesforce-import-templates';
 import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
@@ -51,7 +52,7 @@ export default function CsvImportDialog({
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
-  const [accountTypeValueMappings, setAccountTypeValueMappings] = useState<Record<string, string>>({});
+  const [picklistValueMappings, setPicklistValueMappings] = useState<Record<string, Record<string, string>>>({});
   const [showPropertyMapping, setShowPropertyMapping] = useState(false);
   const [propertyLookupField, setPropertyLookupField] = useState('property');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -88,14 +89,12 @@ export default function CsvImportDialog({
   const selectedPropertyLookupField = propertyLookupFields.some((field) => field.apiName === propertyLookupField)
     ? propertyLookupField
     : propertyLookupFields.find((field) => field.apiName === 'property')?.apiName ?? propertyLookupFields[0]?.apiName ?? '';
-  const accountTypeField = targetFields.find((field) => field.apiName.toLowerCase() === 'accounttype');
-
   const reset = useCallback(() => {
     setStep('upload');
     setCsvHeaders([]);
     setCsvRows([]);
     setColumnMapping({});
-    setAccountTypeValueMappings({});
+    setPicklistValueMappings({});
     setShowPropertyMapping(false);
     setPropertyLookupField('property');
     setImportResult(null);
@@ -245,6 +244,7 @@ export default function CsvImportDialog({
         setCsvHeaders(headers);
         setCsvRows(rows);
         setColumnMapping(autoMapColumns(headers));
+        setPicklistValueMappings({});
         setStep('mapping');
       },
       error: (err: Error) => {
@@ -266,19 +266,23 @@ export default function CsvImportDialog({
 
   // Count how many columns are mapped
   const mappedCount = Object.values(columnMapping).filter(v => v !== '' && v !== '__skip__').length;
-  const accountTypeSourceValues = objectApiName === 'Account'
-    ? getSalesforceAccountTypeValues(csvRows, columnMapping)
-    : [];
-  const accountTypeRowsMissingMapping = objectApiName === 'Account'
-    ? csvRows.filter((row) => {
-      const sourceValue = getMappedSalesforceAccountTypeValue(row, columnMapping);
-      return !(accountTypeValueMappings[sourceValue] ?? getDefaultAccountTypeMapping(sourceValue, accountTypeField?.picklistValues ?? []));
-    }).length
-    : 0;
+  const picklistMappingColumns = csvHeaders.flatMap((header) => {
+    const field = targetFields.find((target) => target.apiName === columnMapping[header] && target.type === 'Picklist');
+    return field ? [{ header, field }] : [];
+  });
+  const unmappedPicklistValueCount = picklistMappingColumns.reduce((total, { header, field }) =>
+    total + getDistinctPicklistSourceValues(csvRows, header).filter((sourceValue) =>
+      !resolvePicklistImportValue(sourceValue, picklistValueMappings[header] ?? {}, field.picklistValues).resolved,
+    ).length, 0)
+  const templateConfig: SalesforceImportTemplateConfig = {
+    columnMapping,
+    picklistValueMappings,
+    propertyLookupField,
+  }
   const requiredMapped = targetFields
     .filter(f => f.required && !f.isAutoNumber)
     .every((field) => Object.values(columnMapping).includes(field.apiName)
-      || (objectApiName === 'Account' && field.apiName.toLowerCase() === 'accounttype' && accountTypeRowsMissingMapping === 0));
+      || (objectApiName === 'Account' && field.apiName.toLowerCase() === 'accounttype' && unmappedPicklistValueCount === 0));
 
   // Build preview data with mapped column names
   const previewRows = useMemo(() => {
@@ -320,8 +324,8 @@ export default function CsvImportDialog({
   }, [csvRows, objectApiName]);
 
   const handleImport = async () => {
-    if (objectApiName === 'Account' && accountTypeRowsMissingMapping > 0) {
-      setParseError('Map every Salesforce Account Type value to a CRM Account Type or choose Leave blank.');
+    if (unmappedPicklistValueCount > 0) {
+      setParseError('Map every source value for mapped Picklist columns to a CRM value or choose Leave blank.');
       setStep('mapping');
       return;
     }
@@ -414,19 +418,24 @@ export default function CsvImportDialog({
       for (const [csvCol, targetField] of Object.entries(columnMapping)) {
         if (targetField && targetField !== '__skip__') {
           const val = row[csvCol];
-          if (val !== undefined && val !== null && val !== '') {
+          const target = targetFields.find((field) => field.apiName === targetField);
+          if (target?.type === 'Picklist') {
+            const sourceValue = val?.trim() ?? '';
+            const fieldMappings = picklistValueMappings[csvCol] ?? {};
+            const selectedValue = Object.prototype.hasOwnProperty.call(fieldMappings, sourceValue)
+              ? fieldMappings[sourceValue]
+              : getDefaultPicklistTarget(sourceValue, target.picklistValues);
+            const resolved = resolvePicklistImportValue(sourceValue, fieldMappings, target.picklistValues);
+            if (!resolved.resolved) continue;
+            if (!resolved.value) {
+              if (objectApiName === 'Account' && target.apiName.toLowerCase() === 'accounttype'
+                && selectedValue === PICKLIST_LEAVE_BLANK) mapped.__allowBlankAccountType = true;
+              continue;
+            }
+            mapped[targetField] = resolved.value;
+          } else if (val !== undefined && val !== null && val !== '') {
             mapped[targetField] = val;
           }
-        }
-      }
-      if (objectApiName === 'Account') {
-        const sourceAccountType = getMappedSalesforceAccountTypeValue(row, columnMapping);
-        const targetAccountType = accountTypeValueMappings[sourceAccountType]
-          ?? getDefaultAccountTypeMapping(sourceAccountType, accountTypeField?.picklistValues ?? []);
-        if (targetAccountType === ACCOUNT_TYPE_LEAVE_BLANK) {
-          mapped.__allowBlankAccountType = true;
-        } else if (targetAccountType) {
-          mapped.Account__accountType = targetAccountType;
         }
       }
       mirrorAccountTypeImportAliases(objectApiName, mapped);
@@ -637,48 +646,30 @@ export default function CsvImportDialog({
                 </p>
                 {!showPropertyMapping && (
                   <button
-                    onClick={() => setColumnMapping(autoMapColumns(csvHeaders))}
+                    onClick={() => {
+                      setColumnMapping(autoMapColumns(csvHeaders))
+                      setPicklistValueMappings({})
+                    }}
                     className="text-sm text-brand-navy hover:text-brand-dark font-medium"
                   >
                     Auto-map columns
                   </button>
                 )}
               </div>
-              {objectApiName === 'Account' && accountTypeSourceValues.length > 0 && (
-                <div className="overflow-hidden rounded-lg border border-amber-200 bg-amber-50">
-                  <div className="border-b border-amber-200 px-4 py-3">
-                    <h3 className="text-sm font-medium text-amber-900">Map Salesforce Account Type values</h3>
-                    <p className="mt-1 text-xs text-amber-800">Choose the CRM Account Type for each distinct Salesforce value. Blank source values default to Leave blank.</p>
-                  </div>
-                  <div className="divide-y divide-amber-100">
-                    {accountTypeSourceValues.map((sourceValue) => {
-                      const selectedValue = accountTypeValueMappings[sourceValue]
-                        ?? getDefaultAccountTypeMapping(sourceValue, accountTypeField?.picklistValues ?? []);
-                      return (
-                        <div key={sourceValue || '__blank__'} className="grid grid-cols-2 items-center gap-4 px-4 py-3">
-                          <span className="text-sm font-medium text-gray-800">{sourceValue || '(blank value)'}</span>
-                          <select
-                            aria-label={`CRM Account Type for ${sourceValue || 'blank Salesforce value'}`}
-                            value={selectedValue}
-                            onChange={(event) => setAccountTypeValueMappings((previous) => ({ ...previous, [sourceValue]: event.target.value }))}
-                            className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800"
-                          >
-                            <option value="">— Map to a CRM value —</option>
-                            <option value={ACCOUNT_TYPE_LEAVE_BLANK}>Leave blank</option>
-                            {(accountTypeField?.picklistValues ?? []).map((value) => (
-                              <option key={value} value={value}>{value}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {accountTypeRowsMissingMapping > 0 && (
-                    <p className="border-t border-amber-200 px-4 py-2 text-xs text-amber-800">
-                      Map {accountTypeRowsMissingMapping} row{accountTypeRowsMissingMapping === 1 ? '' : 's'} before importing.
-                    </p>
-                  )}
-                </div>
+              <SalesforceImportTemplateControls
+                objectApiName={objectApiName}
+                config={templateConfig}
+                onApply={(config) => {
+                  setColumnMapping(config.columnMapping)
+                  setPicklistValueMappings(config.picklistValueMappings)
+                  setPropertyLookupField(config.propertyLookupField ?? 'property')
+                }}
+              />
+
+              {unmappedPicklistValueCount > 0 && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  Map every source value for mapped Picklist columns before importing.
+                </p>
               )}
 
               {showPropertyMapping ? (
@@ -726,6 +717,7 @@ export default function CsvImportDialog({
               <div role="tabpanel" className="border border-gray-200 rounded-lg divide-y divide-gray-200">
                 {csvHeaders.map(header => {
                   const sampleValues = csvRows.slice(0, 3).map(r => r[header]).filter(Boolean);
+                  const targetField = targetFields.find((field) => field.apiName === columnMapping[header]);
                   return (
                     <div key={header} className="flex items-center gap-4 p-4">
                       <div className="flex-1 min-w-0">
@@ -740,7 +732,10 @@ export default function CsvImportDialog({
                       <div className="flex-1">
                         <select
                           value={columnMapping[header] || '__skip__'}
-                          onChange={e => setColumnMapping({ ...columnMapping, [header]: e.target.value })}
+                          onChange={e => {
+                            setColumnMapping({ ...columnMapping, [header]: e.target.value })
+                            setPicklistValueMappings((previous) => ({ ...previous, [header]: {} }))
+                          }}
                           className={`w-full border rounded-lg px-3 py-2 text-sm ${
                             columnMapping[header] && columnMapping[header] !== '__skip__'
                               ? 'border-green-300 bg-green-50 text-green-900'
@@ -757,6 +752,18 @@ export default function CsvImportDialog({
                             ))
                           }
                         </select>
+                        {targetField?.type === 'Picklist' && (
+                          <PicklistValueMapping
+                            column={header}
+                            rows={csvRows}
+                            options={targetField.picklistValues}
+                            mappings={picklistValueMappings[header] ?? {}}
+                            onChange={(sourceValue, targetValue) => setPicklistValueMappings((previous) => ({
+                              ...previous,
+                              [header]: { ...(previous[header] ?? {}), [sourceValue]: targetValue },
+                            }))}
+                          />
+                        )}
                       </div>
                     </div>
                   );
@@ -925,7 +932,7 @@ export default function CsvImportDialog({
             {step === 'mapping' && (
               <button
                 onClick={() => setStep('preview')}
-                disabled={mappedCount === 0}
+                disabled={mappedCount === 0 || unmappedPicklistValueCount > 0}
                 className="inline-flex items-center px-4 py-2 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Preview
@@ -936,7 +943,7 @@ export default function CsvImportDialog({
               <button
                 onClick={handleImport}
                 disabled={(objectApiName === 'Opportunity' && !selectedPropertyLookupField)
-                  || (objectApiName === 'Account' && accountTypeRowsMissingMapping > 0)}
+                  || unmappedPicklistValueCount > 0}
                 className="inline-flex items-center px-4 py-2 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
               >
                 <Upload className="w-4 h-4 mr-1.5" />

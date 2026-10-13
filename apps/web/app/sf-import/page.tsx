@@ -10,14 +10,18 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
-import type { FieldDef, ObjectDef } from '@/lib/schema';
+import type { ObjectDef } from '@/lib/schema';
 import {
-  ACCOUNT_TYPE_LEAVE_BLANK,
-  getDefaultAccountTypeMapping,
-  getMappedSalesforceAccountTypeValue,
   getSalesforceAccountTypeTarget,
   mirrorAccountTypeImportAliases,
 } from '@/lib/salesforce-account-import';
+import { PicklistValueMapping } from '@/components/picklist-value-mapping';
+import { SalesforceImportTemplateControls } from '@/components/salesforce-import-template-controls';
+import {
+  getDefaultPicklistTarget,
+  getDistinctPicklistSourceValues,
+  resolvePicklistImportValue,
+} from '@/lib/salesforce-import-templates';
 import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
@@ -94,6 +98,8 @@ interface FileEntry {
   detectedObject: string | null;
   /** Column → CRM field apiName mapping ('' = skip) */
   columnMapping: Record<string, string>;
+  /** Source string → CRM option for each mapped Picklist column. */
+  picklistValueMappings: Record<string, Record<string, string>>;
   /** Which column holds the Salesforce record Id */
   sfIdColumn: string | null;
 }
@@ -156,6 +162,7 @@ function autoMap(
       apiName: f.apiName.replace(`${objectApiName}__`, ''),
       label: f.label,
       type: (f as any).type,
+      picklistValues: f.picklistValues ?? [],
     }));
 
   // Sub-field entries from CompositeText fields (e.g. Salutation / FirstName / LastName of Name).
@@ -164,7 +171,7 @@ function autoMap(
   const subEntries: SubEntry[] = [];
   for (const f of objectDef.fields) {
     if ((f as any).type !== 'CompositeText') continue;
-    const subFields: Array<{ apiName: string; label: string }> = (f as any).subFields ?? [];
+    const subFields: Array<{ apiName: string; label: string; type: string; picklistValues?: string[] }> = (f as any).subFields ?? [];
     if (!subFields.length) continue;
     const parentBare = f.apiName.replace(`${objectApiName}__`, '');
     for (const sf of subFields) {
@@ -263,11 +270,9 @@ export default function SalesforceImportPage() {
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const [showGeneratedPropertyTab, setShowGeneratedPropertyTab] = useState(false);
   const [propertyLookupField, setPropertyLookupField] = useState('property');
-  const [accountTypeValueMappings, setAccountTypeValueMappings] = useState<Record<string, string>>({});
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [importProgress, setImportProgress] = useState<Record<string, number>>({});
   const [results, setResults] = useState<ObjectResult[]>([]);
-  const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
 
@@ -275,27 +280,6 @@ export default function SalesforceImportPage() {
   const opportunityEntries = useMemo(
     () => files.filter((entry) => entry.detectedObject === 'Opportunity'),
     [files],
-  );
-  const accountTypeOptions = useMemo(() => {
-    const account = crmObjects.find((object) => object.apiName === 'Account');
-    const accountTypeField = account?.fields.find((field) => field.apiName.toLowerCase().replace(/^account__/, '') === 'accounttype');
-    return accountTypeField?.picklistValues ?? [];
-  }, [crmObjects]);
-  const accountTypeSourceValues = useMemo(
-    () => Array.from(new Set(files
-      .filter((entry) => entry.detectedObject === 'Account')
-      .flatMap((entry) => entry.rows.map((row) => getMappedSalesforceAccountTypeValue(row, entry.columnMapping)))))
-      .sort((left, right) => left === '' ? -1 : right === '' ? 1 : left.localeCompare(right)),
-    [files],
-  );
-  const accountRowsMissingType = useMemo(
-    () => files
-      .filter((entry) => entry.detectedObject === 'Account')
-      .reduce((total, entry) => total + entry.rows.filter((row) => {
-        const sourceValue = getMappedSalesforceAccountTypeValue(row, entry.columnMapping);
-        return !(accountTypeValueMappings[sourceValue] ?? getDefaultAccountTypeMapping(sourceValue, accountTypeOptions));
-      }).length, 0),
-    [files, accountTypeValueMappings, accountTypeOptions],
   );
   const propertyLookupFields = useMemo(() => {
     const opportunity = crmObjects.find((object) => object.apiName === 'Opportunity');
@@ -312,6 +296,21 @@ export default function SalesforceImportPage() {
   const selectedPropertyLookupField = propertyLookupFields.some((field) => field.apiName === propertyLookupField)
     ? propertyLookupField
     : propertyLookupFields.find((field) => field.apiName === 'property')?.apiName ?? propertyLookupFields[0]?.apiName ?? '';
+  const unmappedPicklistValueCount = useMemo(() => files.reduce((total, entry) => {
+    if (!entry.detectedObject) return total
+    const objectDef = crmObjects.find((object) => object.apiName === entry.detectedObject)
+    return total + entry.headers.reduce((fileTotal, header) => {
+      const targetApiName = entry.columnMapping[header]
+      const field = objectDef?.fields.find((candidate) =>
+        candidate.apiName.replace(`${entry.detectedObject}__`, '') === targetApiName
+        && candidate.type === 'Picklist',
+      )
+      if (!field) return fileTotal
+      return fileTotal + getDistinctPicklistSourceValues(entry.rows, header).filter((sourceValue) =>
+        !resolvePicklistImportValue(sourceValue, entry.picklistValueMappings[header] ?? {}, field.picklistValues ?? []).resolved,
+      ).length
+    }, 0)
+  }, 0), [files, crmObjects])
 
   // ── File handling ──────────────────────────────────────────────
 
@@ -353,6 +352,7 @@ export default function SalesforceImportPage() {
               rows,
               detectedObject,
               columnMapping: rawMapping,
+              picklistValueMappings: {},
               sfIdColumn,
             });
           },
@@ -437,6 +437,7 @@ export default function SalesforceImportPage() {
         const mapping = autoMap(entry.headers, objectDef, objectApiName);
         if (entry.sfIdColumn) delete mapping[entry.sfIdColumn];
         entry.columnMapping = mapping;
+        entry.picklistValueMappings = {};
       }
       updated[idx] = entry;
       return updated;
@@ -461,10 +462,23 @@ export default function SalesforceImportPage() {
       const updated = [...prev];
       const entry = { ...updated[fileIdx]! };
       entry.columnMapping = { ...entry.columnMapping, [csvCol]: targetField };
+      entry.picklistValueMappings = { ...entry.picklistValueMappings, [csvCol]: {} };
       updated[fileIdx] = entry;
       return updated;
     });
   };
+
+  const updatePicklistValueMapping = (fileIdx: number, csvCol: string, sourceValue: string, targetValue: string) => {
+    setFiles((previous) => previous.map((entry, index) => index === fileIdx
+      ? {
+          ...entry,
+          picklistValueMappings: {
+            ...entry.picklistValueMappings,
+            [csvCol]: { ...(entry.picklistValueMappings[csvCol] ?? {}), [sourceValue]: targetValue },
+          },
+        }
+      : entry))
+  }
 
   const removeFile = (idx: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== idx));
@@ -485,8 +499,8 @@ export default function SalesforceImportPage() {
   // ── Run import ────────────────────────────────────────────────
 
   const runImport = useCallback(async () => {
-    if (accountRowsMissingType > 0) {
-      setParseErrors([`Map every Salesforce Account Type value to a CRM value or choose Leave blank.`]);
+    if (unmappedPicklistValueCount > 0) {
+      setParseErrors(['Map every source value for mapped Picklist columns to a CRM value or choose Leave blank.']);
       setStep('map');
       return;
     }
@@ -496,7 +510,6 @@ export default function SalesforceImportPage() {
       setStep('map');
       return;
     }
-    setIsImporting(true);
     setStep('import');
     setImportProgress({});
 
@@ -607,8 +620,27 @@ export default function SalesforceImportPage() {
         const mapped: Record<string, any> = {};
         for (const [csvCol, targetField] of Object.entries(entry.columnMapping)) {
           if (!targetField || targetField === '__skip__') continue;
-          const val = row[csvCol];
-          if (val === undefined || val === null || val === '') continue;
+          const val = row[csvCol] ?? '';
+          const picklistField = objectDef?.fields.find((field) =>
+            field.apiName.replace(`${objectApiName}__`, '') === targetField && field.type === 'Picklist',
+          );
+          if (picklistField) {
+            const sourceValue = val.trim();
+            const fieldMappings = entry.picklistValueMappings[csvCol] ?? {};
+            const selectedValue = Object.prototype.hasOwnProperty.call(fieldMappings, sourceValue)
+              ? fieldMappings[sourceValue]
+              : getDefaultPicklistTarget(sourceValue, picklistField.picklistValues ?? []);
+            const resolved = resolvePicklistImportValue(sourceValue, fieldMappings, picklistField.picklistValues ?? []);
+            if (!resolved.resolved) continue;
+            if (!resolved.value) {
+              if (objectApiName === 'Account' && targetField.replace(/^Account__/, '').toLowerCase() === 'accounttype'
+                && selectedValue === PICKLIST_LEAVE_BLANK) mapped.__allowBlankAccountType = true;
+              continue;
+            }
+            mapped[`${objectApiName}__${targetField}`] = resolved.value;
+            continue;
+          }
+          if (!val) continue;
 
           // CompositeText sub-field: "name::Contact__name_firstName"
           // Store keys the same way the edit form does so the detail page and
@@ -640,16 +672,6 @@ export default function SalesforceImportPage() {
             ? globalIdMap[val]  // resolved SF id → CRM UUID
             : val;              // raw value (CRM UUID, text, etc.)
           mapped[`${objectApiName}__${targetField}`] = resolvedVal;
-        }
-        if (objectApiName === 'Account') {
-          const sourceAccountType = getMappedSalesforceAccountTypeValue(row, entry.columnMapping);
-          const targetAccountType = accountTypeValueMappings[sourceAccountType]
-            ?? getDefaultAccountTypeMapping(sourceAccountType, accountTypeOptions);
-          if (targetAccountType === ACCOUNT_TYPE_LEAVE_BLANK) {
-            mapped.__allowBlankAccountType = true;
-          } else if (targetAccountType) {
-            mapped.Account__accountType = targetAccountType;
-          }
         }
         mirrorAccountTypeImportAliases(objectApiName, mapped);
         const generatedPropertyId = generatedPropertyIds.get(sourceIndex);
@@ -711,9 +733,8 @@ export default function SalesforceImportPage() {
     }
 
     setResults(allResults);
-    setIsImporting(false);
     setStep('results');
-  }, [sortedFiles, crmObjects, opportunityEntries, selectedPropertyLookupField, accountRowsMissingType, accountTypeValueMappings, accountTypeOptions]);
+  }, [sortedFiles, crmObjects, opportunityEntries, selectedPropertyLookupField, unmappedPicklistValueCount]);
 
   // ── Derived ────────────────────────────────────────────────────
 
@@ -721,9 +742,6 @@ export default function SalesforceImportPage() {
   const totalRows = files.reduce((sum, f) => sum + f.rows.length, 0);
 
   const activeEntry = files[activeFileIdx];
-  const activeAccountTypeSourceValues = activeEntry?.detectedObject === 'Account'
-    ? getSalesforceAccountTypeValues(activeEntry.rows, activeEntry.columnMapping)
-    : [];
   const generatedPropertyAddressCounts = useMemo(() => {
     let ready = 0;
     let invalid = 0;
@@ -744,7 +762,7 @@ export default function SalesforceImportPage() {
 
   const activeTargetFields = useMemo(() => {
     if (!activeObjectDef || !activeEntry) return [];
-    const result: { apiName: string; label: string; type: string }[] = [];
+    const result: { apiName: string; label: string; type: string; picklistValues: string[] }[] = [];
     for (const f of activeObjectDef.fields) {
       if (f.readOnly || f.apiName === 'Id') continue;
       const parentApiName = f.apiName.replace(`${activeEntry.detectedObject}__`, '');
@@ -756,10 +774,11 @@ export default function SalesforceImportPage() {
             apiName: `${parentApiName}::${sf.apiName}`,
             label: `${f.label} › ${sf.label}`,
             type: sf.type,
+            picklistValues: sf.picklistValues ?? [],
           });
         }
       } else {
-        result.push({ apiName: parentApiName, label: f.label, type: (f as any).type });
+        result.push({ apiName: parentApiName, label: f.label, type: (f as any).type, picklistValues: f.picklistValues ?? [] });
       }
     }
     return result;
@@ -979,7 +998,7 @@ export default function SalesforceImportPage() {
                 <button
                   onClick={runImport}
                   disabled={(opportunityEntries.length > 0 && !selectedPropertyLookupField)
-                    || accountRowsMissingType > 0}
+                    || unmappedPicklistValueCount > 0}
                   className="inline-flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Database className="w-4 h-4" /> Start Import ({totalRows.toLocaleString()} rows)
@@ -1020,39 +1039,32 @@ export default function SalesforceImportPage() {
               )}
             </div>
 
-            {activeAccountTypeSourceValues.length > 0 && (
-              <div className="mb-4 overflow-hidden rounded-lg border border-amber-200 bg-amber-50">
-                <div className="border-b border-amber-200 px-4 py-3">
-                  <h3 className="text-sm font-medium text-amber-900">Map Salesforce Account Type values</h3>
-                  <p className="mt-1 text-xs text-amber-800">Map each source value to a CRM picklist option. Blank source values default to Leave blank.</p>
-                </div>
-                <div className="divide-y divide-amber-100">
-                  {activeAccountTypeSourceValues.map((sourceValue) => {
-                    const selectedValue = accountTypeValueMappings[sourceValue]
-                      ?? getDefaultAccountTypeMapping(sourceValue, accountTypeOptions);
-                    return (
-                      <div key={sourceValue || '__blank__'} className="grid grid-cols-2 items-center gap-4 px-4 py-3">
-                        <span className="text-sm font-medium text-gray-800">{sourceValue || '(blank value)'}</span>
-                        <select
-                          aria-label={`CRM Account Type for ${sourceValue || 'blank Salesforce value'}`}
-                          value={selectedValue}
-                          onChange={(event) => setAccountTypeValueMappings((previous) => ({ ...previous, [sourceValue]: event.target.value }))}
-                          className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800"
-                        >
-                          <option value="">— Map to a CRM value —</option>
-                          <option value={ACCOUNT_TYPE_LEAVE_BLANK}>Leave blank</option>
-                          {accountTypeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-                        </select>
-                      </div>
-                    )
-                  })}
-                </div>
-                {accountRowsMissingType > 0 && (
-                  <p className="border-t border-amber-200 px-4 py-2 text-xs text-amber-800">
-                    Map {accountRowsMissingType} Account row{accountRowsMissingType === 1 ? '' : 's'} before importing.
-                  </p>
-                )}
-              </div>
+            {activeEntry?.detectedObject && (
+              <SalesforceImportTemplateControls
+                objectApiName={activeEntry.detectedObject}
+                config={{
+                  columnMapping: activeEntry.columnMapping,
+                  picklistValueMappings: activeEntry.picklistValueMappings,
+                  sfIdColumn: activeEntry.sfIdColumn,
+                  propertyLookupField,
+                }}
+                onApply={(config) => {
+                  setFiles((previous) => previous.map((entry, index) => index === activeFileIdx
+                    ? {
+                        ...entry,
+                        columnMapping: config.columnMapping,
+                        picklistValueMappings: config.picklistValueMappings ?? {},
+                        sfIdColumn: config.sfIdColumn ?? entry.sfIdColumn,
+                      }
+                    : entry))
+                  setPropertyLookupField(config.propertyLookupField ?? 'property')
+                }}
+              />
+            )}
+            {unmappedPicklistValueCount > 0 && (
+              <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Map every source value for mapped Picklist columns before importing.
+              </p>
             )}
 
             {showGeneratedPropertyTab ? (
@@ -1177,6 +1189,15 @@ export default function SalesforceImportPage() {
                                   </span>
                                 )}
                               </div>
+                              {targetField?.type === 'Picklist' && activeEntry && (
+                                <PicklistValueMapping
+                                  column={header}
+                                  rows={activeEntry.rows}
+                                  options={targetField.picklistValues}
+                                  mappings={activeEntry.picklistValueMappings[header] ?? {}}
+                                  onChange={(sourceValue, targetValue) => updatePicklistValueMapping(activeFileIdx, header, sourceValue, targetValue)}
+                                />
+                              )}
                             </td>
                           </tr>
                         );
@@ -1310,7 +1331,7 @@ export default function SalesforceImportPage() {
 
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => { setFiles([]); setResults([]); setAccountTypeValueMappings({}); setStep('upload'); }}
+                onClick={() => { setFiles([]); setResults([]); setStep('upload'); }}
                 className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
                 Start New Import
