@@ -66,10 +66,11 @@ export async function setPreference(key: string, value: any): Promise<void> {
   });
 }
 
-/** Persist a preference before resolving, for flows that must confirm the save. */
-export async function setPreferenceAndWait(key: string, value: any): Promise<void> {
-  await apiClient.setPreference(key, value);
-  if (prefsCache) prefsCache[key] = value;
+/** Persist a preference and return the value confirmed by the API. */
+export async function setPreferenceAndWait<T = unknown>(key: string, value: unknown): Promise<T> {
+  const saved = await apiClient.setPreference(key, value);
+  if (prefsCache) prefsCache[key] = saved.value;
+  return saved.value as T;
 }
 
 export async function deletePreference(key: string): Promise<void> {

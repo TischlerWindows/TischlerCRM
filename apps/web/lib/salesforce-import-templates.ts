@@ -79,8 +79,17 @@ export async function saveSalesforceImportTemplate(
   const nextForObject = [...current]
   if (existingIndex >= 0) nextForObject[existingIndex] = template
   else nextForObject.push(template)
-  await setPreferenceAndWait(SALESFORCE_IMPORT_TEMPLATES_KEY, { ...stored, [objectApiName]: nextForObject })
-  return nextForObject
+  const saved = await setPreferenceAndWait<StoredTemplates>(
+    SALESFORCE_IMPORT_TEMPLATES_KEY,
+    { ...stored, [objectApiName]: nextForObject },
+  )
+  const savedForObject = saved?.[objectApiName]
+  const confirmedTemplate = savedForObject?.find((candidate) => candidate.id === template.id)
+  if (!confirmedTemplate) throw new Error('The import template was not returned by the preferences API.')
+  if (JSON.stringify(confirmedTemplate.config.checkboxRules ?? []) !== JSON.stringify(template.config.checkboxRules ?? [])) {
+    throw new Error('The checkbox rules were not returned by the preferences API.')
+  }
+  return savedForObject
 }
 
 export async function deleteSalesforceImportTemplate(
@@ -89,6 +98,9 @@ export async function deleteSalesforceImportTemplate(
 ): Promise<SalesforceImportTemplate[]> {
   const stored = await getPreference<StoredTemplates>(SALESFORCE_IMPORT_TEMPLATES_KEY, {}) ?? {}
   const nextForObject = (stored[objectApiName] ?? []).filter((template) => template.id !== templateId)
-  await setPreferenceAndWait(SALESFORCE_IMPORT_TEMPLATES_KEY, { ...stored, [objectApiName]: nextForObject })
-  return nextForObject
+  const saved = await setPreferenceAndWait<StoredTemplates>(
+    SALESFORCE_IMPORT_TEMPLATES_KEY,
+    { ...stored, [objectApiName]: nextForObject },
+  )
+  return saved?.[objectApiName] ?? []
 }

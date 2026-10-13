@@ -18,7 +18,7 @@ describe('Salesforce import picklist mappings', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     jest.mocked(getPreference).mockResolvedValue({})
-    jest.mocked(setPreferenceAndWait).mockResolvedValue(undefined)
+    jest.mocked(setPreferenceAndWait).mockImplementation(async (_key, value) => value as never)
   })
 
   it('collects distinct nonblank and blank source values', () => {
@@ -59,6 +59,7 @@ describe('Salesforce import picklist mappings', () => {
     }
 
     const saved = await saveSalesforceImportTemplate('Contact', 'Contact import', config)
+    expect(saved[0]?.config.checkboxRules).toEqual(checkboxRules)
     expect(setPreferenceAndWait).toHaveBeenCalledWith(
       SALESFORCE_IMPORT_TEMPLATES_KEY,
       expect.objectContaining({
@@ -73,9 +74,10 @@ describe('Salesforce import picklist mappings', () => {
 
   it('waits for the preferences write before reporting a template save as complete', async () => {
     let finishWrite: (() => void) | undefined
-    jest.mocked(setPreferenceAndWait).mockImplementationOnce(() => new Promise<void>((resolve) => {
-      finishWrite = resolve
-    }))
+    jest.mocked(setPreferenceAndWait).mockImplementationOnce(async (_key, value) => {
+      await new Promise<void>((resolve) => { finishWrite = resolve })
+      return value as never
+    })
 
     let completed = false
     const savePromise = saveSalesforceImportTemplate('Contact', 'Contact import', {
