@@ -364,8 +364,21 @@ export default function RecordDetailPage({
 
   // ── Callback for a batched inline-edit save (every changed field at once) ─
   const handleInlineFieldsSaved = useCallback((changed: Record<string, unknown>) => {
-    setRecord((prev) => (prev ? { ...prev, ...changed } : prev));
-  }, []);
+    setRecord((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      const objectPrefix = `${objectApiName}__`;
+      for (const [apiName, value] of Object.entries(changed)) {
+        const bareApiName = apiName.startsWith(objectPrefix)
+          ? apiName.slice(objectPrefix.length)
+          : apiName;
+        next[apiName] = value;
+        next[bareApiName] = value;
+        next[`${objectPrefix}${bareApiName}`] = value;
+      }
+      return next;
+    });
+  }, [objectApiName]);
 
   // ── Loading state ────────────────────────────────────────────────────
   if (loading) {
