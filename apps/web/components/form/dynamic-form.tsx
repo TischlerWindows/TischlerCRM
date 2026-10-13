@@ -1457,7 +1457,7 @@ export default function DynamicForm({
     <PendingWidgetProvider value={pendingCtx.contextValue}>
     <PendingTeamMemberPoolProvider>
     <>
-      <form onKeyDown={handleFormKeyDown} className="flex flex-col h-full">
+      <form autoComplete="off" onKeyDown={handleFormKeyDown} className="flex flex-col h-full">
         {/* Wizard Step Indicator — hidden in landscape mobile (<500px tall) to save vertical space */}
         {isWizardMode && (
           <>
