@@ -1768,7 +1768,9 @@ export async function recordRoutes(app: FastifyInstance) {
         const originalSfId =
           rawData['__sfId'] ??
           (sfIdField ? (rawData[sfIdField] ?? rawData['Id'] ?? rawData['id']) : (rawData['Id'] ?? rawData['id']));
-        const sfIdValue = originalSfId ? String(originalSfId) : null;
+        const sfIdValue = originalSfId === undefined || originalSfId === null || String(originalSfId).trim() === ''
+          ? null
+          : String(originalSfId).trim();
 
         // Normalize keys, excluding the internal __sfId sentinel
         const normalizedData: Record<string, any> = {};
@@ -1844,13 +1846,17 @@ export async function recordRoutes(app: FastifyInstance) {
           }
         }
 
-        // Generate record ID
+        // Preserve an external source ID when supplied; otherwise generate a native CRM ID.
         let recordIdValue: string;
-        try {
-          recordIdValue = generateRecordId(apiName);
-        } catch {
-          registerRecordIdPrefix(apiName);
-          recordIdValue = generateRecordId(apiName);
+        if (sfIdValue) {
+          recordIdValue = sfIdValue;
+        } else {
+          try {
+            recordIdValue = generateRecordId(apiName);
+          } catch {
+            registerRecordIdPrefix(apiName);
+            recordIdValue = generateRecordId(apiName);
+          }
         }
 
         await prisma.record.create({

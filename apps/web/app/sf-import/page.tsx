@@ -339,7 +339,7 @@ export default function SalesforceImportPage() {
             }
 
             const detectedObject = detectObject(headers);
-            const sfIdColumn = detectSfIdColumn(headers) ?? headers[0] ?? null;
+            const sfIdColumn = detectSfIdColumn(headers);
             const objectDef = detectedObject
               ? crmObjects.find((o) => o.apiName === detectedObject)
               : undefined;
@@ -444,19 +444,6 @@ export default function SalesforceImportPage() {
         entry.picklistValueMappings = {};
       }
       updated[idx] = entry;
-      return updated;
-    });
-  };
-
-  const updateSfIdColumn = (idx: number, col: string) => {
-    setFiles((prev) => {
-      const updated = [...prev];
-      const entry = { ...updated[idx]! };
-      // Clear mapping for old and new SF Id column — neither should import as a field
-      const mapping = { ...entry.columnMapping };
-      if (entry.sfIdColumn) delete mapping[entry.sfIdColumn];
-      delete mapping[col];
-      updated[idx] = { ...entry, sfIdColumn: col, columnMapping: mapping };
       return updated;
     });
   };
@@ -945,7 +932,7 @@ export default function SalesforceImportPage() {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Salesforce ID Column</label>
-                          <p className="mb-1 text-[11px] text-gray-500">CRM record IDs are generated automatically; this source ID is only used to reconnect relationships.</p>
+                          <p className="mb-1 text-[11px] text-gray-500">This Salesforce ID becomes the CRM Record ID and reconnects imported relationships.</p>
                           <select
                             value={entry.sfIdColumn ?? ''}
                             onChange={(e) => updateSfIdColumn(idx, e.target.value)}
@@ -1059,24 +1046,17 @@ export default function SalesforceImportPage() {
                         ...entry,
                         columnMapping: config.columnMapping,
                         picklistValueMappings: config.picklistValueMappings ?? {},
-                        sfIdColumn: config.sfIdColumn ?? entry.sfIdColumn,
+                        sfIdColumn: entry.sfIdColumn,
                       }
                     : entry))
                   setPropertyLookupField(config.propertyLookupField ?? 'property')
                 }}
               />
-            )}
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Salesforce Source ID</label>
             {unmappedPicklistValueCount > 0 && (
-              <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                Map every source value for mapped Picklist columns before importing.
-              </p>
-            )}
-
-            {showGeneratedPropertyTab ? (
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium text-gray-800">Generated Property records</h3>
+                          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-blue-800">
+                            {entry.sfIdColumn ?? 'No Id column detected; a CRM Record ID will be generated.'}
+                          </div>
                     <p className="mt-1 text-sm text-gray-500">Created from Project Address fields in each Opportunity. The generated Property is written to the Opportunity&apos;s Property lookup. Missing coordinates are looked up with the configured Google Maps integration; failed lookups are reported without blocking the import.</p>
                   </div>
                   <span className="text-sm text-gray-500">{generatedPropertyAddressCounts.ready} generated</span>
@@ -1170,7 +1150,7 @@ export default function SalesforceImportPage() {
                               <div className="flex items-center gap-2">
                                 {isSfIdCol ? (
                                   <div className="w-64 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                                    CRM Record ID is generated automatically
+                                    Used as the CRM Record ID
                                   </div>
                                 ) : <select
                                   value={mapped}

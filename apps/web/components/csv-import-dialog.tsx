@@ -323,7 +323,11 @@ export default function CsvImportDialog({
     return csvRows.slice(0, 10).map(row => {
       const mapped: Record<string, any> = {};
       for (const [csvCol, targetField] of Object.entries(columnMapping)) {
-        if (isNativeRecordIdColumn(csvCol)) continue;
+        if (isNativeRecordIdColumn(csvCol)) {
+          const sourceId = row[csvCol]?.trim();
+          if (sourceId) mapped.__sfId = sourceId;
+          continue;
+        }
         if (targetField && targetField !== '__skip__') {
           mapped[targetField] = row[csvCol] ?? '';
         }
@@ -448,8 +452,11 @@ export default function CsvImportDialog({
     const sourceRows = csvRows
       .map((row, sourceRow) => ({ row, sourceRow }))
       .filter(({ sourceRow }) => !failedPropertyRows.has(sourceRow));
+    const sourceIdColumn = csvHeaders.find(isNativeRecordIdColumn);
     const records = sourceRows.map(({ row, sourceRow }) => {
       const mapped: Record<string, any> = {};
+      const sourceId = sourceIdColumn ? row[sourceIdColumn]?.trim() : '';
+      if (sourceId) mapped.__sfId = sourceId;
       for (const [csvCol, targetField] of Object.entries(columnMapping)) {
         if (targetField && targetField !== '__skip__') {
           const val = row[csvCol];
@@ -781,7 +788,7 @@ export default function CsvImportDialog({
                       <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
                       {isNativeId ? (
                         <div className="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                          CRM Record ID is generated automatically. This source ID is not imported.
+                          This source ID will be used as the CRM Record ID.
                         </div>
                       ) : <div className="flex-1">
                         <select
