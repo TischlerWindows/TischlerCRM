@@ -150,6 +150,10 @@ function detectSfIdColumn(headers: string[]): string | null {
   return sfStyle ?? null;
 }
 
+function isNativeRecordIdField(apiName: string, objectApiName: string): boolean {
+  return apiName.replace(`${objectApiName}__`, '').toLowerCase() === 'id';
+}
+
 function autoMap(
   headers: string[],
   objectDef: ObjectDef,
@@ -157,7 +161,7 @@ function autoMap(
 ): Record<string, string> {
   // Regular flat fields (exclude CompositeText parents — they are handled via sub-fields)
   const fields = objectDef.fields
-    .filter((f) => !f.readOnly && f.apiName !== 'Id' && (f as any).type !== 'CompositeText')
+    .filter((f) => !f.readOnly && !isNativeRecordIdField(f.apiName, objectApiName) && (f as any).type !== 'CompositeText')
     .map((f) => ({
       apiName: f.apiName.replace(`${objectApiName}__`, ''),
       label: f.label,
@@ -170,7 +174,7 @@ function autoMap(
   type SubEntry = { apiName: string; bareApiName: string; bareLabel: string };
   const subEntries: SubEntry[] = [];
   for (const f of objectDef.fields) {
-    if ((f as any).type !== 'CompositeText') continue;
+    if ((f as any).type !== 'CompositeText' || isNativeRecordIdField(f.apiName, objectApiName)) continue;
     const subFields: Array<{ apiName: string; label: string; type: string; picklistValues?: string[] }> = (f as any).subFields ?? [];
     if (!subFields.length) continue;
     const parentBare = f.apiName.replace(`${objectApiName}__`, '');
@@ -764,8 +768,8 @@ export default function SalesforceImportPage() {
     if (!activeObjectDef || !activeEntry) return [];
     const result: { apiName: string; label: string; type: string; picklistValues: string[] }[] = [];
     for (const f of activeObjectDef.fields) {
-      if (f.readOnly || f.apiName === 'Id') continue;
       const parentApiName = f.apiName.replace(`${activeEntry.detectedObject}__`, '');
+      if (f.readOnly || parentApiName.toLowerCase() === 'id') continue;
       const subFields: Array<{ apiName: string; label: string; type: string }> = (f as any).subFields ?? [];
       if ((f as any).type === 'CompositeText' && subFields.length > 0) {
         // Expand compound name into its sub-field options
@@ -941,6 +945,7 @@ export default function SalesforceImportPage() {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Salesforce ID Column</label>
+                          <p className="mb-1 text-[11px] text-gray-500">CRM record IDs are generated automatically; this source ID is only used to reconnect relationships.</p>
                           <select
                             value={entry.sfIdColumn ?? ''}
                             onChange={(e) => updateSfIdColumn(idx, e.target.value)}
@@ -1155,7 +1160,7 @@ export default function SalesforceImportPage() {
                             <td className="px-4 py-2.5 font-mono text-xs text-gray-700">
                               {header}
                               {isSfIdCol && (
-                                <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">SF Id</span>
+                                <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Salesforce source ID</span>
                               )}
                             </td>
                             <td className="px-4 py-2.5 text-xs text-gray-400 max-w-[120px] truncate">
@@ -1163,11 +1168,14 @@ export default function SalesforceImportPage() {
                             </td>
                             <td className="px-4 py-2.5">
                               <div className="flex items-center gap-2">
-                                <select
+                                {isSfIdCol ? (
+                                  <div className="w-64 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                                    CRM Record ID is generated automatically
+                                  </div>
+                                ) : <select
                                   value={mapped}
                                   onChange={(e) => updateColumnMapping(activeFileIdx, header, e.target.value)}
                                   className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm w-64 focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
-                                  disabled={isSfIdCol}
                                 >
                                   <option value="">— Skip —</option>
                                   <option value="__skip__">— Skip —</option>
@@ -1182,7 +1190,7 @@ export default function SalesforceImportPage() {
                                       </option>
                                     );
                                   })}
-                                </select>
+                                </select>}
                                 {isLookup && !isSfIdCol && (
                                   <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
                                     <Link2 className="w-3 h-3" /> Lookup – SF Id auto-resolved

@@ -36,6 +36,10 @@ interface CsvImportDialogProps {
 
 type Step = 'upload' | 'mapping' | 'preview' | 'importing' | 'results';
 
+function isNativeRecordIdColumn(header: string): boolean {
+  return header.trim().toLowerCase() === 'id';
+}
+
 interface ImportResult {
   created: number;
   propertiesCreated: number;
@@ -68,9 +72,9 @@ export default function CsvImportDialog({
   const targetFields = useMemo(() => {
     if (!objectDef?.fields) return [];
     return objectDef.fields
-      .filter(f => !f.readOnly && f.apiName !== 'Id')
       .flatMap((field) => {
         const parentApiName = field.apiName.replace(`${objectApiName}__`, '');
+        if (field.readOnly || parentApiName.toLowerCase() === 'id') return [];
         const parent = {
           apiName: parentApiName,
           label: field.label,
@@ -130,6 +134,7 @@ export default function CsvImportDialog({
 
     for (const header of headers) {
       if (objectApiName === 'Opportunity' && isSalesforceProjectAddressColumn(header)) continue;
+      if (isNativeRecordIdColumn(header)) continue;
       const headerLower = header.toLowerCase().replace(/[^a-z0-9]/g, '');
 
       const compositeSubField = targetFields.find((field) => {
@@ -318,6 +323,7 @@ export default function CsvImportDialog({
     return csvRows.slice(0, 10).map(row => {
       const mapped: Record<string, any> = {};
       for (const [csvCol, targetField] of Object.entries(columnMapping)) {
+        if (isNativeRecordIdColumn(csvCol)) continue;
         if (targetField && targetField !== '__skip__') {
           mapped[targetField] = row[csvCol] ?? '';
         }
@@ -701,7 +707,9 @@ export default function CsvImportDialog({
                 objectApiName={objectApiName}
                 config={templateConfig}
                 onApply={(config) => {
-                  setColumnMapping(config.columnMapping)
+                  setColumnMapping(Object.fromEntries(
+                    Object.entries(config.columnMapping).filter(([header]) => !isNativeRecordIdColumn(header)),
+                  ))
                   setPicklistValueMappings(config.picklistValueMappings)
                   setPropertyLookupField(config.propertyLookupField ?? 'property')
                 }}
@@ -759,6 +767,7 @@ export default function CsvImportDialog({
                 {csvHeaders.map(header => {
                   const sampleValues = csvRows.slice(0, 3).map(r => r[header]).filter(Boolean);
                   const targetField = targetFields.find((field) => field.apiName === columnMapping[header]);
+                  const isNativeId = isNativeRecordIdColumn(header);
                   return (
                     <div key={header} className="flex items-center gap-4 p-4">
                       <div className="flex-1 min-w-0">
@@ -770,7 +779,11 @@ export default function CsvImportDialog({
                         )}
                       </div>
                       <ArrowRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      <div className="flex-1">
+                      {isNativeId ? (
+                        <div className="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                          CRM Record ID is generated automatically. This source ID is not imported.
+                        </div>
+                      ) : <div className="flex-1">
                         <select
                           value={columnMapping[header] || '__skip__'}
                           onChange={e => {
@@ -805,7 +818,7 @@ export default function CsvImportDialog({
                             }))}
                           />
                         )}
-                      </div>
+                      </div>}
                     </div>
                   );
                 })}
