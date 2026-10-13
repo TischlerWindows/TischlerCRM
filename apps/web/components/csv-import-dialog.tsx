@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
+import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
 import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
@@ -104,11 +105,20 @@ export default function CsvImportDialog({
       if (objectApiName === 'Opportunity' && isSalesforceProjectAddressColumn(header)) continue;
       const headerLower = header.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      // Try exact match first
-      let match = targetFields.find(f =>
-        f.apiName.toLowerCase() === headerLower ||
-        f.label.toLowerCase().replace(/[^a-z0-9]/g, '') === headerLower
-      );
+      // Salesforce Account.Type maps to Tischler's required Account Type field,
+      // not the legacy generic `type` field when both exist.
+      const preferredTarget = getSalesforceAccountTypeTarget(objectApiName, header, targetFields);
+      let match = preferredTarget
+        ? targetFields.find((field) => field.apiName === preferredTarget)
+        : undefined;
+
+      // Try exact match when there is no object-specific preference.
+      if (!match) {
+        match = targetFields.find(f =>
+          f.apiName.toLowerCase() === headerLower ||
+          f.label.toLowerCase().replace(/[^a-z0-9]/g, '') === headerLower
+        );
+      }
 
       // Try common Salesforce → CRM field name mappings
       if (!match) {
@@ -382,6 +392,7 @@ export default function CsvImportDialog({
           }
         }
       }
+      mirrorAccountTypeImportAliases(objectApiName, mapped);
       const propertyId = propertyIdsByRow.get(sourceRow);
       if (propertyId) mapped[`${objectApiName}__${selectedPropertyLookupField}`] = propertyId;
       return mapped;

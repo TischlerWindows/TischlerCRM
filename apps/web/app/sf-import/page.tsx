@@ -11,6 +11,7 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import type { FieldDef, ObjectDef } from '@/lib/schema';
+import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
 import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
@@ -194,10 +195,17 @@ function autoMap(
     // Then: standard flat-field matching
     let match: (typeof fields)[0] | undefined;
 
-    // Exact field name
-    match = fields.find(
-      (f) => f.apiName.toLowerCase() === key || f.label.toLowerCase().replace(/[^a-z0-9]/g, '') === key,
-    );
+    // Salesforce Account.Type maps to Tischler's required Account Type field,
+    // not the legacy generic `type` field when both exist.
+    const preferredTarget = getSalesforceAccountTypeTarget(objectApiName, header, fields);
+    match = preferredTarget ? fields.find((field) => field.apiName === preferredTarget) : undefined;
+
+    // Exact field name when there is no object-specific mapping preference.
+    if (!match) {
+      match = fields.find(
+        (f) => f.apiName.toLowerCase() === key || f.label.toLowerCase().replace(/[^a-z0-9]/g, '') === key,
+      );
+    }
 
     // SF synonyms
     if (!match) {
@@ -600,6 +608,7 @@ export default function SalesforceImportPage() {
             : val;              // raw value (CRM UUID, text, etc.)
           mapped[`${objectApiName}__${targetField}`] = resolvedVal;
         }
+        mirrorAccountTypeImportAliases(objectApiName, mapped);
         const generatedPropertyId = generatedPropertyIds.get(sourceIndex);
         if (generatedPropertyId) mapped[`${objectApiName}__${selectedPropertyLookupField}`] = generatedPropertyId;
         return mapped;
