@@ -11,6 +11,7 @@ import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
 import { mapContactFullName, mergeCompositeTextSubField } from '@/lib/composite-text-import';
+import { parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
 import {
   findAddressImportSubfieldTarget,
   geocodeImportedAddressRecords,
@@ -668,6 +669,10 @@ export default function CsvImportDialog({
         if (targetField && targetField !== '__skip__') {
           const val = row[csvCol];
           const target = targetFields.find((field) => field.apiName === targetField);
+          if (target?.type === 'Checkbox') {
+            mapped[targetField] = parseSalesforceCheckbox(val);
+            continue;
+          }
           if (target?.type === 'Picklist') {
             const sourceValue = val?.trim() ?? '';
             const fieldMappings = picklistValueMappings[csvCol] ?? {};

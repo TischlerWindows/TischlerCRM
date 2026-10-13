@@ -15,6 +15,7 @@ import {
   getSalesforceAccountTypeTarget,
   mirrorAccountTypeImportAliases,
 } from '@/lib/salesforce-account-import';
+import { parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
 import { PicklistValueMapping } from '@/components/picklist-value-mapping';
 import { SalesforceImportTemplateControls } from '@/components/salesforce-import-template-controls';
 import {
@@ -633,6 +634,13 @@ export default function SalesforceImportPage() {
         for (const [csvCol, targetField] of Object.entries(entry.columnMapping)) {
           if (!targetField || targetField === '__skip__') continue;
           const val = row[csvCol] ?? '';
+          const checkboxField = objectDef?.fields.find((field) =>
+            field.apiName.replace(`${objectApiName}__`, '') === targetField && field.type === 'Checkbox',
+          );
+          if (checkboxField) {
+            mapped[`${objectApiName}__${targetField}`] = parseSalesforceCheckbox(val);
+            continue;
+          }
           if (targetField.includes('::address:')) {
             if (val.trim()) mergeAddressImportSubField(mapped, objectApiName, targetField, val);
             continue;
