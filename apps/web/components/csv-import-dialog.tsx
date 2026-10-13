@@ -269,10 +269,8 @@ export default function CsvImportDialog({
           required: !!field.required,
           isAutoNumber: !!field.autoNumber,
         };
-        if (field.type !== 'CompositeText') return [parent];
-
-        const subFields: Array<{ apiName: string; label: string; type: string; picklistValues?: string[] }> = field.subFields ?? [];
         if (field.type === 'CompositeText') {
+          const subFields: Array<{ apiName: string; label: string; type: string; picklistValues?: string[] }> = field.subFields ?? [];
           return [parent, ...subFields.map((subField) => ({
             apiName: `${parentApiName}::${subField.apiName}`,
             label: `${field.label} › ${subField.label}`,
