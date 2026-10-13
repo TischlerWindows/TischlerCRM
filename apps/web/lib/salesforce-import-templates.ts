@@ -18,7 +18,6 @@ export interface SalesforceImportTemplateConfig {
   checkboxRules?: SalesforceCheckboxImportRule[]
   sfIdColumn?: string | null
   propertyLookupField?: string
-  checkboxRules?: SalesforceCheckboxImportRule[]
 }
 
 export interface SalesforceImportTemplate {
