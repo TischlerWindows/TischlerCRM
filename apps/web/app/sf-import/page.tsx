@@ -13,6 +13,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import type { FieldDef, ObjectDef } from '@/lib/schema';
 import {
   ACCOUNT_TYPE_LEAVE_BLANK,
+  getDefaultAccountTypeMapping,
   getMappedSalesforceAccountTypeValue,
   getSalesforceAccountTypeTarget,
   mirrorAccountTypeImportAliases,
@@ -262,7 +263,7 @@ export default function SalesforceImportPage() {
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const [showGeneratedPropertyTab, setShowGeneratedPropertyTab] = useState(false);
   const [propertyLookupField, setPropertyLookupField] = useState('property');
-  const [defaultAccountType, setDefaultAccountType] = useState('');
+  const [accountTypeValueMappings, setAccountTypeValueMappings] = useState<Record<string, string>>({});
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [importProgress, setImportProgress] = useState<Record<string, number>>({});
   const [results, setResults] = useState<ObjectResult[]>([]);
@@ -280,11 +281,21 @@ export default function SalesforceImportPage() {
     const accountTypeField = account?.fields.find((field) => field.apiName.toLowerCase().replace(/^account__/, '') === 'accounttype');
     return accountTypeField?.picklistValues ?? [];
   }, [crmObjects]);
+  const accountTypeSourceValues = useMemo(
+    () => Array.from(new Set(files
+      .filter((entry) => entry.detectedObject === 'Account')
+      .flatMap((entry) => entry.rows.map((row) => getMappedSalesforceAccountTypeValue(row, entry.columnMapping)))))
+      .sort((left, right) => left === '' ? -1 : right === '' ? 1 : left.localeCompare(right)),
+    [files],
+  );
   const accountRowsMissingType = useMemo(
     () => files
       .filter((entry) => entry.detectedObject === 'Account')
-      .reduce((total, entry) => total + entry.rows.filter((row) => !getMappedSalesforceAccountTypeValue(row, entry.columnMapping)).length, 0),
-    [files],
+      .reduce((total, entry) => total + entry.rows.filter((row) => {
+        const sourceValue = getMappedSalesforceAccountTypeValue(row, entry.columnMapping);
+        return !(accountTypeValueMappings[sourceValue] ?? getDefaultAccountTypeMapping(sourceValue, accountTypeOptions));
+      }).length, 0),
+    [files, accountTypeValueMappings, accountTypeOptions],
   );
   const propertyLookupFields = useMemo(() => {
     const opportunity = crmObjects.find((object) => object.apiName === 'Opportunity');
@@ -474,8 +485,8 @@ export default function SalesforceImportPage() {
   // ── Run import ────────────────────────────────────────────────
 
   const runImport = useCallback(async () => {
-    if (accountRowsMissingType > 0 && !defaultAccountType) {
-      setParseErrors([`Choose a default Account Type for ${accountRowsMissingType} Account row${accountRowsMissingType === 1 ? '' : 's'} where the CSV Type value is blank.`]);
+    if (accountRowsMissingType > 0) {
+      setParseErrors([`Map every Salesforce Account Type value to a CRM value or choose Leave blank.`]);
       setStep('map');
       return;
     }
@@ -630,11 +641,14 @@ export default function SalesforceImportPage() {
             : val;              // raw value (CRM UUID, text, etc.)
           mapped[`${objectApiName}__${targetField}`] = resolvedVal;
         }
-        if (objectApiName === 'Account' && !getMappedSalesforceAccountTypeValue(row, entry.columnMapping)) {
-          if (defaultAccountType === ACCOUNT_TYPE_LEAVE_BLANK) {
+        if (objectApiName === 'Account') {
+          const sourceAccountType = getMappedSalesforceAccountTypeValue(row, entry.columnMapping);
+          const targetAccountType = accountTypeValueMappings[sourceAccountType]
+            ?? getDefaultAccountTypeMapping(sourceAccountType, accountTypeOptions);
+          if (targetAccountType === ACCOUNT_TYPE_LEAVE_BLANK) {
             mapped.__allowBlankAccountType = true;
-          } else if (defaultAccountType) {
-            mapped.Account__accountType = defaultAccountType;
+          } else if (targetAccountType) {
+            mapped.Account__accountType = targetAccountType;
           }
         }
         mirrorAccountTypeImportAliases(objectApiName, mapped);
@@ -699,7 +713,7 @@ export default function SalesforceImportPage() {
     setResults(allResults);
     setIsImporting(false);
     setStep('results');
-  }, [sortedFiles, crmObjects, opportunityEntries, selectedPropertyLookupField, accountRowsMissingType, defaultAccountType]);
+  }, [sortedFiles, crmObjects, opportunityEntries, selectedPropertyLookupField, accountRowsMissingType, accountTypeValueMappings, accountTypeOptions]);
 
   // ── Derived ────────────────────────────────────────────────────
 
@@ -707,9 +721,9 @@ export default function SalesforceImportPage() {
   const totalRows = files.reduce((sum, f) => sum + f.rows.length, 0);
 
   const activeEntry = files[activeFileIdx];
-  const activeAccountRowsMissingType = activeEntry?.detectedObject === 'Account'
-    ? activeEntry.rows.filter((row) => !getMappedSalesforceAccountTypeValue(row, activeEntry.columnMapping)).length
-    : 0;
+  const activeAccountTypeSourceValues = activeEntry?.detectedObject === 'Account'
+    ? getSalesforceAccountTypeValues(activeEntry.rows, activeEntry.columnMapping)
+    : [];
   const generatedPropertyAddressCounts = useMemo(() => {
     let ready = 0;
     let invalid = 0;
@@ -965,7 +979,7 @@ export default function SalesforceImportPage() {
                 <button
                   onClick={runImport}
                   disabled={(opportunityEntries.length > 0 && !selectedPropertyLookupField)
-                    || (accountRowsMissingType > 0 && !defaultAccountType)}
+                    || accountRowsMissingType > 0}
                   className="inline-flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Database className="w-4 h-4" /> Start Import ({totalRows.toLocaleString()} rows)
@@ -1006,22 +1020,38 @@ export default function SalesforceImportPage() {
               )}
             </div>
 
-            {activeAccountRowsMissingType > 0 && (
-              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <label htmlFor="sf-account-type-default" className="block text-sm font-medium text-amber-900">
-                  Default Account Type for {activeAccountRowsMissingType} blank row{activeAccountRowsMissingType === 1 ? '' : 's'}
-                </label>
-                <select
-                  id="sf-account-type-default"
-                  value={defaultAccountType}
-                  onChange={(event) => setDefaultAccountType(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800"
-                >
-                  <option value="">— Choose a default —</option>
-                  <option value={ACCOUNT_TYPE_LEAVE_BLANK}>Leave blank</option>
-                  {accountTypeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-                <p className="mt-1 text-xs text-amber-800">Applied only to blank Account Type/Type rows in the uploaded Account files.</p>
+            {activeAccountTypeSourceValues.length > 0 && (
+              <div className="mb-4 overflow-hidden rounded-lg border border-amber-200 bg-amber-50">
+                <div className="border-b border-amber-200 px-4 py-3">
+                  <h3 className="text-sm font-medium text-amber-900">Map Salesforce Account Type values</h3>
+                  <p className="mt-1 text-xs text-amber-800">Map each source value to a CRM picklist option. Blank source values default to Leave blank.</p>
+                </div>
+                <div className="divide-y divide-amber-100">
+                  {activeAccountTypeSourceValues.map((sourceValue) => {
+                    const selectedValue = accountTypeValueMappings[sourceValue]
+                      ?? getDefaultAccountTypeMapping(sourceValue, accountTypeOptions);
+                    return (
+                      <div key={sourceValue || '__blank__'} className="grid grid-cols-2 items-center gap-4 px-4 py-3">
+                        <span className="text-sm font-medium text-gray-800">{sourceValue || '(blank value)'}</span>
+                        <select
+                          aria-label={`CRM Account Type for ${sourceValue || 'blank Salesforce value'}`}
+                          value={selectedValue}
+                          onChange={(event) => setAccountTypeValueMappings((previous) => ({ ...previous, [sourceValue]: event.target.value }))}
+                          className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800"
+                        >
+                          <option value="">— Map to a CRM value —</option>
+                          <option value={ACCOUNT_TYPE_LEAVE_BLANK}>Leave blank</option>
+                          {accountTypeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                        </select>
+                      </div>
+                    )
+                  })}
+                </div>
+                {accountRowsMissingType > 0 && (
+                  <p className="border-t border-amber-200 px-4 py-2 text-xs text-amber-800">
+                    Map {accountRowsMissingType} Account row{accountRowsMissingType === 1 ? '' : 's'} before importing.
+                  </p>
+                )}
               </div>
             )}
 
@@ -1280,7 +1310,7 @@ export default function SalesforceImportPage() {
 
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => { setFiles([]); setResults([]); setDefaultAccountType(''); setStep('upload'); }}
+                onClick={() => { setFiles([]); setResults([]); setAccountTypeValueMappings({}); setStep('upload'); }}
                 className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
                 Start New Import

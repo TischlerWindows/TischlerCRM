@@ -11,7 +11,9 @@ import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import {
   ACCOUNT_TYPE_LEAVE_BLANK,
+  getDefaultAccountTypeMapping,
   getMappedSalesforceAccountTypeValue,
+  getSalesforceAccountTypeValues,
   getSalesforceAccountTypeTarget,
   mirrorAccountTypeImportAliases,
 } from '@/lib/salesforce-account-import';
@@ -49,7 +51,7 @@ export default function CsvImportDialog({
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
-  const [defaultAccountType, setDefaultAccountType] = useState('');
+  const [accountTypeValueMappings, setAccountTypeValueMappings] = useState<Record<string, string>>({});
   const [showPropertyMapping, setShowPropertyMapping] = useState(false);
   const [propertyLookupField, setPropertyLookupField] = useState('property');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -93,7 +95,7 @@ export default function CsvImportDialog({
     setCsvHeaders([]);
     setCsvRows([]);
     setColumnMapping({});
-    setDefaultAccountType('');
+    setAccountTypeValueMappings({});
     setShowPropertyMapping(false);
     setPropertyLookupField('property');
     setImportResult(null);
@@ -264,13 +266,19 @@ export default function CsvImportDialog({
 
   // Count how many columns are mapped
   const mappedCount = Object.values(columnMapping).filter(v => v !== '' && v !== '__skip__').length;
+  const accountTypeSourceValues = objectApiName === 'Account'
+    ? getSalesforceAccountTypeValues(csvRows, columnMapping)
+    : [];
+  const accountTypeRowsMissingMapping = objectApiName === 'Account'
+    ? csvRows.filter((row) => {
+      const sourceValue = getMappedSalesforceAccountTypeValue(row, columnMapping);
+      return !(accountTypeValueMappings[sourceValue] ?? getDefaultAccountTypeMapping(sourceValue, accountTypeField?.picklistValues ?? []));
+    }).length
+    : 0;
   const requiredMapped = targetFields
     .filter(f => f.required && !f.isAutoNumber)
     .every((field) => Object.values(columnMapping).includes(field.apiName)
-      || (objectApiName === 'Account' && field.apiName.toLowerCase() === 'accounttype' && !!defaultAccountType));
-  const missingAccountTypeRows = objectApiName === 'Account'
-    ? csvRows.filter((row) => !getMappedSalesforceAccountTypeValue(row, columnMapping)).length
-    : 0;
+      || (objectApiName === 'Account' && field.apiName.toLowerCase() === 'accounttype' && accountTypeRowsMissingMapping === 0));
 
   // Build preview data with mapped column names
   const previewRows = useMemo(() => {
@@ -312,8 +320,8 @@ export default function CsvImportDialog({
   }, [csvRows, objectApiName]);
 
   const handleImport = async () => {
-    if (objectApiName === 'Account' && missingAccountTypeRows > 0 && !defaultAccountType) {
-      setParseError('Choose a default Account Type for rows where the CSV Type value is blank.');
+    if (objectApiName === 'Account' && accountTypeRowsMissingMapping > 0) {
+      setParseError('Map every Salesforce Account Type value to a CRM Account Type or choose Leave blank.');
       setStep('mapping');
       return;
     }
@@ -411,12 +419,14 @@ export default function CsvImportDialog({
           }
         }
       }
-      if (objectApiName === 'Account'
-        && !getMappedSalesforceAccountTypeValue(row, columnMapping)) {
-        if (defaultAccountType === ACCOUNT_TYPE_LEAVE_BLANK) {
+      if (objectApiName === 'Account') {
+        const sourceAccountType = getMappedSalesforceAccountTypeValue(row, columnMapping);
+        const targetAccountType = accountTypeValueMappings[sourceAccountType]
+          ?? getDefaultAccountTypeMapping(sourceAccountType, accountTypeField?.picklistValues ?? []);
+        if (targetAccountType === ACCOUNT_TYPE_LEAVE_BLANK) {
           mapped.__allowBlankAccountType = true;
-        } else if (defaultAccountType) {
-          mapped.Account__accountType = defaultAccountType;
+        } else if (targetAccountType) {
+          mapped.Account__accountType = targetAccountType;
         }
       }
       mirrorAccountTypeImportAliases(objectApiName, mapped);
@@ -634,26 +644,40 @@ export default function CsvImportDialog({
                   </button>
                 )}
               </div>
-              {objectApiName === 'Account' && missingAccountTypeRows > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                  <label htmlFor="account-type-default" className="block text-sm font-medium text-amber-900">
-                    Default Account Type for {missingAccountTypeRows} blank row{missingAccountTypeRows === 1 ? '' : 's'}
-                  </label>
-                  <select
-                    id="account-type-default"
-                    value={defaultAccountType}
-                    onChange={(event) => setDefaultAccountType(event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800"
-                  >
-                    <option value="">— Choose a default —</option>
-                    <option value={ACCOUNT_TYPE_LEAVE_BLANK}>Leave blank</option>
-                    {(accountTypeField?.picklistValues ?? []).map((value) => (
-                      <option key={value} value={value}>{value}</option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-amber-800">
-                    Used only when mapped Account Type and Type columns are blank. Choose “Leave blank” to keep them empty.
-                  </p>
+              {objectApiName === 'Account' && accountTypeSourceValues.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-amber-200 bg-amber-50">
+                  <div className="border-b border-amber-200 px-4 py-3">
+                    <h3 className="text-sm font-medium text-amber-900">Map Salesforce Account Type values</h3>
+                    <p className="mt-1 text-xs text-amber-800">Choose the CRM Account Type for each distinct Salesforce value. Blank source values default to Leave blank.</p>
+                  </div>
+                  <div className="divide-y divide-amber-100">
+                    {accountTypeSourceValues.map((sourceValue) => {
+                      const selectedValue = accountTypeValueMappings[sourceValue]
+                        ?? getDefaultAccountTypeMapping(sourceValue, accountTypeField?.picklistValues ?? []);
+                      return (
+                        <div key={sourceValue || '__blank__'} className="grid grid-cols-2 items-center gap-4 px-4 py-3">
+                          <span className="text-sm font-medium text-gray-800">{sourceValue || '(blank value)'}</span>
+                          <select
+                            aria-label={`CRM Account Type for ${sourceValue || 'blank Salesforce value'}`}
+                            value={selectedValue}
+                            onChange={(event) => setAccountTypeValueMappings((previous) => ({ ...previous, [sourceValue]: event.target.value }))}
+                            className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800"
+                          >
+                            <option value="">— Map to a CRM value —</option>
+                            <option value={ACCOUNT_TYPE_LEAVE_BLANK}>Leave blank</option>
+                            {(accountTypeField?.picklistValues ?? []).map((value) => (
+                              <option key={value} value={value}>{value}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {accountTypeRowsMissingMapping > 0 && (
+                    <p className="border-t border-amber-200 px-4 py-2 text-xs text-amber-800">
+                      Map {accountTypeRowsMissingMapping} row{accountTypeRowsMissingMapping === 1 ? '' : 's'} before importing.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -912,7 +936,7 @@ export default function CsvImportDialog({
               <button
                 onClick={handleImport}
                 disabled={(objectApiName === 'Opportunity' && !selectedPropertyLookupField)
-                  || (objectApiName === 'Account' && missingAccountTypeRows > 0 && !defaultAccountType)}
+                  || (objectApiName === 'Account' && accountTypeRowsMissingMapping > 0)}
                 className="inline-flex items-center px-4 py-2 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
               >
                 <Upload className="w-4 h-4 mr-1.5" />

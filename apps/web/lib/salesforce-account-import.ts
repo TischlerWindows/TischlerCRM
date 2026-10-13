@@ -32,11 +32,31 @@ export function getSalesforceAccountTypeTarget(
     return ''
   }
 
+  export function getSalesforceAccountTypeValues(
+    rows: Record<string, string>[],
+    columnMapping: Record<string, string>,
+  ): string[] {
+    return Array.from(new Set(rows.map((row) => getMappedSalesforceAccountTypeValue(row, columnMapping))))
+      .sort((left, right) => left === '' ? -1 : right === '' ? 1 : left.localeCompare(right))
+  }
+
+  export function getDefaultAccountTypeMapping(sourceValue: string, crmValues: string[]): string {
+    if (!sourceValue) return ACCOUNT_TYPE_LEAVE_BLANK
+    return crmValues.find((value) => normalize(value) === normalize(sourceValue)) ?? ''
+  }
+
 export function mirrorAccountTypeImportAliases(
   objectApiName: string,
   record: Record<string, unknown>,
 ): void {
   if (objectApiName !== 'Account') return
+  if (record.__allowBlankAccountType === true) {
+    delete record.Account__accountType
+    delete record.accountType
+    delete record.Account__type
+    delete record.type
+    return
+  }
   const value = record.Account__accountType
     ?? record.accountType
     ?? record.Account__type
