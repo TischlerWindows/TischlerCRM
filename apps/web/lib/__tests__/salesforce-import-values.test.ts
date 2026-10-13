@@ -1,4 +1,4 @@
-import { parseSalesforceCheckbox } from '../salesforce-import-values'
+import { evaluateSalesforceCheckboxRule, parseSalesforceCheckbox } from '../salesforce-import-values'
 
 describe('Salesforce import values', () => {
   it('maps blank checkbox cells to unchecked', () => {
@@ -21,5 +21,20 @@ describe('Salesforce import values', () => {
     expect(parseSalesforceCheckbox('Included')).toBe(true)
     expect(parseSalesforceCheckbox(true)).toBe(true)
     expect(parseSalesforceCheckbox(false)).toBe(false)
+  })
+
+  it('evaluates checkbox rules from source-column presence', () => {
+    const populatedRule = {
+      id: 'rule-1',
+      targetField: 'homeownerAccount',
+      sourceColumn: 'Account Name',
+      condition: 'has-value' as const,
+    }
+    const blankRule = { ...populatedRule, condition: 'is-blank' as const }
+
+    expect(evaluateSalesforceCheckboxRule(populatedRule, { 'Account Name': 'Silkworth Interiors' })).toBe(true)
+    expect(evaluateSalesforceCheckboxRule(populatedRule, { 'Account Name': '  ' })).toBe(false)
+    expect(evaluateSalesforceCheckboxRule(blankRule, { 'Account Name': '' })).toBe(true)
+    expect(evaluateSalesforceCheckboxRule(blankRule, { 'Account Name': 'Silkworth Interiors' })).toBe(false)
   })
 })

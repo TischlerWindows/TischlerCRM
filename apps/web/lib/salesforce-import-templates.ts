@@ -3,11 +3,22 @@ import { getPreference, setPreference } from './preferences'
 export const SALESFORCE_IMPORT_TEMPLATES_KEY = 'salesforceImportTemplates'
 export const PICKLIST_LEAVE_BLANK = '__leave_blank__'
 
+export type SalesforceCheckboxRuleCondition = 'has-value' | 'is-blank'
+
+export interface SalesforceCheckboxImportRule {
+  id: string
+  targetField: string
+  sourceColumn: string
+  condition: SalesforceCheckboxRuleCondition
+}
+
 export interface SalesforceImportTemplateConfig {
   columnMapping: Record<string, string>
   picklistValueMappings: Record<string, Record<string, string>>
+  checkboxRules?: SalesforceCheckboxImportRule[]
   sfIdColumn?: string | null
   propertyLookupField?: string
+  checkboxRules?: SalesforceCheckboxImportRule[]
 }
 
 export interface SalesforceImportTemplate {

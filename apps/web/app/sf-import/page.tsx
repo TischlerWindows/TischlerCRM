@@ -16,12 +16,16 @@ import {
   mirrorAccountTypeImportAliases,
 } from '@/lib/salesforce-account-import';
 import { parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
+import { evaluateSalesforceCheckboxRule } from '@/lib/salesforce-import-values';
 import { PicklistValueMapping } from '@/components/picklist-value-mapping';
 import { SalesforceImportTemplateControls } from '@/components/salesforce-import-template-controls';
+import { SalesforceCheckboxImportRules } from '@/components/salesforce-checkbox-import-rules';
 import {
   getDefaultPicklistTarget,
   getDistinctPicklistSourceValues,
   resolvePicklistImportValue,
+  type SalesforceCheckboxImportRule,
+  type SalesforceImportTemplateConfig,
 } from '@/lib/salesforce-import-templates';
 import {
   findAddressImportSubfieldTarget,
@@ -107,6 +111,7 @@ interface FileEntry {
   columnMapping: Record<string, string>;
   /** Source string → CRM option for each mapped Picklist column. */
   picklistValueMappings: Record<string, Record<string, string>>;
+  checkboxRules: SalesforceCheckboxImportRule[];
   /** Which column holds the Salesforce record Id */
   sfIdColumn: string | null;
 }
@@ -379,6 +384,7 @@ export default function SalesforceImportPage() {
               detectedObject,
               columnMapping: rawMapping,
               picklistValueMappings: {},
+              checkboxRules: [],
               sfIdColumn,
             });
           },
@@ -464,6 +470,7 @@ export default function SalesforceImportPage() {
         if (entry.sfIdColumn) delete mapping[entry.sfIdColumn];
         entry.columnMapping = mapping;
         entry.picklistValueMappings = {};
+        entry.checkboxRules = [];
       }
       updated[idx] = entry;
       return updated;
@@ -698,6 +705,9 @@ export default function SalesforceImportPage() {
           mapped[`${objectApiName}__${targetField}`] = resolvedVal;
         }
         mirrorAccountTypeImportAliases(objectApiName, mapped);
+        for (const rule of entry.checkboxRules) {
+          mapped[`${objectApiName}__${rule.targetField}`] = evaluateSalesforceCheckboxRule(rule, row);
+        }
         const generatedPropertyId = generatedPropertyIds.get(sourceIndex);
         if (generatedPropertyId) mapped[`${objectApiName}__${selectedPropertyLookupField}`] = generatedPropertyId;
         return mapped;
@@ -1079,6 +1089,7 @@ export default function SalesforceImportPage() {
                 config={{
                   columnMapping: activeEntry.columnMapping,
                   picklistValueMappings: activeEntry.picklistValueMappings,
+                  checkboxRules: activeEntry.checkboxRules,
                   sfIdColumn: activeEntry.sfIdColumn,
                   propertyLookupField,
                 }}
@@ -1088,6 +1099,7 @@ export default function SalesforceImportPage() {
                         ...entry,
                         columnMapping: config.columnMapping,
                         picklistValueMappings: config.picklistValueMappings ?? {},
+                        checkboxRules: config.checkboxRules ?? [],
                         sfIdColumn: entry.sfIdColumn,
                       }
                     : entry))
@@ -1244,6 +1256,16 @@ export default function SalesforceImportPage() {
                 </div>
               </div>
             ) : null}
+            {!showGeneratedPropertyTab && activeEntry && (
+              <SalesforceCheckboxImportRules
+                headers={activeEntry.headers.filter((header) => header !== activeEntry.sfIdColumn)}
+                checkboxFields={activeTargetFields.filter((field) => field.type === 'Checkbox')}
+                rules={activeEntry.checkboxRules}
+                onChange={(checkboxRules) => setFiles((previous) => previous.map((entry, index) =>
+                  index === activeFileIdx ? { ...entry, checkboxRules } : entry,
+                ))}
+              />
+            )}
           </div>
         )}
 

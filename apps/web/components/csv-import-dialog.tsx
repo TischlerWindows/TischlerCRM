@@ -11,7 +11,8 @@ import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
 import { mapContactFullName, mergeCompositeTextSubField } from '@/lib/composite-text-import';
-import { parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
+import { evaluateSalesforceCheckboxRule, parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
+import { SalesforceCheckboxImportRules } from '@/components/salesforce-checkbox-import-rules';
 import {
   findAddressImportSubfieldTarget,
   geocodeImportedAddressRecords,
@@ -25,6 +26,7 @@ import {
   getDistinctPicklistSourceValues,
   PICKLIST_LEAVE_BLANK,
   resolvePicklistImportValue,
+  type SalesforceCheckboxImportRule,
   type SalesforceImportTemplateConfig,
 } from '@/lib/salesforce-import-templates';
 import {
@@ -244,6 +246,7 @@ export default function CsvImportDialog({
   const [mappingSearchQuery, setMappingSearchQuery] = useState('');
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [picklistValueMappings, setPicklistValueMappings] = useState<Record<string, Record<string, string>>>({});
+  const [checkboxRules, setCheckboxRules] = useState<SalesforceCheckboxImportRule[]>([]);
   const [showPropertyMapping, setShowPropertyMapping] = useState(false);
   const [propertyLookupField, setPropertyLookupField] = useState('property');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -306,6 +309,7 @@ export default function CsvImportDialog({
     setMappingSearchQuery('');
     setColumnMapping({});
     setPicklistValueMappings({});
+    setCheckboxRules([]);
     setShowPropertyMapping(false);
     setPropertyLookupField('property');
     setImportResult(null);
@@ -477,6 +481,7 @@ export default function CsvImportDialog({
         setMappingSearchQuery('');
         setColumnMapping(autoMapColumns(headers));
         setPicklistValueMappings({});
+        setCheckboxRules([]);
         setStep('mapping');
       },
       error: (err: Error) => {
@@ -519,6 +524,7 @@ export default function CsvImportDialog({
   const templateConfig: SalesforceImportTemplateConfig = {
     columnMapping,
     picklistValueMappings,
+    checkboxRules,
     propertyLookupField,
   }
   const requiredMapped = targetFields
@@ -707,6 +713,9 @@ export default function CsvImportDialog({
         }
       }
       mirrorAccountTypeImportAliases(objectApiName, mapped);
+      for (const rule of checkboxRules) {
+        mapped[rule.targetField] = evaluateSalesforceCheckboxRule(rule, row);
+      }
       const propertyId = propertyIdsByRow.get(sourceRow);
       if (propertyId) mapped[`${objectApiName}__${selectedPropertyLookupField}`] = propertyId;
       return mapped;
@@ -939,6 +948,7 @@ export default function CsvImportDialog({
                     Object.entries(config.columnMapping).filter(([header]) => !isNativeRecordIdColumn(header)),
                   ))
                   setPicklistValueMappings(config.picklistValueMappings)
+                  setCheckboxRules(config.checkboxRules ?? [])
                   setPropertyLookupField(config.propertyLookupField ?? 'property')
                 }}
               />
@@ -1060,6 +1070,15 @@ export default function CsvImportDialog({
                   <p className="px-4 py-6 text-center text-sm text-gray-500">No matching CSV fields.</p>
                 )}
               </div>
+              )}
+
+              {!showPropertyMapping && (
+                <SalesforceCheckboxImportRules
+                  headers={csvHeaders.filter((header) => !isNativeRecordIdColumn(header))}
+                  checkboxFields={targetFields.filter((field) => field.type === 'Checkbox')}
+                  rules={checkboxRules}
+                  onChange={setCheckboxRules}
+                />
               )}
 
               {!showPropertyMapping && !requiredMapped && (
