@@ -18,6 +18,24 @@ function hasFieldValue(value: unknown): boolean {
   return true;
 }
 
+function normalizeBooleanValue(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number' && (value === 0 || value === 1)) return value === 1;
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (['true', '1', 'yes', 'y', 'on', 'checked'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'n', 'off', 'unchecked'].includes(normalized)) return false;
+  return undefined;
+}
+
+function compareBooleanValues(left: unknown, right: unknown): boolean | undefined {
+  if (typeof left !== 'boolean' && typeof right !== 'boolean') return undefined;
+  const normalizedLeft = normalizeBooleanValue(left);
+  const normalizedRight = normalizeBooleanValue(right);
+  if (normalizedLeft === undefined || normalizedRight === undefined) return undefined;
+  return normalizedLeft === normalizedRight;
+}
+
 /**
  * Evaluates whether a field should be visible based on visibility conditions
  * @param conditions - Array of condition expressions
@@ -76,6 +94,7 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
     : leftValue;
   const numericEquals = (left: unknown, right: unknown): boolean =>
     rightIsNumeric && left !== undefined && left !== null && left !== '' && Number(left) === Number(right);
+  const booleanEquals = compareBooleanValues(leftValue, condition.right);
 
   switch (condition.op) {
     case 'IS_NOT_BLANK':
@@ -92,6 +111,7 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
       if (Array.isArray(condition.right)) {
         return condition.right.includes(leftValue);
       }
+      if (booleanEquals !== undefined) return booleanEquals;
       return numericEquals(normalizedLeftValue, condition.right) || leftValue === condition.right;
     
     case '!=':
@@ -105,6 +125,7 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
       if (Array.isArray(condition.right)) {
         return !condition.right.includes(leftValue);
       }
+      if (booleanEquals !== undefined) return !booleanEquals;
       return !(numericEquals(normalizedLeftValue, condition.right) || leftValue === condition.right);
     
     case '>':
