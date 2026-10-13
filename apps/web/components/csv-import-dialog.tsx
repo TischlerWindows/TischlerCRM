@@ -9,6 +9,7 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
+import { mapContactFullName, mergeCompositeTextSubField } from '@/lib/composite-text-import';
 import { PicklistValueMapping } from '@/components/picklist-value-mapping';
 import { SalesforceImportTemplateControls } from '@/components/salesforce-import-template-controls';
 import {
@@ -68,15 +69,30 @@ export default function CsvImportDialog({
     if (!objectDef?.fields) return [];
     return objectDef.fields
       .filter(f => !f.readOnly && f.apiName !== 'Id')
-      .map(f => ({
-        apiName: f.apiName.replace(`${objectApiName}__`, ''),
-        label: f.label,
-        type: f.type,
-        lookupObject: f.lookupObject,
-        picklistValues: f.picklistValues ?? [],
-        required: !!f.required,
-        isAutoNumber: !!f.autoNumber,
-      }));
+      .flatMap((field) => {
+        const parentApiName = field.apiName.replace(`${objectApiName}__`, '');
+        const parent = {
+          apiName: parentApiName,
+          label: field.label,
+          type: field.type,
+          lookupObject: field.lookupObject,
+          picklistValues: field.picklistValues ?? [],
+          required: !!field.required,
+          isAutoNumber: !!field.autoNumber,
+        };
+        if (field.type !== 'CompositeText') return [parent];
+
+        const subFields: Array<{ apiName: string; label: string; type: string; picklistValues?: string[] }> = field.subFields ?? [];
+        return [parent, ...subFields.map((subField) => ({
+          apiName: `${parentApiName}::${subField.apiName}`,
+          label: `${field.label} › ${subField.label}`,
+          type: subField.type,
+          lookupObject: undefined,
+          picklistValues: subField.picklistValues ?? [],
+          required: false,
+          isAutoNumber: false,
+        }))];
+      });
   }, [objectDef, objectApiName]);
 
   const propertyLookupFields = useMemo(
@@ -115,6 +131,19 @@ export default function CsvImportDialog({
     for (const header of headers) {
       if (objectApiName === 'Opportunity' && isSalesforceProjectAddressColumn(header)) continue;
       const headerLower = header.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      const compositeSubField = targetFields.find((field) => {
+        const separatorIndex = field.apiName.indexOf('::');
+        if (separatorIndex < 0) return false;
+        const subFieldApiName = field.apiName.slice(separatorIndex + 2);
+        const bareApiName = subFieldApiName.slice(subFieldApiName.lastIndexOf('_') + 1);
+        const subFieldLabel = field.label.split('›').pop()?.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        return bareApiName.toLowerCase() === headerLower || subFieldLabel === headerLower;
+      });
+      if (compositeSubField) {
+        mapping[header] = compositeSubField.apiName;
+        continue;
+      }
 
       // Salesforce Account.Type maps to Tischler's required Account Type field,
       // not the legacy generic `type` field when both exist.
@@ -432,9 +461,21 @@ export default function CsvImportDialog({
                 && selectedValue === PICKLIST_LEAVE_BLANK) mapped.__allowBlankAccountType = true;
               continue;
             }
-            mapped[targetField] = resolved.value;
-          } else if (val !== undefined && val !== null && val !== '') {
-            mapped[targetField] = val;
+            if (targetField.includes('::')) {
+              mergeCompositeTextSubField(mapped, objectApiName, targetField, resolved.value);
+            } else {
+              mapped[targetField] = resolved.value;
+            }
+            continue;
+          }
+          if (val !== undefined && val !== null && val !== '') {
+            if (targetField.includes('::')) {
+              mergeCompositeTextSubField(mapped, objectApiName, targetField, val);
+            } else if (objectApiName === 'Contact' && target?.type === 'CompositeText' && target.apiName.toLowerCase() === 'name') {
+              Object.assign(mapped, mapContactFullName(val));
+            } else {
+              mapped[targetField] = val;
+            }
           }
         }
       }
