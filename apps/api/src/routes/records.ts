@@ -1759,6 +1759,8 @@ export async function recordRoutes(app: FastifyInstance) {
     for (let i = 0; i < rows.length; i++) {
       try {
         const rawData = rows[i]!;
+        const allowBlankAccountType = apiName.toLowerCase() === 'account'
+          && rawData['__allowBlankAccountType'] === true;
         // Capture the original SF id before normalisation (used for idMap).
         // The frontend strips the SF Id column from the mapped record and instead
         // injects it as __sfId so it is always available regardless of column name.
@@ -1770,7 +1772,7 @@ export async function recordRoutes(app: FastifyInstance) {
         // Normalize keys, excluding the internal __sfId sentinel
         const normalizedData: Record<string, any> = {};
         for (const [key, value] of Object.entries(rawData)) {
-          if (key === '__sfId') continue; // internal sentinel — never stored
+          if (key === '__sfId' || key === '__allowBlankAccountType') continue; // internal import sentinels — never stored
           if (value === '' || value === null || value === undefined) continue; // skip empty
           normalizedData[key] = value;
           const stripped = key.replace(/^[A-Za-z]+__/, '');
@@ -1810,6 +1812,8 @@ export async function recordRoutes(app: FastifyInstance) {
         // Validate required fields
         const camelPrefix = apiName.charAt(0).toLowerCase() + apiName.slice(1);
         const missing = requiredFields.filter(f => {
+          const bareApiName = f.apiName.replace(/^Account__/i, '').toLowerCase();
+          if (allowBlankAccountType && ['accounttype', 'type'].includes(bareApiName)) return false;
           const nd = normalizedData;
           const direct = nd[f.apiName];
           const unprefixed = nd[f.apiName.replace(/^[A-Za-z]+__/, '')];

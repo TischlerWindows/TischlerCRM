@@ -11,7 +11,12 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import type { FieldDef, ObjectDef } from '@/lib/schema';
-import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
+import {
+  ACCOUNT_TYPE_LEAVE_BLANK,
+  getMappedSalesforceAccountTypeValue,
+  getSalesforceAccountTypeTarget,
+  mirrorAccountTypeImportAliases,
+} from '@/lib/salesforce-account-import';
 import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
@@ -625,8 +630,12 @@ export default function SalesforceImportPage() {
             : val;              // raw value (CRM UUID, text, etc.)
           mapped[`${objectApiName}__${targetField}`] = resolvedVal;
         }
-        if (objectApiName === 'Account' && !getMappedSalesforceAccountTypeValue(row, entry.columnMapping) && defaultAccountType) {
-          mapped.Account__accountType = defaultAccountType;
+        if (objectApiName === 'Account' && !getMappedSalesforceAccountTypeValue(row, entry.columnMapping)) {
+          if (defaultAccountType === ACCOUNT_TYPE_LEAVE_BLANK) {
+            mapped.__allowBlankAccountType = true;
+          } else if (defaultAccountType) {
+            mapped.Account__accountType = defaultAccountType;
+          }
         }
         mirrorAccountTypeImportAliases(objectApiName, mapped);
         const generatedPropertyId = generatedPropertyIds.get(sourceIndex);
@@ -1009,6 +1018,7 @@ export default function SalesforceImportPage() {
                   className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800"
                 >
                   <option value="">— Choose a default —</option>
+                  <option value={ACCOUNT_TYPE_LEAVE_BLANK}>Leave blank</option>
                   {accountTypeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
                 <p className="mt-1 text-xs text-amber-800">Applied only to blank Account Type/Type rows in the uploaded Account files.</p>

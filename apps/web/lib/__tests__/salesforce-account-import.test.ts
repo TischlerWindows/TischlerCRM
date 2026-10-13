@@ -1,4 +1,5 @@
 import {
+  ACCOUNT_TYPE_LEAVE_BLANK,
   getMappedSalesforceAccountTypeValue,
   getSalesforceAccountTypeTarget,
   mirrorAccountTypeImportAliases,
@@ -37,6 +38,13 @@ describe('Salesforce Account type mapping', () => {
   })
 
   it('does not invent a type value for blank source data', () => {
+    const record: Record<string, unknown> = {}
+    mirrorAccountTypeImportAliases('Account', record)
+    expect(record).toEqual({})
+  })
+
+  it('exposes a distinct explicit choice to leave Account Type blank', () => {
+    expect(ACCOUNT_TYPE_LEAVE_BLANK).toBe('__leave_blank__')
     const record: Record<string, unknown> = {}
     mirrorAccountTypeImportAliases('Account', record)
     expect(record).toEqual({})

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useMemo, useCallback } from 'react';
+                    <option value={ACCOUNT_TYPE_LEAVE_BLANK}>Leave blank</option>
 import Papa from 'papaparse';
 import {
   X, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, Check,
@@ -9,6 +10,7 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import {
+  ACCOUNT_TYPE_LEAVE_BLANK,
   getMappedSalesforceAccountTypeValue,
   getSalesforceAccountTypeTarget,
   mirrorAccountTypeImportAliases,
@@ -409,8 +411,13 @@ export default function CsvImportDialog({
           }
         }
       }
-      if (objectApiName === 'Account' && !getMappedSalesforceAccountTypeValue(row, columnMapping) && defaultAccountType) {
-        mapped.Account__accountType = defaultAccountType;
+      if (objectApiName === 'Account'
+        && !getMappedSalesforceAccountTypeValue(row, columnMapping)) {
+        if (defaultAccountType === ACCOUNT_TYPE_LEAVE_BLANK) {
+          mapped.__allowBlankAccountType = true;
+        } else if (defaultAccountType) {
+          mapped.Account__accountType = defaultAccountType;
+        }
       }
       mirrorAccountTypeImportAliases(objectApiName, mapped);
       const propertyId = propertyIdsByRow.get(sourceRow);
@@ -639,12 +646,13 @@ export default function CsvImportDialog({
                     className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800"
                   >
                     <option value="">— Choose a default —</option>
+                    <option value={ACCOUNT_TYPE_LEAVE_BLANK}>Leave blank</option>
                     {(accountTypeField?.picklistValues ?? []).map((value) => (
                       <option key={value} value={value}>{value}</option>
                     ))}
                   </select>
                   <p className="mt-1 text-xs text-amber-800">
-                    This value is used only when the mapped Account Type and Type columns are blank.
+                    Used only when mapped Account Type and Type columns are blank. Choose “Leave blank” to keep them empty.
                   </p>
                 </div>
               )}

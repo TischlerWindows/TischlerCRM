@@ -3,6 +3,8 @@ export interface SalesforceImportField {
   label: string
 }
 
+export const ACCOUNT_TYPE_LEAVE_BLANK = '__leave_blank__'
+
 function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
