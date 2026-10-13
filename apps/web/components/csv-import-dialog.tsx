@@ -43,6 +43,7 @@ export default function CsvImportDialog({
   const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [showPropertyMapping, setShowPropertyMapping] = useState(false);
+  const [propertyLookupField, setPropertyLookupField] = useState('property');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState(0);
@@ -60,10 +61,22 @@ export default function CsvImportDialog({
         apiName: f.apiName.replace(`${objectApiName}__`, ''),
         label: f.label,
         type: f.type,
+        lookupObject: f.lookupObject,
         required: !!f.required,
         isAutoNumber: !!f.autoNumber,
       }));
   }, [objectDef, objectApiName]);
+
+  const propertyLookupFields = useMemo(
+    () => targetFields.filter((field) =>
+      field.lookupObject === 'Property'
+      && ['Lookup', 'Connection', 'ConnectionContact', 'ConnectionAccount', 'ExternalLookup'].includes(field.type),
+    ),
+    [targetFields],
+  );
+  const selectedPropertyLookupField = propertyLookupFields.some((field) => field.apiName === propertyLookupField)
+    ? propertyLookupField
+    : propertyLookupFields.find((field) => field.apiName === 'property')?.apiName ?? propertyLookupFields[0]?.apiName ?? '';
 
   const reset = useCallback(() => {
     setStep('upload');
@@ -71,6 +84,7 @@ export default function CsvImportDialog({
     setCsvRows([]);
     setColumnMapping({});
     setShowPropertyMapping(false);
+    setPropertyLookupField('property');
     setImportResult(null);
     setParseError(null);
     setImportProgress(0);
@@ -274,6 +288,11 @@ export default function CsvImportDialog({
   }, [csvRows, objectApiName]);
 
   const handleImport = async () => {
+    if (objectApiName === 'Opportunity' && !selectedPropertyLookupField) {
+      setParseError('Select an Opportunity lookup field that points to Property before importing.');
+      setStep('mapping');
+      return;
+    }
     setStep('importing');
     setImportProgress(0);
 
@@ -364,7 +383,7 @@ export default function CsvImportDialog({
         }
       }
       const propertyId = propertyIdsByRow.get(sourceRow);
-      if (propertyId) mapped['Opportunity__property'] = propertyId;
+      if (propertyId) mapped[`${objectApiName}__${selectedPropertyLookupField}`] = propertyId;
       return mapped;
     });
 
@@ -591,6 +610,23 @@ export default function CsvImportDialog({
                         <span className="text-gray-700">{mapping.target}</span>
                       </div>
                     ))}
+                    <div className="grid grid-cols-2 items-center gap-4 px-4 py-3 text-sm">
+                      <span className="font-medium text-gray-800">Generated Property</span>
+                      {propertyLookupFields.length > 0 ? (
+                        <select
+                          aria-label="Opportunity Property lookup field"
+                          value={selectedPropertyLookupField}
+                          onChange={(event) => setPropertyLookupField(event.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        >
+                          {propertyLookupFields.map((field) => (
+                            <option key={field.apiName} value={field.apiName}>{field.label} ({field.apiName})</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-amber-700">No Opportunity lookup field targets Property.</span>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1 border-t border-gray-100 px-4 py-3 text-xs text-gray-600">
                     <p>{propertyAddressCounts.ready} Properties will be created and linked.</p>
@@ -815,6 +851,7 @@ export default function CsvImportDialog({
             {step === 'preview' && (
               <button
                 onClick={handleImport}
+                disabled={objectApiName === 'Opportunity' && !selectedPropertyLookupField}
                 className="inline-flex items-center px-4 py-2 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
               >
                 <Upload className="w-4 h-4 mr-1.5" />

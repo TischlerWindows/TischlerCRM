@@ -248,6 +248,7 @@ export default function SalesforceImportPage() {
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const [showGeneratedPropertyTab, setShowGeneratedPropertyTab] = useState(false);
+  const [propertyLookupField, setPropertyLookupField] = useState('property');
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [importProgress, setImportProgress] = useState<Record<string, number>>({});
   const [results, setResults] = useState<ObjectResult[]>([]);
@@ -256,6 +257,25 @@ export default function SalesforceImportPage() {
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
 
   const crmObjects = useMemo(() => schema?.objects ?? [], [schema]);
+  const opportunityEntries = useMemo(
+    () => files.filter((entry) => entry.detectedObject === 'Opportunity'),
+    [files],
+  );
+  const propertyLookupFields = useMemo(() => {
+    const opportunity = crmObjects.find((object) => object.apiName === 'Opportunity');
+    return (opportunity?.fields ?? [])
+      .filter((field) =>
+        field.lookupObject === 'Property'
+        && ['Lookup', 'Connection', 'ConnectionContact', 'ConnectionAccount', 'ExternalLookup'].includes(field.type),
+      )
+      .map((field) => ({
+        apiName: field.apiName.replace(/^Opportunity__/, ''),
+        label: field.label,
+      }));
+  }, [crmObjects]);
+  const selectedPropertyLookupField = propertyLookupFields.some((field) => field.apiName === propertyLookupField)
+    ? propertyLookupField
+    : propertyLookupFields.find((field) => field.apiName === 'property')?.apiName ?? propertyLookupFields[0]?.apiName ?? '';
 
   // ── File handling ──────────────────────────────────────────────
 
@@ -429,6 +449,12 @@ export default function SalesforceImportPage() {
   // ── Run import ────────────────────────────────────────────────
 
   const runImport = useCallback(async () => {
+    if (opportunityEntries.length > 0 && !selectedPropertyLookupField) {
+      setParseErrors(['Select an Opportunity lookup field that points to Property before importing.']);
+      setShowGeneratedPropertyTab(true);
+      setStep('map');
+      return;
+    }
     setIsImporting(true);
     setStep('import');
     setImportProgress({});
@@ -575,7 +601,7 @@ export default function SalesforceImportPage() {
           mapped[`${objectApiName}__${targetField}`] = resolvedVal;
         }
         const generatedPropertyId = generatedPropertyIds.get(sourceIndex);
-        if (generatedPropertyId) mapped['Opportunity__property'] = generatedPropertyId;
+        if (generatedPropertyId) mapped[`${objectApiName}__${selectedPropertyLookupField}`] = generatedPropertyId;
         return mapped;
       });
 
@@ -635,7 +661,7 @@ export default function SalesforceImportPage() {
     setResults(allResults);
     setIsImporting(false);
     setStep('results');
-  }, [sortedFiles, crmObjects]);
+  }, [sortedFiles, crmObjects, opportunityEntries, selectedPropertyLookupField]);
 
   // ── Derived ────────────────────────────────────────────────────
 
@@ -643,10 +669,6 @@ export default function SalesforceImportPage() {
   const totalRows = files.reduce((sum, f) => sum + f.rows.length, 0);
 
   const activeEntry = files[activeFileIdx];
-  const opportunityEntries = useMemo(
-    () => files.filter((entry) => entry.detectedObject === 'Opportunity'),
-    [files],
-  );
   const generatedPropertyAddressCounts = useMemo(() => {
     let ready = 0;
     let invalid = 0;
@@ -901,7 +923,8 @@ export default function SalesforceImportPage() {
                 </button>
                 <button
                   onClick={runImport}
-                  className="inline-flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                  disabled={opportunityEntries.length > 0 && !selectedPropertyLookupField}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Database className="w-4 h-4" /> Start Import ({totalRows.toLocaleString()} rows)
                 </button>
@@ -965,6 +988,25 @@ export default function SalesforceImportPage() {
                           <td className="px-4 py-2.5 text-sm text-gray-700">{mapping.target}</td>
                         </tr>
                       ))}
+                      <tr>
+                        <td className="px-4 py-2.5 font-medium text-gray-800">Generated Property</td>
+                        <td className="px-4 py-2.5">
+                          {propertyLookupFields.length > 0 ? (
+                            <select
+                              aria-label="Opportunity Property lookup field"
+                              value={selectedPropertyLookupField}
+                              onChange={(event) => setPropertyLookupField(event.target.value)}
+                              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                            >
+                              {propertyLookupFields.map((field) => (
+                                <option key={field.apiName} value={field.apiName}>{field.label} ({field.apiName})</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-sm text-amber-700">No Opportunity lookup field targets Property.</span>
+                          )}
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
