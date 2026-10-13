@@ -931,18 +931,11 @@ export default function SalesforceImportPage() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Salesforce ID Column</label>
-                          <p className="mb-1 text-[11px] text-gray-500">This Salesforce ID becomes the CRM Record ID and reconnects imported relationships.</p>
-                          <select
-                            value={entry.sfIdColumn ?? ''}
-                            onChange={(e) => updateSfIdColumn(idx, e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
-                          >
-                            <option value="">— None —</option>
-                            {entry.headers.map((h) => (
-                              <option key={h} value={h}>{h}</option>
-                            ))}
-                          </select>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Salesforce Source ID</label>
+                          <p className="mb-1 text-[11px] text-gray-500">This detected Salesforce ID becomes the CRM Record ID and reconnects imported relationships.</p>
+                          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-blue-800">
+                            {entry.sfIdColumn ?? 'No Id column detected; a CRM Record ID will be generated.'}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1052,11 +1045,18 @@ export default function SalesforceImportPage() {
                   setPropertyLookupField(config.propertyLookupField ?? 'property')
                 }}
               />
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Salesforce Source ID</label>
+            )}
             {unmappedPicklistValueCount > 0 && (
-                          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-blue-800">
-                            {entry.sfIdColumn ?? 'No Id column detected; a CRM Record ID will be generated.'}
-                          </div>
+              <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Map every source value for mapped Picklist columns before importing.
+              </p>
+            )}
+
+            {showGeneratedPropertyTab ? (
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-gray-800">Generated Property records</h3>
                     <p className="mt-1 text-sm text-gray-500">Created from Project Address fields in each Opportunity. The generated Property is written to the Opportunity&apos;s Property lookup. Missing coordinates are looked up with the configured Google Maps integration; failed lookups are reported without blocking the import.</p>
                   </div>
                   <span className="text-sm text-gray-500">{generatedPropertyAddressCounts.ready} generated</span>
