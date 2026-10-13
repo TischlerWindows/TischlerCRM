@@ -4,7 +4,7 @@ import { useState, useRef, useMemo, useCallback } from 'react';
 import Papa from 'papaparse';
 import {
   X, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, Check,
-  AlertCircle, CheckCircle, Loader2, Download
+  AlertCircle, CheckCircle, Loader2, Download, Search
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -56,6 +56,7 @@ export default function CsvImportDialog({
   const [step, setStep] = useState<Step>('upload');
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
+  const [mappingSearchQuery, setMappingSearchQuery] = useState('');
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [picklistValueMappings, setPicklistValueMappings] = useState<Record<string, Record<string, string>>>({});
   const [showPropertyMapping, setShowPropertyMapping] = useState(false);
@@ -113,6 +114,7 @@ export default function CsvImportDialog({
     setStep('upload');
     setCsvHeaders([]);
     setCsvRows([]);
+    setMappingSearchQuery('');
     setColumnMapping({});
     setPicklistValueMappings({});
     setShowPropertyMapping(false);
@@ -277,6 +279,7 @@ export default function CsvImportDialog({
 
         setCsvHeaders(headers);
         setCsvRows(rows);
+        setMappingSearchQuery('');
         setColumnMapping(autoMapColumns(headers));
         setPicklistValueMappings({});
         setStep('mapping');
@@ -300,6 +303,16 @@ export default function CsvImportDialog({
 
   // Count how many columns are mapped
   const mappedCount = Object.values(columnMapping).filter(v => v !== '' && v !== '__skip__').length;
+  const normalizedMappingSearch = mappingSearchQuery.trim().toLowerCase();
+  const filteredCsvHeaders = normalizedMappingSearch
+    ? csvHeaders.filter((header) => {
+        const mappedTarget = targetFields.find((field) => field.apiName === columnMapping[header]);
+        return header.toLowerCase().includes(normalizedMappingSearch)
+          || (mappedTarget?.label.toLowerCase().includes(normalizedMappingSearch) ?? false)
+          || (mappedTarget?.apiName.toLowerCase().includes(normalizedMappingSearch) ?? false)
+          || csvRows.slice(0, 3).some((row) => row[header]?.toLowerCase().includes(normalizedMappingSearch));
+      })
+    : csvHeaders;
   const picklistMappingColumns = csvHeaders.flatMap((header) => {
     const field = targetFields.find((target) => target.apiName === columnMapping[header] && target.type === 'Picklist');
     return field ? [{ header, field }] : [];
@@ -771,7 +784,26 @@ export default function CsvImportDialog({
                 </div>
               ) : (
               <div role="tabpanel" className="border border-gray-200 rounded-lg divide-y divide-gray-200">
-                {csvHeaders.map(header => {
+                <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-3">
+                  <label className="relative block">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="search"
+                      autoComplete="off"
+                      aria-label="Search CSV fields"
+                      placeholder="Search CSV fields..."
+                      value={mappingSearchQuery}
+                      onChange={(event) => setMappingSearchQuery(event.target.value)}
+                      className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm placeholder:text-gray-400 focus:border-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                    />
+                  </label>
+                  {normalizedMappingSearch && (
+                    <p className="mt-1.5 text-xs text-gray-500">
+                      Showing {filteredCsvHeaders.length} of {csvHeaders.length} fields
+                    </p>
+                  )}
+                </div>
+                {filteredCsvHeaders.map(header => {
                   const sampleValues = csvRows.slice(0, 3).map(r => r[header]).filter(Boolean);
                   const targetField = targetFields.find((field) => field.apiName === columnMapping[header]);
                   const isNativeId = isNativeRecordIdColumn(header);
@@ -829,6 +861,9 @@ export default function CsvImportDialog({
                     </div>
                   );
                 })}
+                {filteredCsvHeaders.length === 0 && (
+                  <p className="px-4 py-6 text-center text-sm text-gray-500">No matching CSV fields.</p>
+                )}
               </div>
               )}
 
