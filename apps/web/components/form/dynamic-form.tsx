@@ -626,10 +626,17 @@ export default function DynamicForm({
     visibleTabs.forEach((tab) => {
       tab.regions.forEach((region) => {
         if (isHiddenByLifecycle(region as any, layoutType)) return;
+        if (!evaluateVisibility(region.visibleIf, formData, visibilityCtx, region.visibleIfLogic)) return;
+        if ((region as any).showInTemplate === false) return;
+        if (getFormattingEffectsForRegion(layout, region.id, formData, visibilityCtx)?.hidden) return;
         region.panels.forEach((panel) => {
           if (isHiddenByLifecycle(panel as any, layoutType)) return;
+          if (panel.hidden) return;
+          if (!evaluateVisibility(panel.visibleIf, formData, visibilityCtx, panel.visibleIfLogic)) return;
+          if (getFormattingEffectsForPanel(layout, panel.id, formData, visibilityCtx)?.hidden) return;
           panel.fields.forEach((field) => {
             if (isHiddenByLifecycle(field as any, layoutType)) return;
+            if ((field as any).hidden) return;
             const fd = getFieldDef(field.fieldApiName, field as any);
             if (!fd) return;
             // Skip conditionally-hidden fields (object-wide or placement-level
@@ -637,7 +644,8 @@ export default function DynamicForm({
             // by being flagged as a missing required value.
             if (
               !evaluateVisibility(fd.visibleIf, formData, visibilityCtx, fd.visibleIfLogic) ||
-              !evaluateVisibility(field.visibleIf, formData, visibilityCtx, field.visibleIfLogic)
+              !evaluateVisibility(field.visibleIf, formData, visibilityCtx, field.visibleIfLogic) ||
+              getFormattingEffectsForField(layout, fd.apiName, formData, visibilityCtx)?.hidden
             ) return;
             pairs.push({ panelField: field, fieldDef: fd });
           });
@@ -1806,6 +1814,7 @@ export default function DynamicForm({
                   .sort((a, b) => a.order - b.order)
                   .filter((p) => {
                     if (p.hidden) return false;
+                    if (isHiddenByLifecycle(p as any, layoutType)) return false;
                     if ((p.visibleIf?.length ?? 0) > 0 && !evaluateVisibility(p.visibleIf, formData, visibilityCtx, p.visibleIfLogic)) return false;
                     const panelFx = getFormattingEffectsForPanel(layout, p.id, formData, visibilityCtx);
                     if (panelFx?.hidden) return false;
