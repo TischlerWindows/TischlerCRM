@@ -168,7 +168,6 @@ export function useEditorLifecycle(): EditorLifecycle {
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const addSection = useEditorStore((s) => s.addSection);
   const loadLayout = useEditorStore((s) => s.loadLayout);
-  const setFormattingRules = useEditorStore((s) => s.setFormattingRules);
 
   /* ---- Local UI state ---- */
   const [pendingNavHref, setPendingNavHref] = useState<string | null>(null);
@@ -221,7 +220,10 @@ export function useEditorLifecycle(): EditorLifecycle {
       return;
     }
 
-    const sessionId = getLayoutLockSessionId();
+    const sessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    layoutLockSessionRef.current = { layoutId, sessionId };
     let cancelled = false;
     let ownsLock = false;
     let requestPending = false;
@@ -240,9 +242,16 @@ export function useEditorLifecycle(): EditorLifecycle {
       requestPending = true;
       try {
         const result = await requestLayoutLock();
-        // A pending acquisition may resolve after unmount; leave its lease to
-        // expire rather than risk releasing a newer mount's same-session lock.
-        if (cancelled) return;
+        if (cancelled) {
+          if (result.ok) {
+            void apiClient.post(
+              `/layouts/${encodeURIComponent(layoutId)}/unlock`,
+              { sessionId },
+              { keepalive: true },
+            ).catch(() => {});
+          }
+          return;
+        }
         if (!result.ok) {
           ownsLock = false;
           setLayoutLock({

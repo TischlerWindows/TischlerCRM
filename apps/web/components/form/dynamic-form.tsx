@@ -310,7 +310,10 @@ export default function DynamicForm({
 
   // Current user
   const { user: authUser } = useAuth();
-  const visibilityCtx: VisibilityContext = { currentUserId: authUser?.id };
+  const visibilityCtx: VisibilityContext = useMemo(
+    () => ({ currentUserId: authUser?.id }),
+    [authUser?.id],
+  );
 
   // ── Layout resolution ─────────────────────────────────────────
   const layout = useMemo(() => {
@@ -353,6 +356,14 @@ export default function DynamicForm({
     return resolved;
   }, [object, layoutId, layoutType, layoutOverride, authUser?.profileId]);
 
+  const visibleTabs = useMemo(() => {
+    if (!layout) return [];
+    return layout.tabs.filter((tab) =>
+      !isHiddenByLifecycle(tab as any, layoutType) &&
+      evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic),
+    );
+  }, [layout, layoutType, formData, visibilityCtx]);
+
   const singleCardinalityRoles = useMemo(() => {
     const set = new Set<string>()
     if (!layout) return set
@@ -373,17 +384,12 @@ export default function DynamicForm({
   }, [layout])
 
   useEffect(() => {
-    if (layout && layout.tabs.length > 0) {
-      const isVisible = (tab: import('@/lib/schema').LayoutTab) =>
-        !isHiddenByLifecycle(tab as any, layoutType) &&
-        evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic);
-      const activeIsVisible = layout.tabs.some((tab) => tab.id === activeTab && isVisible(tab));
+    if (visibleTabs.length > 0) {
+      const activeIsVisible = visibleTabs.some((tab) => tab.id === activeTab);
       if (activeIsVisible) return;
-      const firstVisible = layout.tabs.find(isVisible);
-      if (firstVisible) setActiveTab(firstVisible.id);
-      else if (layout.tabs[0]) setActiveTab(layout.tabs[0].id);
+      setActiveTab(visibleTabs[0]!.id);
     }
-  }, [layout, activeTab, layoutType, formData, authUser?.id]);
+  }, [visibleTabs, activeTab]);
 
   // Auto-populate AutoUser fields
   useEffect(() => {
@@ -617,9 +623,7 @@ export default function DynamicForm({
       panelField: import('@/lib/schema').PanelField;
       fieldDef: FieldDef;
     }> = [];
-    layout.tabs.forEach((tab) => {
-      if (isHiddenByLifecycle(tab as any, layoutType)) return;
-      if (!evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic)) return;
+    visibleTabs.forEach((tab) => {
       tab.regions.forEach((region) => {
         if (isHiddenByLifecycle(region as any, layoutType)) return;
         region.panels.forEach((panel) => {
@@ -1544,13 +1548,9 @@ export default function DynamicForm({
         )}
 
         {/* Tabs */}
-        {!isWizardMode && layout.tabs.length > 1 && (
+        {!isWizardMode && visibleTabs.length > 1 && (
           <div className="flex gap-2 border-b px-6 pt-4 bg-white">
-            {layout.tabs
-              .filter((tab) =>
-                !isHiddenByLifecycle(tab as any, layoutType) &&
-                evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic))
-              .map((tab) => (
+            {visibleTabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -1784,9 +1784,7 @@ export default function DynamicForm({
                 </p>
               </div>
             </div>
-            {layout.tabs.filter((tab) =>
-              !isHiddenByLifecycle(tab as any, layoutType) &&
-              evaluateVisibility(tab.visibleIf, formData, visibilityCtx, tab.visibleIfLogic)).map((tab) =>
+            {visibleTabs.map((tab) =>
               tab.regions.flatMap((region) => {
                 const isRegionVisible = evaluateVisibility(
                   (region as any).visibleIf,
