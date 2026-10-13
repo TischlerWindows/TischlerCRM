@@ -1,4 +1,5 @@
 import {
+  getMappedSalesforceAccountTypeValue,
   getSalesforceAccountTypeTarget,
   mirrorAccountTypeImportAliases,
 } from '../salesforce-account-import'
@@ -15,6 +16,13 @@ describe('Salesforce Account type mapping', () => {
     expect(getSalesforceAccountTypeTarget('Opportunity', 'Type', [
       { apiName: 'type', label: 'Type' },
     ])).toBeNull()
+  })
+
+  it('prefers a nonblank Account Type value over the generic Type value', () => {
+    expect(getMappedSalesforceAccountTypeValue(
+      { Type: 'Prospect', Category: 'General Contractor' },
+      { Type: 'type', Category: 'accountType' },
+    )).toBe('General Contractor')
   })
 
   it('mirrors a supplied Account Type value to required aliases', () => {

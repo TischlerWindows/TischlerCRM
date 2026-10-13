@@ -8,7 +8,11 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
-import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
+import {
+  getMappedSalesforceAccountTypeValue,
+  getSalesforceAccountTypeTarget,
+  mirrorAccountTypeImportAliases,
+} from '@/lib/salesforce-account-import';
 import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
@@ -43,6 +47,7 @@ export default function CsvImportDialog({
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+  const [defaultAccountType, setDefaultAccountType] = useState('');
   const [showPropertyMapping, setShowPropertyMapping] = useState(false);
   const [propertyLookupField, setPropertyLookupField] = useState('property');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
@@ -63,6 +68,7 @@ export default function CsvImportDialog({
         label: f.label,
         type: f.type,
         lookupObject: f.lookupObject,
+        picklistValues: f.picklistValues ?? [],
         required: !!f.required,
         isAutoNumber: !!f.autoNumber,
       }));
@@ -78,12 +84,14 @@ export default function CsvImportDialog({
   const selectedPropertyLookupField = propertyLookupFields.some((field) => field.apiName === propertyLookupField)
     ? propertyLookupField
     : propertyLookupFields.find((field) => field.apiName === 'property')?.apiName ?? propertyLookupFields[0]?.apiName ?? '';
+  const accountTypeField = targetFields.find((field) => field.apiName.toLowerCase() === 'accounttype');
 
   const reset = useCallback(() => {
     setStep('upload');
     setCsvHeaders([]);
     setCsvRows([]);
     setColumnMapping({});
+    setDefaultAccountType('');
     setShowPropertyMapping(false);
     setPropertyLookupField('property');
     setImportResult(null);
@@ -256,7 +264,11 @@ export default function CsvImportDialog({
   const mappedCount = Object.values(columnMapping).filter(v => v !== '' && v !== '__skip__').length;
   const requiredMapped = targetFields
     .filter(f => f.required && !f.isAutoNumber)
-    .every(f => Object.values(columnMapping).includes(f.apiName));
+    .every((field) => Object.values(columnMapping).includes(field.apiName)
+      || (objectApiName === 'Account' && field.apiName.toLowerCase() === 'accounttype' && !!defaultAccountType));
+  const missingAccountTypeRows = objectApiName === 'Account'
+    ? csvRows.filter((row) => !getMappedSalesforceAccountTypeValue(row, columnMapping)).length
+    : 0;
 
   // Build preview data with mapped column names
   const previewRows = useMemo(() => {
@@ -298,6 +310,11 @@ export default function CsvImportDialog({
   }, [csvRows, objectApiName]);
 
   const handleImport = async () => {
+    if (objectApiName === 'Account' && missingAccountTypeRows > 0 && !defaultAccountType) {
+      setParseError('Choose a default Account Type for rows where the CSV Type value is blank.');
+      setStep('mapping');
+      return;
+    }
     if (objectApiName === 'Opportunity' && !selectedPropertyLookupField) {
       setParseError('Select an Opportunity lookup field that points to Property before importing.');
       setStep('mapping');
@@ -391,6 +408,9 @@ export default function CsvImportDialog({
             mapped[targetField] = val;
           }
         }
+      }
+      if (objectApiName === 'Account' && !getMappedSalesforceAccountTypeValue(row, columnMapping) && defaultAccountType) {
+        mapped.Account__accountType = defaultAccountType;
       }
       mirrorAccountTypeImportAliases(objectApiName, mapped);
       const propertyId = propertyIdsByRow.get(sourceRow);
@@ -607,6 +627,27 @@ export default function CsvImportDialog({
                   </button>
                 )}
               </div>
+              {objectApiName === 'Account' && missingAccountTypeRows > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <label htmlFor="account-type-default" className="block text-sm font-medium text-amber-900">
+                    Default Account Type for {missingAccountTypeRows} blank row{missingAccountTypeRows === 1 ? '' : 's'}
+                  </label>
+                  <select
+                    id="account-type-default"
+                    value={defaultAccountType}
+                    onChange={(event) => setDefaultAccountType(event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800"
+                  >
+                    <option value="">— Choose a default —</option>
+                    {(accountTypeField?.picklistValues ?? []).map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-amber-800">
+                    This value is used only when the mapped Account Type and Type columns are blank.
+                  </p>
+                </div>
+              )}
 
               {showPropertyMapping ? (
                 <div role="tabpanel" className="overflow-hidden rounded-lg border border-gray-200">
@@ -862,7 +903,8 @@ export default function CsvImportDialog({
             {step === 'preview' && (
               <button
                 onClick={handleImport}
-                disabled={objectApiName === 'Opportunity' && !selectedPropertyLookupField}
+                disabled={(objectApiName === 'Opportunity' && !selectedPropertyLookupField)
+                  || (objectApiName === 'Account' && missingAccountTypeRows > 0 && !defaultAccountType)}
                 className="inline-flex items-center px-4 py-2 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
               >
                 <Upload className="w-4 h-4 mr-1.5" />

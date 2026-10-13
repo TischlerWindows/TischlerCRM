@@ -257,6 +257,7 @@ export default function SalesforceImportPage() {
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const [showGeneratedPropertyTab, setShowGeneratedPropertyTab] = useState(false);
   const [propertyLookupField, setPropertyLookupField] = useState('property');
+  const [defaultAccountType, setDefaultAccountType] = useState('');
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [importProgress, setImportProgress] = useState<Record<string, number>>({});
   const [results, setResults] = useState<ObjectResult[]>([]);
@@ -267,6 +268,17 @@ export default function SalesforceImportPage() {
   const crmObjects = useMemo(() => schema?.objects ?? [], [schema]);
   const opportunityEntries = useMemo(
     () => files.filter((entry) => entry.detectedObject === 'Opportunity'),
+    [files],
+  );
+  const accountTypeOptions = useMemo(() => {
+    const account = crmObjects.find((object) => object.apiName === 'Account');
+    const accountTypeField = account?.fields.find((field) => field.apiName.toLowerCase().replace(/^account__/, '') === 'accounttype');
+    return accountTypeField?.picklistValues ?? [];
+  }, [crmObjects]);
+  const accountRowsMissingType = useMemo(
+    () => files
+      .filter((entry) => entry.detectedObject === 'Account')
+      .reduce((total, entry) => total + entry.rows.filter((row) => !getMappedSalesforceAccountTypeValue(row, entry.columnMapping)).length, 0),
     [files],
   );
   const propertyLookupFields = useMemo(() => {
@@ -457,6 +469,11 @@ export default function SalesforceImportPage() {
   // ── Run import ────────────────────────────────────────────────
 
   const runImport = useCallback(async () => {
+    if (accountRowsMissingType > 0 && !defaultAccountType) {
+      setParseErrors([`Choose a default Account Type for ${accountRowsMissingType} Account row${accountRowsMissingType === 1 ? '' : 's'} where the CSV Type value is blank.`]);
+      setStep('map');
+      return;
+    }
     if (opportunityEntries.length > 0 && !selectedPropertyLookupField) {
       setParseErrors(['Select an Opportunity lookup field that points to Property before importing.']);
       setShowGeneratedPropertyTab(true);
@@ -608,6 +625,9 @@ export default function SalesforceImportPage() {
             : val;              // raw value (CRM UUID, text, etc.)
           mapped[`${objectApiName}__${targetField}`] = resolvedVal;
         }
+        if (objectApiName === 'Account' && !getMappedSalesforceAccountTypeValue(row, entry.columnMapping) && defaultAccountType) {
+          mapped.Account__accountType = defaultAccountType;
+        }
         mirrorAccountTypeImportAliases(objectApiName, mapped);
         const generatedPropertyId = generatedPropertyIds.get(sourceIndex);
         if (generatedPropertyId) mapped[`${objectApiName}__${selectedPropertyLookupField}`] = generatedPropertyId;
@@ -670,7 +690,7 @@ export default function SalesforceImportPage() {
     setResults(allResults);
     setIsImporting(false);
     setStep('results');
-  }, [sortedFiles, crmObjects, opportunityEntries, selectedPropertyLookupField]);
+  }, [sortedFiles, crmObjects, opportunityEntries, selectedPropertyLookupField, accountRowsMissingType, defaultAccountType]);
 
   // ── Derived ────────────────────────────────────────────────────
 
@@ -678,6 +698,9 @@ export default function SalesforceImportPage() {
   const totalRows = files.reduce((sum, f) => sum + f.rows.length, 0);
 
   const activeEntry = files[activeFileIdx];
+  const activeAccountRowsMissingType = activeEntry?.detectedObject === 'Account'
+    ? activeEntry.rows.filter((row) => !getMappedSalesforceAccountTypeValue(row, activeEntry.columnMapping)).length
+    : 0;
   const generatedPropertyAddressCounts = useMemo(() => {
     let ready = 0;
     let invalid = 0;
@@ -932,7 +955,8 @@ export default function SalesforceImportPage() {
                 </button>
                 <button
                   onClick={runImport}
-                  disabled={opportunityEntries.length > 0 && !selectedPropertyLookupField}
+                  disabled={(opportunityEntries.length > 0 && !selectedPropertyLookupField)
+                    || (accountRowsMissingType > 0 && !defaultAccountType)}
                   className="inline-flex items-center gap-2 px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Database className="w-4 h-4" /> Start Import ({totalRows.toLocaleString()} rows)
@@ -972,6 +996,24 @@ export default function SalesforceImportPage() {
                 </button>
               )}
             </div>
+
+            {activeAccountRowsMissingType > 0 && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <label htmlFor="sf-account-type-default" className="block text-sm font-medium text-amber-900">
+                  Default Account Type for {activeAccountRowsMissingType} blank row{activeAccountRowsMissingType === 1 ? '' : 's'}
+                </label>
+                <select
+                  id="sf-account-type-default"
+                  value={defaultAccountType}
+                  onChange={(event) => setDefaultAccountType(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-gray-800"
+                >
+                  <option value="">— Choose a default —</option>
+                  {accountTypeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-amber-800">Applied only to blank Account Type/Type rows in the uploaded Account files.</p>
+              </div>
+            )}
 
             {showGeneratedPropertyTab ? (
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -1228,7 +1270,7 @@ export default function SalesforceImportPage() {
 
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => { setFiles([]); setResults([]); setStep('upload'); }}
+                onClick={() => { setFiles([]); setResults([]); setDefaultAccountType(''); setStep('upload'); }}
                 className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
                 Start New Import

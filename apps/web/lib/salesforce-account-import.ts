@@ -16,6 +16,20 @@ export function getSalesforceAccountTypeTarget(
   return fields.find((field) => normalize(field.apiName.replace(/^Account__/, '')) === 'accounttype')?.apiName ?? null
 }
 
+  export function getMappedSalesforceAccountTypeValue(
+    row: Record<string, string>,
+    columnMapping: Record<string, string>,
+  ): string {
+    for (const targetName of ['accounttype', 'type']) {
+      const sourceColumn = Object.entries(columnMapping).find(([, target]) =>
+        normalize(target.replace(/^Account__/, '')) === targetName,
+      )?.[0]
+      const value = sourceColumn ? row[sourceColumn]?.trim() : ''
+      if (value) return value
+    }
+    return ''
+  }
+
 export function mirrorAccountTypeImportAliases(
   objectApiName: string,
   record: Record<string, unknown>,
