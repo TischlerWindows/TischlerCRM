@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useRef, useMemo, useCallback } from 'react';
+import { useState, useRef, useMemo, useCallback, useEffect, useId } from 'react';
+import { createPortal } from 'react-dom';
 import Papa from 'papaparse';
 import {
   X, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, Check,
-  AlertCircle, CheckCircle, Loader2, Download, Search
+  AlertCircle, CheckCircle, Loader2, Download, Search, ChevronDown
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -38,6 +39,183 @@ type Step = 'upload' | 'mapping' | 'preview' | 'importing' | 'results';
 
 function isNativeRecordIdColumn(header: string): boolean {
   return header.trim().toLowerCase() === 'id';
+}
+
+interface MappingTargetOption {
+  apiName: string;
+  label: string;
+  type: string;
+  required?: boolean;
+}
+
+function SearchableMappingTarget({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  value: string;
+  options: MappingTargetOption[];
+  onChange: (value: string) => void;
+  ariaLabel: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [position, setPosition] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  const selected = options.find((option) => option.apiName === value);
+  const displayValue = value === '__skip__'
+    ? '— Skip this column —'
+    : selected
+      ? `${selected.label}${selected.required ? ' *' : ''} (${selected.type})`
+      : '';
+  const filteredOptions = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return options;
+    return options.filter((option) =>
+      option.label.toLowerCase().includes(normalized)
+      || option.apiName.toLowerCase().includes(normalized)
+      || option.type.toLowerCase().includes(normalized),
+    );
+  }, [options, query]);
+
+  const updatePosition = useCallback(() => {
+    const rect = inputRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const availableAbove = Math.max(0, rect.top - 8);
+    const availableBelow = Math.max(0, window.innerHeight - rect.bottom - 8);
+    const desiredHeight = Math.min(320, (filteredOptions.length + 1) * 40 + 8);
+    const placeAbove = availableBelow < desiredHeight && availableAbove > availableBelow;
+    const available = placeAbove ? availableAbove : availableBelow;
+    const maxHeight = Math.max(80, Math.min(320, available));
+    const menuHeight = Math.min(desiredHeight, maxHeight);
+    setPosition({
+      top: placeAbove ? Math.max(4, rect.top - menuHeight - 4) : rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+      maxHeight,
+    });
+  }, [filteredOptions.length]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!containerRef.current?.contains(target) && !menuRef.current?.contains(target)) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isOpen, updatePosition]);
+
+  const choose = (nextValue: string) => {
+    onChange(nextValue);
+    setQuery('');
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      <div className="relative">
+        <input
+          ref={inputRef}
+          role="combobox"
+          aria-label={ariaLabel}
+          aria-autocomplete="list"
+          aria-expanded={isOpen}
+          aria-controls={listboxId}
+          autoComplete="off"
+          value={isOpen ? query : displayValue}
+          onFocus={() => {
+            setQuery('');
+            setIsOpen(true);
+          }}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setIsOpen(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setIsOpen(false);
+            if (event.key === 'ArrowDown' && !isOpen) setIsOpen(true);
+            if (event.key === 'Enter' && isOpen && filteredOptions[0]) {
+              event.preventDefault();
+              choose(filteredOptions[0].apiName);
+            }
+          }}
+          placeholder="Search CRM fields..."
+          className={`h-9 w-full rounded-md border px-3 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/20 ${
+            value && value !== '__skip__'
+              ? 'border-green-300 bg-green-50 text-green-900 focus:border-brand-navy'
+              : 'border-gray-300 bg-white text-gray-700 focus:border-brand-navy'
+          }`}
+        />
+        <button
+          type="button"
+          aria-label={isOpen ? 'Close CRM field options' : 'Search CRM field options'}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            if (isOpen) setIsOpen(false);
+            else {
+              setQuery('');
+              setIsOpen(true);
+              inputRef.current?.focus();
+            }
+          }}
+          className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-gray-500"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
+      </div>
+      {isOpen && position && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          id={listboxId}
+          role="listbox"
+          style={{ top: position.top, left: position.left, width: position.width, maxHeight: position.maxHeight }}
+          className="fixed z-[60] overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-xl"
+        >
+          <button
+            type="button"
+            role="option"
+            aria-selected={value === '__skip__'}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => choose('__skip__')}
+            className="w-full px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-50"
+          >
+            — Skip this column —
+          </button>
+          {filteredOptions.map((option) => (
+            <button
+              type="button"
+              role="option"
+              aria-selected={value === option.apiName}
+              key={option.apiName}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => choose(option.apiName)}
+              className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${value === option.apiName ? 'bg-blue-50 text-brand-navy' : 'text-gray-700'}`}
+            >
+              {option.label}{option.required ? ' *' : ''} ({option.type})
+            </button>
+          ))}
+          {filteredOptions.length === 0 && (
+            <p className="px-3 py-3 text-sm text-gray-500">No matching CRM fields.</p>
+          )}
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
 }
 
 interface ImportResult {
@@ -823,28 +1001,15 @@ export default function CsvImportDialog({
                           This source ID will be used as the CRM Record ID.
                         </div>
                       ) : <div className="flex-1">
-                        <select
+                        <SearchableMappingTarget
                           value={columnMapping[header] || '__skip__'}
-                          onChange={e => {
-                            setColumnMapping({ ...columnMapping, [header]: e.target.value })
+                          ariaLabel={`CRM field for ${header}`}
+                          options={targetFields.filter((field) => !field.isAutoNumber)}
+                          onChange={(value) => {
+                            setColumnMapping({ ...columnMapping, [header]: value })
                             setPicklistValueMappings((previous) => ({ ...previous, [header]: {} }))
                           }}
-                          className={`w-full border rounded-lg px-3 py-2 text-sm ${
-                            columnMapping[header] && columnMapping[header] !== '__skip__'
-                              ? 'border-green-300 bg-green-50 text-green-900'
-                              : 'border-gray-300 text-gray-700'
-                          }`}
-                        >
-                          <option value="__skip__">— Skip this column —</option>
-                          {targetFields
-                            .filter(f => !f.isAutoNumber)
-                            .map(f => (
-                              <option key={f.apiName} value={f.apiName}>
-                                {f.label}{f.required ? ' *' : ''} ({f.type})
-                              </option>
-                            ))
-                          }
-                        </select>
+                        />
                         {targetField?.type === 'Picklist' && (
                           <PicklistValueMapping
                             column={header}
