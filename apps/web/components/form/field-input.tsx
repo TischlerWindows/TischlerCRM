@@ -1063,60 +1063,62 @@ export function FieldInput({
             disabled={isReadOnly}
           />
           {isPlkLookupActive && (
-            <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-              <button
-                type="button"
-                onClick={() => {
-                  onFieldChange(fieldDef.apiName, {
-                    ...plkValue,
-                    lookup: '',
-                  });
-                  onLookupQueryChange(fieldDef.apiName + '__lookup', '');
-                }}
-                className={cn(
-                  'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
-                  !plkValue.lookup && 'bg-blue-50',
-                )}
-              >
-                -- None --
-              </button>
-              {plkFilteredRecords.length > 0 ? (
-                plkFilteredRecords.slice(0, 20).map((record) => {
-                  const label = getRecordLabel(record);
-                  const displayLabel =
-                    typeof label === 'string'
-                      ? label
-                      : String(label || 'Record');
-                  return (
-                    <button
-                      key={record.id}
-                      type="button"
-                      onClick={() => {
-                        onFieldChange(fieldDef.apiName, {
-                          ...plkValue,
-                          lookup: record.id,
-                        });
-                        onLookupQueryChange(
-                          fieldDef.apiName + '__lookup',
-                          displayLabel,
-                        );
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                    >
-                      <div className="font-medium text-gray-900 truncate">
-                        {displayLabel}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {record.id}
-                      </div>
-                    </button>
-                  );
-                })
-              ) : plkLookupQuery ? (
-                <div className="px-3 py-2 text-xs text-gray-500">
-                  No matches found.
-                </div>
-              ) : null}
+            <div className="absolute z-20 mt-1 flex max-h-56 w-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onFieldChange(fieldDef.apiName, {
+                      ...plkValue,
+                      lookup: '',
+                    });
+                    onLookupQueryChange(fieldDef.apiName + '__lookup', '');
+                  }}
+                  className={cn(
+                    'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
+                    !plkValue.lookup && 'bg-blue-50',
+                  )}
+                >
+                  -- None --
+                </button>
+                {plkFilteredRecords.length > 0 ? (
+                  plkFilteredRecords.slice(0, 20).map((record) => {
+                    const label = getRecordLabel(record);
+                    const displayLabel =
+                      typeof label === 'string'
+                        ? label
+                        : String(label || 'Record');
+                    return (
+                      <button
+                        key={record.id}
+                        type="button"
+                        onClick={() => {
+                          onFieldChange(fieldDef.apiName, {
+                            ...plkValue,
+                            lookup: record.id,
+                          });
+                          onLookupQueryChange(
+                            fieldDef.apiName + '__lookup',
+                            displayLabel,
+                          );
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                      >
+                        <div className="font-medium text-gray-900 truncate">
+                          {displayLabel}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {record.id}
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : plkLookupQuery ? (
+                  <div className="px-3 py-2 text-xs text-gray-500">
+                    No matches found.
+                  </div>
+                ) : null}
+              </div>
               {plkTargetApi &&
                 (() => {
                   const targetObj = schema?.objects?.find(
@@ -1129,7 +1131,7 @@ export function FieldInput({
                       onClick={() =>
                         onInlineCreate(plkTargetApi, fieldDef.apiName)
                       }
-                      className="w-full px-3 py-2 text-left text-sm font-medium text-indigo-600 hover:bg-indigo-50 border-t border-gray-100 rounded-b-lg"
+                      className="w-full flex-none px-3 py-2 text-left text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 border-t border-gray-100 rounded-b-lg"
                     >
                       + Create new {createLabel}
                     </button>

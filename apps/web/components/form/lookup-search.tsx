@@ -423,65 +423,67 @@ export function LookupSearch({
         className={cn(error && 'border-red-500')}
       />
       {isActive && (
-        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-          {!hideNoneOption && (
-            <button
-              type="button"
-              onClick={() => {
-                onChange('');
-                onQueryChange('');
-              }}
-              className={cn(
-                'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
-                !value && 'bg-blue-50',
-              )}
-            >
-              -- None --
-            </button>
-          )}
-          {filteredRecords.length > 0 ? (
-            filteredRecords.slice(0, 20).map((record) => {
-              const label = getRecordLabel(record);
-              const displayLabel =
-                typeof label === 'string' ? label : String(label || 'Record');
-              return (
-                <button
-                  key={record.id}
-                  type="button"
-                  onClick={() => {
-                    // Seed the global lookup cache with the picked record so
-                    // resolveLookupDisplayName (used by the wizard Review
-                    // step's read-only slot widgets, the team-member-slot
-                    // bound row pills, and anywhere else) finds the record
-                    // on the very next render. Without this seed, the user
-                    // sees the raw id flash on Review until the cache's
-                    // background fetch completes (or until a 30s TTL
-                    // expires) — surfaced by QA round 4 as the only loose
-                    // end after the P0 snapshot fix landed.
-                    if (targetApi) {
-                      upsertLookupCacheRecord(targetApi, record);
-                    }
-                    onChange(record.id);
-                    onQueryChange(displayLabel);
-                  }}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                >
-                  <div className="font-medium text-gray-900 truncate">
-                    {displayLabel}
-                  </div>
-                  {(getRecordSubtext(record)) && (
-                    <div className="text-xs text-gray-500 truncate">
-                      {getRecordSubtext(record)}
+        <div className="absolute z-20 mt-1 flex max-h-56 w-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {!hideNoneOption && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('');
+                  onQueryChange('');
+                }}
+                className={cn(
+                  'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
+                  !value && 'bg-blue-50',
+                )}
+              >
+                -- None --
+              </button>
+            )}
+            {filteredRecords.length > 0 ? (
+              filteredRecords.slice(0, 20).map((record) => {
+                const label = getRecordLabel(record);
+                const displayLabel =
+                  typeof label === 'string' ? label : String(label || 'Record');
+                return (
+                  <button
+                    key={record.id}
+                    type="button"
+                    onClick={() => {
+                      // Seed the global lookup cache with the picked record so
+                      // resolveLookupDisplayName (used by the wizard Review
+                      // step's read-only slot widgets, the team-member-slot
+                      // bound row pills, and anywhere else) finds the record
+                      // on the very next render. Without this seed, the user
+                      // sees the raw id flash on Review until the cache's
+                      // background fetch completes (or until a 30s TTL
+                      // expires) — surfaced by QA round 4 as the only loose
+                      // end after the P0 snapshot fix landed.
+                      if (targetApi) {
+                        upsertLookupCacheRecord(targetApi, record);
+                      }
+                      onChange(record.id);
+                      onQueryChange(displayLabel);
+                    }}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                  >
+                    <div className="font-medium text-gray-900 truncate">
+                      {displayLabel}
                     </div>
-                  )}
-                </button>
-              );
-            })
-          ) : lookupQuery ? (
-            <div className="px-3 py-2 text-xs text-gray-500">
-              No matches found.
-            </div>
-          ) : null}
+                    {getRecordSubtext(record) && (
+                      <div className="text-xs text-gray-500 truncate">
+                        {getRecordSubtext(record)}
+                      </div>
+                    )}
+                  </button>
+                );
+              })
+            ) : lookupQuery ? (
+              <div className="px-3 py-2 text-xs text-gray-500">
+                No matches found.
+              </div>
+            ) : null}
+          </div>
           {targetApi &&
             onInlineCreate &&
             (() => {
@@ -493,7 +495,7 @@ export function LookupSearch({
                 <button
                   type="button"
                   onClick={() => onInlineCreate(targetApi)}
-                  className="w-full px-3 py-2 text-left text-sm font-medium text-indigo-600 hover:bg-indigo-50 border-t border-gray-100 rounded-b-lg"
+                  className="w-full flex-none px-3 py-2 text-left text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 border-t border-gray-100 rounded-b-lg"
                 >
                   + Create new {createLabel}
                 </button>

@@ -2176,7 +2176,7 @@ export default function DynamicForm({
             }
           }}
         >
-          <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogContent className="flex h-[94vh] max-h-[94vh] w-[96vw] max-w-[80rem] flex-col gap-0 overflow-hidden p-0">
             <DialogHeader className="px-6 pt-6 pb-4 border-b">
               <DialogTitle>
                 Create New{' '}
@@ -2185,10 +2185,7 @@ export default function DynamicForm({
                 )?.label || inlineCreateTarget}
               </DialogTitle>
             </DialogHeader>
-            <div
-              className="overflow-hidden"
-              style={{ height: 'calc(90vh - 80px)' }}
-            >
+            <div className="min-h-0 flex-1 overflow-hidden">
               <DynamicForm
                 objectApiName={inlineCreateTarget!}
                 layoutType="create"
