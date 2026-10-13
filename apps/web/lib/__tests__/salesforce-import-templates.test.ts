@@ -7,18 +7,18 @@ import {
   SALESFORCE_IMPORT_TEMPLATES_KEY,
   saveSalesforceImportTemplate,
 } from '../salesforce-import-templates'
-import { getPreference, setPreference } from '../preferences'
+import { getPreference, setPreferenceAndWait } from '../preferences'
 
 jest.mock('../preferences', () => ({
   getPreference: jest.fn(),
-  setPreference: jest.fn(),
+  setPreferenceAndWait: jest.fn(),
 }))
 
 describe('Salesforce import picklist mappings', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     jest.mocked(getPreference).mockResolvedValue({})
-    jest.mocked(setPreference).mockResolvedValue(undefined)
+    jest.mocked(setPreferenceAndWait).mockResolvedValue(undefined)
   })
 
   it('collects distinct nonblank and blank source values', () => {
@@ -59,7 +59,7 @@ describe('Salesforce import picklist mappings', () => {
     }
 
     const saved = await saveSalesforceImportTemplate('Contact', 'Contact import', config)
-    expect(setPreference).toHaveBeenCalledWith(
+    expect(setPreferenceAndWait).toHaveBeenCalledWith(
       SALESFORCE_IMPORT_TEMPLATES_KEY,
       expect.objectContaining({
         Contact: [expect.objectContaining({ config: expect.objectContaining({ checkboxRules }) })],
@@ -69,5 +69,34 @@ describe('Salesforce import picklist mappings', () => {
     jest.mocked(getPreference).mockResolvedValueOnce({ Contact: saved })
     await expect(loadSalesforceImportTemplates('Contact')).resolves.toEqual(saved)
     expect(saved[0]?.config.checkboxRules).toEqual(checkboxRules)
+  })
+
+  it('waits for the preferences write before reporting a template save as complete', async () => {
+    let finishWrite: (() => void) | undefined
+    jest.mocked(setPreferenceAndWait).mockImplementationOnce(() => new Promise<void>((resolve) => {
+      finishWrite = resolve
+    }))
+
+    let completed = false
+    const savePromise = saveSalesforceImportTemplate('Contact', 'Contact import', {
+      columnMapping: {},
+      picklistValueMappings: {},
+      checkboxRules: [{
+        id: 'rule-1',
+        targetField: 'homeownerAccount',
+        sourceColumn: 'Account Name',
+        condition: 'has-value',
+      }],
+    }).then((templates) => {
+      completed = true
+      return templates
+    })
+
+    await Promise.resolve()
+    expect(setPreferenceAndWait).toHaveBeenCalledTimes(1)
+    expect(completed).toBe(false)
+    finishWrite?.()
+    await savePromise
+    expect(completed).toBe(true)
   })
 })

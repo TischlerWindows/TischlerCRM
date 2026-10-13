@@ -1,4 +1,4 @@
-import { getPreference, setPreference } from './preferences'
+import { getPreference, setPreferenceAndWait } from './preferences'
 
 export const SALESFORCE_IMPORT_TEMPLATES_KEY = 'salesforceImportTemplates'
 export const PICKLIST_LEAVE_BLANK = '__leave_blank__'
@@ -79,7 +79,7 @@ export async function saveSalesforceImportTemplate(
   const nextForObject = [...current]
   if (existingIndex >= 0) nextForObject[existingIndex] = template
   else nextForObject.push(template)
-  await setPreference(SALESFORCE_IMPORT_TEMPLATES_KEY, { ...stored, [objectApiName]: nextForObject })
+  await setPreferenceAndWait(SALESFORCE_IMPORT_TEMPLATES_KEY, { ...stored, [objectApiName]: nextForObject })
   return nextForObject
 }
 
@@ -89,6 +89,6 @@ export async function deleteSalesforceImportTemplate(
 ): Promise<SalesforceImportTemplate[]> {
   const stored = await getPreference<StoredTemplates>(SALESFORCE_IMPORT_TEMPLATES_KEY, {}) ?? {}
   const nextForObject = (stored[objectApiName] ?? []).filter((template) => template.id !== templateId)
-  await setPreference(SALESFORCE_IMPORT_TEMPLATES_KEY, { ...stored, [objectApiName]: nextForObject })
+  await setPreferenceAndWait(SALESFORCE_IMPORT_TEMPLATES_KEY, { ...stored, [objectApiName]: nextForObject })
   return nextForObject
 }
