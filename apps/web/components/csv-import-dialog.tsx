@@ -11,6 +11,12 @@ import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
 import { mapContactFullName, mergeCompositeTextSubField } from '@/lib/composite-text-import';
+import {
+  findAddressImportSubfieldTarget,
+  geocodeImportedAddressRecords,
+  getAddressImportSubfieldTargets,
+  mergeAddressImportSubField,
+} from '@/lib/salesforce-import-address';
 import { PicklistValueMapping } from '@/components/picklist-value-mapping';
 import { SalesforceImportTemplateControls } from '@/components/salesforce-import-template-controls';
 import {
@@ -266,15 +272,21 @@ export default function CsvImportDialog({
         if (field.type !== 'CompositeText') return [parent];
 
         const subFields: Array<{ apiName: string; label: string; type: string; picklistValues?: string[] }> = field.subFields ?? [];
-        return [parent, ...subFields.map((subField) => ({
-          apiName: `${parentApiName}::${subField.apiName}`,
-          label: `${field.label} › ${subField.label}`,
-          type: subField.type,
-          lookupObject: undefined,
-          picklistValues: subField.picklistValues ?? [],
-          required: false,
-          isAutoNumber: false,
-        }))];
+        if (field.type === 'CompositeText') {
+          return [parent, ...subFields.map((subField) => ({
+            apiName: `${parentApiName}::${subField.apiName}`,
+            label: `${field.label} › ${subField.label}`,
+            type: subField.type,
+            lookupObject: undefined,
+            picklistValues: subField.picklistValues ?? [],
+            required: false,
+            isAutoNumber: false,
+          }))];
+        }
+        if (field.type === 'Address' || field.type === 'LocationSearch') {
+          return [parent, ...getAddressImportSubfieldTargets(parentApiName, field.label)];
+        }
+        return [parent];
       });
   }, [objectDef, objectApiName]);
 
@@ -327,6 +339,12 @@ export default function CsvImportDialog({
       });
       if (compositeSubField) {
         mapping[header] = compositeSubField.apiName;
+        continue;
+      }
+
+      const addressSubField = findAddressImportSubfieldTarget(header, objectApiName, targetFields);
+      if (addressSubField) {
+        mapping[header] = addressSubField;
         continue;
       }
 
@@ -673,7 +691,9 @@ export default function CsvImportDialog({
             continue;
           }
           if (val !== undefined && val !== null && val !== '') {
-            if (targetField.includes('::')) {
+            if (targetField.includes('::address:')) {
+              mergeAddressImportSubField(mapped, objectApiName, targetField, val);
+            } else if (targetField.includes('::')) {
               mergeCompositeTextSubField(mapped, objectApiName, targetField, val);
             } else if (objectApiName === 'Contact' && target?.type === 'CompositeText' && target.apiName.toLowerCase() === 'name') {
               Object.assign(mapped, mapContactFullName(val));
@@ -688,6 +708,13 @@ export default function CsvImportDialog({
       if (propertyId) mapped[`${objectApiName}__${selectedPropertyLookupField}`] = propertyId;
       return mapped;
     });
+
+    await geocodeImportedAddressRecords(
+      records,
+      objectApiName,
+      objectDef?.fields ?? [],
+      (address, sessionToken) => apiClient.geocodeAddress(address, sessionToken),
+    );
 
     // Send in batches of 200
     const BATCH_SIZE = 200;

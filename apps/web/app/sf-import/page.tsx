@@ -23,6 +23,12 @@ import {
   resolvePicklistImportValue,
 } from '@/lib/salesforce-import-templates';
 import {
+  findAddressImportSubfieldTarget,
+  geocodeImportedAddressRecords,
+  getAddressImportSubfieldTargets,
+  mergeAddressImportSubField,
+} from '@/lib/salesforce-import-address';
+import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
   geocodeMissingPropertyCoordinates,
@@ -161,13 +167,21 @@ function autoMap(
 ): Record<string, string> {
   // Regular flat fields (exclude CompositeText parents — they are handled via sub-fields)
   const fields = objectDef.fields
-    .filter((f) => !f.readOnly && !isNativeRecordIdField(f.apiName, objectApiName) && (f as any).type !== 'CompositeText')
-    .map((f) => ({
-      apiName: f.apiName.replace(`${objectApiName}__`, ''),
-      label: f.label,
-      type: (f as any).type,
-      picklistValues: f.picklistValues ?? [],
-    }));
+    .filter((f) => !f.readOnly && !isNativeRecordIdField(f.apiName, objectApiName))
+    .flatMap((field) => {
+      if ((field as any).type === 'CompositeText') return [];
+      const parentApiName = field.apiName.replace(`${objectApiName}__`, '');
+      const parent = {
+        apiName: parentApiName,
+        label: field.label,
+        type: (field as any).type,
+        picklistValues: field.picklistValues ?? [],
+      };
+      if ((field as any).type === 'Address' || (field as any).type === 'LocationSearch') {
+        return [parent, ...getAddressImportSubfieldTargets(parentApiName, field.label)];
+      }
+      return [parent];
+    });
 
   // Sub-field entries from CompositeText fields (e.g. Salutation / FirstName / LastName of Name).
   // apiName format: "parentBare::subFieldApiName" (e.g. "name::Contact__name_firstName")
@@ -206,6 +220,13 @@ function autoMap(
     if (sfMatch && !usedApiNames.has(sfMatch.apiName)) {
       mapping[header] = sfMatch.apiName;
       usedApiNames.add(sfMatch.apiName);
+      continue;
+    }
+
+    const addressSubField = findAddressImportSubfieldTarget(header, objectApiName, fields);
+    if (addressSubField && !usedApiNames.has(addressSubField)) {
+      mapping[header] = addressSubField;
+      usedApiNames.add(addressSubField);
       continue;
     }
 
@@ -612,6 +633,10 @@ export default function SalesforceImportPage() {
         for (const [csvCol, targetField] of Object.entries(entry.columnMapping)) {
           if (!targetField || targetField === '__skip__') continue;
           const val = row[csvCol] ?? '';
+          if (targetField.includes('::address:')) {
+            if (val.trim()) mergeAddressImportSubField(mapped, objectApiName, targetField, val);
+            continue;
+          }
           const picklistField = objectDef?.fields.find((field) =>
             field.apiName.replace(`${objectApiName}__`, '') === targetField && field.type === 'Picklist',
           );
@@ -669,6 +694,13 @@ export default function SalesforceImportPage() {
         if (generatedPropertyId) mapped[`${objectApiName}__${selectedPropertyLookupField}`] = generatedPropertyId;
         return mapped;
       });
+
+      await geocodeImportedAddressRecords(
+        records,
+        objectApiName,
+        objectDef?.fields ?? [],
+        (address, sessionToken) => apiClient.geocodeAddress(address, sessionToken),
+      );
 
       // Send in batches of 500
       const BATCH_SIZE = 500;
@@ -769,7 +801,16 @@ export default function SalesforceImportPage() {
           });
         }
       } else {
-        result.push({ apiName: parentApiName, label: f.label, type: (f as any).type, picklistValues: f.picklistValues ?? [] });
+        const parent = { apiName: parentApiName, label: f.label, type: (f as any).type, picklistValues: f.picklistValues ?? [] };
+        if ((f as any).type === 'Address' || (f as any).type === 'LocationSearch') {
+          result.push(parent, ...getAddressImportSubfieldTargets(parentApiName, f.label).map((target) => ({
+            ...target,
+            type: target.type ?? 'Text',
+            picklistValues: target.picklistValues ?? [],
+          })));
+        } else {
+          result.push(parent);
+        }
       }
     }
     return result;
