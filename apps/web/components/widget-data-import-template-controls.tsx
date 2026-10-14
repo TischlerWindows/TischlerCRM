@@ -26,18 +26,22 @@ export function WidgetDataImportTemplateControls({
   onApply: (config: WidgetDataImportTemplateConfig) => void
 }) {
   const [templates, setTemplates] = useState<WidgetDataImportTemplate[]>([])
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Record<WidgetImportObject, string>>({ PunchList: '', PerDiem: '' })
   const [templateName, setTemplateName] = useState('')
   const [creatingNew, setCreatingNew] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const selectedId = selectedIds[objectApiName]
+  const setSelectedId = (id: string) => setSelectedIds((current) => ({ ...current, [objectApiName]: id }))
 
   useEffect(() => {
     let active = true
-    setSelectedId('')
+    setTemplates([])
     setTemplateName('')
     setCreatingNew(false)
     setError(null)
+    setSuccessMessage(null)
     void loadWidgetDataImportTemplates(objectApiName)
       .then((loaded) => { if (active) setTemplates(loaded) })
       .catch((cause: unknown) => {
@@ -53,13 +57,16 @@ export function WidgetDataImportTemplateControls({
     if (!name) return
     setBusy(true)
     setError(null)
+    setSuccessMessage(null)
     try {
       const next = await saveWidgetDataImportTemplate(objectApiName, name, config, selectedId || undefined)
       setTemplates(next)
-      const saved = next.find((template) => template.name.trim().toLowerCase() === name.toLowerCase())
+      const saved = next.find((template) => template.id === selectedId)
+        ?? next.find((template) => template.name.trim().toLowerCase() === name.toLowerCase())
       setSelectedId(saved?.id ?? '')
       setTemplateName('')
       setCreatingNew(false)
+      setSuccessMessage(`Saved changes to "${saved?.name ?? name}".`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save this widget import template.')
     } finally {
@@ -71,6 +78,7 @@ export function WidgetDataImportTemplateControls({
     if (!selected) return
     setBusy(true)
     setError(null)
+    setSuccessMessage(null)
     try {
       setTemplates(await deleteWidgetDataImportTemplate(objectApiName, selected.id))
       setSelectedId('')
@@ -85,6 +93,7 @@ export function WidgetDataImportTemplateControls({
     setSelectedId(templateId)
     setCreatingNew(false)
     setTemplateName('')
+    setSuccessMessage(null)
     const template = templates.find((candidate) => candidate.id === templateId)
     if (template) onApply(structuredClone(template.config))
   }
@@ -161,7 +170,7 @@ export function WidgetDataImportTemplateControls({
         ) : (
           <button
             type="button"
-            onClick={() => { setSelectedId(''); setCreatingNew(true); setTemplateName('') }}
+            onClick={() => { setSelectedId(''); setCreatingNew(true); setTemplateName(''); setSuccessMessage(null) }}
             disabled={busy}
             className="inline-flex h-9 items-center gap-1.5 rounded border border-gray-300 bg-white px-3 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -171,6 +180,7 @@ export function WidgetDataImportTemplateControls({
         )}
       </div>
       {error && <p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+      {successMessage && <p role="status" className="mt-2 text-xs text-green-700">{successMessage}</p>}
     </div>
   )
 }

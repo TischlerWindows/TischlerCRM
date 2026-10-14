@@ -287,7 +287,6 @@ export default function WidgetImportsPage() {
           {headers.length > 0 && (
             <>
               <WidgetDataImportTemplateControls
-                key={objectApiName}
                 objectApiName={objectApiName}
                 config={templateConfig}
                 onApply={applyTemplate}
