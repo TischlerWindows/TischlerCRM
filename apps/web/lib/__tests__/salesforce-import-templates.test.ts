@@ -1,24 +1,33 @@
 import {
   getDefaultPicklistTarget,
   getDistinctPicklistSourceValues,
+  getSalesforceImportTemplatesPreferenceKey,
   loadSalesforceImportTemplates,
   PICKLIST_LEAVE_BLANK,
   resolvePicklistImportValue,
   SALESFORCE_IMPORT_TEMPLATES_KEY,
   saveSalesforceImportTemplate,
 } from '../salesforce-import-templates'
-import { getPreference, setPreferenceAndWait } from '../preferences'
+import { apiClient } from '../api-client'
 
-jest.mock('../preferences', () => ({
-  getPreference: jest.fn(),
-  setPreferenceAndWait: jest.fn(),
+jest.mock('../api-client', () => ({
+  apiClient: {
+    getPreferences: jest.fn(),
+    setPreference: jest.fn(),
+  },
 }))
+
+let persistedPreferences: Record<string, unknown>
 
 describe('Salesforce import picklist mappings', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    jest.mocked(getPreference).mockResolvedValue({})
-    jest.mocked(setPreferenceAndWait).mockImplementation(async (_key, value) => value as never)
+    persistedPreferences = {}
+    jest.mocked(apiClient.getPreferences).mockImplementation(async () => ({ ...persistedPreferences }))
+    jest.mocked(apiClient.setPreference).mockImplementation(async (key, value) => {
+      persistedPreferences[key] = value
+      return { key, value }
+    })
   })
 
   it('collects distinct nonblank and blank source values', () => {
@@ -60,23 +69,25 @@ describe('Salesforce import picklist mappings', () => {
 
     const saved = await saveSalesforceImportTemplate('Contact', 'Contact import', config)
     expect(saved[0]?.config.checkboxRules).toEqual(checkboxRules)
-    expect(setPreferenceAndWait).toHaveBeenCalledWith(
-      SALESFORCE_IMPORT_TEMPLATES_KEY,
-      expect.objectContaining({
-        Contact: [expect.objectContaining({ config: expect.objectContaining({ checkboxRules }) })],
-      }),
-    )
+    const contactKey = getSalesforceImportTemplatesPreferenceKey('Contact')
+    expect(apiClient.setPreference).toHaveBeenCalledWith(contactKey, expect.arrayContaining([
+      expect.objectContaining({ config: expect.objectContaining({ checkboxRules }) }),
+    ]))
+    expect(persistedPreferences[contactKey]).toEqual(saved)
 
-    jest.mocked(getPreference).mockResolvedValueOnce({ Contact: saved })
     await expect(loadSalesforceImportTemplates('Contact')).resolves.toEqual(saved)
     expect(saved[0]?.config.checkboxRules).toEqual(checkboxRules)
   })
 
   it('waits for the preferences write before reporting a template save as complete', async () => {
     let finishWrite: (() => void) | undefined
-    jest.mocked(setPreferenceAndWait).mockImplementationOnce(async (_key, value) => {
+    let markWriteStarted: (() => void) | undefined
+    const writeStarted = new Promise<void>((resolve) => { markWriteStarted = resolve })
+    jest.mocked(apiClient.setPreference).mockImplementationOnce(async (key, value) => {
+      markWriteStarted?.()
       await new Promise<void>((resolve) => { finishWrite = resolve })
-      return value as never
+      persistedPreferences[key] = value
+      return { key, value }
     })
 
     let completed = false
@@ -94,11 +105,32 @@ describe('Salesforce import picklist mappings', () => {
       return templates
     })
 
-    await Promise.resolve()
-    expect(setPreferenceAndWait).toHaveBeenCalledTimes(1)
+    await writeStarted
+    expect(apiClient.setPreference).toHaveBeenCalledTimes(1)
     expect(completed).toBe(false)
     finishWrite?.()
     await savePromise
     expect(completed).toBe(true)
+  })
+
+  it('keeps Contact and Project templates in separate preference keys', async () => {
+    const contact = await saveSalesforceImportTemplate('Contact', 'Contact Rules', {
+      columnMapping: {},
+      picklistValueMappings: {},
+      checkboxRules: [{ id: 'contact-rule', targetField: 'homeownerAccount', sourceColumn: 'Account Name', condition: 'has-value' }],
+    })
+    const project = await saveSalesforceImportTemplate('Project', 'Project Rules', {
+      columnMapping: {},
+      picklistValueMappings: {},
+      checkboxRules: [{ id: 'project-rule', targetField: 'hasScreen', sourceColumn: 'Screen', condition: 'has-value' }],
+    })
+
+    expect(await loadSalesforceImportTemplates('Contact')).toEqual(contact)
+    expect(await loadSalesforceImportTemplates('Project')).toEqual(project)
+    expect(Object.keys(persistedPreferences)).toEqual([
+      getSalesforceImportTemplatesPreferenceKey('Contact'),
+      getSalesforceImportTemplatesPreferenceKey('Project'),
+    ])
+    expect(persistedPreferences[SALESFORCE_IMPORT_TEMPLATES_KEY]).toBeUndefined()
   })
 })

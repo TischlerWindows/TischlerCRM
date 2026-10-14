@@ -1,4 +1,4 @@
-import { getPreference, setPreferenceAndWait } from './preferences'
+import { apiClient } from './api-client'
 
 export const SALESFORCE_IMPORT_TEMPLATES_KEY = 'salesforceImportTemplates'
 export const PICKLIST_LEAVE_BLANK = '__leave_blank__'
@@ -30,6 +30,14 @@ export interface SalesforceImportTemplate {
 
 type StoredTemplates = Record<string, SalesforceImportTemplate[]>
 
+export function getSalesforceImportTemplatesPreferenceKey(objectApiName: string): string {
+  return `${SALESFORCE_IMPORT_TEMPLATES_KEY}:${objectApiName}`
+}
+
+function asTemplateList(value: unknown): SalesforceImportTemplate[] | undefined {
+  return Array.isArray(value) ? value as SalesforceImportTemplate[] : undefined
+}
+
 export function getDistinctPicklistSourceValues(rows: Record<string, string>[], column: string): string[] {
   return Array.from(new Set(rows.map((row) => row[column]?.trim() ?? '')))
     .sort((left, right) => left === '' ? -1 : right === '' ? 1 : left.localeCompare(right))
@@ -56,8 +64,13 @@ export function resolvePicklistImportValue(
 }
 
 export async function loadSalesforceImportTemplates(objectApiName: string): Promise<SalesforceImportTemplate[]> {
-  const templates = await getPreference<StoredTemplates>(SALESFORCE_IMPORT_TEMPLATES_KEY, {})
-  return templates?.[objectApiName] ?? []
+  const preferences = await apiClient.getPreferences()
+  const objectTemplates = asTemplateList(preferences[getSalesforceImportTemplatesPreferenceKey(objectApiName)])
+  if (objectTemplates) return objectTemplates
+
+  // Read templates saved before storage was separated by object.
+  const legacyTemplates = preferences[SALESFORCE_IMPORT_TEMPLATES_KEY] as StoredTemplates | undefined
+  return legacyTemplates?.[objectApiName] ?? []
 }
 
 export async function saveSalesforceImportTemplate(
@@ -65,8 +78,7 @@ export async function saveSalesforceImportTemplate(
   name: string,
   config: SalesforceImportTemplateConfig,
 ): Promise<SalesforceImportTemplate[]> {
-  const stored = await getPreference<StoredTemplates>(SALESFORCE_IMPORT_TEMPLATES_KEY, {}) ?? {}
-  const current = stored[objectApiName] ?? []
+  const current = await loadSalesforceImportTemplates(objectApiName)
   const normalizedName = name.trim().toLowerCase()
   const existingIndex = current.findIndex((template) => template.name.trim().toLowerCase() === normalizedName)
   const template: SalesforceImportTemplate = {
@@ -79,11 +91,9 @@ export async function saveSalesforceImportTemplate(
   const nextForObject = [...current]
   if (existingIndex >= 0) nextForObject[existingIndex] = template
   else nextForObject.push(template)
-  const saved = await setPreferenceAndWait<StoredTemplates>(
-    SALESFORCE_IMPORT_TEMPLATES_KEY,
-    { ...stored, [objectApiName]: nextForObject },
-  )
-  const savedForObject = saved?.[objectApiName]
+  const key = getSalesforceImportTemplatesPreferenceKey(objectApiName)
+  const response = await apiClient.setPreference(key, nextForObject)
+  const savedForObject = asTemplateList(response?.value)
   const confirmedTemplate = savedForObject?.find((candidate) => candidate.id === template.id)
   if (!confirmedTemplate) throw new Error('The import template was not returned by the preferences API.')
   if (JSON.stringify(confirmedTemplate.config.checkboxRules ?? []) !== JSON.stringify(template.config.checkboxRules ?? [])) {
@@ -96,11 +106,13 @@ export async function deleteSalesforceImportTemplate(
   objectApiName: string,
   templateId: string,
 ): Promise<SalesforceImportTemplate[]> {
-  const stored = await getPreference<StoredTemplates>(SALESFORCE_IMPORT_TEMPLATES_KEY, {}) ?? {}
-  const nextForObject = (stored[objectApiName] ?? []).filter((template) => template.id !== templateId)
-  const saved = await setPreferenceAndWait<StoredTemplates>(
-    SALESFORCE_IMPORT_TEMPLATES_KEY,
-    { ...stored, [objectApiName]: nextForObject },
-  )
-  return saved?.[objectApiName] ?? []
+  const nextForObject = (await loadSalesforceImportTemplates(objectApiName))
+    .filter((template) => template.id !== templateId)
+  const key = getSalesforceImportTemplatesPreferenceKey(objectApiName)
+  const response = await apiClient.setPreference(key, nextForObject)
+  const savedForObject = asTemplateList(response?.value)
+  if (!savedForObject || savedForObject.some((template) => template.id === templateId)) {
+    throw new Error('The import template was not removed by the preferences API.')
+  }
+  return savedForObject
 }
