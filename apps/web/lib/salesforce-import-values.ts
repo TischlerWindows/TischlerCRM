@@ -1,5 +1,62 @@
 import type { SalesforceCheckboxImportRule } from './salesforce-import-templates'
 
+export interface ImportUserLookupRecord {
+  id: string
+  name: string | null
+  email: string
+}
+
+export function isUserLookupType(type: string): boolean {
+  return type === 'LookupUser' || type === 'MultiLookupUser'
+}
+
+function normalizeUserLookupIdentity(value: string): string {
+  return value.trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
+}
+
+export function resolveUserLookupImportValue(
+  sourceValue: string,
+  users: ImportUserLookupRecord[],
+  multiValue = false,
+): { value: string; unmatched: string[] } {
+  const sourceValues = (multiValue ? sourceValue.split(';') : [sourceValue])
+    .map((value) => value.trim())
+    .filter(Boolean)
+  const matchedIds: string[] = []
+  const unmatched: string[] = []
+
+  for (const source of sourceValues) {
+    const normalizedSource = normalizeUserLookupIdentity(source)
+    const exactMatches = new Set(users.filter((user) =>
+      [user.id, user.name ?? '', user.email].some((identity) =>
+        normalizeUserLookupIdentity(identity) === normalizedSource,
+      ),
+    ).map((user) => user.id))
+    let match = exactMatches.size === 1
+      ? users.find((user) => user.id === exactMatches.values().next().value)
+      : undefined
+
+    if (exactMatches.size === 0 && normalizedSource.length >= 3) {
+      const prefixMatches = new Set(users.filter((user) =>
+        [user.name ?? '', user.email].some((identity) =>
+          normalizeUserLookupIdentity(identity).startsWith(normalizedSource),
+        ),
+      ).map((user) => user.id))
+      if (prefixMatches.size === 1) {
+        match = users.find((user) => user.id === prefixMatches.values().next().value)
+      }
+    }
+
+    if (match) {
+      if (!matchedIds.includes(match.id)) matchedIds.push(match.id)
+    } else {
+      unmatched.push(source)
+    }
+  }
+
+  return { value: multiValue ? matchedIds.join(';') : matchedIds[0] ?? '', unmatched }
+}
+
 export function parseSalesforceCheckbox(value: unknown): boolean {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') return value !== 0;

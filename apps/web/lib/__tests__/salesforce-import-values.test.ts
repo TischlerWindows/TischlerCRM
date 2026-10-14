@@ -3,6 +3,7 @@ import {
   getDefaultSalesforcePhonePrefix,
   mapSalesforcePhoneWithPrefix,
   parseSalesforceCheckbox,
+  resolveUserLookupImportValue,
 } from '../salesforce-import-values'
 
 describe('Salesforce import values', () => {
@@ -56,5 +57,35 @@ describe('Salesforce import values', () => {
     expect(evaluateSalesforceCheckboxRule(populatedRule, { 'Account Name': '  ' })).toBe(false)
     expect(evaluateSalesforceCheckboxRule(blankRule, { 'Account Name': '' })).toBe(true)
     expect(evaluateSalesforceCheckboxRule(blankRule, { 'Account Name': 'Silkworth Interiors' })).toBe(false)
+  })
+
+  it('resolves user lookup names, emails, and unique username prefixes to IDs', () => {
+    const users = [
+      { id: 'user-1', name: 'Matthias Mildner', email: 'mildner@example.com' },
+      { id: 'user-2', name: 'Carlos Martinez', email: 'carlos@example.com' },
+      { id: 'user-3', name: 'Carlos Moore', email: 'cmoore@example.com' },
+      { id: 'user-4', name: 'Jose Garcia', email: 'jgarcia@example.com' },
+    ]
+
+    expect(resolveUserLookupImportValue('MATTHIAS_MILDNER', users)).toEqual({
+      value: 'user-1',
+      unmatched: [],
+    })
+    expect(resolveUserLookupImportValue('mildner@example.com', users)).toEqual({
+      value: 'user-1',
+      unmatched: [],
+    })
+    expect(resolveUserLookupImportValue('Jose_Gar', users)).toEqual({
+      value: 'user-4',
+      unmatched: [],
+    })
+    expect(resolveUserLookupImportValue('Carlos_M', users)).toEqual({
+      value: '',
+      unmatched: ['Carlos_M'],
+    })
+    expect(resolveUserLookupImportValue('Matthias; Carlos Martinez; Missing User', users, true)).toEqual({
+      value: 'user-1;user-2',
+      unmatched: ['Missing User'],
+    })
   })
 })

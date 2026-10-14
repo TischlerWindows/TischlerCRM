@@ -11,7 +11,7 @@ import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
 import { mapContactFullName, mergeCompositeTextSubField } from '@/lib/composite-text-import';
-import { evaluateSalesforceCheckboxRule, getDefaultSalesforcePhonePrefix, getSalesforcePhonePrefixOptions, mapSalesforcePhoneWithPrefix, parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
+import { evaluateSalesforceCheckboxRule, getDefaultSalesforcePhonePrefix, getSalesforcePhonePrefixOptions, isUserLookupType, mapSalesforcePhoneWithPrefix, parseSalesforceCheckbox, resolveUserLookupImportValue, type ImportUserLookupRecord } from '@/lib/salesforce-import-values';
 import { SalesforceCheckboxImportRules } from '@/components/salesforce-checkbox-import-rules';
 import {
   findAddressImportSubfieldTarget,
@@ -601,6 +601,21 @@ export default function CsvImportDialog({
       setStep('mapping');
       return;
     }
+
+    const hasMappedUserLookup = Object.values(columnMapping).some((targetApiName) => {
+      const target = targetFields.find((field) => field.apiName === targetApiName);
+      return target ? isUserLookupType(target.type) : false;
+    });
+    let importUsers: ImportUserLookupRecord[] = [];
+    if (hasMappedUserLookup) {
+      try {
+        importUsers = await apiClient.get<ImportUserLookupRecord[]>('/users/lookup');
+      } catch {
+        setParseError('Could not load active users to match user lookup fields. Try again before importing.');
+        setStep('mapping');
+        return;
+      }
+    }
     setStep('importing');
     setImportProgress(0);
 
@@ -699,6 +714,21 @@ export default function CsvImportDialog({
           }
           if (target?.type === 'Checkbox') {
             mapped[targetField] = parseSalesforceCheckbox(val);
+            continue;
+          }
+          if (target && isUserLookupType(target.type)) {
+            const resolved = resolveUserLookupImportValue(
+              val?.trim() ?? '',
+              importUsers,
+              target.type === 'MultiLookupUser',
+            );
+            if (resolved.unmatched.length > 0) {
+              allErrors.push({
+                row: sourceRow + 1,
+                error: `Could not match ${target.label} user value(s): ${resolved.unmatched.join(', ')}. Unmatched values were skipped.`,
+              });
+            }
+            if (resolved.value) mapped[targetField] = resolved.value;
             continue;
           }
           if (target?.type === 'Picklist' || (target && isMultiPicklistType(target.type))) {

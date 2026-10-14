@@ -19,8 +19,11 @@ import {
   evaluateSalesforceCheckboxRule,
   getDefaultSalesforcePhonePrefix,
   getSalesforcePhonePrefixOptions,
+  isUserLookupType,
   mapSalesforcePhoneWithPrefix,
   parseSalesforceCheckbox,
+  resolveUserLookupImportValue,
+  type ImportUserLookupRecord,
 } from '@/lib/salesforce-import-values';
 import { PicklistValueMapping } from '@/components/picklist-value-mapping';
 import { SalesforceImportTemplateControls } from '@/components/salesforce-import-template-controls';
@@ -544,6 +547,27 @@ export default function SalesforceImportPage() {
       setStep('map');
       return;
     }
+
+    const hasMappedUserLookup = sortedFiles.some(({ entry }) => {
+      if (!entry.detectedObject) return false;
+      const objectDef = crmObjects.find((object) => object.apiName === entry.detectedObject);
+      return Object.values(entry.columnMapping).some((targetApiName) =>
+        objectDef?.fields.some((field) =>
+          field.apiName.replace(`${entry.detectedObject}__`, '') === targetApiName
+          && isUserLookupType(field.type),
+        ),
+      );
+    });
+    let importUsers: ImportUserLookupRecord[] = [];
+    if (hasMappedUserLookup) {
+      try {
+        importUsers = await apiClient.get<ImportUserLookupRecord[]>('/users/lookup');
+      } catch {
+        setParseErrors(['Could not load active users to match user lookup fields. Try again before importing.']);
+        setStep('map');
+        return;
+      }
+    }
     setStep('import');
     setImportProgress({});
 
@@ -650,6 +674,7 @@ export default function SalesforceImportPage() {
       const sourceRows = entry.rows
         .map((row, sourceIndex) => ({ row, sourceIndex }))
         .filter(({ sourceIndex }) => !failedPropertyRows.has(sourceIndex));
+      const unmatchedUserErrors: Array<{ row: number; error: string }> = [];
       const records = sourceRows.map(({ row, sourceIndex }) => {
         const mapped: Record<string, any> = {};
         for (const [csvCol, targetField] of Object.entries(entry.columnMapping)) {
@@ -675,6 +700,25 @@ export default function SalesforceImportPage() {
           );
           if (checkboxField) {
             mapped[`${objectApiName}__${targetField}`] = parseSalesforceCheckbox(val);
+            continue;
+          }
+          const userLookupField = objectDef?.fields.find((field) =>
+            field.apiName.replace(`${objectApiName}__`, '') === targetField
+            && isUserLookupType(field.type),
+          );
+          if (userLookupField) {
+            const resolved = resolveUserLookupImportValue(
+              val,
+              importUsers,
+              userLookupField.type === 'MultiLookupUser',
+            );
+            if (resolved.unmatched.length > 0) {
+              unmatchedUserErrors.push({
+                row: sourceIndex + 1,
+                error: `Could not match ${userLookupField.label} user value(s): ${resolved.unmatched.join(', ')}. Unmatched values were skipped.`,
+              });
+            }
+            if (resolved.value) mapped[`${objectApiName}__${targetField}`] = resolved.value;
             continue;
           }
           if (targetField.includes('::address:')) {
@@ -756,10 +800,13 @@ export default function SalesforceImportPage() {
       const BATCH_SIZE = 500;
       const totalBatches = Math.ceil(records.length / BATCH_SIZE);
       let totalCreated = 0;
-      const allErrors: Array<{ row: number; error: string }> = Array.from(failedPropertyRows, ([rowIndex, error]) => ({
-        row: rowIndex + 1,
-        error: `Opportunity skipped: ${error}`,
-      }));
+      const allErrors: Array<{ row: number; error: string }> = [
+        ...unmatchedUserErrors,
+        ...Array.from(failedPropertyRows, ([rowIndex, error]) => ({
+          row: rowIndex + 1,
+          error: `Opportunity skipped: ${error}`,
+        })),
+      ];
 
       for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
         const batch = records.slice(batchIdx * BATCH_SIZE, (batchIdx + 1) * BATCH_SIZE);
