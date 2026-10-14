@@ -37,10 +37,20 @@ function asStoredTemplates(value: unknown): StoredTemplates {
 }
 
 function getObjectTemplates(preferences: Record<string, unknown>, objectApiName: string): SalesforceImportTemplate[] {
-  const aggregateValue = asStoredTemplates(preferences[SALESFORCE_IMPORT_TEMPLATES_KEY])[objectApiName]
-  if (Array.isArray(aggregateValue)) return aggregateValue
+  const aggregateValue = asStoredTemplates(preferences[SALESFORCE_IMPORT_TEMPLATES_KEY])[objectApiName] ?? []
   const previousPerObjectValue = preferences[`${SALESFORCE_IMPORT_TEMPLATES_KEY}:${objectApiName}`]
-  return Array.isArray(previousPerObjectValue) ? previousPerObjectValue as SalesforceImportTemplate[] : []
+  const previousTemplates = Array.isArray(previousPerObjectValue)
+    ? previousPerObjectValue as SalesforceImportTemplate[]
+    : []
+  const merged = new Map<string, SalesforceImportTemplate>()
+  for (const template of [...previousTemplates, ...aggregateValue]) {
+    const key = template.name.trim().toLowerCase() || template.id
+    const existing = merged.get(key)
+    if (!existing || Date.parse(template.updatedAt) >= Date.parse(existing.updatedAt)) {
+      merged.set(key, template)
+    }
+  }
+  return [...merged.values()]
 }
 
 export function getDistinctPicklistSourceValues(rows: Record<string, string>[], column: string): string[] {
@@ -70,7 +80,21 @@ export function resolvePicklistImportValue(
 
 export async function loadSalesforceImportTemplates(objectApiName: string): Promise<SalesforceImportTemplate[]> {
   const preferences = await apiClient.getPreferences()
-  return getObjectTemplates(preferences, objectApiName)
+  const templates = getObjectTemplates(preferences, objectApiName)
+  const legacyKey = `${SALESFORCE_IMPORT_TEMPLATES_KEY}:${objectApiName}`
+  if (!Array.isArray(preferences[legacyKey])) return templates
+
+  const aggregate = {
+    ...asStoredTemplates(preferences[SALESFORCE_IMPORT_TEMPLATES_KEY]),
+    [objectApiName]: templates,
+  }
+  const response = await apiClient.setPreference(SALESFORCE_IMPORT_TEMPLATES_KEY, aggregate)
+  const persisted = asStoredTemplates(response?.value)[objectApiName]
+  if (!persisted || !structurallyEqual(templates, persisted)) {
+    throw new Error('Could not migrate existing import templates.')
+  }
+  await apiClient.deletePreference(legacyKey).catch(() => {})
+  return persisted
 }
 
 export async function saveSalesforceImportTemplate(
@@ -78,6 +102,7 @@ export async function saveSalesforceImportTemplate(
   name: string,
   config: SalesforceImportTemplateConfig,
 ): Promise<SalesforceImportTemplate[]> {
+  await loadSalesforceImportTemplates(objectApiName)
   const preferences = await apiClient.getPreferences()
   const stored = asStoredTemplates(preferences[SALESFORCE_IMPORT_TEMPLATES_KEY])
   const current = getObjectTemplates(preferences, objectApiName)
@@ -109,10 +134,10 @@ export async function deleteSalesforceImportTemplate(
   objectApiName: string,
   templateId: string,
 ): Promise<SalesforceImportTemplate[]> {
+  const current = await loadSalesforceImportTemplates(objectApiName)
   const preferences = await apiClient.getPreferences()
   const stored = asStoredTemplates(preferences[SALESFORCE_IMPORT_TEMPLATES_KEY])
-  const nextForObject = getObjectTemplates(preferences, objectApiName)
-    .filter((template) => template.id !== templateId)
+  const nextForObject = current.filter((template) => template.id !== templateId)
   await apiClient.setPreference(SALESFORCE_IMPORT_TEMPLATES_KEY, { ...stored, [objectApiName]: nextForObject })
   const persistedPreferences = await apiClient.getPreferences()
   const savedForObject = asStoredTemplates(persistedPreferences[SALESFORCE_IMPORT_TEMPLATES_KEY])[objectApiName]

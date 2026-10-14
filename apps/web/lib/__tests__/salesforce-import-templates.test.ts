@@ -13,6 +13,7 @@ jest.mock('../api-client', () => ({
   apiClient: {
     getPreferences: jest.fn(),
     setPreference: jest.fn(),
+    deletePreference: jest.fn(),
   },
 }))
 
@@ -41,6 +42,9 @@ describe('Salesforce import picklist mappings', () => {
       }
       persistedPreferences[key] = persisted
       return { key, value: persisted }
+    })
+    jest.mocked(apiClient.deletePreference).mockImplementation(async (key) => {
+      delete persistedPreferences[key]
     })
   })
 
@@ -151,5 +155,39 @@ describe('Salesforce import picklist mappings', () => {
     const persistedTemplates = persistedPreferences[SALESFORCE_IMPORT_TEMPLATES_KEY] as Record<string, SalesforceImportTemplate[]>
     expect(persistedTemplates.Contact?.[0]?.config.checkboxRules?.[0]?.targetField).toBe('homeownerAccount')
     expect(persistedTemplates.Project?.[0]?.config.checkboxRules?.[0]?.targetField).toBe('hasScreen')
+  })
+
+  it('merges and migrates Contact templates stored under the previous per-object key', async () => {
+    const checkboxRules = [{
+      id: 'legacy-rule',
+      targetField: 'homeownerAccount',
+      sourceColumn: 'Account Name',
+      condition: 'has-value' as const,
+    }]
+    const makeTemplate = (id: string, name: string, updatedAt: string) => ({
+      id,
+      name,
+      objectApiName: 'Contact',
+      config: { columnMapping: {}, picklistValueMappings: {}, checkboxRules },
+      updatedAt,
+    })
+    persistedPreferences[`${SALESFORCE_IMPORT_TEMPLATES_KEY}:Contact`] = [
+      makeTemplate('legacy-id', 'Contact1', '2026-10-13T10:00:00.000Z'),
+    ]
+    persistedPreferences[SALESFORCE_IMPORT_TEMPLATES_KEY] = {
+      Contact: [makeTemplate('canonical-id', 'Contact2', '2026-10-14T10:00:00.000Z')],
+      Project: [],
+    }
+
+    const loaded = await loadSalesforceImportTemplates('Contact')
+
+    expect(loaded.map((template) => template.name)).toEqual(['Contact1', 'Contact2'])
+    expect(loaded[0]?.config.checkboxRules).toEqual(checkboxRules)
+    expect(apiClient.setPreference).toHaveBeenCalledWith(
+      SALESFORCE_IMPORT_TEMPLATES_KEY,
+      expect.objectContaining({ Contact: expect.arrayContaining(loaded) }),
+    )
+    expect(apiClient.deletePreference).toHaveBeenCalledWith(`${SALESFORCE_IMPORT_TEMPLATES_KEY}:Contact`)
+    expect(persistedPreferences[`${SALESFORCE_IMPORT_TEMPLATES_KEY}:Contact`]).toBeUndefined()
   })
 })
