@@ -694,7 +694,7 @@ export default function SalesforceImportPage() {
             const resolved = isMultiPicklistType(picklistField.type)
               ? resolveMultiPicklistImportValue(sourceValue, fieldMappings, picklistField.picklistValues ?? [])
               : resolvePicklistImportValue(sourceValue, fieldMappings, picklistField.picklistValues ?? []);
-            if (!resolved.resolved) continue;
+            if (!resolved.resolved && !isMultiPicklistType(picklistField.type)) continue;
             if (!resolved.value) {
               if (objectApiName === 'Account' && targetField.replace(/^Account__/, '').toLowerCase() === 'accounttype'
                 && selectedValue === PICKLIST_LEAVE_BLANK) mapped.__allowBlankAccountType = true;

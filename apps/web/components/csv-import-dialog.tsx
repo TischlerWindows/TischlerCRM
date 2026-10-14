@@ -710,7 +710,7 @@ export default function CsvImportDialog({
             const resolved = isMultiPicklistType(target.type)
               ? resolveMultiPicklistImportValue(sourceValue, fieldMappings, target.picklistValues)
               : resolvePicklistImportValue(sourceValue, fieldMappings, target.picklistValues);
-            if (!resolved.resolved) continue;
+            if (!resolved.resolved && !isMultiPicklistType(target.type)) continue;
             if (!resolved.value) {
               if (objectApiName === 'Account' && target.apiName.toLowerCase() === 'accounttype'
                 && selectedValue === PICKLIST_LEAVE_BLANK) mapped.__allowBlankAccountType = true;

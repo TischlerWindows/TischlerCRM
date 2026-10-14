@@ -98,12 +98,16 @@ export function resolveMultiPicklistImportValue(
 ): { resolved: boolean; value: string } {
   const sourceValues = sourceValue.split(/\s*;\s*/).map((value) => value.trim()).filter(Boolean)
   const mappedValues: string[] = []
+  let allResolved = true
   for (const value of sourceValues) {
     const resolved = resolvePicklistImportValue(value, valueMappings, options)
-    if (!resolved.resolved) return { resolved: false, value: '' }
+    if (!resolved.resolved) {
+      allResolved = false
+      continue
+    }
     if (resolved.value && !mappedValues.includes(resolved.value)) mappedValues.push(resolved.value)
   }
-  return { resolved: true, value: mappedValues.join(';') }
+  return { resolved: allResolved, value: mappedValues.join(';') }
 }
 
 export async function loadSalesforceImportTemplates(objectApiName: string): Promise<SalesforceImportTemplate[]> {

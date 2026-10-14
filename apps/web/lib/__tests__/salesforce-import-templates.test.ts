@@ -87,6 +87,8 @@ describe('Salesforce import picklist mappings', () => {
       Glass: 'Glazing',
     }, ['Wood', 'Glazing'])).toEqual({ resolved: true, value: 'Wood;Glazing' })
     expect(resolveMultiPicklistImportValue('Timber; Unknown', { Timber: 'Wood' }, ['Wood']))
+      .toEqual({ resolved: false, value: 'Wood' })
+    expect(resolveMultiPicklistImportValue('Unknown; Also unknown', {}, ['Wood']))
       .toEqual({ resolved: false, value: '' })
   })
 
