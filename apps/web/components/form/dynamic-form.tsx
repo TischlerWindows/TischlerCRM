@@ -98,8 +98,8 @@ export interface DynamicFormProps {
 }
 
 /**
- * Returns true if a panel contains only auto-generated / read-only fields and
- * has no widgets — i.e. there's nothing for the user to interact with.
+ * Returns true if a panel contains only system-generated fields and has no
+ * widgets. Formula fields remain visible in create mode as locked computed values.
  *
  * Used to auto-skip pointless steps in the create wizard. Account/Contact
  * layouts ship with a "System Information" panel containing just Created By
@@ -117,7 +117,8 @@ function isPanelAllSystemFields(
     if (isSystemField(pf.fieldApiName)) return true
     const f = schemaObject?.fields.find((sf) => sf.apiName === pf.fieldApiName)
     if (!f) return false
-    if (f.type === 'AutoNumber' || f.type === 'Formula') return true
+    if (f.type === 'Formula') return false
+    if (f.type === 'AutoNumber') return true
     if ((f as { readOnly?: boolean }).readOnly) return true
     return false
   })
