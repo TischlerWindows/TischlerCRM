@@ -14,14 +14,16 @@ export function PicklistValueMapping({
   options,
   mappings,
   onChange,
+  multiValue = false,
 }: {
   column: string
   rows: Record<string, string>[]
   options: string[]
   mappings: Record<string, string>
   onChange: (sourceValue: string, targetValue: string) => void
+  multiValue?: boolean
 }) {
-  const sourceValues = useMemo(() => getDistinctPicklistSourceValues(rows, column), [rows, column])
+  const sourceValues = useMemo(() => getDistinctPicklistSourceValues(rows, column, multiValue), [rows, column, multiValue])
   const [open, setOpen] = useState(false)
   const unresolvedCount = sourceValues.filter((source) =>
     !resolvePicklistImportValue(source, mappings, options).resolved,
@@ -32,7 +34,7 @@ export function PicklistValueMapping({
   return (
     <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)} className="relative mt-2">
       <summary className="cursor-pointer select-none text-xs font-medium text-brand-navy hover:text-brand-dark">
-        Map picklist values ({sourceValues.length})
+        Map {multiValue ? 'multi-picklist' : 'picklist'} values ({sourceValues.length})
         {unresolvedCount > 0 && <span className="ml-2 text-amber-700">{unresolvedCount} need mapping</span>}
       </summary>
       {open && <div className="absolute left-0 top-full z-40 mt-2 w-[min(34rem,80vw)] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl">

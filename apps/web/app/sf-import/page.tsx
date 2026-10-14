@@ -28,7 +28,9 @@ import { SalesforceCheckboxImportRules } from '@/components/salesforce-checkbox-
 import {
   getDefaultPicklistTarget,
   getDistinctPicklistSourceValues,
+  isMultiPicklistType,
   resolvePicklistImportValue,
+  resolveMultiPicklistImportValue,
   type SalesforceCheckboxImportRule,
   type SalesforceImportTemplateConfig,
 } from '@/lib/salesforce-import-templates';
@@ -341,10 +343,10 @@ export default function SalesforceImportPage() {
       const targetApiName = entry.columnMapping[header]
       const field = objectDef?.fields.find((candidate) =>
         candidate.apiName.replace(`${entry.detectedObject}__`, '') === targetApiName
-        && candidate.type === 'Picklist',
+        && (candidate.type === 'Picklist' || isMultiPicklistType(candidate.type)),
       )
       if (!field) return fileTotal
-      return fileTotal + getDistinctPicklistSourceValues(entry.rows, header).filter((sourceValue) =>
+      return fileTotal + getDistinctPicklistSourceValues(entry.rows, header, isMultiPicklistType(field.type)).filter((sourceValue) =>
         !resolvePicklistImportValue(sourceValue, entry.picklistValueMappings[header] ?? {}, field.picklistValues ?? []).resolved,
       ).length
     }, 0)
@@ -680,7 +682,8 @@ export default function SalesforceImportPage() {
             continue;
           }
           const picklistField = objectDef?.fields.find((field) =>
-            field.apiName.replace(`${objectApiName}__`, '') === targetField && field.type === 'Picklist',
+            field.apiName.replace(`${objectApiName}__`, '') === targetField
+            && (field.type === 'Picklist' || isMultiPicklistType(field.type)),
           );
           if (picklistField) {
             const sourceValue = val.trim();
@@ -688,7 +691,9 @@ export default function SalesforceImportPage() {
             const selectedValue = Object.prototype.hasOwnProperty.call(fieldMappings, sourceValue)
               ? fieldMappings[sourceValue]
               : getDefaultPicklistTarget(sourceValue, picklistField.picklistValues ?? []);
-            const resolved = resolvePicklistImportValue(sourceValue, fieldMappings, picklistField.picklistValues ?? []);
+            const resolved = isMultiPicklistType(picklistField.type)
+              ? resolveMultiPicklistImportValue(sourceValue, fieldMappings, picklistField.picklistValues ?? [])
+              : resolvePicklistImportValue(sourceValue, fieldMappings, picklistField.picklistValues ?? []);
             if (!resolved.resolved) continue;
             if (!resolved.value) {
               if (objectApiName === 'Account' && targetField.replace(/^Account__/, '').toLowerCase() === 'accounttype'
@@ -1291,12 +1296,13 @@ export default function SalesforceImportPage() {
                                   </label>
                                 );
                               })()}
-                              {targetField?.type === 'Picklist' && activeEntry && (
+                              {targetField && (targetField.type === 'Picklist' || isMultiPicklistType(targetField.type)) && activeEntry && (
                                 <PicklistValueMapping
                                   column={header}
                                   rows={activeEntry.rows}
                                   options={targetField.picklistValues}
                                   mappings={activeEntry.picklistValueMappings[header] ?? {}}
+                                  multiValue={isMultiPicklistType(targetField.type)}
                                   onChange={(sourceValue, targetValue) => updatePicklistValueMapping(activeFileIdx, header, sourceValue, targetValue)}
                                 />
                               )}

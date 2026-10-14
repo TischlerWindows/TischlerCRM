@@ -54,8 +54,20 @@ function getObjectTemplates(preferences: Record<string, unknown>, objectApiName:
   return [...merged.values()]
 }
 
-export function getDistinctPicklistSourceValues(rows: Record<string, string>[], column: string): string[] {
-  return Array.from(new Set(rows.map((row) => row[column]?.trim() ?? '')))
+export function isMultiPicklistType(type: string): boolean {
+  return type === 'MultiPicklist' || type === 'MultiSelectPicklist'
+}
+
+export function getDistinctPicklistSourceValues(
+  rows: Record<string, string>[],
+  column: string,
+  multiValue = false,
+): string[] {
+  const values = rows.flatMap((row) => {
+    const value = row[column]?.trim() ?? ''
+    return multiValue && value ? value.split(/\s*;\s*/).filter(Boolean) : [value]
+  })
+  return Array.from(new Set(values))
     .sort((left, right) => left === '' ? -1 : right === '' ? 1 : left.localeCompare(right))
 }
 
@@ -77,6 +89,21 @@ export function resolvePicklistImportValue(
   if (mapped === PICKLIST_LEAVE_BLANK) return { resolved: true, value: '' }
   if (!mapped) return { resolved: false, value: '' }
   return { resolved: true, value: mapped }
+}
+
+export function resolveMultiPicklistImportValue(
+  sourceValue: string,
+  valueMappings: Record<string, string>,
+  options: string[],
+): { resolved: boolean; value: string } {
+  const sourceValues = sourceValue.split(/\s*;\s*/).map((value) => value.trim()).filter(Boolean)
+  const mappedValues: string[] = []
+  for (const value of sourceValues) {
+    const resolved = resolvePicklistImportValue(value, valueMappings, options)
+    if (!resolved.resolved) return { resolved: false, value: '' }
+    if (resolved.value && !mappedValues.includes(resolved.value)) mappedValues.push(resolved.value)
+  }
+  return { resolved: true, value: mappedValues.join(';') }
 }
 
 export async function loadSalesforceImportTemplates(objectApiName: string): Promise<SalesforceImportTemplate[]> {

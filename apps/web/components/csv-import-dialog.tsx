@@ -24,8 +24,10 @@ import { SalesforceImportTemplateControls } from '@/components/salesforce-import
 import {
   getDefaultPicklistTarget,
   getDistinctPicklistSourceValues,
+  isMultiPicklistType,
   PICKLIST_LEAVE_BLANK,
   resolvePicklistImportValue,
+  resolveMultiPicklistImportValue,
   type SalesforceCheckboxImportRule,
   type SalesforceImportTemplateConfig,
 } from '@/lib/salesforce-import-templates';
@@ -517,11 +519,14 @@ export default function CsvImportDialog({
       })
     : csvHeaders;
   const picklistMappingColumns = csvHeaders.flatMap((header) => {
-    const field = targetFields.find((target) => target.apiName === columnMapping[header] && target.type === 'Picklist');
+    const field = targetFields.find((target) =>
+      target.apiName === columnMapping[header]
+      && (target.type === 'Picklist' || isMultiPicklistType(target.type)),
+    );
     return field ? [{ header, field }] : [];
   });
   const unmappedPicklistValueCount = picklistMappingColumns.reduce((total, { header, field }) =>
-    total + getDistinctPicklistSourceValues(csvRows, header).filter((sourceValue) =>
+    total + getDistinctPicklistSourceValues(csvRows, header, isMultiPicklistType(field.type)).filter((sourceValue) =>
       !resolvePicklistImportValue(sourceValue, picklistValueMappings[header] ?? {}, field.picklistValues).resolved,
     ).length, 0)
   const templateConfig: SalesforceImportTemplateConfig = {
@@ -696,13 +701,15 @@ export default function CsvImportDialog({
             mapped[targetField] = parseSalesforceCheckbox(val);
             continue;
           }
-          if (target?.type === 'Picklist') {
+          if (target?.type === 'Picklist' || (target && isMultiPicklistType(target.type))) {
             const sourceValue = val?.trim() ?? '';
             const fieldMappings = picklistValueMappings[csvCol] ?? {};
             const selectedValue = Object.prototype.hasOwnProperty.call(fieldMappings, sourceValue)
               ? fieldMappings[sourceValue]
               : getDefaultPicklistTarget(sourceValue, target.picklistValues);
-            const resolved = resolvePicklistImportValue(sourceValue, fieldMappings, target.picklistValues);
+            const resolved = isMultiPicklistType(target.type)
+              ? resolveMultiPicklistImportValue(sourceValue, fieldMappings, target.picklistValues)
+              : resolvePicklistImportValue(sourceValue, fieldMappings, target.picklistValues);
             if (!resolved.resolved) continue;
             if (!resolved.value) {
               if (objectApiName === 'Account' && target.apiName.toLowerCase() === 'accounttype'
@@ -1083,12 +1090,13 @@ export default function CsvImportDialog({
                             </select>
                           </label>
                         )}
-                        {targetField?.type === 'Picklist' && (
+                        {(targetField?.type === 'Picklist' || (targetField && isMultiPicklistType(targetField.type))) && (
                           <PicklistValueMapping
                             column={header}
                             rows={csvRows}
                             options={targetField.picklistValues}
                             mappings={picklistValueMappings[header] ?? {}}
+                            multiValue={isMultiPicklistType(targetField.type)}
                             onChange={(sourceValue, targetValue) => setPicklistValueMappings((previous) => ({
                               ...previous,
                               [header]: { ...(previous[header] ?? {}), [sourceValue]: targetValue },

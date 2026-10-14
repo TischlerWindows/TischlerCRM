@@ -1,9 +1,11 @@
 import {
   getDefaultPicklistTarget,
   getDistinctPicklistSourceValues,
+  isMultiPicklistType,
   loadSalesforceImportTemplates,
   PICKLIST_LEAVE_BLANK,
   resolvePicklistImportValue,
+  resolveMultiPicklistImportValue,
   SALESFORCE_IMPORT_TEMPLATES_KEY,
   saveSalesforceImportTemplate,
 } from '../salesforce-import-templates'
@@ -69,6 +71,22 @@ describe('Salesforce import picklist mappings', () => {
     expect(resolvePicklistImportValue('', { '': PICKLIST_LEAVE_BLANK }, ['Property Management']))
       .toEqual({ resolved: true, value: '' })
     expect(resolvePicklistImportValue('Architect Account', {}, ['Property Management']))
+      .toEqual({ resolved: false, value: '' })
+  })
+
+  it('maps semicolon-separated MultiPicklist values individually', () => {
+    expect(isMultiPicklistType('MultiPicklist')).toBe(true)
+    expect(isMultiPicklistType('MultiSelectPicklist')).toBe(true)
+    expect(isMultiPicklistType('Picklist')).toBe(false)
+    expect(getDistinctPicklistSourceValues([
+      { Materials: 'Timber; Glass' },
+      { Materials: 'Glass;Steel' },
+    ], 'Materials', true)).toEqual(['Glass', 'Steel', 'Timber'])
+    expect(resolveMultiPicklistImportValue('Timber; Glass', {
+      Timber: 'Wood',
+      Glass: 'Glazing',
+    }, ['Wood', 'Glazing'])).toEqual({ resolved: true, value: 'Wood;Glazing' })
+    expect(resolveMultiPicklistImportValue('Timber; Unknown', { Timber: 'Wood' }, ['Wood']))
       .toEqual({ resolved: false, value: '' })
   })
 
