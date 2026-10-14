@@ -1,5 +1,6 @@
 import {
   evaluateSalesforceCheckboxRule,
+  getDefaultSalesforcePhonePrefix,
   mapSalesforcePhoneWithPrefix,
   parseSalesforceCheckbox,
 } from '../salesforce-import-values'
@@ -28,8 +29,14 @@ describe('Salesforce import values', () => {
   })
 
   it('imports PhoneWithPrefix strings in Mobile mode and skips blanks', () => {
+    expect(getDefaultSalesforcePhonePrefix(['Home', 'Mobile', 'Work'])).toBe('Mobile')
+    expect(getDefaultSalesforcePhonePrefix(['Work', 'Office'])).toBe('Work')
     expect(mapSalesforcePhoneWithPrefix('  917-597-2421  ')).toEqual({
       prefix: 'Mobile',
+      phone: '917-597-2421',
+    })
+    expect(mapSalesforcePhoneWithPrefix('917-597-2421', 'Home')).toEqual({
+      prefix: 'Home',
       phone: '917-597-2421',
     })
     expect(mapSalesforcePhoneWithPrefix('')).toBeNull()

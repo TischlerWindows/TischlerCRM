@@ -11,7 +11,7 @@ import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
 import { mapContactFullName, mergeCompositeTextSubField } from '@/lib/composite-text-import';
-import { evaluateSalesforceCheckboxRule, mapSalesforcePhoneWithPrefix, parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
+import { evaluateSalesforceCheckboxRule, getDefaultSalesforcePhonePrefix, getSalesforcePhonePrefixOptions, mapSalesforcePhoneWithPrefix, parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
 import { SalesforceCheckboxImportRules } from '@/components/salesforce-checkbox-import-rules';
 import {
   findAddressImportSubfieldTarget,
@@ -246,6 +246,7 @@ export default function CsvImportDialog({
   const [mappingSearchQuery, setMappingSearchQuery] = useState('');
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [picklistValueMappings, setPicklistValueMappings] = useState<Record<string, Record<string, string>>>({});
+  const [phonePrefixMappings, setPhonePrefixMappings] = useState<Record<string, string>>({});
   const [checkboxRules, setCheckboxRules] = useState<SalesforceCheckboxImportRule[]>([]);
   const [showPropertyMapping, setShowPropertyMapping] = useState(false);
   const [propertyLookupField, setPropertyLookupField] = useState('property');
@@ -309,6 +310,7 @@ export default function CsvImportDialog({
     setMappingSearchQuery('');
     setColumnMapping({});
     setPicklistValueMappings({});
+    setPhonePrefixMappings({});
     setCheckboxRules([]);
     setShowPropertyMapping(false);
     setPropertyLookupField('property');
@@ -481,6 +483,7 @@ export default function CsvImportDialog({
         setMappingSearchQuery('');
         setColumnMapping(autoMapColumns(headers));
         setPicklistValueMappings({});
+        setPhonePrefixMappings({});
         setCheckboxRules([]);
         setStep('mapping');
       },
@@ -524,6 +527,12 @@ export default function CsvImportDialog({
   const templateConfig: SalesforceImportTemplateConfig = {
     columnMapping,
     picklistValueMappings,
+    phonePrefixMappings: Object.fromEntries(csvHeaders.flatMap((header) => {
+      const target = targetFields.find((field) => field.apiName === columnMapping[header]);
+      return target?.type === 'PhoneWithPrefix'
+        ? [[header, phonePrefixMappings[header] ?? getDefaultSalesforcePhonePrefix(target.picklistValues)]]
+        : [];
+    })),
     checkboxRules,
     propertyLookupField,
   }
@@ -676,7 +685,10 @@ export default function CsvImportDialog({
           const val = row[csvCol];
           const target = targetFields.find((field) => field.apiName === targetField);
           if (target?.type === 'PhoneWithPrefix') {
-            const phoneValue = mapSalesforcePhoneWithPrefix(val);
+            const phoneValue = mapSalesforcePhoneWithPrefix(
+              val,
+              phonePrefixMappings[csvCol] ?? getDefaultSalesforcePhonePrefix(target.picklistValues),
+            );
             if (phoneValue) mapped[targetField] = phoneValue;
             continue;
           }
@@ -953,6 +965,7 @@ export default function CsvImportDialog({
                     Object.entries(config.columnMapping).filter(([header]) => !isNativeRecordIdColumn(header)),
                   ))
                   setPicklistValueMappings(config.picklistValueMappings)
+                  setPhonePrefixMappings(config.phonePrefixMappings ?? {})
                   setCheckboxRules(config.checkboxRules ?? [])
                   setPropertyLookupField(config.propertyLookupField ?? 'property')
                 }}
@@ -1055,6 +1068,21 @@ export default function CsvImportDialog({
                             setPicklistValueMappings((previous) => ({ ...previous, [header]: {} }))
                           }}
                         />
+                        {targetField?.type === 'PhoneWithPrefix' && (
+                          <label className="mt-2 block text-xs font-medium text-gray-700">
+                            Phone prefix
+                            <select
+                              aria-label={`Phone prefix for ${header}`}
+                              value={getSalesforcePhonePrefixOptions(targetField.picklistValues).includes(phonePrefixMappings[header] ?? '')
+                                ? phonePrefixMappings[header]!
+                                : getDefaultSalesforcePhonePrefix(targetField.picklistValues)}
+                              onChange={(event) => setPhonePrefixMappings((previous) => ({ ...previous, [header]: event.target.value }))}
+                              className="mt-1 block h-8 w-full rounded border border-gray-300 bg-white px-2 text-xs"
+                            >
+                              {getSalesforcePhonePrefixOptions(targetField.picklistValues).map((prefix) => <option key={prefix} value={prefix}>{prefix}</option>)}
+                            </select>
+                          </label>
+                        )}
                         {targetField?.type === 'Picklist' && (
                           <PicklistValueMapping
                             column={header}

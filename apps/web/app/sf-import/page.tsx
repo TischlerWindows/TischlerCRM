@@ -17,6 +17,8 @@ import {
 } from '@/lib/salesforce-account-import';
 import {
   evaluateSalesforceCheckboxRule,
+  getDefaultSalesforcePhonePrefix,
+  getSalesforcePhonePrefixOptions,
   mapSalesforcePhoneWithPrefix,
   parseSalesforceCheckbox,
 } from '@/lib/salesforce-import-values';
@@ -114,6 +116,8 @@ interface FileEntry {
   columnMapping: Record<string, string>;
   /** Source string → CRM option for each mapped Picklist column. */
   picklistValueMappings: Record<string, Record<string, string>>;
+  /** Prefix selection per mapped PhoneWithPrefix source column. */
+  phonePrefixMappings: Record<string, string>;
   checkboxRules: SalesforceCheckboxImportRule[];
   /** Which column holds the Salesforce record Id */
   sfIdColumn: string | null;
@@ -387,6 +391,7 @@ export default function SalesforceImportPage() {
               detectedObject,
               columnMapping: rawMapping,
               picklistValueMappings: {},
+              phonePrefixMappings: {},
               checkboxRules: [],
               sfIdColumn,
             });
@@ -473,6 +478,7 @@ export default function SalesforceImportPage() {
         if (entry.sfIdColumn) delete mapping[entry.sfIdColumn];
         entry.columnMapping = mapping;
         entry.picklistValueMappings = {};
+        entry.phonePrefixMappings = {};
         entry.checkboxRules = [];
       }
       updated[idx] = entry;
@@ -486,6 +492,9 @@ export default function SalesforceImportPage() {
       const entry = { ...updated[fileIdx]! };
       entry.columnMapping = { ...entry.columnMapping, [csvCol]: targetField };
       entry.picklistValueMappings = { ...entry.picklistValueMappings, [csvCol]: {} };
+      const phonePrefixMappings = { ...entry.phonePrefixMappings };
+      delete phonePrefixMappings[csvCol];
+      entry.phonePrefixMappings = phonePrefixMappings;
       updated[fileIdx] = entry;
       return updated;
     });
@@ -648,7 +657,14 @@ export default function SalesforceImportPage() {
             field.apiName.replace(`${objectApiName}__`, '') === targetField && field.type === 'PhoneWithPrefix',
           );
           if (phoneField) {
-            const phoneValue = mapSalesforcePhoneWithPrefix(val);
+            const prefixOptions = getSalesforcePhonePrefixOptions(phoneField.picklistValues ?? []);
+            const selectedPrefix = entry.phonePrefixMappings[csvCol];
+            const phoneValue = mapSalesforcePhoneWithPrefix(
+              val,
+              prefixOptions.includes(selectedPrefix ?? '')
+                ? selectedPrefix!
+                : getDefaultSalesforcePhonePrefix(phoneField.picklistValues ?? []),
+            );
             if (phoneValue) mapped[`${objectApiName}__${targetField}`] = phoneValue;
             continue;
           }
@@ -1100,6 +1116,7 @@ export default function SalesforceImportPage() {
                 config={{
                   columnMapping: activeEntry.columnMapping,
                   picklistValueMappings: activeEntry.picklistValueMappings,
+                  phonePrefixMappings: activeEntry.phonePrefixMappings,
                   checkboxRules: activeEntry.checkboxRules,
                   sfIdColumn: activeEntry.sfIdColumn,
                   propertyLookupField,
@@ -1110,6 +1127,7 @@ export default function SalesforceImportPage() {
                         ...entry,
                         columnMapping: config.columnMapping,
                         picklistValueMappings: config.picklistValueMappings ?? {},
+                        phonePrefixMappings: config.phonePrefixMappings ?? {},
                         checkboxRules: config.checkboxRules ?? [],
                         sfIdColumn: entry.sfIdColumn,
                       }
@@ -1249,6 +1267,30 @@ export default function SalesforceImportPage() {
                                   </span>
                                 )}
                               </div>
+                              {targetField?.type === 'PhoneWithPrefix' && activeEntry && (() => {
+                                const prefixes = getSalesforcePhonePrefixOptions(targetField.picklistValues);
+                                const currentPrefix = activeEntry.phonePrefixMappings[header];
+                                const selectedPrefix = prefixes.includes(currentPrefix ?? '')
+                                  ? currentPrefix!
+                                  : getDefaultSalesforcePhonePrefix(targetField.picklistValues);
+                                return (
+                                  <label className="mt-2 block max-w-64 text-xs font-medium text-gray-700">
+                                    Phone prefix
+                                    <select
+                                      aria-label={`Phone prefix for ${header}`}
+                                      value={selectedPrefix}
+                                      onChange={(event) => setFiles((previous) => previous.map((entry, index) =>
+                                        index === activeFileIdx
+                                          ? { ...entry, phonePrefixMappings: { ...entry.phonePrefixMappings, [header]: event.target.value } }
+                                          : entry,
+                                      ))}
+                                      className="mt-1 block h-8 w-full rounded border border-gray-300 bg-white px-2 text-xs"
+                                    >
+                                      {prefixes.map((prefix) => <option key={prefix} value={prefix}>{prefix}</option>)}
+                                    </select>
+                                  </label>
+                                );
+                              })()}
                               {targetField?.type === 'Picklist' && activeEntry && (
                                 <PicklistValueMapping
                                   column={header}

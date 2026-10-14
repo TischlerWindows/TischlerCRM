@@ -82,11 +82,13 @@ describe('Salesforce import picklist mappings', () => {
     const config = {
       columnMapping: { AccountId: 'account' },
       picklistValueMappings: {},
+      phonePrefixMappings: { Phone: 'Home' },
       checkboxRules,
     }
 
     const saved = await saveSalesforceImportTemplate('Contact', 'Contact import', config)
     expect(saved[0]?.config.checkboxRules).toEqual(checkboxRules)
+    expect(saved[0]?.config.phonePrefixMappings).toEqual({ Phone: 'Home' })
     expect(apiClient.setPreference).toHaveBeenCalledWith(
       SALESFORCE_IMPORT_TEMPLATES_KEY,
       expect.objectContaining({
@@ -101,6 +103,7 @@ describe('Salesforce import picklist mappings', () => {
 
     await expect(loadSalesforceImportTemplates('Contact')).resolves.toEqual(saved)
     expect(saved[0]?.config.checkboxRules).toEqual(checkboxRules)
+    expect(saved[0]?.config.phonePrefixMappings).toEqual({ Phone: 'Home' })
   })
 
   it('waits for the preferences write before reporting a template save as complete', async () => {

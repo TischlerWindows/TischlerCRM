@@ -15,6 +15,7 @@ export interface SalesforceCheckboxImportRule {
 export interface SalesforceImportTemplateConfig {
   columnMapping: Record<string, string>
   picklistValueMappings: Record<string, Record<string, string>>
+  phonePrefixMappings?: Record<string, string>
   checkboxRules?: SalesforceCheckboxImportRule[]
   sfIdColumn?: string | null
   propertyLookupField?: string
