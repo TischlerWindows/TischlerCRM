@@ -48,8 +48,8 @@ export function SalesforceImportTemplateControls({
       const saved = next.find((template) => template.name.trim().toLowerCase() === name.toLowerCase())
       setSelectedId(saved?.id ?? '')
       setTemplateName('')
-    } catch {
-      setError('Could not save this import template.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save this import template.')
     } finally {
       setBusy(false)
     }

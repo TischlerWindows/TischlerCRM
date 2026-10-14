@@ -25,8 +25,20 @@ describe('Salesforce import picklist mappings', () => {
     persistedPreferences = {}
     jest.mocked(apiClient.getPreferences).mockImplementation(async () => ({ ...persistedPreferences }))
     jest.mocked(apiClient.setPreference).mockImplementation(async (key, value) => {
-      persistedPreferences[key] = value
-      return { key, value }
+      const persisted = JSON.parse(JSON.stringify(value)) as unknown
+      if (Array.isArray(persisted)) {
+        for (const template of persisted as SalesforceImportTemplate[]) {
+          if (!template.config.checkboxRules) continue
+          template.config.checkboxRules = template.config.checkboxRules.map((rule) => ({
+            condition: rule.condition,
+            sourceColumn: rule.sourceColumn,
+            targetField: rule.targetField,
+            id: rule.id,
+          }))
+        }
+      }
+      persistedPreferences[key] = persisted
+      return { key, value: persisted }
     })
   })
 

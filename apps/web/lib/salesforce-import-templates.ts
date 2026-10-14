@@ -38,6 +38,21 @@ function asTemplateList(value: unknown): SalesforceImportTemplate[] | undefined 
   return Array.isArray(value) ? value as SalesforceImportTemplate[] : undefined
 }
 
+function checkboxRulesMatch(
+  expected: SalesforceCheckboxImportRule[] | undefined,
+  persisted: unknown,
+): boolean {
+  const actualRules = Array.isArray(persisted) ? persisted as SalesforceCheckboxImportRule[] : []
+  const expectedRules = expected ?? []
+  if (actualRules.length !== expectedRules.length) return false
+  return expectedRules.every((rule) => actualRules.some((actual) =>
+    actual.id === rule.id
+    && actual.targetField === rule.targetField
+    && actual.sourceColumn === rule.sourceColumn
+    && actual.condition === rule.condition,
+  ))
+}
+
 export function getDistinctPicklistSourceValues(rows: Record<string, string>[], column: string): string[] {
   return Array.from(new Set(rows.map((row) => row[column]?.trim() ?? '')))
     .sort((left, right) => left === '' ? -1 : right === '' ? 1 : left.localeCompare(right))
@@ -96,7 +111,7 @@ export async function saveSalesforceImportTemplate(
   const savedForObject = asTemplateList(response?.value)
   const confirmedTemplate = savedForObject?.find((candidate) => candidate.id === template.id)
   if (!confirmedTemplate) throw new Error('The import template was not returned by the preferences API.')
-  if (JSON.stringify(confirmedTemplate.config.checkboxRules ?? []) !== JSON.stringify(template.config.checkboxRules ?? [])) {
+  if (!checkboxRulesMatch(template.config.checkboxRules, confirmedTemplate.config.checkboxRules)) {
     throw new Error('The checkbox rules were not returned by the preferences API.')
   }
   return savedForObject
