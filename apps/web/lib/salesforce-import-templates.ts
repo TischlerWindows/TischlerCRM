@@ -30,27 +30,17 @@ export interface SalesforceImportTemplate {
 
 type StoredTemplates = Record<string, SalesforceImportTemplate[]>
 
-export function getSalesforceImportTemplatesPreferenceKey(objectApiName: string): string {
-  return `${SALESFORCE_IMPORT_TEMPLATES_KEY}:${objectApiName}`
+function asStoredTemplates(value: unknown): StoredTemplates {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as StoredTemplates
+    : {}
 }
 
-function asTemplateList(value: unknown): SalesforceImportTemplate[] | undefined {
-  return Array.isArray(value) ? value as SalesforceImportTemplate[] : undefined
-}
-
-function checkboxRulesMatch(
-  expected: SalesforceCheckboxImportRule[] | undefined,
-  persisted: unknown,
-): boolean {
-  const actualRules = Array.isArray(persisted) ? persisted as SalesforceCheckboxImportRule[] : []
-  const expectedRules = expected ?? []
-  if (actualRules.length !== expectedRules.length) return false
-  return expectedRules.every((rule) => actualRules.some((actual) =>
-    actual.id === rule.id
-    && actual.targetField === rule.targetField
-    && actual.sourceColumn === rule.sourceColumn
-    && actual.condition === rule.condition,
-  ))
+function getObjectTemplates(preferences: Record<string, unknown>, objectApiName: string): SalesforceImportTemplate[] {
+  const aggregateValue = asStoredTemplates(preferences[SALESFORCE_IMPORT_TEMPLATES_KEY])[objectApiName]
+  if (Array.isArray(aggregateValue)) return aggregateValue
+  const previousPerObjectValue = preferences[`${SALESFORCE_IMPORT_TEMPLATES_KEY}:${objectApiName}`]
+  return Array.isArray(previousPerObjectValue) ? previousPerObjectValue as SalesforceImportTemplate[] : []
 }
 
 export function getDistinctPicklistSourceValues(rows: Record<string, string>[], column: string): string[] {
@@ -80,12 +70,7 @@ export function resolvePicklistImportValue(
 
 export async function loadSalesforceImportTemplates(objectApiName: string): Promise<SalesforceImportTemplate[]> {
   const preferences = await apiClient.getPreferences()
-  const objectTemplates = asTemplateList(preferences[getSalesforceImportTemplatesPreferenceKey(objectApiName)])
-  if (objectTemplates) return objectTemplates
-
-  // Read templates saved before storage was separated by object.
-  const legacyTemplates = preferences[SALESFORCE_IMPORT_TEMPLATES_KEY] as StoredTemplates | undefined
-  return legacyTemplates?.[objectApiName] ?? []
+  return getObjectTemplates(preferences, objectApiName)
 }
 
 export async function saveSalesforceImportTemplate(
@@ -93,7 +78,9 @@ export async function saveSalesforceImportTemplate(
   name: string,
   config: SalesforceImportTemplateConfig,
 ): Promise<SalesforceImportTemplate[]> {
-  const current = await loadSalesforceImportTemplates(objectApiName)
+  const preferences = await apiClient.getPreferences()
+  const stored = asStoredTemplates(preferences[SALESFORCE_IMPORT_TEMPLATES_KEY])
+  const current = getObjectTemplates(preferences, objectApiName)
   const normalizedName = name.trim().toLowerCase()
   const existingIndex = current.findIndex((template) => template.name.trim().toLowerCase() === normalizedName)
   const template: SalesforceImportTemplate = {
@@ -106,13 +93,14 @@ export async function saveSalesforceImportTemplate(
   const nextForObject = [...current]
   if (existingIndex >= 0) nextForObject[existingIndex] = template
   else nextForObject.push(template)
-  const key = getSalesforceImportTemplatesPreferenceKey(objectApiName)
-  const response = await apiClient.setPreference(key, nextForObject)
-  const savedForObject = asTemplateList(response?.value)
+  const nextStored = { ...stored, [objectApiName]: nextForObject }
+  await apiClient.setPreference(SALESFORCE_IMPORT_TEMPLATES_KEY, nextStored)
+  const persistedPreferences = await apiClient.getPreferences()
+  const savedForObject = asStoredTemplates(persistedPreferences[SALESFORCE_IMPORT_TEMPLATES_KEY])[objectApiName]
   const confirmedTemplate = savedForObject?.find((candidate) => candidate.id === template.id)
   if (!confirmedTemplate) throw new Error('The import template was not returned by the preferences API.')
-  if (!checkboxRulesMatch(template.config.checkboxRules, confirmedTemplate.config.checkboxRules)) {
-    throw new Error('The checkbox rules were not returned by the preferences API.')
+  if (!structurallyEqual(template.config, confirmedTemplate.config)) {
+    throw new Error('The saved import mappings did not match the preferences API response.')
   }
   return savedForObject
 }
@@ -121,13 +109,31 @@ export async function deleteSalesforceImportTemplate(
   objectApiName: string,
   templateId: string,
 ): Promise<SalesforceImportTemplate[]> {
-  const nextForObject = (await loadSalesforceImportTemplates(objectApiName))
+  const preferences = await apiClient.getPreferences()
+  const stored = asStoredTemplates(preferences[SALESFORCE_IMPORT_TEMPLATES_KEY])
+  const nextForObject = getObjectTemplates(preferences, objectApiName)
     .filter((template) => template.id !== templateId)
-  const key = getSalesforceImportTemplatesPreferenceKey(objectApiName)
-  const response = await apiClient.setPreference(key, nextForObject)
-  const savedForObject = asTemplateList(response?.value)
+  await apiClient.setPreference(SALESFORCE_IMPORT_TEMPLATES_KEY, { ...stored, [objectApiName]: nextForObject })
+  const persistedPreferences = await apiClient.getPreferences()
+  const savedForObject = asStoredTemplates(persistedPreferences[SALESFORCE_IMPORT_TEMPLATES_KEY])[objectApiName]
   if (!savedForObject || savedForObject.some((template) => template.id === templateId)) {
     throw new Error('The import template was not removed by the preferences API.')
   }
   return savedForObject
+}
+
+function structurallyEqual(left: unknown, right: unknown): boolean {
+  const normalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(normalize)
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+          .filter(([, entry]) => entry !== undefined)
+          .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+          .map(([key, entry]) => [key, normalize(entry)]),
+      )
+    }
+    return value
+  }
+  return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right))
 }

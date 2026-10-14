@@ -1,7 +1,6 @@
 import {
   getDefaultPicklistTarget,
   getDistinctPicklistSourceValues,
-  getSalesforceImportTemplatesPreferenceKey,
   loadSalesforceImportTemplates,
   PICKLIST_LEAVE_BLANK,
   resolvePicklistImportValue,
@@ -26,15 +25,18 @@ describe('Salesforce import picklist mappings', () => {
     jest.mocked(apiClient.getPreferences).mockImplementation(async () => ({ ...persistedPreferences }))
     jest.mocked(apiClient.setPreference).mockImplementation(async (key, value) => {
       const persisted = JSON.parse(JSON.stringify(value)) as unknown
-      if (Array.isArray(persisted)) {
-        for (const template of persisted as SalesforceImportTemplate[]) {
-          if (!template.config.checkboxRules) continue
-          template.config.checkboxRules = template.config.checkboxRules.map((rule) => ({
-            condition: rule.condition,
-            sourceColumn: rule.sourceColumn,
-            targetField: rule.targetField,
-            id: rule.id,
-          }))
+      if (key === SALESFORCE_IMPORT_TEMPLATES_KEY && persisted && typeof persisted === 'object') {
+        for (const templates of Object.values(persisted as Record<string, unknown>)) {
+          if (!Array.isArray(templates)) continue
+          for (const template of templates as SalesforceImportTemplate[]) {
+            if (!template.config.checkboxRules) continue
+            template.config.checkboxRules = template.config.checkboxRules.map((rule) => ({
+              condition: rule.condition,
+              sourceColumn: rule.sourceColumn,
+              targetField: rule.targetField,
+              id: rule.id,
+            }))
+          }
         }
       }
       persistedPreferences[key] = persisted
@@ -81,11 +83,17 @@ describe('Salesforce import picklist mappings', () => {
 
     const saved = await saveSalesforceImportTemplate('Contact', 'Contact import', config)
     expect(saved[0]?.config.checkboxRules).toEqual(checkboxRules)
-    const contactKey = getSalesforceImportTemplatesPreferenceKey('Contact')
-    expect(apiClient.setPreference).toHaveBeenCalledWith(contactKey, expect.arrayContaining([
-      expect.objectContaining({ config: expect.objectContaining({ checkboxRules }) }),
-    ]))
-    expect(persistedPreferences[contactKey]).toEqual(saved)
+    expect(apiClient.setPreference).toHaveBeenCalledWith(
+      SALESFORCE_IMPORT_TEMPLATES_KEY,
+      expect.objectContaining({
+        Contact: expect.arrayContaining([
+          expect.objectContaining({ config: expect.objectContaining({ checkboxRules }) }),
+        ]),
+      }),
+    )
+    expect(persistedPreferences[SALESFORCE_IMPORT_TEMPLATES_KEY]).toMatchObject({
+      Contact: [{ config: { checkboxRules } }],
+    })
 
     await expect(loadSalesforceImportTemplates('Contact')).resolves.toEqual(saved)
     expect(saved[0]?.config.checkboxRules).toEqual(checkboxRules)
@@ -125,7 +133,7 @@ describe('Salesforce import picklist mappings', () => {
     expect(completed).toBe(true)
   })
 
-  it('keeps Contact and Project templates in separate preference keys', async () => {
+  it('keeps Contact and Project templates separate under the canonical preference key', async () => {
     const contact = await saveSalesforceImportTemplate('Contact', 'Contact Rules', {
       columnMapping: {},
       picklistValueMappings: {},
@@ -139,10 +147,9 @@ describe('Salesforce import picklist mappings', () => {
 
     expect(await loadSalesforceImportTemplates('Contact')).toEqual(contact)
     expect(await loadSalesforceImportTemplates('Project')).toEqual(project)
-    expect(Object.keys(persistedPreferences)).toEqual([
-      getSalesforceImportTemplatesPreferenceKey('Contact'),
-      getSalesforceImportTemplatesPreferenceKey('Project'),
-    ])
-    expect(persistedPreferences[SALESFORCE_IMPORT_TEMPLATES_KEY]).toBeUndefined()
+    expect(Object.keys(persistedPreferences)).toEqual([SALESFORCE_IMPORT_TEMPLATES_KEY])
+    const persistedTemplates = persistedPreferences[SALESFORCE_IMPORT_TEMPLATES_KEY] as Record<string, SalesforceImportTemplate[]>
+    expect(persistedTemplates.Contact?.[0]?.config.checkboxRules?.[0]?.targetField).toBe('homeownerAccount')
+    expect(persistedTemplates.Project?.[0]?.config.checkboxRules?.[0]?.targetField).toBe('hasScreen')
   })
 })
