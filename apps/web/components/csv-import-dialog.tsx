@@ -11,7 +11,7 @@ import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
 import { mapContactFullName, mergeCompositeTextSubField } from '@/lib/composite-text-import';
-import { evaluateSalesforceCheckboxRule, parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
+import { evaluateSalesforceCheckboxRule, mapSalesforcePhoneWithPrefix, parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
 import { SalesforceCheckboxImportRules } from '@/components/salesforce-checkbox-import-rules';
 import {
   findAddressImportSubfieldTarget,
@@ -675,6 +675,11 @@ export default function CsvImportDialog({
         if (targetField && targetField !== '__skip__') {
           const val = row[csvCol];
           const target = targetFields.find((field) => field.apiName === targetField);
+          if (target?.type === 'PhoneWithPrefix') {
+            const phoneValue = mapSalesforcePhoneWithPrefix(val);
+            if (phoneValue) mapped[targetField] = phoneValue;
+            continue;
+          }
           if (target?.type === 'Checkbox') {
             mapped[targetField] = parseSalesforceCheckbox(val);
             continue;

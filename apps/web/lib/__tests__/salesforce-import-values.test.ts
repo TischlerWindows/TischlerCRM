@@ -1,4 +1,8 @@
-import { evaluateSalesforceCheckboxRule, parseSalesforceCheckbox } from '../salesforce-import-values'
+import {
+  evaluateSalesforceCheckboxRule,
+  mapSalesforcePhoneWithPrefix,
+  parseSalesforceCheckbox,
+} from '../salesforce-import-values'
 
 describe('Salesforce import values', () => {
   it('maps blank checkbox cells to unchecked', () => {
@@ -21,6 +25,15 @@ describe('Salesforce import values', () => {
     expect(parseSalesforceCheckbox('Included')).toBe(true)
     expect(parseSalesforceCheckbox(true)).toBe(true)
     expect(parseSalesforceCheckbox(false)).toBe(false)
+  })
+
+  it('imports PhoneWithPrefix strings in Mobile mode and skips blanks', () => {
+    expect(mapSalesforcePhoneWithPrefix('  917-597-2421  ')).toEqual({
+      prefix: 'Mobile',
+      phone: '917-597-2421',
+    })
+    expect(mapSalesforcePhoneWithPrefix('')).toBeNull()
+    expect(mapSalesforcePhoneWithPrefix(undefined)).toBeNull()
   })
 
   it('evaluates checkbox rules from source-column presence', () => {

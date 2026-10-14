@@ -15,8 +15,11 @@ import {
   getSalesforceAccountTypeTarget,
   mirrorAccountTypeImportAliases,
 } from '@/lib/salesforce-account-import';
-import { parseSalesforceCheckbox } from '@/lib/salesforce-import-values';
-import { evaluateSalesforceCheckboxRule } from '@/lib/salesforce-import-values';
+import {
+  evaluateSalesforceCheckboxRule,
+  mapSalesforcePhoneWithPrefix,
+  parseSalesforceCheckbox,
+} from '@/lib/salesforce-import-values';
 import { PicklistValueMapping } from '@/components/picklist-value-mapping';
 import { SalesforceImportTemplateControls } from '@/components/salesforce-import-template-controls';
 import { SalesforceCheckboxImportRules } from '@/components/salesforce-checkbox-import-rules';
@@ -641,6 +644,14 @@ export default function SalesforceImportPage() {
         for (const [csvCol, targetField] of Object.entries(entry.columnMapping)) {
           if (!targetField || targetField === '__skip__') continue;
           const val = row[csvCol] ?? '';
+          const phoneField = objectDef?.fields.find((field) =>
+            field.apiName.replace(`${objectApiName}__`, '') === targetField && field.type === 'PhoneWithPrefix',
+          );
+          if (phoneField) {
+            const phoneValue = mapSalesforcePhoneWithPrefix(val);
+            if (phoneValue) mapped[`${objectApiName}__${targetField}`] = phoneValue;
+            continue;
+          }
           const checkboxField = objectDef?.fields.find((field) =>
             field.apiName.replace(`${objectApiName}__`, '') === targetField && field.type === 'Checkbox',
           );

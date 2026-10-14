@@ -10,6 +10,15 @@ export function parseSalesforceCheckbox(value: unknown): boolean {
   return !['false', '0', 'no', 'n', 'off', 'unchecked'].includes(normalized);
 }
 
+export function mapSalesforcePhoneWithPrefix(value: unknown): { prefix: 'Mobile'; phone: string } | null {
+  const rawPhone = value && typeof value === 'object' && 'phone' in value
+    ? (value as { phone?: unknown }).phone
+    : value;
+  if (rawPhone === null || rawPhone === undefined) return null;
+  const phone = String(rawPhone).trim();
+  return phone ? { prefix: 'Mobile', phone } : null;
+}
+
 export function evaluateSalesforceCheckboxRule(
   rule: SalesforceCheckboxImportRule,
   row: Record<string, string>,
