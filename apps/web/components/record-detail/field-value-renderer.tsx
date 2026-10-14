@@ -30,7 +30,7 @@ function LookupUserValue({ value }: { value: unknown }) {
 
   React.useEffect(() => {
     let cancelled = false;
-    apiClient.get<LookupUserIdentity[]>('/users/lookup')
+    apiClient.get<LookupUserIdentity[]>('/users/lookup/import')
       .then((records) => { if (!cancelled) setUsers(Array.isArray(records) ? records : []); })
       .catch(() => { if (!cancelled) setUsers([]); });
     return () => { cancelled = true; };

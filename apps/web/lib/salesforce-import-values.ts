@@ -4,6 +4,7 @@ export interface ImportUserLookupRecord {
   id: string
   name: string | null
   email: string
+  isActive: boolean
 }
 
 export function isUserLookupType(type: string): boolean {

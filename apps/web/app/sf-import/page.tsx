@@ -561,7 +561,7 @@ export default function SalesforceImportPage() {
     let importUsers: ImportUserLookupRecord[] = [];
     if (hasMappedUserLookup) {
       try {
-        importUsers = await apiClient.get<ImportUserLookupRecord[]>('/users/lookup');
+        importUsers = await apiClient.get<ImportUserLookupRecord[]>('/users/lookup/import');
       } catch {
         setParseErrors(['Could not load active users to match user lookup fields. Try again before importing.']);
         setStep('map');

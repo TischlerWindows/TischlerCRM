@@ -134,6 +134,17 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     return reply.send(users);
   });
 
+  // ── Users allowed as stored lookup values, including inactive users ─────
+  app.get('/users/lookup/import', async (req, reply) => {
+    if (!(req as any).user?.sub) return reply.code(401).send({ error: 'Unauthorized' });
+    const users = await prisma.user.findMany({
+      where: { deletedAt: null, id: { not: DELETED_USER_PLACEHOLDER_ID } },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, email: true, title: true, isActive: true },
+    });
+    return reply.send(users);
+  });
+
   // ── Resolve one active user for LookupUser display/defaults ──────────────
   app.get('/users/lookup/:id', async (req, reply) => {
     if (!(req as any).user?.sub) return reply.code(401).send({ error: 'Unauthorized' });

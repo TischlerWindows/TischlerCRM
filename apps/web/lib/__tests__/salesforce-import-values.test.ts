@@ -61,10 +61,11 @@ describe('Salesforce import values', () => {
 
   it('resolves user lookup names, emails, and unique username prefixes to IDs', () => {
     const users = [
-      { id: 'user-1', name: 'Matthias Mildner', email: 'mildner@example.com' },
-      { id: 'user-2', name: 'Carlos Martinez', email: 'carlos@example.com' },
-      { id: 'user-3', name: 'Carlos Moore', email: 'cmoore@example.com' },
-      { id: 'user-4', name: 'Jose Garcia', email: 'jgarcia@example.com' },
+      { id: 'user-1', name: 'Matthias Mildner', email: 'mildner@example.com', isActive: true },
+      { id: 'user-2', name: 'Carlos Martinez', email: 'carlos@example.com', isActive: true },
+      { id: 'user-3', name: 'Carlos Moore', email: 'cmoore@example.com', isActive: true },
+      { id: 'user-4', name: 'Jose Garcia', email: 'jgarcia@example.com', isActive: true },
+      { id: 'user-5', name: 'Inactive Tech', email: 'inactive@example.com', isActive: false },
     ]
 
     expect(resolveUserLookupImportValue('MATTHIAS_MILDNER', users)).toEqual({
@@ -77,6 +78,10 @@ describe('Salesforce import values', () => {
     })
     expect(resolveUserLookupImportValue('Jose_Gar', users)).toEqual({
       value: 'user-4',
+      unmatched: [],
+    })
+    expect(resolveUserLookupImportValue('Inactive Tech', users)).toEqual({
+      value: 'user-5',
       unmatched: [],
     })
     expect(resolveUserLookupImportValue('Carlos_M', users)).toEqual({

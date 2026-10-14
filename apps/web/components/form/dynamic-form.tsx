@@ -486,7 +486,7 @@ export default function DynamicForm({
 
       if (hasLookupUser) {
         try {
-          const users = await apiClient.get<any[]>('/users/lookup');
+          const users = await apiClient.get<any[]>('/users/lookup/import');
           newCache['__users__'] = Array.isArray(users) ? users : [];
         } catch (err) {
           console.error('Failed to fetch users for LookupUser:', err);
@@ -505,7 +505,7 @@ export default function DynamicForm({
 
         if (targetApis.has('User') && !newCache['__users__']) {
           try {
-            const users = await apiClient.get<any[]>('/users/lookup');
+            const users = await apiClient.get<any[]>('/users/lookup/import');
             newCache['__users__'] = Array.isArray(users) ? users : [];
           } catch {
             newCache['__users__'] = [];

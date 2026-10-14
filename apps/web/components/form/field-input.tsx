@@ -821,7 +821,8 @@ export function FieldInput({
 
     // ── LookupUser ───────────────────────────────────────────
     case 'LookupUser': {
-      const userRecords = lookupRecordsCache['__users__'] || [];
+      const selectedUserRecords = lookupRecordsCache['__users__'] || [];
+      const userRecords = selectedUserRecords.filter((user: any) => user.isActive !== false);
       if (isSystemField(fieldDef.apiName)) {
         const matchedUser = value
           ? userRecords.find((u: any) => String(u.id) === String(value))
@@ -843,6 +844,7 @@ export function FieldInput({
             disabled={isReadOnly}
             error={error}
             userRecords={userRecords}
+            selectedUserRecords={selectedUserRecords}
             lookupQuery={lookupQueries[fieldDef.apiName] ?? ''}
             isActive={activeLookupField === fieldDef.apiName}
             onQueryChange={(q) => onLookupQueryChange(fieldDef.apiName, q)}
@@ -856,7 +858,8 @@ export function FieldInput({
 
     // ── MultiLookupUser ──────────────────────────────────────
     case 'MultiLookupUser': {
-      const userRecords = lookupRecordsCache['__users__'] || [];
+      const selectedUserRecords = lookupRecordsCache['__users__'] || [];
+      const userRecords = selectedUserRecords.filter((user: any) => user.isActive !== false);
       inputElement = (
         <MultiLookupUserSearch
           fieldDef={fieldDef}
@@ -865,6 +868,7 @@ export function FieldInput({
           disabled={isReadOnly}
           error={error}
           userRecords={userRecords}
+          selectedUserRecords={selectedUserRecords}
           lookupQuery={lookupQueries[fieldDef.apiName] ?? ''}
           isActive={activeLookupField === fieldDef.apiName}
           onQueryChange={(q) => onLookupQueryChange(fieldDef.apiName, q)}

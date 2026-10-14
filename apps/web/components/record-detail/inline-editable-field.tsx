@@ -389,7 +389,7 @@ function useLookupUserCandidates() {
   useEffect(() => {
     let cancelled = false;
     apiClient
-      .get<any[]>('/users/lookup')
+      .get<any[]>('/users/lookup/import')
       .then((users) => {
         if (!cancelled) setRecords(Array.isArray(users) ? users : []);
       })
@@ -510,7 +510,8 @@ function InlineLookupUserEditor({
       fieldDef={fieldDef}
       value={value}
       onChange={onChange}
-      userRecords={userRecords}
+      userRecords={userRecords.filter((user) => user.isActive !== false)}
+      selectedUserRecords={userRecords}
       lookupQuery={query}
       isActive={isActive}
       onQueryChange={setQuery}
@@ -538,7 +539,8 @@ function InlineMultiLookupUserEditor({
       fieldDef={fieldDef}
       value={value}
       onChange={onChange}
-      userRecords={userRecords}
+      userRecords={userRecords.filter((user) => user.isActive !== false)}
+      selectedUserRecords={userRecords}
       lookupQuery={query}
       isActive={isActive}
       onQueryChange={setQuery}

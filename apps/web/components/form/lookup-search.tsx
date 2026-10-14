@@ -525,6 +525,7 @@ export interface LookupUserSearchProps {
   disabled?: boolean;
   error?: string;
   userRecords: any[];
+  selectedUserRecords?: any[];
   lookupQuery: string;
   isActive: boolean;
   onQueryChange: (query: string) => void;
@@ -540,6 +541,7 @@ export function LookupUserSearch({
   disabled,
   error,
   userRecords,
+  selectedUserRecords = userRecords,
   lookupQuery,
   isActive,
   onQueryChange,
@@ -549,9 +551,9 @@ export function LookupUserSearch({
 }: LookupUserSearchProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const normalizedValue = normalizeSingleLookupUserValue(value, userRecords);
+  const normalizedValue = normalizeSingleLookupUserValue(value, selectedUserRecords);
   const selectedUser = normalizedValue
-    ? userRecords.find((u) => String(u.id) === normalizedValue)
+    ? selectedUserRecords.find((u) => String(u.id) === normalizedValue)
     : null;
   const selectedUserLabel = selectedUser
     ? selectedUser.name || selectedUser.email || ''
@@ -559,8 +561,8 @@ export function LookupUserSearch({
   const userDisplayValue = isActive ? lookupQuery : selectedUserLabel;
 
   useEffect(() => {
-    if (userRecords.length > 0 && value && String(value) !== normalizedValue) onChange(normalizedValue);
-  }, [normalizedValue, onChange, userRecords.length, value]);
+    if (selectedUserRecords.length > 0 && value && String(value) !== normalizedValue) onChange(normalizedValue);
+  }, [normalizedValue, onChange, selectedUserRecords.length, value]);
 
   const filteredUsers = userRecords.filter((user) => {
     const query = lookupQuery.toLowerCase();
