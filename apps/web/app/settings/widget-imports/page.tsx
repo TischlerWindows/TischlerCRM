@@ -6,6 +6,7 @@ import { AlertTriangle, CheckCircle2, FileSpreadsheet, Loader2, Upload } from 'l
 import { apiClient } from '@/lib/api-client'
 import { SettingsContentCard } from '@/components/settings/settings-content-card'
 import { SettingsPageHeader } from '@/components/settings/settings-page-header'
+import { WidgetDataImportTemplateControls } from '@/components/widget-data-import-template-controls'
 import { recordsService } from '@/lib/records-service'
 import type { ImportUserLookupRecord } from '@/lib/salesforce-import-values'
 import {
@@ -30,6 +31,18 @@ interface ImportResult {
   errors: Array<{ row: number; error: string }>
 }
 
+interface ImportDraft {
+  headers: string[]
+  rows: Record<string, string>[]
+  fileName: string
+  workOrderColumn: string
+  fieldMapping: Record<string, string>
+}
+
+function emptyImportDraft(): ImportDraft {
+  return { headers: [], rows: [], fileName: '', workOrderColumn: '', fieldMapping: {} }
+}
+
 const OBJECT_LABELS: Record<WidgetImportObject, string> = {
   PunchList: 'Punch List',
   PerDiem: 'Per Diem',
@@ -43,14 +56,21 @@ export default function WidgetImportsPage() {
   const [importUsers, setImportUsers] = useState<ImportUserLookupRecord[] | null>(null)
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [userLoadError, setUserLoadError] = useState<string | null>(null)
-  const [headers, setHeaders] = useState<string[]>([])
-  const [rows, setRows] = useState<Record<string, string>[]>([])
-  const [fileName, setFileName] = useState('')
-  const [workOrderColumn, setWorkOrderColumn] = useState('')
-  const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({})
+  const [drafts, setDrafts] = useState<Record<WidgetImportObject, ImportDraft>>({
+    PunchList: emptyImportDraft(),
+    PerDiem: emptyImportDraft(),
+  })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
+  const activeDraft = drafts[objectApiName]
+  const { headers, rows, fileName, workOrderColumn, fieldMapping } = activeDraft
+  const updateDraft = (patch: Partial<ImportDraft>) => {
+    setDrafts((current) => ({
+      ...current,
+      [objectApiName]: { ...current[objectApiName], ...patch },
+    }))
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -109,9 +129,7 @@ export default function WidgetImportsPage() {
     if (!file) return
     setError(null)
     setResult(null)
-    setFileName('')
-    setHeaders([])
-    setRows([])
+    updateDraft({ headers: [], rows: [], fileName: '', workOrderColumn: '', fieldMapping: {} })
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: 'greedy',
@@ -125,11 +143,13 @@ export default function WidgetImportsPage() {
           setError('The selected CSV has no header row or data rows.')
           return
         }
-        setFileName(file.name)
-        setHeaders(parsedHeaders)
-        setRows(parsed.data)
-        setWorkOrderColumn(getDefaultWorkOrderColumn(parsedHeaders))
-        setFieldMapping(getDefaultWidgetFieldMapping(parsedHeaders, objectApiName))
+        updateDraft({
+          fileName: file.name,
+          headers: parsedHeaders,
+          rows: parsed.data,
+          workOrderColumn: getDefaultWorkOrderColumn(parsedHeaders),
+          fieldMapping: getDefaultWidgetFieldMapping(parsedHeaders, objectApiName),
+        })
       },
       error: (cause) => setError(cause.message || 'Could not read the selected CSV.'),
     })
@@ -137,7 +157,17 @@ export default function WidgetImportsPage() {
 
   const changeObject = (nextObject: WidgetImportObject) => {
     setObjectApiName(nextObject)
-    setFieldMapping(getDefaultWidgetFieldMapping(headers, nextObject))
+    setResult(null)
+    setError(null)
+  }
+
+  const applyTemplate = (config: { workOrderColumn: string; fieldMapping: Record<string, string> }) => {
+    const availableHeaders = new Set(headers)
+    updateDraft({
+      workOrderColumn: availableHeaders.has(config.workOrderColumn) ? config.workOrderColumn : '',
+      fieldMapping: Object.fromEntries(Object.entries(config.fieldMapping)
+        .filter(([, sourceColumn]) => availableHeaders.has(sourceColumn))),
+    })
     setResult(null)
     setError(null)
   }
@@ -199,6 +229,8 @@ export default function WidgetImportsPage() {
     }
   }
 
+  const templateConfig = { workOrderColumn, fieldMapping }
+
   return (
     <>
       <SettingsPageHeader
@@ -216,6 +248,7 @@ export default function WidgetImportsPage() {
                 type="button"
                 aria-pressed={objectApiName === object}
                 onClick={() => changeObject(object)}
+                disabled={busy}
                 className={`rounded px-4 py-2 text-sm font-medium ${objectApiName === object ? 'bg-brand-navy text-white' : 'text-gray-600 hover:bg-gray-100'}`}
               >
                 {OBJECT_LABELS[object]}
@@ -240,7 +273,10 @@ export default function WidgetImportsPage() {
                 type="file"
                 accept=".csv,text/csv"
                 className="sr-only"
-                onChange={(event) => handleFile(event.target.files?.[0])}
+                onChange={(event) => {
+                  handleFile(event.target.files?.[0])
+                  event.target.value = ''
+                }}
               />
             </label>
             {fileName && <span className="text-sm text-gray-600">{fileName} · {rows.length} rows</span>}
@@ -250,12 +286,19 @@ export default function WidgetImportsPage() {
 
           {headers.length > 0 && (
             <>
+              <WidgetDataImportTemplateControls
+                key={objectApiName}
+                objectApiName={objectApiName}
+                config={templateConfig}
+                onApply={applyTemplate}
+              />
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="text-sm font-medium text-gray-700">
                   Workorder ID column <span className="text-red-600">*</span>
                   <select
                     value={workOrderColumn}
-                    onChange={(event) => setWorkOrderColumn(event.target.value)}
+                    onChange={(event) => updateDraft({ workOrderColumn: event.target.value })}
                     className="mt-1 block h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm"
                   >
                     <option value="">Select CSV column</option>
@@ -280,7 +323,7 @@ export default function WidgetImportsPage() {
                           <select
                             aria-label={`CSV column for ${field.label}`}
                             value={fieldMapping[field.apiName] ?? ''}
-                            onChange={(event) => setFieldMapping((current) => ({ ...current, [field.apiName]: event.target.value }))}
+                            onChange={(event) => updateDraft({ fieldMapping: { ...fieldMapping, [field.apiName]: event.target.value } })}
                             className="h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm"
                           >
                             <option value="">Skip field</option>
