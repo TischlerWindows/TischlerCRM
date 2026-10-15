@@ -61,11 +61,13 @@ export default function WidgetImportsPage() {
     PerDiem: emptyImportDraft(),
   })
   const [busy, setBusy] = useState(false)
+  const [skipRowsWithIssues, setSkipRowsWithIssues] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
   const activeDraft = drafts[objectApiName]
   const { headers, rows, fileName, workOrderColumn, fieldMapping } = activeDraft
   const updateDraft = (patch: Partial<ImportDraft>) => {
+    setSkipRowsWithIssues(false)
     setDrafts((current) => ({
       ...current,
       [objectApiName]: { ...current[objectApiName], ...patch },
@@ -124,11 +126,13 @@ export default function WidgetImportsPage() {
 
   const importableCount = preparedRows.filter((row) => row.data).length
   const issueCount = preparedRows.reduce((count, row) => count + row.errors.length, 0)
+  const skippedRowCount = preparedRows.filter((row) => !row.data).length
 
   const handleFile = (file?: File) => {
     if (!file) return
     setError(null)
     setResult(null)
+    setSkipRowsWithIssues(false)
     updateDraft({ headers: [], rows: [], fileName: '', workOrderColumn: '', fieldMapping: {} })
     Papa.parse<Record<string, string>>(file, {
       header: true,
@@ -157,6 +161,7 @@ export default function WidgetImportsPage() {
 
   const changeObject = (nextObject: WidgetImportObject) => {
     setObjectApiName(nextObject)
+    setSkipRowsWithIssues(false)
     setResult(null)
     setError(null)
   }
@@ -168,6 +173,7 @@ export default function WidgetImportsPage() {
       fieldMapping: Object.fromEntries(Object.entries(config.fieldMapping)
         .filter(([, sourceColumn]) => availableHeaders.has(sourceColumn))),
     })
+    setSkipRowsWithIssues(false)
     setResult(null)
     setError(null)
   }
@@ -175,6 +181,10 @@ export default function WidgetImportsPage() {
   const importRows = async () => {
     if (!workOrderColumn) {
       setError('Select the CSV column containing the Workorder ID.')
+      return
+    }
+    if (skippedRowCount > 0 && !skipRowsWithIssues) {
+      setError(`Confirm that you want to skip the ${skippedRowCount} rows that cannot be imported and import the ${importableCount} valid rows.`)
       return
     }
     setBusy(true)
@@ -360,15 +370,35 @@ export default function WidgetImportsPage() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
-                <p className="text-xs text-gray-500">Rows with valid Workorder IDs and widget fields are imported; unresolved rows are reported below.</p>
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500">Rows with valid Workorder IDs and widget fields are imported; skipped rows are reported below.</p>
+                  {skippedRowCount > 0 && (
+                    <label className="flex items-start gap-2 text-sm text-amber-900">
+                      <input
+                        type="checkbox"
+                        checked={skipRowsWithIssues}
+                        onChange={(event) => {
+                          setSkipRowsWithIssues(event.target.checked)
+                          setError(null)
+                        }}
+                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-navy"
+                      />
+                      <span>
+                        Skip the {skippedRowCount} row{skippedRowCount === 1 ? '' : 's'} that cannot be imported and import the {importableCount} valid row{importableCount === 1 ? '' : 's'}.
+                      </span>
+                    </label>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => void importRows()}
-                  disabled={busy || loadingWorkOrders || !!workOrderError || (objectApiName === 'PerDiem' && loadingUsers) || !workOrderColumn || importableCount === 0}
+                  disabled={busy || loadingWorkOrders || !!workOrderError || (objectApiName === 'PerDiem' && loadingUsers) || !workOrderColumn || importableCount === 0 || (skippedRowCount > 0 && !skipRowsWithIssues)}
                   className="inline-flex h-10 items-center gap-2 rounded bg-brand-navy px-4 text-sm font-semibold text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  Import {importableCount} {OBJECT_LABELS[objectApiName]} rows
+                  {skippedRowCount > 0
+                    ? `Import ${importableCount} valid rows · skip ${skippedRowCount}`
+                    : `Import ${importableCount} ${OBJECT_LABELS[objectApiName]} rows`}
                 </button>
               </div>
             </>
