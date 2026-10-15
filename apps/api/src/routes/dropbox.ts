@@ -468,8 +468,8 @@ async function findExistingFolderInDropbox(
 }
 
 /**
- * Build an Opportunity folder name in the format "OPP0001 (Name)" or
- * "OPP0001 (Name) - Requote 1". Falls back to just the number if no name.
+ * Build an Opportunity folder name in the format "27540 (Name)" or
+ * "27540 (Name) - Requote 1". Falls back to just the number if no name.
  */
 function deriveOpportunityFolderName(data: Record<string, any>, createdAt?: Date | string | null): string {
   let oppNum = '';

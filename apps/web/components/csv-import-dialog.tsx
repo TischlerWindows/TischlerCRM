@@ -11,7 +11,7 @@ import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
 import { mapContactFullName, mergeCompositeTextSubField } from '@/lib/composite-text-import';
-import { evaluateSalesforceCheckboxRule, getDefaultSalesforcePhonePrefix, getSalesforcePhonePrefixOptions, isImportableSalesforceAutoNumber, isUserLookupType, mapSalesforcePhoneWithPrefix, normalizeSalesforceAutoNumber, parseSalesforceCheckbox, resolveUserLookupImportValue, type ImportUserLookupRecord } from '@/lib/salesforce-import-values';
+import { evaluateSalesforceCheckboxRule, getDefaultSalesforcePhonePrefix, getSalesforceRecordCreatedDate, getSalesforcePhonePrefixOptions, isImportableSalesforceAutoNumber, isUserLookupType, mapSalesforcePhoneWithPrefix, normalizeSalesforceAutoNumber, parseSalesforceCheckbox, resolveUserLookupImportValue, type ImportUserLookupRecord } from '@/lib/salesforce-import-values';
 import { SalesforceCheckboxImportRules } from '@/components/salesforce-checkbox-import-rules';
 import {
   findAddressImportSubfieldTarget,
@@ -761,7 +761,7 @@ export default function CsvImportDialog({
             } else if (objectApiName === 'Contact' && target?.type === 'CompositeText' && target.apiName.toLowerCase() === 'name') {
               Object.assign(mapped, mapContactFullName(val));
             } else {
-              mapped[targetField] = normalizeSalesforceAutoNumber(targetField, val);
+              mapped[targetField] = normalizeSalesforceAutoNumber(targetField, val, getSalesforceRecordCreatedDate(row));
             }
           }
         }

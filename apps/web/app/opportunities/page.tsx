@@ -552,32 +552,18 @@ export default function OpportunitiesPage() {
         normalizedData[cleanKey] = value;
       });
 
-      // Generate unique opportunity number
-      const existingNumbers = opportunities
-        .map(d => d.opportunityNumber)
-        .filter(num => num && num.startsWith('OPP'))
-        .map(num => parseInt(num.replace(/^OPP-?/, ''), 10))
-        .filter(num => !isNaN(num));
-
-      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-      const nextNumber = maxNumber + 1;
-      const opportunityNumber = `OPP${String(nextNumber).padStart(4, '0')}`;
-
-
       const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'Development User';
 
-      const recordData = {
-        ...normalizedData,
-        opportunityNumber,
-      };
-
-      const result = await recordsService.createRecord('Opportunity', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
+      delete normalizedData.opportunityNumber;
+      const result = await recordsService.createRecord('Opportunity', { data: normalizedData, pageLayoutId: layoutId || selectedLayoutId || undefined });
+      const createdData = result.data as Record<string, unknown>;
+      const opportunityNumber = String(createdData.opportunityNumber ?? createdData.Opportunity__opportunityNumber ?? '');
 
       const newOpp: Opportunity = {
         id: result.id,
-        opportunityNumber,
         ...normalizedData,
+        opportunityNumber,
         createdBy: currentUserName,
         createdAt: today,
         lastModifiedBy: currentUserName,

@@ -1,5 +1,6 @@
 import {
   evaluateSalesforceCheckboxRule,
+  getSalesforceRecordCreatedDate,
   getDefaultSalesforcePhonePrefix,
   isImportableSalesforceAutoNumber,
   mapSalesforcePhoneWithPrefix,
@@ -46,16 +47,17 @@ describe('Salesforce import values', () => {
     expect(mapSalesforcePhoneWithPrefix(undefined)).toBeNull()
   })
 
-  it('adds CRM prefixes to imported Opportunity, Project, and Work Order numbers', () => {
+  it('uses the Salesforce creation year for Opportunity and Project numbers', () => {
     expect(isImportableSalesforceAutoNumber('opportunityNumber')).toBe(true)
     expect(isImportableSalesforceAutoNumber('Opportunity__projectNumber')).toBe(true)
     expect(isImportableSalesforceAutoNumber('workOrderNumber')).toBe(true)
     expect(isImportableSalesforceAutoNumber('accountNumber')).toBe(false)
-    expect(normalizeSalesforceAutoNumber('opportunityNumber', '26596')).toBe('OPP26596')
-    expect(normalizeSalesforceAutoNumber('projectNumber', '26596')).toBe('PRJ26596')
+    expect(getSalesforceRecordCreatedDate({ CreatedDate: '2027-01-01T00:00:00.000Z' })).toBe('2027-01-01T00:00:00.000Z')
+    expect(normalizeSalesforceAutoNumber('opportunityNumber', '26596', '2026-04-14')).toBe('26596')
+    expect(normalizeSalesforceAutoNumber('projectNumber', 'PRJ-540', '2027-04-14')).toBe('27540')
+    expect(normalizeSalesforceAutoNumber('Opportunity__opportunityNumber', 'OPP-26596', '2027-04-14')).toBe('27596')
+    expect(normalizeSalesforceAutoNumber('opportunityNumber', '27540 - Requote 1', '2027-04-14')).toBe('27540 - Requote 1')
     expect(normalizeSalesforceAutoNumber('workOrderNumber', '26596')).toBe('WO26596')
-    expect(normalizeSalesforceAutoNumber('opportunityNumber', 'OPP26596')).toBe('OPP26596')
-    expect(normalizeSalesforceAutoNumber('Opportunity__opportunityNumber', 'opp-26596')).toBe('OPP26596')
     expect(normalizeSalesforceAutoNumber('opportunityNumber', 'External-26596')).toBe('External-26596')
   })
 

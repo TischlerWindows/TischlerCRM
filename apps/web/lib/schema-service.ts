@@ -200,6 +200,7 @@ class LocalStorageSchemaService implements SchemaService {
 
         // Ensure system field definitions are up-to-date (type, readOnly, etc.)
         migratedSchema = this.migrateSystemFieldTypes(migratedSchema);
+        migratedSchema = this.migrateYearBasedObjectNumberFormats(migratedSchema);
 
         // Self-contained layouts: embed full FieldDef into every PageField
         // so DynamicForm never needs to cross-reference object.fields.
@@ -803,6 +804,30 @@ class LocalStorageSchemaService implements SchemaService {
     return changed ? { ...schema, updatedAt: new Date().toISOString() } : schema;
   }
 
+  private migrateYearBasedObjectNumberFormats(schema: OrgSchema): OrgSchema {
+    let changed = false;
+    const yearBasedNumberFields: Record<string, string> = {
+      Opportunity: 'opportunityNumber',
+      Project: 'projectNumber',
+    };
+    const objects = schema.objects.map((object) => {
+      const fieldName = yearBasedNumberFields[object.apiName];
+      if (!fieldName) return object;
+      let objectChanged = false;
+      const fields = object.fields.map((field) => {
+        const bareApiName = field.apiName.replace(/^[A-Za-z]+__/, '');
+        if (bareApiName !== fieldName || field.type !== 'AutoNumber' || !field.autoNumber
+          || field.autoNumber.displayFormat === '{00000}') return field;
+        objectChanged = true;
+        return { ...field, autoNumber: { ...field.autoNumber, displayFormat: '{00000}' } };
+      });
+      if (!objectChanged) return object;
+      changed = true;
+      return { ...object, fields };
+    });
+    return changed ? { ...schema, objects, updatedAt: new Date().toISOString() } : schema;
+  }
+
   private ensurePropertyWoodLayout(schema: OrgSchema): OrgSchema {
     return ensurePropertyOpportunityRelatedLists(schema);
   }
@@ -1249,7 +1274,7 @@ class LocalStorageSchemaService implements SchemaService {
       apiName: 'Opportunity__opportunityNumber',
       label: 'Opportunity Number',
       type: 'AutoNumber',
-      autoNumber: { displayFormat: 'OPP{0000}', startingNumber: 1 }
+      autoNumber: { displayFormat: '{00000}', startingNumber: 1 }
     });
     ensureField({
       id: generateId(),
@@ -3163,7 +3188,7 @@ class LocalStorageSchemaService implements SchemaService {
           apiName: 'Project__projectNumber',
           label: 'Project Number',
           type: 'AutoNumber',
-          autoNumber: { displayFormat: 'PRJ-{0000}', startingNumber: 1 }
+          autoNumber: { displayFormat: '{00000}', startingNumber: 1 }
         },
         {
           id: generateId(),

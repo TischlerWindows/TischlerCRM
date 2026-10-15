@@ -11,20 +11,52 @@ export function isUserLookupType(type: string): boolean {
   return type === 'LookupUser' || type === 'MultiLookupUser'
 }
 
-const SALESFORCE_NUMBER_PREFIXES: Record<string, string> = {
+const YEAR_BASED_SALESFORCE_NUMBER_PREFIXES: Record<string, string> = {
   opportunityNumber: 'OPP',
   projectNumber: 'PRJ',
+}
+
+const SALESFORCE_NUMBER_PREFIXES: Record<string, string> = {
   workOrderNumber: 'WO',
 }
 
 export function isImportableSalesforceAutoNumber(fieldApiName: string): boolean {
   const fieldName = fieldApiName.replace(/^[A-Za-z]+__/, '')
-  return Object.prototype.hasOwnProperty.call(SALESFORCE_NUMBER_PREFIXES, fieldName)
+  return Object.prototype.hasOwnProperty.call(YEAR_BASED_SALESFORCE_NUMBER_PREFIXES, fieldName)
+    || Object.prototype.hasOwnProperty.call(SALESFORCE_NUMBER_PREFIXES, fieldName)
 }
 
-export function normalizeSalesforceAutoNumber(fieldApiName: string, value: unknown): string {
+export function getSalesforceRecordCreatedDate(row: Record<string, string>): string | undefined {
+  const createdDateColumn = Object.keys(row).find((header) =>
+    header.trim().toLowerCase().replace(/[^a-z0-9]/g, '') === 'createddate',
+  )
+  return createdDateColumn ? row[createdDateColumn] : undefined
+}
+
+export function normalizeSalesforceAutoNumber(
+  fieldApiName: string,
+  value: unknown,
+  createdAt?: unknown,
+): string {
   const rawValue = String(value ?? '').trim()
   const fieldName = fieldApiName.replace(/^[A-Za-z]+__/, '')
+
+  const legacyPrefix = YEAR_BASED_SALESFORCE_NUMBER_PREFIXES[fieldName]
+  if (legacyPrefix && rawValue) {
+    const requoteSuffix = rawValue.match(/\s*-\s*Requote\s*\d+$/i)?.[0] ?? ''
+    const baseValue = requoteSuffix ? rawValue.slice(0, -requoteSuffix.length).trim() : rawValue
+    const numericValue = baseValue.match(new RegExp(`^(?:${legacyPrefix}[-\\s]?)?(\\d+)$`, 'i'))?.[1]
+    if (!numericValue) return rawValue
+
+    const sourceDate = createdAt instanceof Date ? createdAt : new Date(String(createdAt ?? ''))
+    const year = Number.isNaN(sourceDate.getTime()) ? new Date().getUTCFullYear() : sourceDate.getUTCFullYear()
+    const yearPrefix = String(year % 100).padStart(2, '0')
+    const sequence = numericValue.length === 5 && numericValue.startsWith(yearPrefix)
+      ? numericValue.slice(2)
+      : numericValue.slice(-3).padStart(3, '0')
+    return `${yearPrefix}${sequence}${requoteSuffix}`
+  }
+
   const prefix = SALESFORCE_NUMBER_PREFIXES[fieldName]
   if (!prefix || !rawValue) return rawValue
 

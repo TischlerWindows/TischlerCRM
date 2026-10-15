@@ -10,6 +10,40 @@ import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
 const PROJECT_CHILD_OBJECTS = new Set(['AutoCad', 'CadIndexItem', 'InstallProgressItem']);
+const YEAR_SCOPED_NUMBER_PREFIXES: Record<string, string> = {
+  opportunityNumber: 'OPP',
+  projectNumber: 'PRJ',
+};
+
+function getYearScopedNumberSequence(
+  records: Array<{ data: unknown; createdAt: Date }>,
+  fieldApiName: string,
+  year: number,
+): number {
+  const yearPrefix = String(year % 100).padStart(2, '0');
+  const legacyPrefix = YEAR_SCOPED_NUMBER_PREFIXES[fieldApiName];
+  let maxSequence = 0;
+
+  for (const record of records) {
+    if (record.createdAt.getUTCFullYear() !== year || !record.data || typeof record.data !== 'object') continue;
+    const value = Object.entries(record.data as Record<string, unknown>)
+      .find(([key]) => key.replace(/^[A-Za-z]+__/, '') === fieldApiName)?.[1];
+    if (typeof value !== 'string') continue;
+
+    const withoutRequote = value.trim().replace(/\s*-\s*Requote\s*\d+$/i, '');
+    const withoutLegacyPrefix = withoutRequote.replace(new RegExp(`^${legacyPrefix}[-\\s]?`, 'i'), '');
+    if (!/^\d+$/.test(withoutLegacyPrefix)) continue;
+
+    const sequence = Number(withoutLegacyPrefix.slice(-3));
+    if (sequence > maxSequence) maxSequence = sequence;
+  }
+
+  return maxSequence;
+}
+
+function formatYearScopedNumber(year: number, sequence: number): string {
+  return `${String(year % 100).padStart(2, '0')}${String(sequence).padStart(3, '0')}`;
+}
 
 async function checkObjectPermission(
   userId: string,
@@ -685,10 +719,26 @@ export async function recordRoutes(app: FastifyInstance) {
       teamMemberNumber: 'TM',
       taskNumber: 'TSK',
     };
+    const year = new Date().getUTCFullYear();
     for (const field of object.fields) {
       const currentVal = normalizedData[field.apiName];
       const isEmpty = !currentVal || currentVal === 'N/A';
       if (field.apiName in autoNumberFormats && isEmpty) {
+        if (field.apiName in YEAR_SCOPED_NUMBER_PREFIXES) {
+          const existingRecords = await prisma.record.findMany({
+            where: { objectId: object.id, deletedAt: null },
+            select: { data: true, createdAt: true },
+          });
+          const maxSequence = getYearScopedNumberSequence(existingRecords, field.apiName, year);
+          if (maxSequence >= 999) {
+            return reply.code(409).send({ error: `No ${field.label} numbers remain for ${year}.` });
+          }
+          const generatedNum = formatYearScopedNumber(year, maxSequence + 1);
+          normalizedData[field.apiName] = generatedNum;
+          normalizedData[`${apiName}__${field.apiName}`] = generatedNum;
+          continue;
+        }
+
         // For propertyNumber, derive a smart prefix from address data
         const prefix = field.apiName === 'propertyNumber'
           ? getPropertyPrefix(extractAddressFromRecord(normalizedData))
@@ -1095,7 +1145,7 @@ export async function recordRoutes(app: FastifyInstance) {
 
   // ── Create Requote of an Opportunity ────────────────────────────────────
   // POST /objects/Opportunity/records/:id/requote
-  // Clones the Opportunity record and names it "OPP#### - Requote N"
+  // Clones the Opportunity record and names it "YY### - Requote N"
   app.post('/objects/:apiName/records/:id/requote', async (req, reply) => {
     const { apiName, id } = req.params as { apiName: string; id: string };
     const userId = req.user!.sub;
@@ -1715,6 +1765,7 @@ export async function recordRoutes(app: FastifyInstance) {
       installationNumber: 'INST', workOrderNumber: 'WO', teamMemberNumber: 'TM',
       taskNumber: 'TSK',
     };
+    const year = new Date().getUTCFullYear();
 
     // Pre-fetch existing records for auto-number sequence
     let maxAutoNumbers: Record<string, number> = {};
@@ -1722,9 +1773,13 @@ export async function recordRoutes(app: FastifyInstance) {
     if (autoNumberFields.length > 0) {
       const existing = await prisma.record.findMany({
         where: { objectId: object.id, deletedAt: null },
-        select: { data: true },
+        select: { data: true, createdAt: true },
       });
       for (const field of autoNumberFields) {
+        if (field.apiName in YEAR_SCOPED_NUMBER_PREFIXES) {
+          maxAutoNumbers[field.apiName] = getYearScopedNumberSequence(existing, field.apiName, year);
+          continue;
+        }
         const prefix = autoNumberFormats[field.apiName]!;
         const prefixRegex = field.apiName === 'propertyNumber'
           ? /^[A-Za-z]+-?(\d+)$/
@@ -1784,10 +1839,22 @@ export async function recordRoutes(app: FastifyInstance) {
         }
 
         // Auto-generate number fields
+        let exhaustedYearNumberField: string | null = null;
         for (const field of autoNumberFields) {
           const currentVal = normalizedData[field.apiName];
           const isEmpty = !currentVal || currentVal === 'N/A';
           if (isEmpty) {
+            if (field.apiName in YEAR_SCOPED_NUMBER_PREFIXES) {
+              if ((maxAutoNumbers[field.apiName] ?? 0) >= 999) {
+                exhaustedYearNumberField = field.label;
+                break;
+              }
+              maxAutoNumbers[field.apiName] = (maxAutoNumbers[field.apiName] ?? 0) + 1;
+              const generatedNum = formatYearScopedNumber(year, maxAutoNumbers[field.apiName]!);
+              normalizedData[field.apiName] = generatedNum;
+              normalizedData[`${apiName}__${field.apiName}`] = generatedNum;
+              continue;
+            }
             const prefix = field.apiName === 'propertyNumber'
               ? getPropertyPrefix(extractAddressFromRecord(normalizedData))
               : autoNumberFormats[field.apiName]!;
@@ -1797,6 +1864,10 @@ export async function recordRoutes(app: FastifyInstance) {
             normalizedData[field.apiName] = generatedNum;
             normalizedData[`${apiName}__${field.apiName}`] = generatedNum;
           }
+        }
+        if (exhaustedYearNumberField) {
+          errors.push({ row: i + 1, error: `No ${exhaustedYearNumberField} numbers remain for ${year}.` });
+          continue;
         }
 
         // Apply defaultValues for any field that is missing from the row data.

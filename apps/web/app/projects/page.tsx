@@ -447,31 +447,18 @@ export default function ProjectsPage() {
         normalizedData[cleanKey] = value;
       });
 
-      // Generate unique project number
-      const existingNumbers = projects
-        .map(p => p.projectNumber)
-        .filter(num => num.startsWith('PRJ'))
-        .map(num => parseInt(num.replace(/^PRJ-?/, ''), 10))
-        .filter(num => !isNaN(num));
-      
-      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-      const nextNumber = maxNumber + 1;
-      const projectNumber = `PRJ${String(nextNumber).padStart(3, '0')}`;
-      
       const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'Development User';
-      
-      const recordData = {
-        ...normalizedData,
-        projectNumber,
-      };
 
-      const result = await recordsService.createRecord('Project', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
-      
+      delete normalizedData.projectNumber;
+      const result = await recordsService.createRecord('Project', { data: normalizedData, pageLayoutId: layoutId || selectedLayoutId || undefined });
+      const createdData = result.data as Record<string, unknown>;
+      const projectNumber = String(createdData.projectNumber ?? createdData.Project__projectNumber ?? '');
+
       const newProject: Project = {
         id: result.id,
-        projectNumber,
         ...normalizedData,
+        projectNumber,
         createdBy: currentUserName,
         createdAt: today,
         lastModifiedBy: currentUserName,
