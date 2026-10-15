@@ -11,6 +11,23 @@ export function isUserLookupType(type: string): boolean {
   return type === 'LookupUser' || type === 'MultiLookupUser'
 }
 
+const SALESFORCE_NUMBER_PREFIXES: Record<string, string> = {
+  opportunityNumber: 'OPP',
+  projectNumber: 'PRJ',
+  workOrderNumber: 'WO',
+}
+
+export function normalizeSalesforceAutoNumber(fieldApiName: string, value: unknown): string {
+  const rawValue = String(value ?? '').trim()
+  const fieldName = fieldApiName.replace(/^[A-Za-z]+__/, '')
+  const prefix = SALESFORCE_NUMBER_PREFIXES[fieldName]
+  if (!prefix || !rawValue) return rawValue
+
+  const numericValue = rawValue.match(new RegExp(`^${prefix}[-\\s]?(\\d+)$`, 'i'))?.[1]
+    ?? rawValue.match(/^(\d+)$/)?.[1]
+  return numericValue ? `${prefix}${numericValue}` : rawValue
+}
+
 function normalizeUserLookupIdentity(value: string): string {
   return value.trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '')
 }

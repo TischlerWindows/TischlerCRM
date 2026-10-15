@@ -21,6 +21,7 @@ import {
   getSalesforcePhonePrefixOptions,
   isUserLookupType,
   mapSalesforcePhoneWithPrefix,
+  normalizeSalesforceAutoNumber,
   parseSalesforceCheckbox,
   resolveUserLookupImportValue,
   type ImportUserLookupRecord,
@@ -777,7 +778,7 @@ export default function SalesforceImportPage() {
           // create the stripped alias so both prefixed and bare lookups resolve correctly.
           const resolvedVal = (lookupFields[targetField] && globalIdMap[val])
             ? globalIdMap[val]  // resolved SF id → CRM UUID
-            : val;              // raw value (CRM UUID, text, etc.)
+            : normalizeSalesforceAutoNumber(targetField, val); // CRM number prefix or unchanged source value
           mapped[`${objectApiName}__${targetField}`] = resolvedVal;
         }
         mirrorAccountTypeImportAliases(objectApiName, mapped);

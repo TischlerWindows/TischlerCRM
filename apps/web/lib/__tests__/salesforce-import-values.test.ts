@@ -2,6 +2,7 @@ import {
   evaluateSalesforceCheckboxRule,
   getDefaultSalesforcePhonePrefix,
   mapSalesforcePhoneWithPrefix,
+  normalizeSalesforceAutoNumber,
   parseSalesforceCheckbox,
   resolveUserLookupImportValue,
 } from '../salesforce-import-values'
@@ -42,6 +43,15 @@ describe('Salesforce import values', () => {
     })
     expect(mapSalesforcePhoneWithPrefix('')).toBeNull()
     expect(mapSalesforcePhoneWithPrefix(undefined)).toBeNull()
+  })
+
+  it('adds CRM prefixes to imported Opportunity, Project, and Work Order numbers', () => {
+    expect(normalizeSalesforceAutoNumber('opportunityNumber', '26596')).toBe('OPP26596')
+    expect(normalizeSalesforceAutoNumber('projectNumber', '26596')).toBe('PRJ26596')
+    expect(normalizeSalesforceAutoNumber('workOrderNumber', '26596')).toBe('WO26596')
+    expect(normalizeSalesforceAutoNumber('opportunityNumber', 'OPP26596')).toBe('OPP26596')
+    expect(normalizeSalesforceAutoNumber('Opportunity__opportunityNumber', 'opp-26596')).toBe('OPP26596')
+    expect(normalizeSalesforceAutoNumber('opportunityNumber', 'External-26596')).toBe('External-26596')
   })
 
   it('evaluates checkbox rules from source-column presence', () => {
