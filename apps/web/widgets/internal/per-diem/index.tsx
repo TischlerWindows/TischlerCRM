@@ -356,7 +356,7 @@ function NewPerDiemModal({
 export default function PerDiemWidget({ record, object }: WidgetProps) {
   const recordId = record?.id ? String(record.id) : undefined
   const [rows, setRowsState] = useState<RecordData[]>([])
-  const initialSort = { fieldKey: FIELDS[0]!.key, direction: 'desc' as RowSortDirection }
+  const initialSort = { fieldKey: FIELDS[0]!.key, direction: 'asc' as RowSortDirection }
   const [sortState, setSortState] = useState(initialSort)
   const sortStateRef = useRef(initialSort)
   const setRows = useCallback((update: RecordData[] | ((current: RecordData[]) => RecordData[])) => {

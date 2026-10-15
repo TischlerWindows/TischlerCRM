@@ -498,7 +498,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   const workOrderName = String(record?.name ?? record?.title ?? record?.workOrderNumber ?? '')
   const creatorName = user?.name ?? ''
   const [rows, setRowsState] = useState<RecordData[]>([])
-  const initialSort = { fieldKey: ALL_FIELDS[0]!.key, direction: 'desc' as RowSortDirection }
+  const initialSort = { fieldKey: ALL_FIELDS[0]!.key, direction: 'asc' as RowSortDirection }
   const [sortState, setSortState] = useState(initialSort)
   const sortStateRef = useRef(initialSort)
   const setRows = useCallback((update: RecordData[] | ((current: RecordData[]) => RecordData[])) => {
