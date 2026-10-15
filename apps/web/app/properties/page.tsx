@@ -50,7 +50,6 @@ import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
-import { getPropertyPrefix, generatePropertyNumber } from '@/lib/property-number';
 
 interface Property {
   id: string;
@@ -492,29 +491,14 @@ export default function PropertiesPage() {
       normalizedData[cleanKey] = value;
     });
     
-    // Derive country & state from the composite Address/LocationSearch field or the standalone text fields.
-    // The composite object has { street, city, state, postalCode, country }.
-    // LocationSearch fields are stored under address_search; legacy Address fields under address.
-    const addr = normalizedData.address_search || normalizedData.address;
-    const isAddrObj = typeof addr === 'object' && addr !== null;
-    const addrCountry = (isAddrObj && addr.country) || normalizedData.country || '';
-    const addrState = (isAddrObj && addr.state) || normalizedData.state || '';
-
-    const prefix = getPropertyPrefix({ country: addrCountry, state: addrState });
-    const allExistingNumbers = properties.map(p => p.propertyNumber);
-    const propertyNumber = generatePropertyNumber(prefix, allExistingNumbers);
-    
     const today = new Date().toISOString().split('T')[0];
     const currentUserName = user?.name || user?.email || 'System';
     
     // Get default record type
     const defaultRecordType = schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0];
 
-    // Prepare the record data for the API — only include fields explicitly filled in + auto-generated
-    const recordData = {
-      ...normalizedData,
-      propertyNumber,
-    };
+    // Property numbers are assigned by the API from the linked Opportunity or NT sequence.
+    const recordData = normalizedData;
 
     try {
       // Create record via API

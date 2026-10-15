@@ -1,3 +1,5 @@
+import { getSalesforceRecordCreatedDate, normalizeSalesforceAutoNumber } from './salesforce-import-values'
+
 type ImportRow = Record<string, string>
 
 type PropertyAddressResult =
@@ -41,6 +43,20 @@ function readAddressPart(row: ImportRow, fieldSuffix: string): string {
   const header = Object.keys(row).find((key) => normalizeHeader(key) === suffix)
     ?? Object.keys(row).find((key) => normalizeHeader(key).endsWith(suffix))
   return header ? row[header]?.trim() ?? '' : ''
+}
+
+function getOpportunityNumberFromRow(row: ImportRow): string | undefined {
+  const header = Object.keys(row).find((key) => {
+    const normalized = normalizeHeader(key)
+    return normalized === 'opportunitynumber'
+      || normalized === 'opportunitynumberc'
+      || normalized.endsWith('opportunitynumber')
+  })
+  if (!header) return undefined
+  const value = row[header]?.trim()
+  return value
+    ? normalizeSalesforceAutoNumber('opportunityNumber', value, getSalesforceRecordCreatedDate(row))
+    : undefined
 }
 
 function parseCoordinate(value: string): number | undefined {
@@ -140,6 +156,7 @@ export function buildPropertyImportDataFromOpportunity(row: ImportRow): Property
   if (parsedLatitude !== undefined) address.lat = parsedLatitude
   if (parsedLongitude !== undefined) address.lng = parsedLongitude
   if (geocodeAccuracy) address.geocodeAccuracy = geocodeAccuracy
+  const opportunityNumber = getOpportunityNumberFromRow(row)
 
   return {
     status: 'ready',
@@ -151,6 +168,7 @@ export function buildPropertyImportDataFromOpportunity(row: ImportRow): Property
       Property__zipCode: postalCode,
       ...(parsedLatitude !== undefined ? { Property__latitude: parsedLatitude } : {}),
       ...(parsedLongitude !== undefined ? { Property__longitude: parsedLongitude } : {}),
+      ...(opportunityNumber ? { __propertyOpportunityNumber: opportunityNumber } : {}),
     },
   }
 }

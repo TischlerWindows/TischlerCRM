@@ -55,6 +55,21 @@ describe('Salesforce Opportunity Property address mapping', () => {
     }).status).toBe('ready')
   })
 
+  it('carries a year-normalized Opportunity number into its generated Property row', () => {
+    const result = buildPropertyImportDataFromOpportunity({
+      Opportunity_Number__c: 'OPP-26540',
+      CreatedDate: '2027-04-14T00:00:00.000Z',
+      Project_Addresses__City__s: 'Miami',
+      Project_Addresses__PostalCode__s: '33101',
+      Project_Addresses__StateCode__s: 'FL',
+    })
+
+    expect(result).toMatchObject({
+      status: 'ready',
+      data: { __propertyOpportunityNumber: '27540' },
+    })
+  })
+
   it('recognizes Project Address columns for exclusion from generic Opportunity mapping', () => {
     expect(isSalesforceProjectAddressColumn('Project_Addresses__City__s')).toBe(true)
     expect(isSalesforceProjectAddressColumn('Project_Addresses__Street__s')).toBe(true)
