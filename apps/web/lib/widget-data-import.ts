@@ -98,7 +98,10 @@ export function resolveWorkOrderImportId(
 }
 
 function parseDate(value: string): string | null {
-  const source = value.trim()
+  const source = value.trim().replace(
+    /(?:\s+|T)\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:\s?(?:AM|PM))?(?:Z|[+-]\d{2}:?\d{2})?$/i,
+    '',
+  )
   const iso = source.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
   if (iso) return `${iso[1]}-${iso[2]!.padStart(2, '0')}-${iso[3]!.padStart(2, '0')}`
   const us = source.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)

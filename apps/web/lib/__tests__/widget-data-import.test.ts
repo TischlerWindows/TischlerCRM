@@ -36,7 +36,7 @@ describe('widget data imports', () => {
         Men: '2',
         'Hours Each': '1.5',
         Approved: 'Yes',
-        'Service Date': '4/6/2026',
+        'Service Date': '4/14/2025 0:00',
       },
       workOrderId: 'wo-1',
       fieldMapping: {
@@ -53,7 +53,7 @@ describe('widget data imports', () => {
         estimateOfMen: 2,
         estimateOfIndividualHours: 1.5,
         clientApproved: true,
-        serviceDate: '2026-04-06',
+        serviceDate: '2025-04-14',
         totalEstimateOfHours: 3,
       },
       errors: [],
