@@ -11,7 +11,7 @@ import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSalesforceAccountTypeTarget, mirrorAccountTypeImportAliases } from '@/lib/salesforce-account-import';
 import { mapContactFullName, mergeCompositeTextSubField } from '@/lib/composite-text-import';
-import { evaluateSalesforceCheckboxRule, getDefaultSalesforcePhonePrefix, getSalesforcePhonePrefixOptions, isUserLookupType, mapSalesforcePhoneWithPrefix, normalizeSalesforceAutoNumber, parseSalesforceCheckbox, resolveUserLookupImportValue, type ImportUserLookupRecord } from '@/lib/salesforce-import-values';
+import { evaluateSalesforceCheckboxRule, getDefaultSalesforcePhonePrefix, getSalesforcePhonePrefixOptions, isImportableSalesforceAutoNumber, isUserLookupType, mapSalesforcePhoneWithPrefix, normalizeSalesforceAutoNumber, parseSalesforceCheckbox, resolveUserLookupImportValue, type ImportUserLookupRecord } from '@/lib/salesforce-import-values';
 import { SalesforceCheckboxImportRules } from '@/components/salesforce-checkbox-import-rules';
 import {
   findAddressImportSubfieldTarget,
@@ -424,7 +424,7 @@ export default function CsvImportDialog({
         );
       }
 
-      if (match && !match.isAutoNumber) {
+      if (match && (!match.isAutoNumber || isImportableSalesforceAutoNumber(match.apiName))) {
         // Don't double-map the same target
         const alreadyMapped = Object.values(mapping).includes(match.apiName);
         if (!alreadyMapped) {
@@ -832,7 +832,7 @@ export default function CsvImportDialog({
 
   const downloadTemplate = () => {
     const headers = targetFields
-      .filter(f => !f.isAutoNumber)
+      .filter(f => !f.isAutoNumber || isImportableSalesforceAutoNumber(f.apiName))
       .map(f => f.label);
     const csv = Papa.unparse({ fields: headers, data: [] });
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -1099,7 +1099,7 @@ export default function CsvImportDialog({
                         <SearchableMappingTarget
                           value={columnMapping[header] || '__skip__'}
                           ariaLabel={`CRM field for ${header}`}
-                          options={targetFields.filter((field) => !field.isAutoNumber)}
+                          options={targetFields.filter((field) => !field.isAutoNumber || isImportableSalesforceAutoNumber(field.apiName))}
                           onChange={(value) => {
                             setColumnMapping({ ...columnMapping, [header]: value })
                             setPicklistValueMappings((previous) => ({ ...previous, [header]: {} }))

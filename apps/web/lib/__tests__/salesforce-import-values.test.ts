@@ -1,6 +1,7 @@
 import {
   evaluateSalesforceCheckboxRule,
   getDefaultSalesforcePhonePrefix,
+  isImportableSalesforceAutoNumber,
   mapSalesforcePhoneWithPrefix,
   normalizeSalesforceAutoNumber,
   parseSalesforceCheckbox,
@@ -46,6 +47,10 @@ describe('Salesforce import values', () => {
   })
 
   it('adds CRM prefixes to imported Opportunity, Project, and Work Order numbers', () => {
+    expect(isImportableSalesforceAutoNumber('opportunityNumber')).toBe(true)
+    expect(isImportableSalesforceAutoNumber('Opportunity__projectNumber')).toBe(true)
+    expect(isImportableSalesforceAutoNumber('workOrderNumber')).toBe(true)
+    expect(isImportableSalesforceAutoNumber('accountNumber')).toBe(false)
     expect(normalizeSalesforceAutoNumber('opportunityNumber', '26596')).toBe('OPP26596')
     expect(normalizeSalesforceAutoNumber('projectNumber', '26596')).toBe('PRJ26596')
     expect(normalizeSalesforceAutoNumber('workOrderNumber', '26596')).toBe('WO26596')

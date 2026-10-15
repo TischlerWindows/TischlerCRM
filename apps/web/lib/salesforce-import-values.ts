@@ -17,6 +17,11 @@ const SALESFORCE_NUMBER_PREFIXES: Record<string, string> = {
   workOrderNumber: 'WO',
 }
 
+export function isImportableSalesforceAutoNumber(fieldApiName: string): boolean {
+  const fieldName = fieldApiName.replace(/^[A-Za-z]+__/, '')
+  return Object.prototype.hasOwnProperty.call(SALESFORCE_NUMBER_PREFIXES, fieldName)
+}
+
 export function normalizeSalesforceAutoNumber(fieldApiName: string, value: unknown): string {
   const rawValue = String(value ?? '').trim()
   const fieldName = fieldApiName.replace(/^[A-Za-z]+__/, '')
