@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2, FileText } from 'lucide-react'
+import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2, FileText, ArrowDown, ArrowUp } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { restoreGridRows, snapshotGridRows } from '@/lib/grid-undo-records'
@@ -42,6 +42,7 @@ import {
 } from '@/lib/cad-index-grid'
 import { GridRangeDecoration, GridRangeStyles } from '../shared/grid-range-decoration'
 import { generatePunchListPdf } from './pdf'
+import { sortRowsByValue, type RowSortDirection } from '@/lib/widget-row-sorting'
 
 type FieldType = 'text' | 'textarea' | 'checkbox' | 'number' | 'date'
 
@@ -495,7 +496,23 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   const recordId = record?.id ? String(record.id) : undefined
   const workOrderName = String(record?.name ?? record?.title ?? record?.workOrderNumber ?? '')
   const creatorName = user?.name ?? ''
-  const [rows, setRows] = useState<RecordData[]>([])
+  const [rows, setRowsState] = useState<RecordData[]>([])
+  const [sortDirection, setSortDirection] = useState<RowSortDirection>('desc')
+  const sortDirectionRef = useRef<RowSortDirection>('desc')
+  const sortRows = (nextRows: RecordData[], direction: RowSortDirection) =>
+    sortRowsByValue(nextRows, (row) => row.data?.[ALL_FIELDS[0]!.key], direction)
+  const setRows = useCallback((update: RecordData[] | ((current: RecordData[]) => RecordData[])) => {
+    setRowsState((current) => sortRows(
+      typeof update === 'function' ? update(current) : update,
+      sortDirectionRef.current,
+    ))
+  }, [])
+  const toggleSortDirection = () => {
+    const nextDirection = sortDirectionRef.current === 'desc' ? 'asc' : 'desc'
+    sortDirectionRef.current = nextDirection
+    setSortDirection(nextDirection)
+    setRowsState((current) => sortRows(current, nextDirection))
+  }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
@@ -734,7 +751,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     } finally {
       setLoading(false)
     }
-  }, [recordId, clearUndo])
+  }, [recordId, clearUndo, setRows])
 
   useEffect(() => { load() }, [load])
 
@@ -757,7 +774,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     } finally {
       setSavingRowId(null)
     }
-  }, [rows, pushUndo])
+  }, [rows, pushUndo, setRows])
 
   async function undoGridAction() {
     const previousRows = popUndo()
@@ -809,7 +826,7 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
     }
     window.addEventListener('mouseup', onMouseUp)
     return () => window.removeEventListener('mouseup', onMouseUp)
-  }, [fillDrag, rows, pushUndo])
+  }, [fillDrag, rows, pushUndo, setRows])
 
   const handleFillDragEnter = (rowIndex: number, colIndex: number) => {
     setFillDrag(previous => previous ? { ...previous, target: { row: rowIndex, column: colIndex } } : previous)
@@ -993,6 +1010,16 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
             />
           </label>
           <button
+            type="button"
+            onClick={toggleSortDirection}
+            aria-label={`Sort Item# ${sortDirection === 'desc' ? 'ascending' : 'descending'}`}
+            title={`Item# sorted ${sortDirection === 'desc' ? 'descending' : 'ascending'}`}
+            className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            {sortDirection === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
+            Item#
+          </button>
+          <button
             onClick={() => void handlePreviewPdf()}
             disabled={generatingPdf}
             className="text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex items-center gap-1.5 font-semibold text-gray-700 disabled:opacity-50"
@@ -1069,6 +1096,15 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
               aria-label="Service Date for new punch list items"
             />
           </label>
+          <button
+            type="button"
+            onClick={toggleSortDirection}
+            aria-label={`Sort Item# ${sortDirection === 'desc' ? 'ascending' : 'descending'}`}
+            className="inline-flex items-center justify-center gap-1.5 rounded border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700"
+          >
+            {sortDirection === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
+            Item#
+          </button>
           <button
             type="button"
             onClick={() => void handlePreviewPdf()}
