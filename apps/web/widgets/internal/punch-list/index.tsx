@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2, FileText, ArrowDown, ArrowUp } from 'lucide-react'
+import { Loader2, AlertCircle, ListChecks, Plus, X, Trash2, FileText } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { restoreGridRows, snapshotGridRows } from '@/lib/grid-undo-records'
@@ -43,6 +43,7 @@ import {
 import { GridRangeDecoration, GridRangeStyles } from '../shared/grid-range-decoration'
 import { generatePunchListPdf } from './pdf'
 import { sortRowsByValue, type RowSortDirection } from '@/lib/widget-row-sorting'
+import { SortableGridHeader } from '../shared/sortable-grid-header'
 
 type FieldType = 'text' | 'textarea' | 'checkbox' | 'number' | 'date'
 
@@ -497,22 +498,16 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   const workOrderName = String(record?.name ?? record?.title ?? record?.workOrderNumber ?? '')
   const creatorName = user?.name ?? ''
   const [rows, setRowsState] = useState<RecordData[]>([])
-  const [sortDirection, setSortDirection] = useState<RowSortDirection>('desc')
-  const sortDirectionRef = useRef<RowSortDirection>('desc')
-  const sortRows = (nextRows: RecordData[], direction: RowSortDirection) =>
-    sortRowsByValue(nextRows, (row) => row.data?.[ALL_FIELDS[0]!.key], direction)
+  const initialSort = { fieldKey: ALL_FIELDS[0]!.key, direction: 'desc' as RowSortDirection }
+  const [sortState, setSortState] = useState(initialSort)
+  const sortStateRef = useRef(initialSort)
   const setRows = useCallback((update: RecordData[] | ((current: RecordData[]) => RecordData[])) => {
-    setRowsState((current) => sortRows(
-      typeof update === 'function' ? update(current) : update,
-      sortDirectionRef.current,
-    ))
+    setRowsState((current) => {
+      const nextRows = typeof update === 'function' ? update(current) : update
+      const activeSort = sortStateRef.current
+      return sortRowsByValue(nextRows, (row) => row.data?.[activeSort.fieldKey], activeSort.direction)
+    })
   }, [])
-  const toggleSortDirection = () => {
-    const nextDirection = sortDirectionRef.current === 'desc' ? 'asc' : 'desc'
-    sortDirectionRef.current = nextDirection
-    setSortDirection(nextDirection)
-    setRowsState((current) => sortRows(current, nextDirection))
-  }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
@@ -535,6 +530,17 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
   const { pushUndo, popUndo, clearUndo } = useGridUndo<RecordData[]>()
   const gridRootRef = useRef<HTMLDivElement>(null)
   const selectingGridRef = useRef(false)
+
+  const applySort = (fieldKey: string, direction: RowSortDirection) => {
+    const nextSort = { fieldKey, direction }
+    sortStateRef.current = nextSort
+    setSortState(nextSort)
+    setRowsState((current) => sortRowsByValue(current, (row) => row.data?.[fieldKey], direction))
+    setGridSelection(null)
+    setCopiedGridSelection(null)
+    setFillDrag(null)
+    setEditingCellId(null)
+  }
 
   const focusGridCell = (coordinate: GridCoordinate) => {
     requestAnimationFrame(() => {
@@ -1010,16 +1016,6 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
             />
           </label>
           <button
-            type="button"
-            onClick={toggleSortDirection}
-            aria-label={`Sort Item# ${sortDirection === 'desc' ? 'ascending' : 'descending'}`}
-            title={`Item# sorted ${sortDirection === 'desc' ? 'descending' : 'ascending'}`}
-            className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            {sortDirection === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
-            Item#
-          </button>
-          <button
             onClick={() => void handlePreviewPdf()}
             disabled={generatingPdf}
             className="text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 transition-colors flex items-center gap-1.5 font-semibold text-gray-700 disabled:opacity-50"
@@ -1098,15 +1094,6 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
           </label>
           <button
             type="button"
-            onClick={toggleSortDirection}
-            aria-label={`Sort Item# ${sortDirection === 'desc' ? 'ascending' : 'descending'}`}
-            className="inline-flex items-center justify-center gap-1.5 rounded border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700"
-          >
-            {sortDirection === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
-            Item#
-          </button>
-          <button
-            type="button"
             onClick={() => void handlePreviewPdf()}
             disabled={generatingPdf}
             className="inline-flex items-center justify-center gap-1.5 rounded border border-gray-300 px-2 py-2 text-xs font-semibold text-gray-700 disabled:opacity-50"
@@ -1156,9 +1143,14 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                 {ALL_FIELDS.map((f) => (
                   <th
                     key={f.key}
-                    className={`px-1.5 py-1 text-left font-semibold text-gray-600 border-b border-gray-200 ${WRAPPED_HEADER_KEYS.has(f.key) ? 'whitespace-normal break-words' : 'whitespace-nowrap'}`}
+                    className={`px-1.5 py-1 text-left border-b border-gray-200 ${WRAPPED_HEADER_KEYS.has(f.key) ? 'whitespace-normal break-words' : 'whitespace-nowrap'}`}
                   >
-                    {f.label}
+                    <SortableGridHeader
+                      label={f.label}
+                      active={sortState.fieldKey === f.key}
+                      direction={sortState.direction}
+                      onSort={(direction) => applySort(f.key, direction)}
+                    />
                   </th>
                 ))}
                 <th className="w-8 px-1 py-1 border-b border-gray-200" aria-label="Actions" />
@@ -1251,7 +1243,13 @@ export default function PunchListWidget({ record, object, onRecordChange }: Widg
                   className={gridCellClassName(index, colIndex, `${getMobileRowWidthClass(field)} relative shrink-0`)}
                 >
                   <GridRangeDecoration row={index} column={colIndex} selection={gridSelection} copiedSelection={copiedGridSelection} />
-                  <p className="truncate text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
+                  <SortableGridHeader
+                    compact
+                    label={field.label}
+                    active={sortState.fieldKey === field.key}
+                    direction={sortState.direction}
+                    onSort={(direction) => applySort(field.key, direction)}
+                  />
                   <EditableCell
                     cellId={cellId}
                     value={row.data?.[field.key] ?? (field.key === 'itemNumber' ? index + 1 : undefined)}

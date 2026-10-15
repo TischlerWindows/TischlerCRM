@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertCircle, ArrowDown, ArrowUp, CalendarDays, FileText, Loader2, Plus, Trash2, WalletCards, X } from 'lucide-react'
+import { AlertCircle, CalendarDays, FileText, Loader2, Plus, Trash2, WalletCards, X } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { recordsService, RecordData } from '@/lib/records-service'
 import { restoreGridRows, snapshotGridRows } from '@/lib/grid-undo-records'
@@ -29,6 +29,7 @@ import {
 import { GridRangeDecoration, GridRangeStyles } from '../shared/grid-range-decoration'
 import { generatePerDiemPdf } from './pdf'
 import { sortRowsByValue, type RowSortDirection } from '@/lib/widget-row-sorting'
+import { SortableGridHeader } from '../shared/sortable-grid-header'
 
 type PerDiemGridSelection = GridSelection & { view: 'desktop' | 'mobile' }
 
@@ -355,22 +356,16 @@ function NewPerDiemModal({
 export default function PerDiemWidget({ record, object }: WidgetProps) {
   const recordId = record?.id ? String(record.id) : undefined
   const [rows, setRowsState] = useState<RecordData[]>([])
-  const [sortDirection, setSortDirection] = useState<RowSortDirection>('desc')
-  const sortDirectionRef = useRef<RowSortDirection>('desc')
-  const sortRows = (nextRows: RecordData[], direction: RowSortDirection) =>
-    sortRowsByValue(nextRows, (row) => row.data?.[FIELDS[0]!.key], direction)
+  const initialSort = { fieldKey: FIELDS[0]!.key, direction: 'desc' as RowSortDirection }
+  const [sortState, setSortState] = useState(initialSort)
+  const sortStateRef = useRef(initialSort)
   const setRows = useCallback((update: RecordData[] | ((current: RecordData[]) => RecordData[])) => {
-    setRowsState((current) => sortRows(
-      typeof update === 'function' ? update(current) : update,
-      sortDirectionRef.current,
-    ))
+    setRowsState((current) => {
+      const nextRows = typeof update === 'function' ? update(current) : update
+      const activeSort = sortStateRef.current
+      return sortRowsByValue(nextRows, (row) => row.data?.[activeSort.fieldKey], activeSort.direction)
+    })
   }, [])
-  const toggleSortDirection = () => {
-    const nextDirection = sortDirectionRef.current === 'desc' ? 'asc' : 'desc'
-    sortDirectionRef.current = nextDirection
-    setSortDirection(nextDirection)
-    setRowsState((current) => sortRows(current, nextDirection))
-  }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
@@ -387,6 +382,17 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
   const { pushUndo, popUndo, clearUndo } = useGridUndo<RecordData[]>()
   const gridRootRef = useRef<HTMLDivElement>(null)
   const selectingGridRef = useRef(false)
+
+  const applySort = (fieldKey: string, direction: RowSortDirection) => {
+    const nextSort = { fieldKey, direction }
+    sortStateRef.current = nextSort
+    setSortState(nextSort)
+    setRowsState((current) => sortRowsByValue(current, (row) => row.data?.[fieldKey], direction))
+    setGridSelection(null)
+    setCopiedGridSelection(null)
+    setFillDrag(null)
+    setEditingCellId(null)
+  }
 
   const focusGridCell = (coordinate: GridCoordinate, view: 'desktop' | 'mobile') => {
     requestAnimationFrame(() => {
@@ -778,10 +784,6 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={toggleSortDirection} aria-label={`Sort Service Tech Per Diem ${sortDirection === 'desc' ? 'ascending' : 'descending'}`} title={`Service Tech Per Diem sorted ${sortDirection}`} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-2 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
-            {sortDirection === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
-            Service Tech
-          </button>
           <button type="button" onClick={() => void handlePreviewPdf()} disabled={generatingPdf} className="inline-flex items-center gap-1.5 rounded border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
             {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
             Preview PDF
@@ -805,10 +807,6 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <button type="button" onClick={toggleSortDirection} aria-label={`Sort Service Tech Per Diem ${sortDirection === 'desc' ? 'ascending' : 'descending'}`} title={`Service Tech Per Diem sorted ${sortDirection}`} className="inline-flex h-8 items-center justify-center gap-1 rounded border border-gray-300 px-2 text-xs font-semibold text-gray-700">
-            {sortDirection === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5" />}
-            Tech
-          </button>
           <button type="button" onClick={() => void handlePreviewPdf()} disabled={generatingPdf} aria-label="Preview Per Diem PDF" title="Preview Per Diem PDF" className="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 disabled:opacity-50">
             {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
           </button>
@@ -838,7 +836,16 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
             </colgroup>
             <thead className="bg-gray-100">
               <tr>
-                {FIELDS.map((field) => <th key={field.key} className="border-b border-gray-200 px-2 py-1.5 text-left font-semibold text-gray-600">{field.label}</th>)}
+                {FIELDS.map((field) => (
+                  <th key={field.key} className="border-b border-gray-200 px-2 py-1.5 text-left">
+                    <SortableGridHeader
+                      label={field.label}
+                      active={sortState.fieldKey === field.key}
+                      direction={sortState.direction}
+                      onSort={(direction) => applySort(field.key, direction)}
+                    />
+                  </th>
+                ))}
                 <th className="w-8 border-b border-gray-200 px-1 py-1.5" aria-label="Actions" />
               </tr>
             </thead>
@@ -901,7 +908,13 @@ export default function PerDiemWidget({ record, object }: WidgetProps) {
                   className={gridCellClassName(rowIndex, colIndex, 'mobile', `relative shrink-0 ${field.width}`)}
                 >
                   <GridRangeDecoration row={rowIndex} column={colIndex} selection={gridSelection?.view === 'mobile' ? gridSelection : null} copiedSelection={copiedGridSelection?.view === 'mobile' ? copiedGridSelection : null} />
-                  <p className="text-[9px] font-semibold uppercase text-gray-400">{field.label}</p>
+                  <SortableGridHeader
+                    compact
+                    label={field.label}
+                    active={sortState.fieldKey === field.key}
+                    direction={sortState.direction}
+                    onSort={(direction) => applySort(field.key, direction)}
+                  />
                   <EditableCell cellId={cellId} value={row.data?.[field.key]} type={field.type} saving={savingRowId === row.id} isEditing={editingCellId === cellId} editSeed={editingCellId === cellId ? editSeed : null} onStartEdit={() => { setEditSeed(null); setEditingCellId(cellId) }} onStopEdit={() => { setEditSeed(null); setEditingCellId(null) }} onCommit={(value) => void handleCommit(row.id, field.key, value)} />
                   {gridSelection?.view === 'mobile' && !editingCellId && getGridSelectionBounds(gridSelection).bottom === rowIndex && getGridSelectionBounds(gridSelection).right === colIndex && (
                     <span
