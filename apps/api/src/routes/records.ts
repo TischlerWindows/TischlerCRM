@@ -133,6 +133,10 @@ function getMaxStandaloneProjectSequence(records: Array<{ data: unknown }>): num
   return maxSequence;
 }
 
+function formatStandaloneProjectNumber(sequence: number): string {
+  return `NT${String(sequence).padStart(4, '0')}`;
+}
+
 async function addProjectNumberFormula<T extends { id: string; data: unknown }>(
   records: T[],
   objectApiName: string,
@@ -145,23 +149,31 @@ async function addProjectNumberFormula<T extends { id: string; data: unknown }>(
     select: { id: true, data: true, createdAt: true },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
-  let nextStandaloneSequence = getMaxStandaloneProjectSequence(projectRecords);
-  const standaloneNumbers = new Map<string, string>();
   const linkedOpportunityIds = new Map<string, string>();
-
   for (const project of projectRecords) {
     const data = project.data && typeof project.data === 'object'
       ? project.data as Record<string, unknown>
       : {};
     const opportunityId = getOpportunityLookupRecordId(data, objectApiName, lookupFieldApiName);
     if (opportunityId) linkedOpportunityIds.set(project.id, opportunityId);
+  }
+  const opportunityNumbers = await getOpportunityNumbersById([...linkedOpportunityIds.values()]);
+  let nextStandaloneSequence = getMaxStandaloneProjectSequence(projectRecords);
+  const standaloneNumbers = new Map<string, string>();
+
+  for (const project of projectRecords) {
+    const data = project.data && typeof project.data === 'object'
+      ? project.data as Record<string, unknown>
+      : {};
+    const opportunityId = linkedOpportunityIds.get(project.id);
+    const linkedOpportunityNumber = opportunityId ? opportunityNumbers.get(opportunityId) : undefined;
 
     const existingNumber = getStandaloneProjectNumber(data);
     if (existingNumber) {
       standaloneNumbers.set(project.id, existingNumber);
-    } else if (!opportunityId) {
+    } else if (!linkedOpportunityNumber) {
       nextStandaloneSequence += 1;
-      const projectNumber = `NT${String(nextStandaloneSequence).padStart(4, '0')}`;
+      const projectNumber = formatStandaloneProjectNumber(nextStandaloneSequence);
       await prisma.record.update({
         where: { id: project.id },
         data: {
@@ -171,8 +183,6 @@ async function addProjectNumberFormula<T extends { id: string; data: unknown }>(
       standaloneNumbers.set(project.id, projectNumber);
     }
   }
-
-  const opportunityNumbers = await getOpportunityNumbersById([...linkedOpportunityIds.values()]);
 
   return records.map((record, index) => {
     const data = record.data && typeof record.data === 'object'
@@ -896,6 +906,19 @@ export async function recordRoutes(app: FastifyInstance) {
     const year = new Date().getUTCFullYear();
     const importedPropertyOpportunityNumber = normalizedData.__propertyOpportunityNumber;
     delete normalizedData.__propertyOpportunityNumber;
+    if (apiName.toLowerCase() === 'project') {
+      const linkedOpportunityNumber = await getLinkedOpportunityNumber(normalizedData, object.id, apiName);
+      let projectNumber = linkedOpportunityNumber;
+      if (!projectNumber) {
+        const existingProjects = await prisma.record.findMany({
+          where: { objectId: object.id, deletedAt: null },
+          select: { data: true },
+        });
+        projectNumber = formatStandaloneProjectNumber(getMaxStandaloneProjectSequence(existingProjects) + 1);
+      }
+      normalizedData.projectNumber = projectNumber;
+      normalizedData[`${apiName}__projectNumber`] = projectNumber;
+    }
     for (const field of object.fields) {
       const fieldApiName = field.apiName.replace(/^[A-Za-z]+__/, '');
       if (fieldApiName === 'propertyNumber') {
