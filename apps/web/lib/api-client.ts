@@ -574,6 +574,10 @@ class ApiClient {
     return this.request<any[]>(`/objects/${objectApiName}/records${queryString ? `?${queryString}` : ''}`);
   }
 
+  async getRecordCount(objectApiName: string): Promise<{ count: number }> {
+    return this.request<{ count: number }>(`/objects/${objectApiName}/records/count`);
+  }
+
   async getRecord(objectApiName: string, recordId: string) {
     return this.request<any>(`/objects/${objectApiName}/records/${recordId}`);
   }

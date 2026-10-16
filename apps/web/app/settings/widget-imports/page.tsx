@@ -28,6 +28,8 @@ interface PreparedRow {
 
 interface ImportResult {
   created: number
+  totalRows: number
+  fileName: string
   errors: Array<{ row: number; error: string }>
 }
 
@@ -231,7 +233,7 @@ export default function WidgetImportsPage() {
           errors.push(...batch.map((row) => ({ row: row.rowNumber, error: message })))
         }
       }
-      setResult({ created, errors })
+      setResult({ created, totalRows: rows.length, fileName, errors })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not import widget records.')
     } finally {
@@ -240,6 +242,64 @@ export default function WidgetImportsPage() {
   }
 
   const templateConfig = { workOrderColumn, fieldMapping }
+  const importComplete = result !== null
+    && result.errors.length === 0
+    && result.created === result.totalRows
+
+  if (result) {
+    return (
+      <>
+        <SettingsPageHeader
+          icon={Upload}
+          title="Widget Data Import"
+          subtitle="Import Punch List or Per Diem rows linked to Work Orders"
+        />
+        <SettingsContentCard>
+          <section className="mx-auto max-w-3xl px-5 py-10 sm:px-8" aria-labelledby="widget-import-result-title">
+            <div className="text-center">
+              {importComplete
+                ? <CheckCircle2 className="mx-auto h-12 w-12 text-green-600" />
+                : <AlertTriangle className="mx-auto h-12 w-12 text-amber-600" />}
+              <h2 id="widget-import-result-title" className="mt-4 text-xl font-semibold text-gray-900">
+                {importComplete ? 'Import complete' : 'Import finished with issues'}
+              </h2>
+              <p className="mt-2 text-sm text-gray-600">{result.fileName}</p>
+              <p className="mt-1 text-sm text-gray-700">
+                Imported {result.created} of {result.totalRows} {OBJECT_LABELS[objectApiName]} rows.
+                {result.errors.length > 0 && ` ${result.errors.length} row${result.errors.length === 1 ? '' : 's'} failed or were skipped.`}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setResult(null)
+                  setError(null)
+                  setSkipRowsWithIssues(false)
+                  updateDraft(emptyImportDraft())
+                }}
+                className="mt-6 inline-flex h-10 items-center gap-2 rounded bg-brand-navy px-4 text-sm font-semibold text-white hover:bg-brand-dark"
+              >
+                <Upload className="h-4 w-4" /> Import another file
+              </button>
+            </div>
+            {result.errors.length > 0 && (
+              <div className="mt-8 overflow-hidden rounded border border-amber-200">
+                <div className="bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+                  Row errors ({result.errors.length})
+                </div>
+                <div className="max-h-[50vh] overflow-auto divide-y divide-amber-100">
+                  {result.errors.map((rowError, index) => (
+                    <p key={`${rowError.row}-${index}`} className="px-4 py-2 text-sm text-amber-900">
+                      Row {rowError.row}: {rowError.error}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        </SettingsContentCard>
+      </>
+    )
+  }
 
   return (
     <>

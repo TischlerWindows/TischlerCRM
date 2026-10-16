@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useIsMobileViewport, useIsLandscapeMobile } from '@/lib/use-is-mobile-viewport';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -48,6 +48,7 @@ import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, 
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { apiClient } from '@/lib/api-client';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 import { applyListView, ListViewManager, useListViews, type ListViewDefinition } from '@/components/list-view-manager';
 
@@ -67,6 +68,18 @@ interface Project {
   isFavorite?: boolean;
 }
 
+const PROJECTS_PAGE_SIZE = 100;
+
+function flattenProjectRecords(records: any[]): Project[] {
+  return recordsService.flattenRecords(records).map(record => ({
+    ...record,
+    projectNumber: record.projectNumber || '',
+    createdBy: record.createdBy || 'System',
+    createdAt: record.createdAt || new Date().toISOString(),
+    lastModifiedBy: record.modifiedBy || 'System',
+    lastModifiedAt: record.updatedAt || new Date().toISOString(),
+  })) as Project[];
+}
 
 
 const informationModules = [
@@ -98,6 +111,13 @@ const defaultTabs = DEFAULT_TAB_ORDER;
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectCount, setProjectCount] = useState<number | null>(null);
+  const [projectsOffset, setProjectsOffset] = useState(0);
+  const [hasMoreProjects, setHasMoreProjects] = useState(true);
+  const [loadingMoreProjects, setLoadingMoreProjects] = useState(false);
+  const [loadMoreProjectsError, setLoadMoreProjectsError] = useState(false);
+  const projectsLoadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const loadingMoreProjectsRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -198,6 +218,7 @@ export default function ProjectsPage() {
     setSortDirection(view.sortDirection);
   }, []);
   const listViews = useListViews({ objectApiName: 'Project', onViewChange: handleListViewChange });
+  const canLoadAllProjects = sidebarFilter === 'all' && listViews.activeView.id === 'all-records';
 
 
 
@@ -239,16 +260,18 @@ export default function ProjectsPage() {
     try {
       setLoading(true);
       setFetchError(null);
-      const records = await recordsService.getRecords('Project');
-      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        ...record,
-        projectNumber: record.projectNumber || '',
-        createdBy: record.createdBy || 'System',
-        createdAt: record.createdAt || new Date().toISOString(),
-        lastModifiedBy: record.modifiedBy || 'System',
-        lastModifiedAt: record.updatedAt || new Date().toISOString(),
-      }));
+      setProjectsOffset(0);
+      setHasMoreProjects(true);
+      const [records, countResult] = await Promise.all([
+        apiClient.getRecords('Project', { limit: PROJECTS_PAGE_SIZE, offset: 0 }),
+        apiClient.getRecordCount('Project'),
+      ]);
+      const flattenedRecords = flattenProjectRecords(records);
       setProjects(flattenedRecords as Project[]);
+      setProjectsOffset(records.length);
+      setProjectCount(countResult.count);
+      setHasMoreProjects(records.length === PROJECTS_PAGE_SIZE);
+      setLoadMoreProjectsError(false);
     } catch (error) {
       console.error('Failed to fetch projects from API:', error);
       setFetchError('Failed to load data. Please try refreshing the page.');
@@ -256,6 +279,44 @@ export default function ProjectsPage() {
       setLoading(false);
     }
   }, []);
+
+  const loadMoreProjects = useCallback(async () => {
+    if (!canLoadAllProjects || !hasMoreProjects || loadingMoreProjectsRef.current) return;
+    loadingMoreProjectsRef.current = true;
+    setLoadingMoreProjects(true);
+    setLoadMoreProjectsError(false);
+    try {
+      const records = await apiClient.getRecords('Project', {
+        limit: PROJECTS_PAGE_SIZE,
+        offset: projectsOffset,
+      });
+      const nextProjects = flattenProjectRecords(records);
+      setProjects((current) => {
+        const currentIds = new Set(current.map((project) => project.id));
+        return [...current, ...nextProjects.filter((project) => !currentIds.has(project.id))];
+      });
+      setProjectsOffset((offset) => offset + records.length);
+      setHasMoreProjects(records.length === PROJECTS_PAGE_SIZE);
+    } catch (error) {
+      console.error('Failed to load more projects:', error);
+      setLoadMoreProjectsError(true);
+    } finally {
+      loadingMoreProjectsRef.current = false;
+      setLoadingMoreProjects(false);
+    }
+  }, [canLoadAllProjects, hasMoreProjects, projectsOffset]);
+
+  useEffect(() => {
+    const sentinel = projectsLoadMoreSentinelRef.current;
+    if (!sentinel || loading || !canLoadAllProjects || !hasMoreProjects
+      || loadingMoreProjects || loadMoreProjectsError || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) void loadMoreProjects();
+    }, { root: null, rootMargin: '400px 0px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [canLoadAllProjects, hasMoreProjects, loadMoreProjects, loadMoreProjectsError, loading, loadingMoreProjects]);
 
   useEffect(() => {
     fetchProjects();
@@ -467,6 +528,7 @@ export default function ProjectsPage() {
 
       const updatedProjects = [newProject, ...projects];
       setProjects(updatedProjects);
+      setProjectCount((count) => (count ?? projects.length) + 1);
 
       // Navigation + dialog-close happen in `onCreated` (see DynamicFormDialog
       // wiring) — that callback fires AFTER the form has flushed any pending
@@ -585,6 +647,7 @@ export default function ProjectsPage() {
         await recordsService.deleteRecord('Project', id);
         const updatedProjects = projects.filter(p => p.id !== id);
         setProjects(updatedProjects);
+        setProjectCount((count) => count === null ? null : Math.max(0, count - 1));
       } catch (error) {
         console.error('Failed to delete project from API, trying locally:', error);
         const updatedProjects = projects.filter(p => p.id !== id);
@@ -820,6 +883,7 @@ export default function ProjectsPage() {
           fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))}
           views={listViews.views}
           activeView={listViews.activeView}
+          recordCount={projectCount}
           pinnedViewId={listViews.pinnedViewId}
           canManage={hasAppPermission('manageListViews')}
           onSelect={listViews.selectView}
@@ -975,6 +1039,16 @@ export default function ProjectsPage() {
             </p>
           </div>
         )}
+
+        <div ref={projectsLoadMoreSentinelRef} aria-live="polite" className="flex min-h-10 items-center justify-center py-3 text-sm text-gray-500">
+          {canLoadAllProjects && loadingMoreProjects && 'Loading more projects...'}
+          {canLoadAllProjects && loadMoreProjectsError && (
+            <button type="button" onClick={() => void loadMoreProjects()} className="text-brand-navy underline">
+              Could not load more projects. Retry
+            </button>
+          )}
+          {canLoadAllProjects && !hasMoreProjects && projects.length > 0 && 'All projects loaded.'}
+        </div>
       </div>
 
       {/* No Page Layouts Dialog */}

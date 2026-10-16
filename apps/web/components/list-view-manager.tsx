@@ -281,6 +281,7 @@ interface ListViewManagerProps {
   fields: ListViewField[];
   views: ListViewDefinition[];
   activeView: ListViewDefinition;
+  recordCount?: number | null;
   pinnedViewId: string | null;
   canManage: boolean;
   onSelect: (id: string) => void;
@@ -306,6 +307,7 @@ export function ListViewManager({
   fields,
   views,
   activeView,
+  recordCount,
   pinnedViewId,
   canManage,
   onSelect,
@@ -376,6 +378,11 @@ export function ListViewManager({
           >
             <Pin className="h-4 w-4" />
           </button>
+          {activeView.id === ALL_RECORDS_VIEW.id && recordCount != null && (
+            <span className="whitespace-nowrap text-sm text-gray-500">
+              ({recordCount.toLocaleString()} records)
+            </span>
+          )}
         </div>
         {canManage && (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">

@@ -869,6 +869,23 @@ export async function recordRoutes(app: FastifyInstance) {
     reply.send(await addProjectNumberFormula(result, apiName, object.id));
   });
 
+  app.get('/objects/:apiName/records/count', async (req, reply) => {
+    const { apiName } = req.params as { apiName: string };
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'read');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to view this object' });
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (!object) return reply.code(404).send({ error: 'Object not found' });
+
+    const count = await prisma.record.count({ where: { objectId: object.id, deletedAt: null } });
+    reply.send({ count });
+  });
+
   // Get single record — accepts either a standardized recordId or a UUID
   app.get('/objects/:apiName/records/:recordId', async (req, reply) => {
     const { apiName, recordId: idParam } = req.params as { apiName: string; recordId: string };

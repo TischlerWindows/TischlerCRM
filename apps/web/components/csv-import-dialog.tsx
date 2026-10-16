@@ -232,6 +232,7 @@ function SearchableMappingTarget({
 interface ImportResult {
   created: number;
   propertiesCreated: number;
+  totalRows: number;
   errors: Array<{ row: number; error: string }>;
 }
 
@@ -813,7 +814,7 @@ export default function CsvImportDialog({
     }
 
     if (totalBatches === 0) setImportProgress(100);
-    setImportResult({ created: totalCreated, propertiesCreated, errors: allErrors });
+    setImportResult({ created: totalCreated, propertiesCreated, totalRows: csvRows.length, errors: allErrors });
     setStep('results');
     if (totalCreated > 0) onImportComplete();
   };
@@ -1221,8 +1222,16 @@ export default function CsvImportDialog({
                   <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
                   <div>
                     <h3 className="font-medium text-green-900">
-                      Successfully imported {importResult.created} {objectLabel} record{importResult.created !== 1 ? 's' : ''}
+                      Imported {importResult.created} of {importResult.totalRows} {objectLabel} record{importResult.totalRows !== 1 ? 's' : ''}
                     </h3>
+                    {importResult.created === importResult.totalRows && importResult.errors.length === 0 && (
+                      <p className="text-sm text-green-700 mt-0.5">All CSV rows imported successfully.</p>
+                    )}
+                    {(importResult.created < importResult.totalRows || importResult.errors.length > 0) && (
+                      <p className="text-sm text-amber-800 mt-0.5">
+                        {Math.max(importResult.totalRows - importResult.created, 0)} row{Math.max(importResult.totalRows - importResult.created, 0) === 1 ? '' : 's'} were not imported.
+                      </p>
+                    )}
                     {importResult.propertiesCreated > 0 && (
                       <p className="text-sm text-green-700 mt-0.5">Created {importResult.propertiesCreated} linked Property record{importResult.propertiesCreated !== 1 ? 's' : ''}.</p>
                     )}
