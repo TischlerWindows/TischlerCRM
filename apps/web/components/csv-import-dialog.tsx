@@ -1217,44 +1217,39 @@ export default function CsvImportDialog({
           {/* ── Results Step ── */}
           {step === 'results' && importResult && (
             <div className="space-y-6">
-              {(importResult.created > 0 || importResult.propertiesCreated > 0) && (
-                <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+              <div className={`flex items-center gap-3 p-4 rounded-lg border ${
+                importResult.created === importResult.totalRows && importResult.errors.length === 0
+                  ? 'bg-green-50 border-green-200'
+                  : importResult.created > 0 || importResult.propertiesCreated > 0
+                    ? 'bg-amber-50 border-amber-200'
+                    : 'bg-red-50 border-red-200'
+              }`}>
+                  {importResult.created === importResult.totalRows && importResult.errors.length === 0
+                    ? <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+                    : importResult.created > 0 || importResult.propertiesCreated > 0
+                      ? <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0" />
+                      : <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />}
                   <div>
-                    <h3 className="font-medium text-green-900">
-                      Imported {importResult.created} of {importResult.totalRows} {objectLabel} record{importResult.totalRows !== 1 ? 's' : ''}
+                    <h3 className="font-medium text-gray-900">
+                      {importResult.created === importResult.totalRows && importResult.errors.length === 0
+                        ? 'Import complete'
+                        : importResult.created > 0 || importResult.propertiesCreated > 0
+                          ? 'Import incomplete'
+                          : 'Opportunity import failed'}
                     </h3>
-                    {importResult.created === importResult.totalRows && importResult.errors.length === 0 && (
-                      <p className="text-sm text-green-700 mt-0.5">All CSV rows imported successfully.</p>
-                    )}
-                    {(importResult.created < importResult.totalRows || importResult.errors.length > 0) && (
-                      <p className="text-sm text-amber-800 mt-0.5">
-                        {Math.max(importResult.totalRows - importResult.created, 0)} row{Math.max(importResult.totalRows - importResult.created, 0) === 1 ? '' : 's'} were not imported.
-                      </p>
-                    )}
+                    <p className="text-sm text-gray-800 mt-0.5">
+                      Imported {importResult.created} of {importResult.totalRows} {objectLabel} record{importResult.totalRows !== 1 ? 's' : ''}
+                    </p>
                     {importResult.propertiesCreated > 0 && (
-                      <p className="text-sm text-green-700 mt-0.5">Created {importResult.propertiesCreated} linked Property record{importResult.propertiesCreated !== 1 ? 's' : ''}.</p>
+                      <p className="text-sm text-gray-700 mt-0.5">Created {importResult.propertiesCreated} linked Property record{importResult.propertiesCreated !== 1 ? 's' : ''}.</p>
                     )}
                     {importResult.errors.length > 0 && (
-                      <p className="text-sm text-green-700 mt-0.5">
+                      <p className="text-sm text-gray-700 mt-0.5">
                         {importResult.errors.length} row{importResult.errors.length !== 1 ? 's' : ''} had errors.
                       </p>
                     )}
                   </div>
                 </div>
-              )}
-
-              {importResult.created === 0 && importResult.propertiesCreated === 0 && (
-                <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-medium text-red-900">Import failed</h3>
-                    <p className="text-sm text-red-700 mt-0.5">
-                      No records were created. {importResult.errors.length} error{importResult.errors.length !== 1 ? 's' : ''} occurred.
-                    </p>
-                  </div>
-                </div>
-              )}
 
               {importResult.errors.length > 0 && (
                 <div>
