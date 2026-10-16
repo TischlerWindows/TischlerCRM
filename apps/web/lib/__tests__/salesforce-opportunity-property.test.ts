@@ -65,7 +65,7 @@ describe('Salesforce Opportunity Property address mapping', () => {
     }).status).toBe('ready')
   })
 
-  it('carries a year-normalized Opportunity number into its generated Property row', () => {
+  it('does not copy the Opportunity number into its generated Property row', () => {
     const result = buildPropertyImportDataFromOpportunity({
       Opportunity_Number__c: 'OPP-26540',
       CreatedDate: '2027-04-14T00:00:00.000Z',
@@ -76,8 +76,11 @@ describe('Salesforce Opportunity Property address mapping', () => {
 
     expect(result).toMatchObject({
       status: 'ready',
-      data: { __propertyOpportunityNumber: '27540' },
+      data: { Property__city: 'Miami' },
     })
+    if (result.status === 'ready') {
+      expect(result.data).not.toHaveProperty('__propertyOpportunityNumber')
+    }
   })
 
   it('recognizes Project Address columns for exclusion from generic Opportunity mapping', () => {

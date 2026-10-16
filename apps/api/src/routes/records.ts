@@ -2151,16 +2151,18 @@ export async function recordRoutes(app: FastifyInstance) {
       : [];
     const seenSalesforceIds = new Set<string>();
     const salesforceIdToRecordId = new Map<string, string>();
+    const salesforceIdToRecordData = new Map<string, Record<string, any>>();
     if (incomingSalesforceIds.length > 0) {
       const lookupCandidates = [...new Set(incomingSalesforceIds.flatMap(getSalesforceIdLookupCandidates))];
       const existingRecords = await prisma.record.findMany({
         where: { objectId: object.id, id: { in: lookupCandidates, mode: 'insensitive' } },
-        select: { id: true },
+        select: { id: true, data: true },
       });
       for (const existing of existingRecords) {
         const normalizedId = normalizeSalesforceIdForComparison(existing.id);
         seenSalesforceIds.add(normalizedId);
         salesforceIdToRecordId.set(normalizedId, existing.id);
+        salesforceIdToRecordData.set(normalizedId, existing.data as Record<string, any>);
       }
     }
 
@@ -2244,12 +2246,6 @@ export async function recordRoutes(app: FastifyInstance) {
     const errors: Array<{ row: number; error: string }> = [];
     // Maps original SF Id value → newly created CRM record id
     const idMap: Record<string, string> = {};
-    const propertyOpportunityFieldApiName = apiName.toLowerCase() === 'property'
-      ? await getOpportunityLookupFieldApiName(object.id)
-      : undefined;
-    const propertyOpportunityNumberById = apiName.toLowerCase() === 'property'
-      ? await getOpportunityNumbersById(rows.map((rawData) => getOpportunityLookupRecordId(rawData ?? {}, apiName, propertyOpportunityFieldApiName) ?? ''))
-      : new Map<string, string>()
     const workOrderPropertyFieldApiName = apiName.toLowerCase() === 'workorder'
       ? object.fields.find((field) => field.apiName.replace(/^[A-Za-z]+__/, '').toLowerCase() === 'property')?.apiName
         ?? await getRelatedLookupFieldApiName(object.id, 'Property')
@@ -2279,6 +2275,26 @@ export async function recordRoutes(app: FastifyInstance) {
         if (tracksSalesforceIds && normalizedSalesforceId && seenSalesforceIds.has(normalizedSalesforceId)) {
           const existingRecordId = salesforceIdToRecordId.get(normalizedSalesforceId);
           if ((isPropertyImport || isOpportunityImport) && existingRecordId && sfIdValue) {
+            if (isPropertyImport) {
+              const existingData = salesforceIdToRecordData.get(normalizedSalesforceId) ?? {};
+              const propertyPrefix = getPropertyPrefix(extractAddressFromRecord(rawData));
+              const currentPropertyNumber = getPropertyNumber(existingData);
+              const validPropertyNumber = new RegExp(`^${propertyPrefix}\\d{4,}$`, 'i');
+              if (!currentPropertyNumber || !validPropertyNumber.test(currentPropertyNumber)) {
+                const generatedNum = generatePropertyNumber(propertyPrefix, existingPropertyNumbers);
+                existingPropertyNumbers.push(generatedNum);
+                const repairedData = {
+                  ...existingData,
+                  propertyNumber: generatedNum,
+                  [`${apiName}__propertyNumber`]: generatedNum,
+                };
+                await prisma.record.update({
+                  where: { id: existingRecordId },
+                  data: { data: repairedData },
+                });
+                salesforceIdToRecordData.set(normalizedSalesforceId, repairedData);
+              }
+            }
             idMap[sfIdValue] = existingRecordId;
             reused++;
             continue;
@@ -2317,23 +2333,11 @@ export async function recordRoutes(app: FastifyInstance) {
               ? 'workOrderNumber'
             : field.apiName;
           if (fieldApiName === 'propertyNumber') {
-            const opportunityId = getOpportunityLookupRecordId(rawData, apiName, propertyOpportunityFieldApiName)
-            const linkedNumber = opportunityId ? propertyOpportunityNumberById.get(opportunityId) : undefined
-            const importedOpportunityNumber = typeof rawData.__propertyOpportunityNumber === 'string'
-              ? rawData.__propertyOpportunityNumber.trim()
-              : undefined
-            const copiedNumber = linkedNumber || importedOpportunityNumber
-            if (copiedNumber) {
-              normalizedData.propertyNumber = copiedNumber
-              normalizedData[`${apiName}__propertyNumber`] = copiedNumber
-              existingPropertyNumbers.push(copiedNumber)
-            } else {
-              const propertyPrefix = getPropertyPrefix(extractAddressFromRecord(normalizedData))
-              const generatedNum = generatePropertyNumber(propertyPrefix, existingPropertyNumbers)
-              existingPropertyNumbers.push(generatedNum)
-              normalizedData.propertyNumber = generatedNum
-              normalizedData[`${apiName}__propertyNumber`] = generatedNum
-            }
+            const propertyPrefix = getPropertyPrefix(extractAddressFromRecord(normalizedData))
+            const generatedNum = generatePropertyNumber(propertyPrefix, existingPropertyNumbers)
+            existingPropertyNumbers.push(generatedNum)
+            normalizedData.propertyNumber = generatedNum
+            normalizedData[`${apiName}__propertyNumber`] = generatedNum
             continue
           }
           const workOrderPropertyId = fieldApiName === 'workOrderNumber'
@@ -2456,6 +2460,7 @@ export async function recordRoutes(app: FastifyInstance) {
             const normalizedId = normalizeSalesforceIdForComparison(sfIdValue);
             seenSalesforceIds.add(normalizedId);
             salesforceIdToRecordId.set(normalizedId, recordIdValue);
+            salesforceIdToRecordData.set(normalizedId, normalizedData);
           }
         }
 
