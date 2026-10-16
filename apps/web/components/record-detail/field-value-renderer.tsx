@@ -2,12 +2,13 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { formatFieldValue, resolveLookupDisplayName, getLookupCachedRecord } from '@/lib/utils';
+import { formatFieldValue, resolveLookupDisplayName, getLookupCachedRecord, upsertLookupCacheRecord } from '@/lib/utils';
 import { FieldDef, getConnectionRoleFieldApiName, getConnectionRoleFieldBareName, getConnectionTargetObject, isConnectionFieldType, normalizeFieldType, type PageField } from '@/lib/schema';
 import type { ObjectDef } from '@/lib/schema';
 import LocationMapPreview from '@/components/location-map-preview';
 import { DropboxFileBrowser } from '@/components/dropbox-file-browser';
 import { apiClient } from '@/lib/api-client';
+import { recordsService } from '@/lib/records-service';
 import { activeLookupUsers, type LookupUserIdentity } from '@/lib/user-lookup';
 
 // ── Lookup route map ───────────────────────────────────────────────────
@@ -118,6 +119,80 @@ export function getRecordValue(
   }
 
   return value;
+}
+
+function PropertyLookupValue({ lookupId, route, displayLabel }: {
+  lookupId: string;
+  route: string | undefined;
+  displayLabel: string;
+}) {
+  const [loadedProperty, setLoadedProperty] = React.useState<{
+    id: string;
+    record: Record<string, any>;
+  } | null>(null);
+  const cachedProperty = getLookupCachedRecord('Property', lookupId) as Record<string, any> | null;
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const cached = getLookupCachedRecord('Property', lookupId);
+    if (cached) {
+      setLoadedProperty({ id: lookupId, record: cached });
+      return () => { cancelled = true; };
+    }
+
+    setLoadedProperty(null);
+    recordsService.getRecord('Property', lookupId).then((record) => {
+      if (!record || cancelled) return;
+      const flattened = recordsService.flattenRecord(record);
+      upsertLookupCacheRecord('Property', flattened);
+      setLoadedProperty({ id: lookupId, record: flattened });
+    });
+
+    return () => { cancelled = true; };
+  }, [lookupId]);
+
+  const property = cachedProperty ?? (loadedProperty?.id === lookupId ? loadedProperty.record : null);
+  const link = route ? (
+    <Link href={`/${route}/${lookupId}`} className="text-brand-navy hover:underline underline-offset-2">
+      {displayLabel}
+    </Link>
+  ) : displayLabel;
+  if (!property) return link;
+
+  const addressBlob = property.address_search ?? property.Property__address_search;
+  let address: string | undefined;
+  if (typeof addressBlob === 'object' && addressBlob) {
+    address = [addressBlob.street, addressBlob.city, addressBlob.state, addressBlob.postalCode]
+      .filter(Boolean).join(', ') || undefined;
+  }
+  const legacyAddress = property.address ?? property.Property__address;
+  if (!address && typeof legacyAddress === 'object' && legacyAddress) {
+    address = [legacyAddress.street, legacyAddress.city, legacyAddress.state,
+      legacyAddress.zip || legacyAddress.postalCode].filter(Boolean).join(', ') || undefined;
+  } else if (!address && typeof legacyAddress === 'string' && legacyAddress) {
+    address = legacyAddress;
+  }
+  if (!address) {
+    const parts = [
+      property.city ?? property.Property__city,
+      property.state ?? property.Property__state,
+      property.zipCode ?? property.Property__zipCode,
+    ].filter(Boolean);
+    if (parts.length > 0) address = parts.join(', ');
+  }
+
+  const latitude = Number(addressBlob?.lat ?? property.latitude ?? property.Property__latitude);
+  const longitude = Number(addressBlob?.lng ?? property.longitude ?? property.Property__longitude);
+  const hasMap = Number.isFinite(latitude) && Number.isFinite(longitude)
+    && latitude !== 0 && longitude !== 0;
+
+  return (
+    <div>
+      {link}
+      {address && <p className="mt-1 text-xs text-gray-500">{address}</p>}
+      {hasMap && <LocationMapPreview lat={latitude} lng={longitude} address={address} className="mt-2" />}
+    </div>
+  );
 }
 
 // ── renderValue ────────────────────────────────────────────────────────
@@ -341,46 +416,7 @@ export function renderValue(
 
     // For Property lookups, show the property address as text and a map preview when available
     if (lookupTarget === 'Property' && !compact) {
-      const propRecord = getLookupCachedRecord('Property', String(value));
-      if (propRecord) {
-        const blob = propRecord.address_search ?? propRecord.Property__address_search ??
-          (() => { const k = Object.keys(propRecord).find(x => x.toLowerCase().endsWith('__address_search') || x.toLowerCase() === 'address_search'); return k ? propRecord[k] : undefined; })();
-
-        let address: string | undefined;
-        if (typeof blob === 'object' && blob) {
-          address = [blob.street, blob.city, blob.state, blob.postalCode].filter(Boolean).join(', ') || undefined;
-        }
-        if (!address) {
-          const legacyAddr = propRecord.address ?? propRecord.Property__address ??
-            (() => { const k = Object.keys(propRecord).find(x => (x.toLowerCase().endsWith('__address') || x.toLowerCase() === 'address') && !x.toLowerCase().includes('_search')); return k ? propRecord[k] : undefined; })();
-          if (typeof legacyAddr === 'object' && legacyAddr) {
-            address = [legacyAddr.street, legacyAddr.city, legacyAddr.state, legacyAddr.zip || legacyAddr.postalCode].filter(Boolean).join(', ') || undefined;
-          } else if (typeof legacyAddr === 'string' && legacyAddr) {
-            address = legacyAddr;
-          }
-        }
-        if (!address) {
-          const city = propRecord.city ?? propRecord.Property__city ?? '';
-          const state = propRecord.state ?? propRecord.Property__state ?? '';
-          const zip = propRecord.zipCode ?? propRecord.Property__zipCode ?? '';
-          const parts = [city, state, zip].filter(Boolean);
-          if (parts.length > 0) address = parts.join(', ');
-        }
-
-        const lat = parseFloat(String(blob?.lat ?? propRecord.latitude ?? propRecord.Property__latitude ?? ''));
-        const lng = parseFloat(String(blob?.lng ?? propRecord.longitude ?? propRecord.Property__longitude ?? ''));
-        const hasMap = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
-
-        if (address || hasMap) {
-          return (
-            <div>
-              {link}
-              {address && <p className="text-xs text-gray-500 mt-1">{address}</p>}
-              {hasMap && <LocationMapPreview lat={lat} lng={lng} address={address} className="mt-2" />}
-            </div>
-          );
-        }
-      }
+      return <PropertyLookupValue lookupId={lookupId} route={route} displayLabel={displayLabel} />;
     }
 
     if (route) {
