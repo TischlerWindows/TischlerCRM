@@ -32,6 +32,7 @@ describe('widget data imports', () => {
     expect(buildWidgetImportPayload({
       objectApiName: 'PunchList',
       row: {
+        Id: 'a0B000000000001AAA',
         'Item #': ' 4 ',
         Men: '2',
         'Hours Each': '1.5',
@@ -55,6 +56,7 @@ describe('widget data imports', () => {
         clientApproved: true,
         serviceDate: '2025-04-14',
         totalEstimateOfHours: 3,
+        Id: 'a0B000000000001AAA',
       },
       errors: [],
     })
@@ -63,13 +65,22 @@ describe('widget data imports', () => {
   it('retains matched per diem users and reports unknown users without blocking other fields', () => {
     expect(buildWidgetImportPayload({
       objectApiName: 'PerDiem',
-      row: { Techs: 'Matthias Mildner; Unknown Tech', Amount: '$120.50' },
+      row: { Id: 'a0C000000000001AAA', Techs: 'Matthias Mildner; Unknown Tech', Amount: '$120.50' },
       workOrderId: 'wo-1',
       fieldMapping: { serviceTechPerDiem: 'Techs', perDiemAmount: 'Amount' },
       users: [{ id: 'user-1', name: 'Matthias Mildner', email: 'matthias@example.com', isActive: false }],
     })).toEqual({
-      data: { workOrder: 'wo-1', serviceTechPerDiem: 'user-1', perDiemAmount: 120.5 },
+      data: { workOrder: 'wo-1', serviceTechPerDiem: 'user-1', perDiemAmount: 120.5, Id: 'a0C000000000001AAA' },
       errors: ['Service Tech Per Diem did not match: Unknown Tech'],
     })
+  })
+
+  it('rejects rows without a Salesforce Id', () => {
+    expect(buildWidgetImportPayload({
+      objectApiName: 'PunchList',
+      row: { Location: 'Kitchen' },
+      workOrderId: 'wo-1',
+      fieldMapping: { location: 'Location' },
+    })).toEqual({ data: null, errors: ['Id column is blank or missing.'] })
   })
 })

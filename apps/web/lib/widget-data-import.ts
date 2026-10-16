@@ -131,6 +131,8 @@ export function buildWidgetImportPayload({
 }): { data: Record<string, unknown> | null; errors: string[] } {
   const data: Record<string, unknown> = { workOrder: workOrderId }
   const errors: string[] = []
+  const salesforceIdColumn = Object.keys(row).find((header) => normalizeWidgetImportHeader(header) === 'id')
+  const salesforceId = salesforceIdColumn ? row[salesforceIdColumn]?.trim() : ''
 
   for (const field of WIDGET_IMPORT_FIELDS[objectApiName]) {
     const sourceColumn = fieldMapping[field.apiName]
@@ -181,6 +183,7 @@ export function buildWidgetImportPayload({
   }
 
   if (Object.keys(data).length === 1) errors.push('No widget fields were mapped for this row.')
+  if (!salesforceId) errors.push('Id column is blank or missing.')
   if (errors.some((error) => !error.includes('did not match:'))) return { data: null, errors }
-  return { data, errors }
+  return { data: { ...data, Id: salesforceId }, errors }
 }
