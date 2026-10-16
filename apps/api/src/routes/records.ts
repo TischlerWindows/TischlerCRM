@@ -897,7 +897,8 @@ export async function recordRoutes(app: FastifyInstance) {
     const importedPropertyOpportunityNumber = normalizedData.__propertyOpportunityNumber;
     delete normalizedData.__propertyOpportunityNumber;
     for (const field of object.fields) {
-      if (field.apiName === 'propertyNumber') {
+      const fieldApiName = field.apiName.replace(/^[A-Za-z]+__/, '');
+      if (fieldApiName === 'propertyNumber') {
         const linkedOpportunityNumber = await getLinkedOpportunityNumber(normalizedData, object.id, apiName);
         const copiedNumber = linkedOpportunityNumber
           ?? (typeof importedPropertyOpportunityNumber === 'string' ? importedPropertyOpportunityNumber : undefined);
@@ -914,25 +915,25 @@ export async function recordRoutes(app: FastifyInstance) {
         continue;
       }
 
-      const currentVal = normalizedData[field.apiName];
+      const currentVal = normalizedData[field.apiName] ?? normalizedData[fieldApiName];
       const isEmpty = !currentVal || currentVal === 'N/A';
-      if (field.apiName in autoNumberFormats && isEmpty) {
-        if (field.apiName in YEAR_SCOPED_NUMBER_PREFIXES) {
+      if (fieldApiName in autoNumberFormats && isEmpty) {
+        if (fieldApiName in YEAR_SCOPED_NUMBER_PREFIXES) {
           const existingRecords = await prisma.record.findMany({
             where: { objectId: object.id, deletedAt: null },
             select: { data: true, createdAt: true },
           });
-          const maxSequence = getYearScopedNumberSequence(existingRecords, field.apiName, year);
+          const maxSequence = getYearScopedNumberSequence(existingRecords, fieldApiName, year);
           if (maxSequence >= 999) {
             return reply.code(409).send({ error: `No ${field.label} numbers remain for ${year}.` });
           }
           const generatedNum = formatYearScopedNumber(year, maxSequence + 1);
-          normalizedData[field.apiName] = generatedNum;
-          normalizedData[`${apiName}__${field.apiName}`] = generatedNum;
+          normalizedData[fieldApiName] = generatedNum;
+          normalizedData[`${apiName}__${fieldApiName}`] = generatedNum;
           continue;
         }
 
-        const prefix = autoNumberFormats[field.apiName];
+        const prefix = autoNumberFormats[fieldApiName];
         const existing = await prisma.record.findMany({
           where: { objectId: object.id, deletedAt: null },
           select: { data: true },
@@ -946,18 +947,18 @@ export async function recordRoutes(app: FastifyInstance) {
           let val: string | undefined;
           for (const [k, v] of Object.entries(recData)) {
             const stripped = k.replace(/^[A-Za-z]+__/, '');
-            if (stripped === field.apiName && typeof v === 'string') { val = v; break; }
+            if (stripped === fieldApiName && typeof v === 'string') { val = v; break; }
           }
           if (typeof val === 'string') {
             const m = val.match(prefixRegex);
             if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
           }
         }
-        const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber' || field.apiName === 'teamMemberNumber' || field.apiName === 'taskNumber') ? 4 : 3;
+        const padWidth = (fieldApiName === 'propertyNumber' || fieldApiName === 'leadNumber' || fieldApiName === 'opportunityNumber' || fieldApiName === 'workOrderNumber' || fieldApiName === 'teamMemberNumber' || fieldApiName === 'taskNumber') ? 4 : 3;
         const generatedNum = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
-        normalizedData[field.apiName] = generatedNum;
+        normalizedData[fieldApiName] = generatedNum;
         // Also set the prefixed key so the stored JSON is consistent
-        const prefixedKey = `${apiName}__${field.apiName}`;
+        const prefixedKey = `${apiName}__${fieldApiName}`;
         normalizedData[prefixedKey] = generatedNum;
       }
     }
@@ -1963,23 +1964,26 @@ export async function recordRoutes(app: FastifyInstance) {
 
     // Pre-fetch existing records for auto-number sequence
     let maxAutoNumbers: Record<string, number> = {};
-    const autoNumberFields = object.fields.filter(f => f.apiName in autoNumberFormats);
+    const autoNumberFields = object.fields.filter(
+      (field) => field.apiName.replace(/^[A-Za-z]+__/, '') in autoNumberFormats,
+    );
     if (autoNumberFields.length > 0) {
       const existing = await prisma.record.findMany({
         where: { objectId: object.id, deletedAt: null },
         select: { data: true, createdAt: true },
       });
       for (const field of autoNumberFields) {
-        if (field.apiName === 'propertyNumber') {
-          maxAutoNumbers[field.apiName] = getMaxStandalonePropertySequence(existing)
+        const fieldApiName = field.apiName.replace(/^[A-Za-z]+__/, '');
+        if (fieldApiName === 'propertyNumber') {
+          maxAutoNumbers[fieldApiName] = getMaxStandalonePropertySequence(existing)
           continue
         }
-        if (field.apiName in YEAR_SCOPED_NUMBER_PREFIXES) {
-          maxAutoNumbers[field.apiName] = getYearScopedNumberSequence(existing, field.apiName, year);
+        if (fieldApiName in YEAR_SCOPED_NUMBER_PREFIXES) {
+          maxAutoNumbers[fieldApiName] = getYearScopedNumberSequence(existing, fieldApiName, year);
           continue;
         }
-        const prefix = autoNumberFormats[field.apiName]!;
-        const prefixRegex = field.apiName === 'propertyNumber'
+        const prefix = autoNumberFormats[fieldApiName]!;
+        const prefixRegex = fieldApiName === 'propertyNumber'
           ? /^[A-Za-z]+-?(\d+)$/
           : new RegExp(`^${prefix}-?(\\d+)$`);
         let maxNum = 0;
@@ -1988,19 +1992,19 @@ export async function recordRoutes(app: FastifyInstance) {
           if (!recData) continue;
           for (const [k, v] of Object.entries(recData)) {
             const stripped = k.replace(/^[A-Za-z]+__/, '');
-            if (stripped === field.apiName && typeof v === 'string') {
+            if (stripped === fieldApiName && typeof v === 'string') {
               const m = v.match(prefixRegex);
               if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
             }
           }
         }
-        maxAutoNumbers[field.apiName] = maxNum;
+        maxAutoNumbers[fieldApiName] = maxNum;
       }
     }
 
     const autoGeneratedFieldNames = new Set(Object.keys(autoNumberFormats));
     const requiredFields = object.fields.filter(
-      f => f.required && !autoGeneratedFieldNames.has(f.apiName)
+      f => f.required && !autoGeneratedFieldNames.has(f.apiName.replace(/^[A-Za-z]+__/, ''))
         && f.apiName.replace(/^[A-Za-z]+__/, '').toLowerCase() !== 'id'
         && f.type !== 'Lookup' && f.type !== 'ExternalLookup'
     );
@@ -2045,7 +2049,8 @@ export async function recordRoutes(app: FastifyInstance) {
         // Auto-generate number fields
         let exhaustedYearNumberField: string | null = null;
         for (const field of autoNumberFields) {
-          if (field.apiName === 'propertyNumber') {
+          const fieldApiName = field.apiName.replace(/^[A-Za-z]+__/, '');
+          if (fieldApiName === 'propertyNumber') {
             const opportunityId = getOpportunityLookupRecordId(rawData, apiName, propertyOpportunityFieldApiName)
             const linkedNumber = opportunityId ? propertyOpportunityNumberById.get(opportunityId) : undefined
             const importedOpportunityNumber = typeof rawData.__propertyOpportunityNumber === 'string'
@@ -2063,26 +2068,26 @@ export async function recordRoutes(app: FastifyInstance) {
             }
             continue
           }
-          const currentVal = normalizedData[field.apiName];
+          const currentVal = normalizedData[field.apiName] ?? normalizedData[fieldApiName];
           const isEmpty = !currentVal || currentVal === 'N/A';
           if (isEmpty) {
-            if (field.apiName in YEAR_SCOPED_NUMBER_PREFIXES) {
-              if ((maxAutoNumbers[field.apiName] ?? 0) >= 999) {
+            if (fieldApiName in YEAR_SCOPED_NUMBER_PREFIXES) {
+              if ((maxAutoNumbers[fieldApiName] ?? 0) >= 999) {
                 exhaustedYearNumberField = field.label;
                 break;
               }
-              maxAutoNumbers[field.apiName] = (maxAutoNumbers[field.apiName] ?? 0) + 1;
-              const generatedNum = formatYearScopedNumber(year, maxAutoNumbers[field.apiName]!);
-              normalizedData[field.apiName] = generatedNum;
-              normalizedData[`${apiName}__${field.apiName}`] = generatedNum;
+              maxAutoNumbers[fieldApiName] = (maxAutoNumbers[fieldApiName] ?? 0) + 1;
+              const generatedNum = formatYearScopedNumber(year, maxAutoNumbers[fieldApiName]!);
+              normalizedData[fieldApiName] = generatedNum;
+              normalizedData[`${apiName}__${fieldApiName}`] = generatedNum;
               continue;
             }
-            const prefix = autoNumberFormats[field.apiName]!;
-            const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber' || field.apiName === 'teamMemberNumber' || field.apiName === 'taskNumber') ? 4 : 3;
-            maxAutoNumbers[field.apiName] = (maxAutoNumbers[field.apiName] || 0) + 1;
-            const generatedNum = `${prefix}${String(maxAutoNumbers[field.apiName]).padStart(padWidth, '0')}`;
-            normalizedData[field.apiName] = generatedNum;
-            normalizedData[`${apiName}__${field.apiName}`] = generatedNum;
+            const prefix = autoNumberFormats[fieldApiName]!;
+            const padWidth = (fieldApiName === 'propertyNumber' || fieldApiName === 'leadNumber' || fieldApiName === 'opportunityNumber' || fieldApiName === 'workOrderNumber' || fieldApiName === 'teamMemberNumber' || fieldApiName === 'taskNumber') ? 4 : 3;
+            maxAutoNumbers[fieldApiName] = (maxAutoNumbers[fieldApiName] || 0) + 1;
+            const generatedNum = `${prefix}${String(maxAutoNumbers[fieldApiName]).padStart(padWidth, '0')}`;
+            normalizedData[fieldApiName] = generatedNum;
+            normalizedData[`${apiName}__${fieldApiName}`] = generatedNum;
           }
         }
         if (exhaustedYearNumberField) {
