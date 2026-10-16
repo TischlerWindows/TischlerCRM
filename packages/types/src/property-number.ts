@@ -7,8 +7,7 @@
  *   - US addresses:     Two-letter state code            (e.g. NY0001)
  *   - Unknown:          UNK0001
  *
- * The sequential number is global across all prefixes so every property
- * gets a unique number.
+ * The sequence advances independently for each prefix.
  */
 
 // ─── Country name → ISO 3166-1 alpha-3 ────────────────────────────────
@@ -512,18 +511,17 @@ export function extractAddressFromRecord(normalizedData: Record<string, any>): {
 
 /**
  * Generate the next property number for a given prefix by scanning
- * existing property numbers. The numeric sequence is global across
- * ALL prefixes so every property gets a unique number.
+ * existing property numbers with the same prefix.
  */
 export function generatePropertyNumber(
   prefix: string,
   existingNumbers: string[],
 ): string {
-  const globalRegex = /^[A-Za-z]+-?(\d+)$/;
+  const normalizedPrefix = prefix.toUpperCase();
   const nums = existingNumbers
     .map((n) => {
-      const m = n.match(globalRegex);
-      return m ? parseInt(m[1]!, 10) : NaN;
+      const match = n.trim().match(/^([A-Za-z]+)-?(\d+)$/);
+      return match?.[1]?.toUpperCase() === normalizedPrefix ? parseInt(match[2]!, 10) : NaN;
     })
     .filter((n) => !isNaN(n));
 
