@@ -870,6 +870,7 @@ export async function recordRoutes(app: FastifyInstance) {
   });
 
   app.get('/objects/:apiName/records/count', async (req, reply) => {
+    reply.header('Cache-Control', 'no-store, max-age=0');
     const { apiName } = req.params as { apiName: string };
     const userId = req.user!.sub;
     const userRole = req.user!.role;

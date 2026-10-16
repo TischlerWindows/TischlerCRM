@@ -575,7 +575,7 @@ class ApiClient {
   }
 
   async getRecordCount(objectApiName: string): Promise<{ count: number }> {
-    return this.request<{ count: number }>(`/objects/${objectApiName}/records/count`);
+    return this.request<{ count: number }>(`/objects/${objectApiName}/records/count`, { cache: 'no-store' });
   }
 
   async getRecord(objectApiName: string, recordId: string) {
