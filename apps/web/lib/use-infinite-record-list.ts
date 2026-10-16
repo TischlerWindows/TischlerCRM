@@ -88,6 +88,7 @@ export function useInfiniteRecordList<T extends RecordWithId>({
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) void loadMore()
     }, { root: null, rootMargin: '400px 0px' })
+    observer.observe(sentinel)
     return () => observer.disconnect()
   }, [enabled, hasMore, loadError, loadMore, loading, loadingMore])
 
