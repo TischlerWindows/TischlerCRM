@@ -2060,6 +2060,23 @@ export async function recordRoutes(app: FastifyInstance) {
     });
     if (!object) return reply.code(404).send({ error: 'Object not found' });
 
+    const tracksSalesforceIds = ['punchlist', 'perdiem'].includes(apiName.toLowerCase());
+    const incomingSalesforceIds = tracksSalesforceIds
+      ? rows.map((rawData) => {
+          const value = rawData.__sfId
+            ?? (sfIdField ? rawData[sfIdField] ?? rawData.Id ?? rawData.id : rawData.Id ?? rawData.id);
+          return value == null ? '' : String(value).trim();
+        }).filter(Boolean)
+      : [];
+    const seenSalesforceIds = new Set<string>();
+    if (incomingSalesforceIds.length > 0) {
+      const existingRecords = await prisma.record.findMany({
+        where: { objectId: object.id, id: { in: incomingSalesforceIds, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      for (const existing of existingRecords) seenSalesforceIds.add(existing.id.toLowerCase());
+    }
+
     // Prepare auto-number info once
     const autoNumberFormats: Record<string, string> = {
       accountNumber: 'A', propertyNumber: 'NT', contactNumber: 'C',
@@ -2166,6 +2183,11 @@ export async function recordRoutes(app: FastifyInstance) {
         const sfIdValue = originalSfId === undefined || originalSfId === null || String(originalSfId).trim() === ''
           ? null
           : String(originalSfId).trim();
+        const normalizedSalesforceId = sfIdValue?.toLowerCase();
+        if (tracksSalesforceIds && normalizedSalesforceId && seenSalesforceIds.has(normalizedSalesforceId)) {
+          errors.push({ row: i + 1, error: `Duplicate Salesforce Id: ${sfIdValue}.` });
+          continue;
+        }
 
         // Normalize keys, excluding the internal __sfId sentinel
         const normalizedData: Record<string, any> = {};
@@ -2320,7 +2342,10 @@ export async function recordRoutes(app: FastifyInstance) {
         });
 
         // Track SF id → new CRM id mapping for relational re-linking
-        if (sfIdValue) idMap[sfIdValue] = recordIdValue;
+        if (sfIdValue) {
+          idMap[sfIdValue] = recordIdValue;
+          if (tracksSalesforceIds) seenSalesforceIds.add(sfIdValue.toLowerCase());
+        }
 
         created++;
       } catch (err: any) {
