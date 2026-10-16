@@ -417,6 +417,19 @@ const US_STATE_CODES: Record<string, string> = {
   'wyoming': 'WY', 'wy': 'WY',
 };
 
+const US_TERRITORY_ISO3: Record<string, string> = {
+  'american samoa': 'ASM', 'as': 'ASM',
+  'guam': 'GUM', 'gu': 'GUM',
+  'northern mariana islands': 'MNP', 'mp': 'MNP',
+  'puerto rico': 'PRI', 'pr': 'PRI',
+  'united states minor outlying islands': 'UMI', 'um': 'UMI',
+  'virgin islands': 'VIR', 'vi': 'VIR',
+};
+
+function getUSStateOrTerritoryPrefix(state: string): string | undefined {
+  return US_TERRITORY_ISO3[state] || US_STATE_CODES[state];
+}
+
 /**
  * Derive the property-number prefix from an address.
  *
@@ -436,7 +449,7 @@ export function getPropertyPrefix(address: {
   // Check if it's a US address
   const iso3 = country ? COUNTRY_TO_ISO3[country] : undefined;
   if (iso3 === 'USA') {
-    const stateCode = US_STATE_CODES[state];
+    const stateCode = getUSStateOrTerritoryPrefix(state);
     return stateCode || 'UNK';
   }
 
@@ -449,7 +462,7 @@ export function getPropertyPrefix(address: {
     const allCodes = new Set(Object.values(COUNTRY_TO_ISO3));
     if (allCodes.has(upper)) {
       if (upper === 'USA') {
-        const stateCode = US_STATE_CODES[state];
+        const stateCode = getUSStateOrTerritoryPrefix(state);
         return stateCode || 'UNK';
       }
       return upper;
@@ -458,7 +471,7 @@ export function getPropertyPrefix(address: {
 
   // No country found — if the state matches a known US state, infer US.
   if (state) {
-    const stateCode = US_STATE_CODES[state];
+    const stateCode = getUSStateOrTerritoryPrefix(state);
     if (stateCode) return stateCode;
   }
 

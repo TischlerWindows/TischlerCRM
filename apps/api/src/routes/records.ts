@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
+import { extractAddressFromRecord, generatePropertyNumber, getPropertyPrefix } from '@crm/types';
 import { logAudit, extractIp } from '../audit.js';
 import { tryRenameDropboxFolder, tryEnsureLinkedFolder, tryEnsurePropertyRootFolder } from './dropbox.js';
 import { runWorkflows } from '../workflow-engine.js';
@@ -201,37 +202,17 @@ async function addProjectNumberFormula<T extends { id: string; data: unknown }>(
   });
 }
 
-function getStandalonePropertyPrefix(data: unknown): string {
-  if (!data || typeof data !== 'object') return 'NT';
-  const fields = data as Record<string, unknown>;
-  const stateField = Object.entries(fields).find(([key]) =>
-    key.replace(/^[A-Za-z]+__/, '').toLowerCase() === 'state',
-  )?.[1];
-  const addressField = Object.entries(fields).find(([key]) =>
-    key.replace(/^[A-Za-z]+__/, '').toLowerCase() === 'address',
-  )?.[1];
-  const nestedState = addressField && typeof addressField === 'object'
-    ? (addressField as Record<string, unknown>).state
-    : undefined;
-  const state = String(stateField ?? nestedState ?? '').trim().toUpperCase();
-  return /^[A-Z]{2}$/.test(state) ? state : 'NT';
-}
-
-function getMaxStandalonePropertySequence(records: Array<{ data: unknown }>, prefix: string): number {
-  let maxSequence = 0;
+function getPropertyNumbers(records: Array<{ data: unknown }>): string[] {
+  const numbers: string[] = [];
   for (const record of records) {
     if (!record.data || typeof record.data !== 'object') continue;
     for (const [key, value] of Object.entries(record.data as Record<string, unknown>)) {
-      if (key.replace(/^[A-Za-z]+__/, '').toLowerCase() !== 'propertynumber' || typeof value !== 'string') continue;
-      const sequence = value.trim().match(new RegExp(`^${prefix}-?(\\d+)$`, 'i'))?.[1];
-      if (sequence) maxSequence = Math.max(maxSequence, Number(sequence));
+      if (key.replace(/^[A-Za-z]+__/, '').toLowerCase() === 'propertynumber' && typeof value === 'string') {
+        numbers.push(value.trim());
+      }
     }
   }
-  return maxSequence
-}
-
-function formatStandalonePropertyNumber(sequence: number, prefix: string): string {
-  return `${prefix}${String(sequence).padStart(4, '0')}`
+  return numbers;
 }
 
 async function getLinkedOpportunityNumber(
@@ -946,15 +927,12 @@ export async function recordRoutes(app: FastifyInstance) {
           ?? (typeof importedPropertyOpportunityNumber === 'string' ? importedPropertyOpportunityNumber : undefined);
         let propertyNumber = copiedNumber;
         if (!propertyNumber) {
-          const propertyPrefix = getStandalonePropertyPrefix(normalizedData);
+          const propertyPrefix = getPropertyPrefix(extractAddressFromRecord(normalizedData));
           const existingProperties = await prisma.record.findMany({
             where: { objectId: object.id, deletedAt: null },
             select: { data: true },
           });
-          propertyNumber = formatStandalonePropertyNumber(
-            getMaxStandalonePropertySequence(existingProperties, propertyPrefix) + 1,
-            propertyPrefix,
-          );
+          propertyNumber = generatePropertyNumber(propertyPrefix, getPropertyNumbers(existingProperties));
         }
         normalizedData.propertyNumber = propertyNumber;
         normalizedData[`${apiName}__propertyNumber`] = propertyNumber;
@@ -1774,11 +1752,8 @@ export async function recordRoutes(app: FastifyInstance) {
           where: { objectId: object.id, deletedAt: null, id: { not: existingRecord.id } },
           select: { data: true },
         });
-        const propertyPrefix = getStandalonePropertyPrefix(mergedData);
-        const standaloneNumber = formatStandalonePropertyNumber(
-          getMaxStandalonePropertySequence(existingProperties, propertyPrefix) + 1,
-          propertyPrefix,
-        );
+        const propertyPrefix = getPropertyPrefix(extractAddressFromRecord(mergedData));
+        const standaloneNumber = generatePropertyNumber(propertyPrefix, getPropertyNumbers(existingProperties));
         mergedData.propertyNumber = standaloneNumber;
         mergedData.Property__propertyNumber = standaloneNumber;
       }
@@ -2014,8 +1989,11 @@ export async function recordRoutes(app: FastifyInstance) {
 
     // Pre-fetch existing records for auto-number sequence
     let maxAutoNumbers: Record<string, number> = {};
+    let existingPropertyNumbers: string[] = [];
     const autoNumberFields = object.fields.filter(
-      (field) => field.apiName in autoNumberFormats || field.apiName === 'Opportunity__opportunityNumber',
+      (field) => field.apiName in autoNumberFormats
+        || field.apiName === 'Opportunity__opportunityNumber'
+        || (apiName.toLowerCase() === 'property' && field.apiName === 'Property__propertyNumber'),
     );
     if (autoNumberFields.length > 0) {
       const existing = await prisma.record.findMany({
@@ -2025,11 +2003,11 @@ export async function recordRoutes(app: FastifyInstance) {
       for (const field of autoNumberFields) {
         const fieldApiName = field.apiName === 'Opportunity__opportunityNumber'
           ? 'opportunityNumber'
+          : field.apiName === 'Property__propertyNumber'
+            ? 'propertyNumber'
           : field.apiName;
         if (fieldApiName === 'propertyNumber') {
-          for (const prefix of new Set(rows.map(getStandalonePropertyPrefix))) {
-            maxAutoNumbers[`propertyNumber:${prefix}`] = getMaxStandalonePropertySequence(existing, prefix);
-          }
+          existingPropertyNumbers = getPropertyNumbers(existing);
           continue
         }
         if (fieldApiName in YEAR_SCOPED_NUMBER_PREFIXES) {
@@ -2060,6 +2038,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const requiredFields = object.fields.filter(
       f => f.required && !autoGeneratedFieldNames.has(f.apiName)
         && f.apiName !== 'Opportunity__opportunityNumber'
+        && !(apiName.toLowerCase() === 'property' && f.apiName === 'Property__propertyNumber')
         && f.apiName.replace(/^[A-Za-z]+__/, '').toLowerCase() !== 'id'
         && f.type !== 'Lookup' && f.type !== 'ExternalLookup'
     );
@@ -2117,11 +2096,11 @@ export async function recordRoutes(app: FastifyInstance) {
             if (copiedNumber) {
               normalizedData.propertyNumber = copiedNumber
               normalizedData[`${apiName}__propertyNumber`] = copiedNumber
+              existingPropertyNumbers.push(copiedNumber)
             } else {
-              const propertyPrefix = getStandalonePropertyPrefix(normalizedData)
-              const counterKey = `propertyNumber:${propertyPrefix}`
-              maxAutoNumbers[counterKey] = (maxAutoNumbers[counterKey] ?? 0) + 1
-              const generatedNum = formatStandalonePropertyNumber(maxAutoNumbers[counterKey], propertyPrefix)
+              const propertyPrefix = getPropertyPrefix(extractAddressFromRecord(normalizedData))
+              const generatedNum = generatePropertyNumber(propertyPrefix, existingPropertyNumbers)
+              existingPropertyNumbers.push(generatedNum)
               normalizedData.propertyNumber = generatedNum
               normalizedData[`${apiName}__propertyNumber`] = generatedNum
             }
