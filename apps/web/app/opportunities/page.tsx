@@ -233,9 +233,9 @@ export default function OpportunitiesPage() {
     })();
   }, [schema]);
 
-  const fetchOpportunities = useCallback(async () => {
+  const fetchOpportunities = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       setFetchError(null);
       const [records, countResult] = await Promise.all([
         recordsService.getRecords('Opportunity'),
@@ -255,7 +255,7 @@ export default function OpportunitiesPage() {
       console.error('Failed to fetch opportunities from API:', error);
       setFetchError('Failed to load data. Please try refreshing the page.');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
@@ -1141,7 +1141,7 @@ export default function OpportunitiesPage() {
         onOpenChange={setShowImportDialog}
         objectApiName="Opportunity"
         objectLabel="Opportunity"
-        onImportComplete={() => fetchOpportunities()}
+        onImportComplete={() => fetchOpportunities(false)}
       />
 
       </div>
