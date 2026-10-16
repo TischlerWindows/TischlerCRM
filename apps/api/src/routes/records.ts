@@ -201,21 +201,37 @@ async function addProjectNumberFormula<T extends { id: string; data: unknown }>(
   });
 }
 
-function getMaxStandalonePropertySequence(records: Array<{ data: unknown }>): number {
+function getStandalonePropertyPrefix(data: unknown): string {
+  if (!data || typeof data !== 'object') return 'NT';
+  const fields = data as Record<string, unknown>;
+  const stateField = Object.entries(fields).find(([key]) =>
+    key.replace(/^[A-Za-z]+__/, '').toLowerCase() === 'state',
+  )?.[1];
+  const addressField = Object.entries(fields).find(([key]) =>
+    key.replace(/^[A-Za-z]+__/, '').toLowerCase() === 'address',
+  )?.[1];
+  const nestedState = addressField && typeof addressField === 'object'
+    ? (addressField as Record<string, unknown>).state
+    : undefined;
+  const state = String(stateField ?? nestedState ?? '').trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(state) ? state : 'NT';
+}
+
+function getMaxStandalonePropertySequence(records: Array<{ data: unknown }>, prefix: string): number {
   let maxSequence = 0;
   for (const record of records) {
     if (!record.data || typeof record.data !== 'object') continue;
     for (const [key, value] of Object.entries(record.data as Record<string, unknown>)) {
       if (key.replace(/^[A-Za-z]+__/, '').toLowerCase() !== 'propertynumber' || typeof value !== 'string') continue;
-      const sequence = value.trim().match(/^NT-?(\d+)$/i)?.[1];
+      const sequence = value.trim().match(new RegExp(`^${prefix}-?(\\d+)$`, 'i'))?.[1];
       if (sequence) maxSequence = Math.max(maxSequence, Number(sequence));
     }
   }
   return maxSequence
 }
 
-function formatStandalonePropertyNumber(sequence: number): string {
-  return `NT${String(sequence).padStart(4, '0')}`
+function formatStandalonePropertyNumber(sequence: number, prefix: string): string {
+  return `${prefix}${String(sequence).padStart(4, '0')}`
 }
 
 async function getLinkedOpportunityNumber(
@@ -920,20 +936,25 @@ export async function recordRoutes(app: FastifyInstance) {
       normalizedData[`${apiName}__projectNumber`] = projectNumber;
     }
     for (const field of object.fields) {
+      const bareFieldApiName = field.apiName.replace(/^[A-Za-z]+__/, '');
       const fieldApiName = field.apiName === 'Opportunity__opportunityNumber'
         ? 'opportunityNumber'
         : field.apiName;
-      if (field.apiName === 'propertyNumber') {
+      if (apiName.toLowerCase() === 'property' && bareFieldApiName === 'propertyNumber') {
         const linkedOpportunityNumber = await getLinkedOpportunityNumber(normalizedData, object.id, apiName);
         const copiedNumber = linkedOpportunityNumber
           ?? (typeof importedPropertyOpportunityNumber === 'string' ? importedPropertyOpportunityNumber : undefined);
         let propertyNumber = copiedNumber;
         if (!propertyNumber) {
+          const propertyPrefix = getStandalonePropertyPrefix(normalizedData);
           const existingProperties = await prisma.record.findMany({
             where: { objectId: object.id, deletedAt: null },
             select: { data: true },
           });
-          propertyNumber = formatStandalonePropertyNumber(getMaxStandalonePropertySequence(existingProperties) + 1);
+          propertyNumber = formatStandalonePropertyNumber(
+            getMaxStandalonePropertySequence(existingProperties, propertyPrefix) + 1,
+            propertyPrefix,
+          );
         }
         normalizedData.propertyNumber = propertyNumber;
         normalizedData[`${apiName}__propertyNumber`] = propertyNumber;
@@ -1753,7 +1774,11 @@ export async function recordRoutes(app: FastifyInstance) {
           where: { objectId: object.id, deletedAt: null, id: { not: existingRecord.id } },
           select: { data: true },
         });
-        const standaloneNumber = formatStandalonePropertyNumber(getMaxStandalonePropertySequence(existingProperties) + 1);
+        const propertyPrefix = getStandalonePropertyPrefix(mergedData);
+        const standaloneNumber = formatStandalonePropertyNumber(
+          getMaxStandalonePropertySequence(existingProperties, propertyPrefix) + 1,
+          propertyPrefix,
+        );
         mergedData.propertyNumber = standaloneNumber;
         mergedData.Property__propertyNumber = standaloneNumber;
       }
@@ -2002,7 +2027,9 @@ export async function recordRoutes(app: FastifyInstance) {
           ? 'opportunityNumber'
           : field.apiName;
         if (fieldApiName === 'propertyNumber') {
-          maxAutoNumbers[fieldApiName] = getMaxStandalonePropertySequence(existing)
+          for (const prefix of new Set(rows.map(getStandalonePropertyPrefix))) {
+            maxAutoNumbers[`propertyNumber:${prefix}`] = getMaxStandalonePropertySequence(existing, prefix);
+          }
           continue
         }
         if (fieldApiName in YEAR_SCOPED_NUMBER_PREFIXES) {
@@ -2091,8 +2118,10 @@ export async function recordRoutes(app: FastifyInstance) {
               normalizedData.propertyNumber = copiedNumber
               normalizedData[`${apiName}__propertyNumber`] = copiedNumber
             } else {
-              maxAutoNumbers.propertyNumber = (maxAutoNumbers.propertyNumber ?? 0) + 1
-              const generatedNum = formatStandalonePropertyNumber(maxAutoNumbers.propertyNumber)
+              const propertyPrefix = getStandalonePropertyPrefix(normalizedData)
+              const counterKey = `propertyNumber:${propertyPrefix}`
+              maxAutoNumbers[counterKey] = (maxAutoNumbers[counterKey] ?? 0) + 1
+              const generatedNum = formatStandalonePropertyNumber(maxAutoNumbers[counterKey], propertyPrefix)
               normalizedData.propertyNumber = generatedNum
               normalizedData[`${apiName}__propertyNumber`] = generatedNum
             }
