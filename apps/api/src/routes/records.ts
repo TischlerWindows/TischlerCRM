@@ -180,6 +180,20 @@ function getImportedSalesforceId(
   return undefined;
 }
 
+function sanitizeImportedValue(value: unknown): unknown {
+  if (typeof value === 'string') return value.replace(/\u0000/g, '');
+  if (Array.isArray(value)) return value.map(sanitizeImportedValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key.replace(/\u0000/g, ''),
+        sanitizeImportedValue(nestedValue),
+      ]),
+    );
+  }
+  return value;
+}
+
 async function getPropertyNumbersById(propertyIds: string[]): Promise<Map<string, string>> {
   const uniqueIds = [...new Set(propertyIds.filter(Boolean))];
   if (uniqueIds.length === 0) return new Map();
@@ -2127,8 +2141,11 @@ export async function recordRoutes(app: FastifyInstance) {
     });
     if (!object) return reply.code(404).send({ error: 'Object not found' });
 
-    const isPropertyImport = apiName.toLowerCase() === 'property';
-    const tracksSalesforceIds = isPropertyImport || ['punchlist', 'perdiem'].includes(apiName.toLowerCase());
+    const normalizedApiName = apiName.toLowerCase();
+    const isPropertyImport = normalizedApiName === 'property';
+    const isOpportunityImport = normalizedApiName === 'opportunity';
+    const requiresSalesforceId = ['punchlist', 'perdiem'].includes(normalizedApiName);
+    const tracksSalesforceIds = isPropertyImport || isOpportunityImport || requiresSalesforceId;
     const incomingSalesforceIds = tracksSalesforceIds
       ? rows.map((rawData) => getImportedSalesforceId(rawData, sfIdField) ?? '').filter(Boolean)
       : [];
@@ -2223,6 +2240,7 @@ export async function recordRoutes(app: FastifyInstance) {
     );
 
     let created = 0;
+    let reused = 0;
     const errors: Array<{ row: number; error: string }> = [];
     // Maps original SF Id value → newly created CRM record id
     const idMap: Record<string, string> = {};
@@ -2244,16 +2262,15 @@ export async function recordRoutes(app: FastifyInstance) {
 
     for (let i = 0; i < rows.length; i++) {
       try {
-        const rawData = rows[i]!;
+        const rawData = sanitizeImportedValue(rows[i]!) as Record<string, any>;
         const allowBlankAccountType = apiName.toLowerCase() === 'account'
           && rawData['__allowBlankAccountType'] === true;
         // Capture the original SF id before normalisation (used for idMap).
         // The frontend strips the SF Id column from the mapped record and instead
         // injects it as __sfId so it is always available regardless of column name.
         const sfIdValue = getImportedSalesforceId(rawData, sfIdField) ?? null;
-        if (tracksSalesforceIds && !sfIdValue) {
-          const requiredObject = isPropertyImport ? 'Property' : 'Punch List and Per Diem';
-          errors.push({ row: i + 1, error: `Salesforce Id is required to import ${requiredObject} records.` });
+        if (requiresSalesforceId && !sfIdValue) {
+          errors.push({ row: i + 1, error: 'Salesforce Id is required to import Punch List and Per Diem records.' });
           continue;
         }
         const normalizedSalesforceId = sfIdValue
@@ -2261,8 +2278,9 @@ export async function recordRoutes(app: FastifyInstance) {
           : undefined;
         if (tracksSalesforceIds && normalizedSalesforceId && seenSalesforceIds.has(normalizedSalesforceId)) {
           const existingRecordId = salesforceIdToRecordId.get(normalizedSalesforceId);
-          if (isPropertyImport && existingRecordId && sfIdValue) {
+          if ((isPropertyImport || isOpportunityImport) && existingRecordId && sfIdValue) {
             idMap[sfIdValue] = existingRecordId;
+            reused++;
             continue;
           }
           errors.push({ row: i + 1, error: `Duplicate Salesforce Id: ${sfIdValue}.` });
@@ -2458,7 +2476,7 @@ export async function recordRoutes(app: FastifyInstance) {
       ipAddress: extractIp(req),
     });
 
-    reply.send({ created, errors, idMap });
+    reply.send({ created, reused, errors, idMap });
   });
 
 }

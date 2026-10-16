@@ -232,6 +232,7 @@ function SearchableMappingTarget({
 
 interface ImportResult {
   created: number;
+  reused: number;
   propertiesCreated: number;
   totalRows: number;
   errors: Array<{ row: number; error: string }>;
@@ -796,6 +797,7 @@ export default function CsvImportDialog({
     // Send in batches of 200
     const BATCH_SIZE = 200;
     let totalCreated = 0;
+    let totalReused = 0;
     const totalBatches = Math.ceil(records.length / BATCH_SIZE);
     const progressOffset = objectApiName === 'Opportunity' ? 50 : 0;
     const progressScale = objectApiName === 'Opportunity' ? 50 : 100;
@@ -807,6 +809,7 @@ export default function CsvImportDialog({
       try {
         const result = await apiClient.importRecords(objectApiName, batch);
         totalCreated += result.created;
+        totalReused += result.reused ?? 0;
         // Adjust row numbers to be global
         for (const err of result.errors) {
           const sourceRow = sourceRows[offset + err.row - 1]?.sourceRow ?? offset + err.row - 1;
@@ -824,7 +827,7 @@ export default function CsvImportDialog({
     }
 
     if (totalBatches === 0) setImportProgress(100);
-    setImportResult({ created: totalCreated, propertiesCreated, totalRows: csvRows.length, errors: allErrors });
+    setImportResult({ created: totalCreated, reused: totalReused, propertiesCreated, totalRows: csvRows.length, errors: allErrors });
     setStep('results');
     if (totalCreated > 0) onImportComplete();
   };
@@ -1228,28 +1231,31 @@ export default function CsvImportDialog({
           {step === 'results' && importResult && (
             <div className="space-y-6">
               <div className={`flex items-center gap-3 p-4 rounded-lg border ${
-                importResult.created === importResult.totalRows && importResult.errors.length === 0
+                importResult.created + importResult.reused === importResult.totalRows && importResult.errors.length === 0
                   ? 'bg-green-50 border-green-200'
-                  : importResult.created > 0 || importResult.propertiesCreated > 0
+                  : importResult.created > 0 || importResult.reused > 0 || importResult.propertiesCreated > 0
                     ? 'bg-amber-50 border-amber-200'
                     : 'bg-red-50 border-red-200'
               }`}>
-                  {importResult.created === importResult.totalRows && importResult.errors.length === 0
+                  {importResult.created + importResult.reused === importResult.totalRows && importResult.errors.length === 0
                     ? <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
-                    : importResult.created > 0 || importResult.propertiesCreated > 0
+                    : importResult.created > 0 || importResult.reused > 0 || importResult.propertiesCreated > 0
                       ? <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0" />
                       : <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />}
                   <div>
                     <h3 className="font-medium text-gray-900">
-                      {importResult.created === importResult.totalRows && importResult.errors.length === 0
+                      {importResult.created + importResult.reused === importResult.totalRows && importResult.errors.length === 0
                         ? 'Import complete'
-                        : importResult.created > 0 || importResult.propertiesCreated > 0
+                        : importResult.created > 0 || importResult.reused > 0 || importResult.propertiesCreated > 0
                           ? 'Import incomplete'
                           : 'Opportunity import failed'}
                     </h3>
                     <p className="text-sm text-gray-800 mt-0.5">
-                      Imported {importResult.created} of {importResult.totalRows} {objectLabel} record{importResult.totalRows !== 1 ? 's' : ''}
+                      Imported {importResult.created + importResult.reused} of {importResult.totalRows} {objectLabel} record{importResult.totalRows !== 1 ? 's' : ''}
                     </p>
+                    {importResult.reused > 0 && (
+                      <p className="text-sm text-gray-700 mt-0.5">Reused {importResult.reused} existing record{importResult.reused !== 1 ? 's' : ''}.</p>
+                    )}
                     {importResult.propertiesCreated > 0 && (
                       <p className="text-sm text-gray-700 mt-0.5">Created {importResult.propertiesCreated} linked Property record{importResult.propertiesCreated !== 1 ? 's' : ''}.</p>
                     )}

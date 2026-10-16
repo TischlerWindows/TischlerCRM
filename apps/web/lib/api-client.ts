@@ -619,8 +619,8 @@ class ApiClient {
     objectApiName: string,
     records: Record<string, any>[],
     sfIdField?: string,
-  ): Promise<{ created: number; errors: Array<{ row: number; error: string }>; idMap: Record<string, string> }> {
-    return this.request<{ created: number; errors: Array<{ row: number; error: string }>; idMap: Record<string, string> }>(
+  ): Promise<{ created: number; reused?: number; errors: Array<{ row: number; error: string }>; idMap: Record<string, string> }> {
+    return this.request<{ created: number; reused?: number; errors: Array<{ row: number; error: string }>; idMap: Record<string, string> }>(
       `/objects/${objectApiName}/records/import`,
       {
         method: 'POST',
