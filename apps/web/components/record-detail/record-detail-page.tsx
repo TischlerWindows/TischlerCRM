@@ -288,9 +288,13 @@ export default function RecordDetailPage({
   const getRecordTitle = (): string => {
     if (!record) return '';
 
-    const numberKey = Object.keys(record).find(
-      (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k],
-    );
+    const numberKey = Object.keys(record).find((key) => {
+      const bareName = key.replace(/^[A-Za-z]+__/, '').toLowerCase();
+      const isNumberField = objectApiName.toLowerCase() === 'workorder'
+        ? bareName === 'workordernumber'
+        : bareName.includes('number');
+      return isNumberField && typeof record[key] === 'string' && record[key];
+    });
     let numberValue: string = numberKey ? record[numberKey] : '';
     // Opportunity: strip "- Requote N" suffix — the name already carries that info
     if (objectApiName === 'Opportunity' && numberValue) {
