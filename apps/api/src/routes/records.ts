@@ -2213,12 +2213,26 @@ export async function recordRoutes(app: FastifyInstance) {
         const sfIdValue = originalSfId === undefined || originalSfId === null || String(originalSfId).trim() === ''
           ? null
           : String(originalSfId).trim();
+        if (tracksSalesforceIds && !sfIdValue) {
+          errors.push({ row: i + 1, error: 'Salesforce Id is required to import Punch List and Per Diem records.' });
+          continue;
+        }
         const normalizedSalesforceId = sfIdValue
           ? normalizeSalesforceIdForComparison(sfIdValue)
           : undefined;
         if (tracksSalesforceIds && normalizedSalesforceId && seenSalesforceIds.has(normalizedSalesforceId)) {
           errors.push({ row: i + 1, error: `Duplicate Salesforce Id: ${sfIdValue}.` });
           continue;
+        }
+        if (tracksSalesforceIds && sfIdValue) {
+          const existingIdRecord = await prisma.record.findUnique({
+            where: { id: sfIdValue },
+            select: { objectId: true },
+          });
+          if (existingIdRecord) {
+            errors.push({ row: i + 1, error: `Salesforce Id already exists: ${sfIdValue}.` });
+            continue;
+          }
         }
 
         // Normalize keys, excluding the internal __sfId sentinel
