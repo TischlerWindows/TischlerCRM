@@ -131,6 +131,33 @@ function getPropertyNumber(data: unknown): string | undefined {
   return undefined;
 }
 
+function normalizeSalesforceIdForComparison(value: string): string {
+  const id = value.trim();
+  if (!/^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$/.test(id)) return id.toLowerCase();
+  if (id.length === 18) return id.toUpperCase();
+
+  const checksumChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+  let checksum = '';
+  for (let block = 0; block < 3; block++) {
+    let uppercaseMask = 0;
+    for (let position = 0; position < 5; position++) {
+      const character = id[block * 5 + position]!;
+      if (character >= 'A' && character <= 'Z') uppercaseMask |= 1 << position;
+    }
+    checksum += checksumChars[uppercaseMask];
+  }
+  return `${id}${checksum}`.toUpperCase();
+}
+
+function getSalesforceIdLookupCandidates(value: string): string[] {
+  const id = value.trim();
+  if (/^[A-Za-z0-9]{15}$/.test(id)) {
+    return [id, normalizeSalesforceIdForComparison(id)];
+  }
+  if (/^[A-Za-z0-9]{18}$/.test(id)) return [id, id.slice(0, 15)];
+  return [id];
+}
+
 async function getPropertyNumbersById(propertyIds: string[]): Promise<Map<string, string>> {
   const uniqueIds = [...new Set(propertyIds.filter(Boolean))];
   if (uniqueIds.length === 0) return new Map();
@@ -2070,11 +2097,14 @@ export async function recordRoutes(app: FastifyInstance) {
       : [];
     const seenSalesforceIds = new Set<string>();
     if (incomingSalesforceIds.length > 0) {
+      const lookupCandidates = [...new Set(incomingSalesforceIds.flatMap(getSalesforceIdLookupCandidates))];
       const existingRecords = await prisma.record.findMany({
-        where: { objectId: object.id, id: { in: incomingSalesforceIds, mode: 'insensitive' } },
+        where: { objectId: object.id, id: { in: lookupCandidates, mode: 'insensitive' } },
         select: { id: true },
       });
-      for (const existing of existingRecords) seenSalesforceIds.add(existing.id.toLowerCase());
+      for (const existing of existingRecords) {
+        seenSalesforceIds.add(normalizeSalesforceIdForComparison(existing.id));
+      }
     }
 
     // Prepare auto-number info once
@@ -2183,7 +2213,9 @@ export async function recordRoutes(app: FastifyInstance) {
         const sfIdValue = originalSfId === undefined || originalSfId === null || String(originalSfId).trim() === ''
           ? null
           : String(originalSfId).trim();
-        const normalizedSalesforceId = sfIdValue?.toLowerCase();
+        const normalizedSalesforceId = sfIdValue
+          ? normalizeSalesforceIdForComparison(sfIdValue)
+          : undefined;
         if (tracksSalesforceIds && normalizedSalesforceId && seenSalesforceIds.has(normalizedSalesforceId)) {
           errors.push({ row: i + 1, error: `Duplicate Salesforce Id: ${sfIdValue}.` });
           continue;
@@ -2344,7 +2376,7 @@ export async function recordRoutes(app: FastifyInstance) {
         // Track SF id → new CRM id mapping for relational re-linking
         if (sfIdValue) {
           idMap[sfIdValue] = recordIdValue;
-          if (tracksSalesforceIds) seenSalesforceIds.add(sfIdValue.toLowerCase());
+          if (tracksSalesforceIds) seenSalesforceIds.add(normalizeSalesforceIdForComparison(sfIdValue));
         }
 
         created++;
