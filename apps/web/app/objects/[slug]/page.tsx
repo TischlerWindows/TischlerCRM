@@ -34,6 +34,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import { recordsService } from '@/lib/records-service';
+import { useInfiniteRecordList } from '@/lib/use-infinite-record-list';
 import { apiClient } from '@/lib/api-client';
 import { formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
@@ -52,8 +53,6 @@ interface CustomRecord {
   [key: string]: any;
 }
 
-const RECORDS_PAGE_SIZE = 100;
-
 export default function CustomObjectRecordsPage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -64,13 +63,6 @@ export default function CustomObjectRecordsPage() {
   const [records, setRecords] = useState<CustomRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [recordsError, setRecordsError] = useState<string | null>(null);
-  const [recordsOffset, setRecordsOffset] = useState(0);
-  const [hasMoreRecords, setHasMoreRecords] = useState(true);
-  const [loadingMoreRecords, setLoadingMoreRecords] = useState(false);
-  const [loadMoreError, setLoadMoreError] = useState(false);
-  const mainContentRef = useRef<HTMLDivElement>(null);
-  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
-  const loadingMoreRef = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
@@ -160,6 +152,13 @@ export default function CustomObjectRecordsPage() {
     objectApiName: objectDef?.apiName ?? slug,
     onViewChange: handleListViewChange,
   });
+  const customObjectPaging = useInfiniteRecordList({
+    objectApiName: objectDef?.apiName ?? slug,
+    records,
+    setRecords,
+    loading,
+    enabled: sidebarFilter === 'all' && listViews.activeView.id === 'all-records',
+  });
 
   // Load schema on mount
   useEffect(() => {
@@ -177,13 +176,9 @@ export default function CustomObjectRecordsPage() {
         const apiName = objectDef?.apiName || slug;
         setRecords([]);
         setRecordsError(null);
-        setRecordsOffset(0);
-        setHasMoreRecords(true);
-        const apiRecords = await apiClient.getRecords(apiName, { limit: RECORDS_PAGE_SIZE, offset: 0 });
+        const apiRecords = await apiClient.getRecords(apiName, { limit: 50, offset: 0 });
         if (cancelled) return;
         setRecords(apiRecords.map((record: any) => recordsService.flattenRecord(record) as CustomRecord));
-        setRecordsOffset(apiRecords.length);
-        setHasMoreRecords(apiRecords.length === RECORDS_PAGE_SIZE);
       } catch (error) {
         console.error('Failed to load records from API:', error);
         if (!cancelled) setRecordsError('Could not load records. Please try again.');
@@ -194,47 +189,6 @@ export default function CustomObjectRecordsPage() {
     loadRecords();
     return () => { cancelled = true; };
   }, [storageKey, slug, objectDef]);
-
-  const canLoadAllRecords = sidebarFilter === 'all' && listViews.activeView.id === 'all-records';
-  const loadMoreRecords = useCallback(async () => {
-    if (!canLoadAllRecords || !hasMoreRecords || loadingMoreRef.current) return;
-    loadingMoreRef.current = true;
-    setLoadingMoreRecords(true);
-    setLoadMoreError(false);
-    try {
-      const apiName = objectDef?.apiName || slug;
-      const apiRecords = await apiClient.getRecords(apiName, {
-        limit: RECORDS_PAGE_SIZE,
-        offset: recordsOffset,
-      });
-      const flatRecords = apiRecords.map((record: any) => recordsService.flattenRecord(record) as CustomRecord);
-      setRecords((current) => {
-        const currentIds = new Set(current.map((record) => record.id));
-        return [...current, ...flatRecords.filter((record) => !currentIds.has(record.id))];
-      });
-      setRecordsOffset((offset) => offset + apiRecords.length);
-      setHasMoreRecords(apiRecords.length === RECORDS_PAGE_SIZE);
-    } catch (error) {
-      console.error('Failed to load more records:', error);
-      setLoadMoreError(true);
-    } finally {
-      loadingMoreRef.current = false;
-      setLoadingMoreRecords(false);
-    }
-  }, [canLoadAllRecords, hasMoreRecords, objectDef, recordsOffset, slug]);
-
-  useEffect(() => {
-    const sentinel = loadMoreSentinelRef.current;
-    const root = mainContentRef.current;
-    if (!sentinel || !root || loading || !canLoadAllRecords || !hasMoreRecords
-      || loadingMoreRecords || loadMoreError || typeof IntersectionObserver === 'undefined') return;
-
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) void loadMoreRecords();
-    }, { root, rootMargin: '400px 0px' });
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [canLoadAllRecords, hasMoreRecords, loadMoreError, loadMoreRecords, loading, loadingMoreRecords]);
 
   // Load visible columns from preferences
   useEffect(() => {
@@ -677,7 +631,7 @@ export default function CustomObjectRecordsPage() {
         </div>
 
         {/* Main Content */}
-        <div ref={mainContentRef} className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto">
       <div className="px-6 py-6">
         {/* Actions */}
         <div className="mb-6 flex justify-between items-center">
@@ -709,7 +663,7 @@ export default function CustomObjectRecordsPage() {
           </div>
         </div>
 
-        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} objectApiName={objectDef?.apiName ?? slug} pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
 
         {recordsError && (
           <div role="alert" className="my-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -838,15 +792,7 @@ export default function CustomObjectRecordsPage() {
           </div>
         )}
 
-        <div ref={loadMoreSentinelRef} aria-live="polite" className="flex min-h-10 items-center justify-center py-3 text-sm text-gray-500">
-          {canLoadAllRecords && loadingMoreRecords && 'Loading more records...'}
-          {canLoadAllRecords && loadMoreError && (
-            <button type="button" onClick={() => void loadMoreRecords()} className="text-brand-navy underline">
-              Could not load more records. Retry
-            </button>
-          )}
-          {canLoadAllRecords && !hasMoreRecords && records.length > 0 && 'All records loaded.'}
-        </div>
+        {customObjectPaging.footer}
       </div>
 
       {/* No Page Layouts Dialog */}

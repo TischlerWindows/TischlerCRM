@@ -44,6 +44,7 @@ import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, 
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { useInfiniteRecordList } from '@/lib/use-infinite-record-list';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Installation {
@@ -270,6 +271,10 @@ export default function InstallationsPage() {
     setSortDirection(view.sortDirection);
   }, []);
   const listViews = useListViews({ objectApiName: 'Installation', onViewChange: handleListViewChange });
+  const installationPaging = useInfiniteRecordList({
+    objectApiName: 'Installation', records: installations, setRecords: setInstallations, loading,
+    enabled: sidebarFilter === 'all' && listViews.activeView.id === 'all-records',
+  });
 
   const handleSort = (columnId: string) => {
     if (listViews.activeView.id === 'recently-viewed') return;
@@ -665,7 +670,7 @@ export default function InstallationsPage() {
           </div>
         </div>
 
-        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} objectApiName="Installation" pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
 
         {/* Search */}
         <div className="mb-6">
@@ -805,6 +810,7 @@ export default function InstallationsPage() {
             </p>
           </div>
         )}
+        {installationPaging.footer}
       </div>
 
       {/* No Page Layouts Dialog */}

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pin, Plus, Save, Trash2, X } from 'lucide-react';
 import { getPreference, setPreference } from '@/lib/preferences';
 import { useAuth } from '@/lib/auth-context';
+import { apiClient } from '@/lib/api-client';
 
 export type ListViewOperator =
   | 'contains'
@@ -281,6 +282,7 @@ interface ListViewManagerProps {
   fields: ListViewField[];
   views: ListViewDefinition[];
   activeView: ListViewDefinition;
+  objectApiName?: string;
   recordCount?: number | null;
   pinnedViewId: string | null;
   canManage: boolean;
@@ -307,6 +309,7 @@ export function ListViewManager({
   fields,
   views,
   activeView,
+  objectApiName,
   recordCount,
   pinnedViewId,
   canManage,
@@ -318,9 +321,19 @@ export function ListViewManager({
   const [editingMode, setEditingMode] = useState<'new' | 'filter' | 'sort' | null>(null);
   const [draft, setDraft] = useState<ListViewDefinition>(activeView);
   const [error, setError] = useState('');
+  const [fetchedRecordCount, setFetchedRecordCount] = useState<number | null>(null);
   const sortedFields = [...fields].sort((left, right) =>
     left.label.localeCompare(right.label, undefined, { sensitivity: 'base', numeric: true }),
   );
+
+  useEffect(() => {
+    if (!objectApiName || recordCount != null) return;
+    let cancelled = false;
+    void apiClient.getRecordCount(objectApiName)
+      .then(({ count }) => { if (!cancelled) setFetchedRecordCount(count); })
+      .catch(() => { if (!cancelled) setFetchedRecordCount(null); });
+    return () => { cancelled = true; };
+  }, [objectApiName, recordCount]);
 
   const openNew = () => {
     setDraft({ id: '', name: '', filters: [], sortField: null, sortDirection: 'asc' });
@@ -378,9 +391,9 @@ export function ListViewManager({
           >
             <Pin className="h-4 w-4" />
           </button>
-          {activeView.id === ALL_RECORDS_VIEW.id && recordCount != null && (
+          {activeView.id === ALL_RECORDS_VIEW.id && (recordCount ?? fetchedRecordCount) != null && (
             <span className="whitespace-nowrap text-sm text-gray-500">
-              ({recordCount.toLocaleString()} records)
+              ({(recordCount ?? fetchedRecordCount)!.toLocaleString()} records)
             </span>
           )}
         </div>

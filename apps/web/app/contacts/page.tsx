@@ -46,6 +46,7 @@ import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, 
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { useInfiniteRecordList } from '@/lib/use-infinite-record-list';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Contact {
@@ -365,6 +366,13 @@ export default function ContactsPage() {
     setSortDirection(view.sortDirection);
   }, []);
   const listViews = useListViews({ objectApiName: 'Contact', onViewChange: handleListViewChange });
+  const contactPaging = useInfiniteRecordList({
+    objectApiName: 'Contact',
+    records: contacts,
+    setRecords: setContacts,
+    loading,
+    enabled: sidebarFilter === 'all' && listViews.activeView.id === 'all-records',
+  });
 
   const handleSort = (columnId: string) => {
     if (listViews.activeView.id === 'recently-viewed') return;
@@ -715,7 +723,7 @@ export default function ContactsPage() {
             )}
           </div>
         </div>
-        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} objectApiName="Contact" pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
         <div className="mb-6 flex gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -905,6 +913,7 @@ export default function ContactsPage() {
             <p className="text-gray-600">{searchTerm ? 'Try adjusting your search.' : 'Get started by creating your first contact.'}</p>
           </div>
         )}
+        {contactPaging.footer}
       </div>
       {showNoLayoutsDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

@@ -883,6 +883,7 @@ export default function ProjectsPage() {
           fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))}
           views={listViews.views}
           activeView={listViews.activeView}
+          objectApiName="Project"
           recordCount={projectCount}
           pinnedViewId={listViews.pinnedViewId}
           canManage={hasAppPermission('manageListViews')}

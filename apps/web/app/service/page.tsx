@@ -44,6 +44,7 @@ import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, 
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { useInfiniteRecordList } from '@/lib/use-infinite-record-list';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Service {
@@ -242,6 +243,10 @@ export default function ServicePage() {
     setSortDirection(view.sortDirection);
   }, []);
   const listViews = useListViews({ objectApiName: 'Service', onViewChange: handleListViewChange });
+  const servicePaging = useInfiniteRecordList({
+    objectApiName: 'Service', records: services, setRecords: setServices, loading,
+    enabled: sidebarFilter === 'all' && listViews.activeView.id === 'all-records',
+  });
 
   const handleSort = (columnId: string) => {
     if (listViews.activeView.id === 'recently-viewed') return;
@@ -684,7 +689,7 @@ export default function ServicePage() {
           </div>
         </div>
 
-        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} objectApiName="Service" pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
 
         {/* Search */}
         <div className="mb-6">
@@ -832,6 +837,7 @@ export default function ServicePage() {
             </p>
           </div>
         )}
+        {servicePaging.footer}
       </div>
 
       {/* No Page Layouts Dialog */}

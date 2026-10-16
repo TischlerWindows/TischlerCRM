@@ -45,6 +45,7 @@ import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, 
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { useInfiniteRecordList } from '@/lib/use-infinite-record-list';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Account {
@@ -208,6 +209,13 @@ export default function AccountsPage() {
     setSortDirection(view.sortDirection);
   }, []);
   const listViews = useListViews({ objectApiName: 'Account', onViewChange: handleListViewChange });
+  const accountPaging = useInfiniteRecordList({
+    objectApiName: 'Account',
+    records: accounts,
+    setRecords: setAccounts,
+    loading,
+    enabled: sidebarFilter === 'all' && listViews.activeView.id === 'all-records',
+  });
 
 
 
@@ -732,6 +740,7 @@ export default function AccountsPage() {
           fields={AVAILABLE_COLUMNS_DYNAMIC.map(column => ({ id: column.id, label: column.label }))}
           views={listViews.views}
           activeView={listViews.activeView}
+          objectApiName="Account"
           pinnedViewId={listViews.pinnedViewId}
           canManage={hasAppPermission('manageListViews')}
           onSelect={listViews.selectView}
@@ -885,6 +894,7 @@ export default function AccountsPage() {
             </p>
           </div>
         )}
+        {accountPaging.footer}
       </div>
 
       {/* No Page Layouts Dialog */}

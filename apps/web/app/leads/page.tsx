@@ -44,6 +44,7 @@ import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, 
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { useInfiniteRecordList } from '@/lib/use-infinite-record-list';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Lead {
@@ -255,6 +256,10 @@ export default function LeadsPage() {
     setSortDirection(view.sortDirection);
   }, []);
   const listViews = useListViews({ objectApiName: 'Lead', onViewChange: handleListViewChange });
+  const leadPaging = useInfiniteRecordList({
+    objectApiName: 'Lead', records: leads, setRecords: setLeads, loading,
+    enabled: sidebarFilter === 'all' && listViews.activeView.id === 'all-records',
+  });
 
   const handleSort = (columnId: string) => {
     if (listViews.activeView.id === 'recently-viewed') return;
@@ -727,7 +732,7 @@ export default function LeadsPage() {
           </div>
         </div>
 
-        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} objectApiName="Lead" pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
 
         {/* Search */}
         <div className="mb-6">
@@ -876,6 +881,7 @@ export default function LeadsPage() {
             </p>
           </div>
         )}
+        {leadPaging.footer}
       </div>
 
       {/* No Page Layouts Dialog */}

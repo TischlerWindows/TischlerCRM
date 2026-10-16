@@ -40,6 +40,7 @@ import { applyFilters, describeCondition } from '@/lib/filter-utils';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { recordsService } from '@/lib/records-service';
+import { useInfiniteRecordList } from '@/lib/use-infinite-record-list';
 import { getPreference, setPreference } from '@/lib/preferences';
 
 interface TaskRecord {
@@ -233,6 +234,10 @@ export default function TasksPage() {
     setSortDirection(view.sortDirection);
   }, []);
   const listViews = useListViews({ objectApiName: 'Task', onViewChange: handleListViewChange });
+  const taskPaging = useInfiniteRecordList({
+    objectApiName: 'Task', records: tasks, setRecords: setTasks, loading,
+    enabled: sidebarFilter === 'all' && listViews.activeView.id === 'all-records',
+  });
 
   const handleSort = (columnId: string) => {
     if (listViews.activeView.id === 'recently-viewed') return;
@@ -546,7 +551,7 @@ export default function TasksPage() {
             </div>
           </div>
 
-          <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
+          <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} objectApiName="Task" pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
           <div className="mb-6 flex gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -723,6 +728,7 @@ export default function TasksPage() {
               <p className="text-gray-600">{searchTerm ? 'Try adjusting your search.' : 'Get started by creating your first task.'}</p>
             </div>
           )}
+          {taskPaging.footer}
         </div>
 
         {/* No layouts dialog */}
