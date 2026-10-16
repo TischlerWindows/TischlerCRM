@@ -44,22 +44,30 @@ function formatYearScopedNumber(year: number, sequence: number): string {
   return `${String(year % 100).padStart(2, '0')}${String(sequence).padStart(3, '0')}`;
 }
 
-async function getOpportunityLookupFieldApiName(childObjectId: string): Promise<string | undefined> {
-  const opportunityObject = await prisma.customObject.findFirst({
-    where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+async function getRelatedLookupFieldApiName(
+  childObjectId: string,
+  parentObjectApiName: string,
+): Promise<string | undefined> {
+  const parentObject = await prisma.customObject.findFirst({
+    where: { apiName: { equals: parentObjectApiName, mode: 'insensitive' } },
   });
-  if (!opportunityObject) return undefined;
+  if (!parentObject) return undefined;
   const relationship = await prisma.relationship.findFirst({
-    where: { childObjectId, parentObjectId: opportunityObject.id },
+    where: { childObjectId, parentObjectId: parentObject.id },
     include: { field: { select: { apiName: true } } },
   });
   return relationship?.field.apiName;
+}
+
+async function getOpportunityLookupFieldApiName(childObjectId: string): Promise<string | undefined> {
+  return getRelatedLookupFieldApiName(childObjectId, 'Opportunity');
 }
 
 function getOpportunityLookupRecordId(
   data: Record<string, unknown>,
   objectApiName: string,
   fieldApiName: string | undefined,
+  relatedObjectApiName = 'Opportunity',
 ): string | undefined {
   if (fieldApiName) {
     const bareName = fieldApiName.replace(/^[A-Za-z]+__/, '');
@@ -74,7 +82,7 @@ function getOpportunityLookupRecordId(
 
   const fallback = Object.entries(data).find(([key, value]) => {
     const bareName = key.replace(/^[A-Za-z]+__/, '').toLowerCase();
-    return bareName.includes('opportunity')
+    return bareName.includes(relatedObjectApiName.toLowerCase())
       && !bareName.includes('number')
       && !bareName.includes('name')
       && (typeof value === 'string' || (value !== null && typeof value === 'object'));
@@ -110,6 +118,32 @@ async function getOpportunityNumbersById(opportunityIds: string[]): Promise<Map<
   });
   return new Map(records.flatMap((record) => {
     const number = getOpportunityNumber(record.data);
+    return number ? [[record.id, number] as [string, string]] : [];
+  }));
+}
+
+function getPropertyNumber(data: unknown): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    if (key.replace(/^[A-Za-z]+__/, '').toLowerCase() === 'propertynumber'
+      && typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+async function getPropertyNumbersById(propertyIds: string[]): Promise<Map<string, string>> {
+  const uniqueIds = [...new Set(propertyIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return new Map();
+  const propertyObject = await prisma.customObject.findFirst({
+    where: { apiName: { equals: 'Property', mode: 'insensitive' } },
+  });
+  if (!propertyObject) return new Map();
+  const records = await prisma.record.findMany({
+    where: { objectId: propertyObject.id, id: { in: uniqueIds }, deletedAt: null },
+    select: { id: true, data: true },
+  });
+  return new Map(records.flatMap((record) => {
+    const number = getPropertyNumber(record.data);
     return number ? [[record.id, number] as [string, string]] : [];
   }));
 }
@@ -903,6 +937,15 @@ export async function recordRoutes(app: FastifyInstance) {
     const year = new Date().getUTCFullYear();
     const importedPropertyOpportunityNumber = normalizedData.__propertyOpportunityNumber;
     delete normalizedData.__propertyOpportunityNumber;
+    const workOrderPropertyFieldApiName = apiName.toLowerCase() === 'workorder'
+      ? await getRelatedLookupFieldApiName(object.id, 'Property')
+      : undefined;
+    const workOrderPropertyId = apiName.toLowerCase() === 'workorder'
+      ? getOpportunityLookupRecordId(normalizedData, apiName, workOrderPropertyFieldApiName, 'Property')
+      : undefined;
+    const linkedWorkOrderPropertyNumber = workOrderPropertyId
+      ? (await getPropertyNumbersById([workOrderPropertyId])).get(workOrderPropertyId)
+      : undefined;
     if (apiName.toLowerCase() === 'project') {
       const linkedOpportunityNumber = await getLinkedOpportunityNumber(normalizedData, object.id, apiName);
       let projectNumber = linkedOpportunityNumber;
@@ -920,6 +963,8 @@ export async function recordRoutes(app: FastifyInstance) {
       const bareFieldApiName = field.apiName.replace(/^[A-Za-z]+__/, '');
       const fieldApiName = field.apiName === 'Opportunity__opportunityNumber'
         ? 'opportunityNumber'
+        : field.apiName === 'WorkOrder__workOrderNumber'
+          ? 'workOrderNumber'
         : field.apiName;
       if (apiName.toLowerCase() === 'property' && bareFieldApiName === 'propertyNumber') {
         const linkedOpportunityNumber = await getLinkedOpportunityNumber(normalizedData, object.id, apiName);
@@ -958,12 +1003,14 @@ export async function recordRoutes(app: FastifyInstance) {
         }
 
         const prefix = autoNumberFormats[fieldApiName];
+        const prefixRegex = fieldApiName === 'workOrderNumber'
+          ? /(?:^|-)WO-?(\d+)$/i
+          : new RegExp(`^${prefix}-?(\\d+)$`);
         const existing = await prisma.record.findMany({
           where: { objectId: object.id, deletedAt: null },
           select: { data: true },
         });
         let maxNum = 0;
-        const prefixRegex = new RegExp(`^${prefix}-?(\\d+)$`);
         for (const rec of existing) {
           const recData = rec.data as Record<string, any> | null;
           if (!recData) continue;
@@ -979,7 +1026,10 @@ export async function recordRoutes(app: FastifyInstance) {
           }
         }
         const padWidth = (fieldApiName === 'propertyNumber' || fieldApiName === 'leadNumber' || fieldApiName === 'opportunityNumber' || fieldApiName === 'workOrderNumber' || fieldApiName === 'teamMemberNumber' || fieldApiName === 'taskNumber') ? 4 : 3;
-        const generatedNum = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
+        const workOrderSuffix = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
+        const generatedNum = fieldApiName === 'workOrderNumber' && linkedWorkOrderPropertyNumber
+          ? `${linkedWorkOrderPropertyNumber}-${workOrderSuffix}`
+          : workOrderSuffix;
         normalizedData[fieldApiName] = generatedNum;
         // Also set the prefixed key so the stored JSON is consistent
         const prefixedKey = `${apiName}__${fieldApiName}`;
@@ -1993,6 +2043,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const autoNumberFields = object.fields.filter(
       (field) => field.apiName in autoNumberFormats
         || field.apiName === 'Opportunity__opportunityNumber'
+        || (apiName.toLowerCase() === 'workorder' && field.apiName === 'WorkOrder__workOrderNumber')
         || (apiName.toLowerCase() === 'property' && field.apiName === 'Property__propertyNumber'),
     );
     if (autoNumberFields.length > 0) {
@@ -2005,6 +2056,8 @@ export async function recordRoutes(app: FastifyInstance) {
           ? 'opportunityNumber'
           : field.apiName === 'Property__propertyNumber'
             ? 'propertyNumber'
+            : field.apiName === 'WorkOrder__workOrderNumber'
+              ? 'workOrderNumber'
           : field.apiName;
         if (fieldApiName === 'propertyNumber') {
           existingPropertyNumbers = getPropertyNumbers(existing);
@@ -2015,7 +2068,9 @@ export async function recordRoutes(app: FastifyInstance) {
           continue;
         }
         const prefix = autoNumberFormats[fieldApiName]!;
-        const prefixRegex = fieldApiName === 'propertyNumber'
+        const prefixRegex = fieldApiName === 'workOrderNumber'
+          ? /(?:^|-)WO-?(\d+)$/i
+          : fieldApiName === 'propertyNumber'
           ? /^[A-Za-z]+-?(\d+)$/
           : new RegExp(`^${prefix}-?(\\d+)$`);
         let maxNum = 0;
@@ -2038,6 +2093,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const requiredFields = object.fields.filter(
       f => f.required && !autoGeneratedFieldNames.has(f.apiName)
         && f.apiName !== 'Opportunity__opportunityNumber'
+        && !(apiName.toLowerCase() === 'workorder' && f.apiName === 'WorkOrder__workOrderNumber')
         && !(apiName.toLowerCase() === 'property' && f.apiName === 'Property__propertyNumber')
         && f.apiName.replace(/^[A-Za-z]+__/, '').toLowerCase() !== 'id'
         && f.type !== 'Lookup' && f.type !== 'ExternalLookup'
@@ -2053,6 +2109,14 @@ export async function recordRoutes(app: FastifyInstance) {
     const propertyOpportunityNumberById = apiName.toLowerCase() === 'property'
       ? await getOpportunityNumbersById(rows.map((rawData) => getOpportunityLookupRecordId(rawData ?? {}, apiName, propertyOpportunityFieldApiName) ?? ''))
       : new Map<string, string>()
+    const workOrderPropertyFieldApiName = apiName.toLowerCase() === 'workorder'
+      ? await getRelatedLookupFieldApiName(object.id, 'Property')
+      : undefined;
+    const workOrderPropertyNumberById = apiName.toLowerCase() === 'workorder'
+      ? await getPropertyNumbersById(rows.map((rawData) =>
+        getOpportunityLookupRecordId(rawData ?? {}, apiName, workOrderPropertyFieldApiName, 'Property') ?? '',
+      ))
+      : new Map<string, string>();
 
     for (let i = 0; i < rows.length; i++) {
       try {
@@ -2085,6 +2149,8 @@ export async function recordRoutes(app: FastifyInstance) {
         for (const field of autoNumberFields) {
           const fieldApiName = field.apiName === 'Opportunity__opportunityNumber'
             ? 'opportunityNumber'
+            : field.apiName === 'WorkOrder__workOrderNumber'
+              ? 'workOrderNumber'
             : field.apiName;
           if (fieldApiName === 'propertyNumber') {
             const opportunityId = getOpportunityLookupRecordId(rawData, apiName, propertyOpportunityFieldApiName)
@@ -2123,7 +2189,16 @@ export async function recordRoutes(app: FastifyInstance) {
             const prefix = autoNumberFormats[fieldApiName]!;
             const padWidth = (fieldApiName === 'propertyNumber' || fieldApiName === 'leadNumber' || fieldApiName === 'opportunityNumber' || fieldApiName === 'workOrderNumber' || fieldApiName === 'teamMemberNumber' || fieldApiName === 'taskNumber') ? 4 : 3;
             maxAutoNumbers[fieldApiName] = (maxAutoNumbers[fieldApiName] || 0) + 1;
-            const generatedNum = `${prefix}${String(maxAutoNumbers[fieldApiName]).padStart(padWidth, '0')}`;
+            const workOrderSuffix = `${prefix}${String(maxAutoNumbers[fieldApiName]).padStart(padWidth, '0')}`;
+            const workOrderPropertyId = fieldApiName === 'workOrderNumber'
+              ? getOpportunityLookupRecordId(rawData, apiName, workOrderPropertyFieldApiName, 'Property')
+              : undefined;
+            const linkedPropertyNumber = workOrderPropertyId
+              ? workOrderPropertyNumberById.get(workOrderPropertyId)
+              : undefined;
+            const generatedNum = fieldApiName === 'workOrderNumber' && linkedPropertyNumber
+              ? `${linkedPropertyNumber}-${workOrderSuffix}`
+              : workOrderSuffix;
             normalizedData[fieldApiName] = generatedNum;
             normalizedData[`${apiName}__${fieldApiName}`] = generatedNum;
           }
