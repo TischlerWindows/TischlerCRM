@@ -169,11 +169,9 @@ function detectObject(headers: string[]): string | null {
 }
 
 function detectSfIdColumn(headers: string[]): string | null {
-  // Prefer exact 'Id' or 'ID', then anything ending in 'id' that looks like SF
-  const exact = headers.find((h) => h === 'Id' || h === 'ID');
-  if (exact) return exact;
-  const sfStyle = headers.find((h) => /^[A-Z][a-z]+Id$/.test(h) === false && /^Id$/i.test(h));
-  return sfStyle ?? null;
+  return headers.find((header) =>
+    header.replace(/^\uFEFF/, '').replace(/[^a-z0-9]/gi, '').toLowerCase() === 'id',
+  ) ?? null;
 }
 
 function isNativeRecordIdField(apiName: string, objectApiName: string): boolean {
@@ -801,6 +799,7 @@ export default function SalesforceImportPage() {
       // Send in batches of 500
       const BATCH_SIZE = 500;
       const totalBatches = Math.ceil(records.length / BATCH_SIZE);
+      const sfIdColumn = entry.sfIdColumn ?? detectSfIdColumn(entry.headers);
       let totalCreated = 0;
       const allErrors: Array<{ row: number; error: string }> = [
         ...unmatchedUserErrors,
@@ -818,15 +817,15 @@ export default function SalesforceImportPage() {
         const rawBatch = sourceRows.slice(offset, offset + batch.length);
 
         // Add sfId → row mapping so the API can return idMap
-        if (entry.sfIdColumn) {
+        if (sfIdColumn) {
           batch.forEach((rec, i) => {
-            const sfId = rawBatch[i]?.row[entry.sfIdColumn!];
+            const sfId = rawBatch[i]?.row[sfIdColumn];
             if (sfId) (rec as any).__sfId = sfId;
           });
         }
 
         try {
-          const result = await apiClient.importRecords(objectApiName, batch, entry.sfIdColumn ?? undefined);
+          const result = await apiClient.importRecords(objectApiName, batch, sfIdColumn ?? undefined);
           totalCreated += result.created;
 
           // Merge returned idMap into global map

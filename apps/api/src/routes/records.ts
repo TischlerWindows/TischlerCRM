@@ -158,6 +158,28 @@ function getSalesforceIdLookupCandidates(value: string): string[] {
   return [id];
 }
 
+function getImportedSalesforceId(
+  data: Record<string, unknown>,
+  sfIdField?: string,
+): string | undefined {
+  const idHeader = Object.keys(data).find(
+    (key) => key.replace(/[^a-z0-9]/gi, '').toLowerCase() === 'id',
+  );
+  const candidates = [
+    data.__sfId,
+    sfIdField ? data[sfIdField] : undefined,
+    data.Id,
+    data.id,
+    idHeader ? data[idHeader] : undefined,
+  ];
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) continue;
+    const value = String(candidate).trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
 async function getPropertyNumbersById(propertyIds: string[]): Promise<Map<string, string>> {
   const uniqueIds = [...new Set(propertyIds.filter(Boolean))];
   if (uniqueIds.length === 0) return new Map();
@@ -2089,11 +2111,7 @@ export async function recordRoutes(app: FastifyInstance) {
 
     const tracksSalesforceIds = ['punchlist', 'perdiem'].includes(apiName.toLowerCase());
     const incomingSalesforceIds = tracksSalesforceIds
-      ? rows.map((rawData) => {
-          const value = rawData.__sfId
-            ?? (sfIdField ? rawData[sfIdField] ?? rawData.Id ?? rawData.id : rawData.Id ?? rawData.id);
-          return value == null ? '' : String(value).trim();
-        }).filter(Boolean)
+      ? rows.map((rawData) => getImportedSalesforceId(rawData, sfIdField) ?? '').filter(Boolean)
       : [];
     const seenSalesforceIds = new Set<string>();
     if (incomingSalesforceIds.length > 0) {
@@ -2207,12 +2225,7 @@ export async function recordRoutes(app: FastifyInstance) {
         // Capture the original SF id before normalisation (used for idMap).
         // The frontend strips the SF Id column from the mapped record and instead
         // injects it as __sfId so it is always available regardless of column name.
-        const originalSfId =
-          rawData['__sfId'] ??
-          (sfIdField ? (rawData[sfIdField] ?? rawData['Id'] ?? rawData['id']) : (rawData['Id'] ?? rawData['id']));
-        const sfIdValue = originalSfId === undefined || originalSfId === null || String(originalSfId).trim() === ''
-          ? null
-          : String(originalSfId).trim();
+        const sfIdValue = getImportedSalesforceId(rawData, sfIdField) ?? null;
         if (tracksSalesforceIds && !sfIdValue) {
           errors.push({ row: i + 1, error: 'Salesforce Id is required to import Punch List and Per Diem records.' });
           continue;
