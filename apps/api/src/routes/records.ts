@@ -1986,9 +1986,34 @@ export async function recordRoutes(app: FastifyInstance) {
       ipAddress: extractIp(req),
     });
 
-    await prisma.record.update({
-      where: { id: existingRecord.id },
-      data: { deletedAt: new Date(), deletedById: userId },
+    const deletedAt = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.record.update({
+        where: { id: existingRecord.id },
+        data: { deletedAt, deletedById: userId },
+      });
+
+      if (apiName.toLowerCase() !== 'workorder') return;
+
+      for (const childApiName of ['PunchList', 'PerDiem']) {
+        const childObject = await tx.customObject.findFirst({
+          where: { apiName: { equals: childApiName, mode: 'insensitive' } },
+          select: { id: true, apiName: true },
+        });
+        if (!childObject) continue;
+
+        await tx.record.updateMany({
+          where: {
+            objectId: childObject.id,
+            deletedAt: null,
+            OR: [
+              { data: { path: ['workOrder'], equals: existingRecord.id } },
+              { data: { path: [`${childObject.apiName}__workOrder`], equals: existingRecord.id } },
+            ],
+          },
+          data: { deletedAt, deletedById: userId },
+        });
+      }
     });
 
     reply.code(204).send();
