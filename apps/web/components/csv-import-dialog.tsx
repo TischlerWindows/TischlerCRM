@@ -4,7 +4,7 @@ import { useState, useRef, useMemo, useCallback, useEffect, useId } from 'react'
 import { createPortal } from 'react-dom';
 import Papa from 'papaparse';
 import {
-  X, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, Check,
+  X, Upload, FileSpreadsheet, ArrowRight, ArrowLeft, Check, AlertTriangle,
   AlertCircle, CheckCircle, Loader2, Download, Search, ChevronDown
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
@@ -34,6 +34,7 @@ import {
 import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
+  getGeneratedPropertySalesforceId,
   geocodeMissingPropertyCoordinates,
   isSalesforceProjectAddressColumn,
 } from '@/lib/salesforce-opportunity-property';
@@ -624,6 +625,7 @@ export default function CsvImportDialog({
     const propertyIdsByRow = new Map<number, string>();
     const failedPropertyRows = new Set<number>();
     let propertiesCreated = 0;
+    const sourceIdColumn = csvHeaders.find(isNativeRecordIdColumn);
 
     if (objectApiName === 'Opportunity') {
       const propertyRows: Array<{ sourceRow: number; token: string; record: Record<string, unknown> }> = [];
@@ -636,7 +638,16 @@ export default function CsvImportDialog({
           if (property.geocodingWarning) {
             allErrors.push({ row: sourceRow + 1, error: `Property created without map coordinates: ${property.geocodingWarning}` });
           }
-          const token = `generated-property-${crypto.randomUUID()}`;
+          const sourceOpportunityId = sourceIdColumn ? row[sourceIdColumn]?.trim() : '';
+          const token = getGeneratedPropertySalesforceId(sourceOpportunityId);
+          if (!token) {
+            failedPropertyRows.add(sourceRow);
+            allErrors.push({
+              row: sourceRow + 1,
+              error: 'Opportunity skipped: Salesforce Opportunity Id is required to create a deduplicated Property.',
+            });
+            continue;
+          }
           propertyRows.push({ sourceRow, token, record: { ...property.data, __sfId: token } });
           continue;
         }
@@ -655,9 +666,9 @@ export default function CsvImportDialog({
           const result = await apiClient.importRecords('Property', batch.map(({ record }) => record));
           propertiesCreated += result.created;
           const importedRows = new Set<number>();
-          for (const [token, propertyId] of Object.entries(result.idMap ?? {})) {
-            const imported = batch.find((item) => item.token === token);
-            if (!imported) continue;
+          for (const imported of batch) {
+            const propertyId = result.idMap?.[imported.token];
+            if (!propertyId) continue;
             propertyIdsByRow.set(imported.sourceRow, propertyId);
             importedRows.add(imported.sourceRow);
           }
@@ -696,7 +707,6 @@ export default function CsvImportDialog({
     const sourceRows = csvRows
       .map((row, sourceRow) => ({ row, sourceRow }))
       .filter(({ sourceRow }) => !failedPropertyRows.has(sourceRow));
-    const sourceIdColumn = csvHeaders.find(isNativeRecordIdColumn);
     const records = sourceRows.map(({ row, sourceRow }) => {
       const mapped: Record<string, any> = {};
       const sourceId = sourceIdColumn ? row[sourceIdColumn]?.trim() : '';

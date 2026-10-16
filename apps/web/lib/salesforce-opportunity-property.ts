@@ -34,6 +34,32 @@ export function isSalesforceProjectAddressColumn(header: string): boolean {
   return Object.values(SALESFORCE_ADDRESS_FIELDS).some((field) => normalized.endsWith(normalizeHeader(field)))
 }
 
+export function getGeneratedPropertySalesforceId(opportunitySalesforceId: string | undefined): string | null {
+  const sourceId = opportunitySalesforceId?.trim()
+  if (!sourceId) return null
+
+  const normalizedId = /^[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?$/.test(sourceId)
+    ? normalizeSalesforceId(sourceId)
+    : sourceId.toLowerCase()
+  return `generated-property-${normalizedId}`
+}
+
+function normalizeSalesforceId(value: string): string {
+  if (value.length === 18) return value.toUpperCase()
+
+  const checksumCharacters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345'
+  let checksum = ''
+  for (let block = 0; block < 3; block++) {
+    let uppercaseMask = 0
+    for (let position = 0; position < 5; position++) {
+      const character = value[block * 5 + position]!
+      if (character >= 'A' && character <= 'Z') uppercaseMask |= 1 << position
+    }
+    checksum += checksumCharacters[uppercaseMask]
+  }
+  return `${value}${checksum}`.toUpperCase()
+}
+
 function normalizeHeader(header: string): string {
   return header.toLowerCase().replace(/[^a-z0-9]/g, '')
 }

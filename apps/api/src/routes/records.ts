@@ -2127,11 +2127,13 @@ export async function recordRoutes(app: FastifyInstance) {
     });
     if (!object) return reply.code(404).send({ error: 'Object not found' });
 
-    const tracksSalesforceIds = ['punchlist', 'perdiem'].includes(apiName.toLowerCase());
+    const isPropertyImport = apiName.toLowerCase() === 'property';
+    const tracksSalesforceIds = isPropertyImport || ['punchlist', 'perdiem'].includes(apiName.toLowerCase());
     const incomingSalesforceIds = tracksSalesforceIds
       ? rows.map((rawData) => getImportedSalesforceId(rawData, sfIdField) ?? '').filter(Boolean)
       : [];
     const seenSalesforceIds = new Set<string>();
+    const salesforceIdToRecordId = new Map<string, string>();
     if (incomingSalesforceIds.length > 0) {
       const lookupCandidates = [...new Set(incomingSalesforceIds.flatMap(getSalesforceIdLookupCandidates))];
       const existingRecords = await prisma.record.findMany({
@@ -2139,7 +2141,9 @@ export async function recordRoutes(app: FastifyInstance) {
         select: { id: true },
       });
       for (const existing of existingRecords) {
-        seenSalesforceIds.add(normalizeSalesforceIdForComparison(existing.id));
+        const normalizedId = normalizeSalesforceIdForComparison(existing.id);
+        seenSalesforceIds.add(normalizedId);
+        salesforceIdToRecordId.set(normalizedId, existing.id);
       }
     }
 
@@ -2248,13 +2252,19 @@ export async function recordRoutes(app: FastifyInstance) {
         // injects it as __sfId so it is always available regardless of column name.
         const sfIdValue = getImportedSalesforceId(rawData, sfIdField) ?? null;
         if (tracksSalesforceIds && !sfIdValue) {
-          errors.push({ row: i + 1, error: 'Salesforce Id is required to import Punch List and Per Diem records.' });
+          const requiredObject = isPropertyImport ? 'Property' : 'Punch List and Per Diem';
+          errors.push({ row: i + 1, error: `Salesforce Id is required to import ${requiredObject} records.` });
           continue;
         }
         const normalizedSalesforceId = sfIdValue
           ? normalizeSalesforceIdForComparison(sfIdValue)
           : undefined;
         if (tracksSalesforceIds && normalizedSalesforceId && seenSalesforceIds.has(normalizedSalesforceId)) {
+          const existingRecordId = salesforceIdToRecordId.get(normalizedSalesforceId);
+          if (isPropertyImport && existingRecordId && sfIdValue) {
+            idMap[sfIdValue] = existingRecordId;
+            continue;
+          }
           errors.push({ row: i + 1, error: `Duplicate Salesforce Id: ${sfIdValue}.` });
           continue;
         }
@@ -2424,7 +2434,11 @@ export async function recordRoutes(app: FastifyInstance) {
         // Track SF id → new CRM id mapping for relational re-linking
         if (sfIdValue) {
           idMap[sfIdValue] = recordIdValue;
-          if (tracksSalesforceIds) seenSalesforceIds.add(normalizeSalesforceIdForComparison(sfIdValue));
+          if (tracksSalesforceIds) {
+            const normalizedId = normalizeSalesforceIdForComparison(sfIdValue);
+            seenSalesforceIds.add(normalizedId);
+            salesforceIdToRecordId.set(normalizedId, recordIdValue);
+          }
         }
 
         created++;

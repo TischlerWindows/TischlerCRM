@@ -48,6 +48,7 @@ import {
 import {
   buildPropertyImportDataFromOpportunity,
   GENERATED_PROPERTY_FIELD_MAPPINGS,
+  getGeneratedPropertySalesforceId,
   geocodeMissingPropertyCoordinates,
   isSalesforceProjectAddressColumn,
 } from '@/lib/salesforce-opportunity-property';
@@ -608,7 +609,14 @@ export default function SalesforceImportPage() {
               error: `Property created without map coordinates: ${property.geocodingWarning}`,
             });
           }
-          const token = `generated-property-${crypto.randomUUID()}`;
+          const sourceOpportunityId = entry.sfIdColumn ? row[entry.sfIdColumn]?.trim() : '';
+          const token = getGeneratedPropertySalesforceId(sourceOpportunityId);
+          if (!token) {
+            const message = 'Salesforce Opportunity Id is required to create a deduplicated Property.';
+            failedPropertyRows.set(opportunityRowIndex, message);
+            generatedPropertyErrors.push({ row: opportunityRowIndex + 1, error: message });
+            continue;
+          }
           propertyRows.push({
             opportunityRowIndex,
             token,
@@ -623,9 +631,9 @@ export default function SalesforceImportPage() {
             const result = await apiClient.importRecords('Property', batch.map(({ record }) => record));
             generatedProperties += result.created;
             const importedRows = new Set<number>();
-            for (const [token, propertyId] of Object.entries(result.idMap ?? {})) {
-              const imported = batch.find((item) => item.token === token);
-              if (!imported) continue;
+            for (const imported of batch) {
+              const propertyId = result.idMap?.[imported.token];
+              if (!propertyId) continue;
               generatedPropertyIds.set(imported.opportunityRowIndex, propertyId);
               importedRows.add(imported.opportunityRowIndex);
             }
