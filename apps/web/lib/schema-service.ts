@@ -806,18 +806,32 @@ class LocalStorageSchemaService implements SchemaService {
 
   private migrateYearBasedObjectNumberFormats(schema: OrgSchema): OrgSchema {
     let changed = false;
-    const yearBasedNumberFields: Record<string, string> = {
-      Opportunity: 'opportunityNumber',
-      Project: 'projectNumber',
-    };
     const objects = schema.objects.map((object) => {
-      const fieldName = yearBasedNumberFields[object.apiName];
+      const fieldName = object.apiName === 'Opportunity'
+        ? 'opportunityNumber'
+        : object.apiName === 'Project'
+          ? 'projectNumber'
+          : undefined;
       if (!fieldName) return object;
       let objectChanged = false;
       const fields = object.fields.map((field) => {
         const bareApiName = field.apiName.replace(/^[A-Za-z]+__/, '');
-        if (bareApiName !== fieldName || field.type !== 'AutoNumber' || !field.autoNumber
-          || field.autoNumber.displayFormat === '{00000}') return field;
+        if (bareApiName !== fieldName) return field;
+        if (object.apiName === 'Project') {
+          if (field.type === 'Formula' && field.formulaExpr === 'opportunity.opportunityNumber'
+            && field.formulaReturnType === 'Text' && field.readOnly && !field.autoNumber) return field;
+          const formulaField = {
+            ...field,
+            type: 'Formula',
+            formulaExpr: 'opportunity.opportunityNumber',
+            formulaReturnType: 'Text',
+            readOnly: true,
+          };
+          delete formulaField.autoNumber;
+          objectChanged = true;
+          return formulaField;
+        }
+        if (field.type !== 'AutoNumber' || !field.autoNumber || field.autoNumber.displayFormat === '{00000}') return field;
         objectChanged = true;
         return { ...field, autoNumber: { ...field.autoNumber, displayFormat: '{00000}' } };
       });
@@ -3187,8 +3201,10 @@ class LocalStorageSchemaService implements SchemaService {
           id: generateId(),
           apiName: 'Project__projectNumber',
           label: 'Project Number',
-          type: 'AutoNumber',
-          autoNumber: { displayFormat: '{00000}', startingNumber: 1 }
+          type: 'Formula',
+          formulaExpr: 'opportunity.opportunityNumber',
+          formulaReturnType: 'Text',
+          readOnly: true
         },
         {
           id: generateId(),

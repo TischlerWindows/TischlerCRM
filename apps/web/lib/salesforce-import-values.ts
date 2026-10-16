@@ -13,7 +13,6 @@ export function isUserLookupType(type: string): boolean {
 
 const YEAR_BASED_SALESFORCE_NUMBER_PREFIXES: Record<string, string> = {
   opportunityNumber: 'OPP',
-  projectNumber: 'PRJ',
 }
 
 const SALESFORCE_NUMBER_PREFIXES: Record<string, string> = {

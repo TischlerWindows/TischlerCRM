@@ -11,7 +11,6 @@ import { z } from 'zod';
 const PROJECT_CHILD_OBJECTS = new Set(['AutoCad', 'CadIndexItem', 'InstallProgressItem']);
 const YEAR_SCOPED_NUMBER_PREFIXES: Record<string, string> = {
   opportunityNumber: 'OPP',
-  projectNumber: 'PRJ',
 };
 
 function getYearScopedNumberSequence(
@@ -112,6 +111,35 @@ async function getOpportunityNumbersById(opportunityIds: string[]): Promise<Map<
     const number = getOpportunityNumber(record.data);
     return number ? [[record.id, number] as [string, string]] : [];
   }));
+}
+
+async function addProjectNumberFormula<T extends { data: unknown }>(
+  records: T[],
+  objectApiName: string,
+  objectId: string,
+): Promise<T[]> {
+  if (objectApiName.toLowerCase() !== 'project' || records.length === 0) return records;
+  const lookupFieldApiName = await getOpportunityLookupFieldApiName(objectId);
+  const linkedOpportunityIds = records.map((record) => {
+    const data = record.data && typeof record.data === 'object'
+      ? record.data as Record<string, unknown>
+      : {};
+    return getOpportunityLookupRecordId(data, objectApiName, lookupFieldApiName) ?? '';
+  });
+  const opportunityNumbers = await getOpportunityNumbersById(linkedOpportunityIds);
+
+  return records.map((record, index) => {
+    const data = record.data && typeof record.data === 'object'
+      ? record.data as Record<string, unknown>
+      : {};
+    const opportunityId = linkedOpportunityIds[index];
+    const projectNumber = opportunityId ? opportunityNumbers.get(opportunityId) ?? '' : '';
+    const { projectNumber: _legacyNumber, Project__projectNumber: _legacyPrefixedNumber, ...otherData } = data;
+    return {
+      ...record,
+      data: { ...otherData, projectNumber, Project__projectNumber: projectNumber },
+    } as T;
+  });
 }
 
 function getMaxStandalonePropertySequence(records: Array<{ data: unknown }>): number {
@@ -699,7 +727,7 @@ export async function recordRoutes(app: FastifyInstance) {
       }).slice(offset, offset + limit);
     }
 
-    reply.send(result);
+    reply.send(await addProjectNumberFormula(result, apiName, object.id));
   });
 
   // Get single record — accepts either a standardized recordId or a UUID
@@ -757,7 +785,8 @@ export async function recordRoutes(app: FastifyInstance) {
       req.log.warn({ err, apiName, recordId: record.id }, 'Could not resolve lookup display labels');
     }
 
-    reply.send({ ...record, lookupLabels });
+    const [recordWithFormulas] = await addProjectNumberFormula([record], apiName, object.id);
+    reply.send({ ...recordWithFormulas, lookupLabels });
   });
 
   // Create new record
@@ -808,7 +837,6 @@ export async function recordRoutes(app: FastifyInstance) {
       leadNumber: 'LEAD',
       opportunityNumber: 'OPP',
       productCode: 'PROD',
-      projectNumber: 'PRJ',
       quoteNumber: 'QTE',
       serviceNumber: 'SRV',
       installationNumber: 'INST',
@@ -1251,7 +1279,8 @@ export async function recordRoutes(app: FastifyInstance) {
       orgId: userId,
     }).catch(() => { /* non-fatal — trigger errors must not break record creation */ });
 
-    reply.code(201).send(record);
+    const [recordWithFormulas] = await addProjectNumberFormula([record], apiName, object.id);
+    reply.code(201).send(recordWithFormulas);
   });
 
   // ── Create Requote of an Opportunity ────────────────────────────────────
@@ -1772,7 +1801,8 @@ export async function recordRoutes(app: FastifyInstance) {
       orgId: userId,
     }).catch(() => { /* non-fatal */ });
 
-    reply.send(record);
+    const [recordWithFormulas] = await addProjectNumberFormula([record], apiName, object.id);
+    reply.send(recordWithFormulas);
   });
 
   app.delete('/objects/:apiName/records/:recordId', async (req, reply) => {
@@ -1876,7 +1906,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const autoNumberFormats: Record<string, string> = {
       accountNumber: 'A', propertyNumber: 'NT', contactNumber: 'C',
       leadNumber: 'LEAD', opportunityNumber: 'OPP', productCode: 'PROD',
-      projectNumber: 'PRJ', quoteNumber: 'QTE', serviceNumber: 'SRV',
+      quoteNumber: 'QTE', serviceNumber: 'SRV',
       installationNumber: 'INST', workOrderNumber: 'WO', teamMemberNumber: 'TM',
       taskNumber: 'TSK',
     };
