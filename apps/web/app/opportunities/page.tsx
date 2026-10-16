@@ -44,6 +44,7 @@ import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, 
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { apiClient } from '@/lib/api-client';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Opportunity {
@@ -94,6 +95,7 @@ const defaultTabs = DEFAULT_TAB_ORDER;
 
 export default function OpportunitiesPage() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [opportunityCount, setOpportunityCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -234,7 +236,10 @@ export default function OpportunitiesPage() {
     try {
       setLoading(true);
       setFetchError(null);
-      const records = await recordsService.getRecords('Opportunity');
+      const [records, countResult] = await Promise.all([
+        recordsService.getRecords('Opportunity'),
+        apiClient.getRecordCount('Opportunity').catch(() => null),
+      ]);
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
         opportunityNumber: record.opportunityNumber || '',
@@ -244,6 +249,7 @@ export default function OpportunitiesPage() {
         lastModifiedAt: record.updatedAt || new Date().toISOString(),
       }));
       setOpportunities(flattenedRecords as Opportunity[]);
+      if (countResult) setOpportunityCount(countResult.count);
     } catch (error) {
       console.error('Failed to fetch opportunities from API:', error);
       setFetchError('Failed to load data. Please try refreshing the page.');
@@ -572,6 +578,7 @@ export default function OpportunitiesPage() {
 
       const updatedOpps = [newOpp, ...opportunities];
       setOpportunities(updatedOpps);
+      setOpportunityCount((count) => count === null ? null : count + 1);
 
       // Return the new record ID so DynamicForm can save pending widget
       // data (e.g. team members) before navigating away.
@@ -595,6 +602,7 @@ export default function OpportunitiesPage() {
         await recordsService.deleteRecord('Opportunity', id);
         const updatedOpps = opportunities.filter(d => d.id !== id);
         setOpportunities(updatedOpps);
+        setOpportunityCount((count) => count === null ? null : Math.max(0, count - 1));
       } catch (error) {
         console.error('Failed to Delete Opportunity from API, trying locally:', error);
         const updatedOpps = opportunities.filter(d => d.id !== id);
@@ -804,7 +812,7 @@ export default function OpportunitiesPage() {
           </div>
         </div>
 
-        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
+        <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} recordCount={opportunityCount} pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
 
         {/* Search */}
         <div className="mb-6">
