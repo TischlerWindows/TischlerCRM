@@ -819,8 +819,11 @@ export default function SalesforceImportPage() {
         // Add sfId → row mapping so the API can return idMap
         if (sfIdColumn) {
           batch.forEach((rec, i) => {
-            const sfId = rawBatch[i]?.row[sfIdColumn];
-            if (sfId) (rec as any).__sfId = sfId;
+            const sfId = rawBatch[i]?.row[sfIdColumn]?.trim();
+            if (sfId) {
+              (rec as any).Id = sfId;
+              (rec as any).__sfId = sfId;
+            }
           });
         }
 

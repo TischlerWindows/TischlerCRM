@@ -166,10 +166,10 @@ function getImportedSalesforceId(
     (key) => key.replace(/[^a-z0-9]/gi, '').toLowerCase() === 'id',
   );
   const candidates = [
-    data.__sfId,
     sfIdField ? data[sfIdField] : undefined,
     data.Id,
     data.id,
+    data.__sfId,
     idHeader ? data[idHeader] : undefined,
   ];
   for (const candidate of candidates) {
