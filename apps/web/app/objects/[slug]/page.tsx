@@ -228,6 +228,9 @@ export default function CustomObjectRecordsPage() {
     if (schemaFieldForFormula?.type === 'Formula' && schemaFieldForFormula.formulaExpr) {
       const computed = evaluateFormulaForRecord(schemaFieldForFormula.formulaExpr, record as any, objectDef);
       if (computed !== null && computed !== undefined) return String(computed);
+      const formulaFieldName = schemaFieldForFormula.apiName.replace(/^[A-Za-z]+__/, '').toLowerCase();
+      if (objectDef?.apiName.toLowerCase() === 'project' && formulaFieldName === 'projectnumber'
+        && value !== null && value !== undefined) return String(value);
       return 'N/A';
     }
     

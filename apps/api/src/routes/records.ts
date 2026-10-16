@@ -113,27 +113,76 @@ async function getOpportunityNumbersById(opportunityIds: string[]): Promise<Map<
   }));
 }
 
-async function addProjectNumberFormula<T extends { data: unknown }>(
+function getStandaloneProjectNumber(data: unknown): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+    if (key.replace(/^[A-Za-z]+__/, '').toLowerCase() !== 'projectnumber' || typeof value !== 'string') continue;
+    const match = value.trim().match(/^NT-?\d+$/i);
+    if (match) return value.trim().replace('-', '').toUpperCase();
+  }
+  return undefined;
+}
+
+function getMaxStandaloneProjectSequence(records: Array<{ data: unknown }>): number {
+  let maxSequence = 0;
+  for (const record of records) {
+    const number = getStandaloneProjectNumber(record.data);
+    const sequence = number?.match(/^NT(\d+)$/i)?.[1];
+    if (sequence) maxSequence = Math.max(maxSequence, Number(sequence));
+  }
+  return maxSequence;
+}
+
+async function addProjectNumberFormula<T extends { id: string; data: unknown }>(
   records: T[],
   objectApiName: string,
   objectId: string,
 ): Promise<T[]> {
   if (objectApiName.toLowerCase() !== 'project' || records.length === 0) return records;
   const lookupFieldApiName = await getOpportunityLookupFieldApiName(objectId);
-  const linkedOpportunityIds = records.map((record) => {
-    const data = record.data && typeof record.data === 'object'
-      ? record.data as Record<string, unknown>
-      : {};
-    return getOpportunityLookupRecordId(data, objectApiName, lookupFieldApiName) ?? '';
+  const projectRecords = await prisma.record.findMany({
+    where: { objectId, deletedAt: null },
+    select: { id: true, data: true, createdAt: true },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
-  const opportunityNumbers = await getOpportunityNumbersById(linkedOpportunityIds);
+  let nextStandaloneSequence = getMaxStandaloneProjectSequence(projectRecords);
+  const standaloneNumbers = new Map<string, string>();
+  const linkedOpportunityIds = new Map<string, string>();
+
+  for (const project of projectRecords) {
+    const data = project.data && typeof project.data === 'object'
+      ? project.data as Record<string, unknown>
+      : {};
+    const opportunityId = getOpportunityLookupRecordId(data, objectApiName, lookupFieldApiName);
+    if (opportunityId) linkedOpportunityIds.set(project.id, opportunityId);
+
+    const existingNumber = getStandaloneProjectNumber(data);
+    if (existingNumber) {
+      standaloneNumbers.set(project.id, existingNumber);
+    } else if (!opportunityId) {
+      nextStandaloneSequence += 1;
+      const projectNumber = `NT${String(nextStandaloneSequence).padStart(4, '0')}`;
+      await prisma.record.update({
+        where: { id: project.id },
+        data: {
+          data: { ...data, projectNumber, [`${objectApiName}__projectNumber`]: projectNumber },
+        },
+      });
+      standaloneNumbers.set(project.id, projectNumber);
+    }
+  }
+
+  const opportunityNumbers = await getOpportunityNumbersById([...linkedOpportunityIds.values()]);
 
   return records.map((record, index) => {
     const data = record.data && typeof record.data === 'object'
       ? record.data as Record<string, unknown>
       : {};
-    const opportunityId = linkedOpportunityIds[index];
-    const projectNumber = opportunityId ? opportunityNumbers.get(opportunityId) ?? '' : '';
+    const opportunityId = linkedOpportunityIds.get(record.id);
+    const projectNumber = (opportunityId ? opportunityNumbers.get(opportunityId) : undefined)
+      ?? standaloneNumbers.get(record.id)
+      ?? getStandaloneProjectNumber(data)
+      ?? '';
     const { projectNumber: _legacyNumber, Project__projectNumber: _legacyPrefixedNumber, ...otherData } = data;
     return {
       ...record,
