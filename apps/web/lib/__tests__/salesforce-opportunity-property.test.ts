@@ -77,17 +77,31 @@ describe('Salesforce Opportunity Property address mapping', () => {
     expect(isSalesforceProjectAddressColumn('Name')).toBe(false)
   })
 
-  it('does not create a Property when the Opportunity has no project address', () => {
-    expect(buildPropertyImportDataFromOpportunity({ Name: 'No address' })).toEqual({ status: 'empty' })
+  it('creates an empty-address Property when the Opportunity has no project address', () => {
+    expect(buildPropertyImportDataFromOpportunity({ Name: 'No address' })).toMatchObject({
+      status: 'ready',
+      data: {
+        Property__address: { street: '', city: '', state: '', postalCode: '', country: '' },
+        Property__city: '',
+        Property__state: '',
+        Property__zipCode: '',
+      },
+    })
   })
 
-  it('reports incomplete project addresses that cannot satisfy required Property fields', () => {
+  it('keeps partial project addresses and leaves missing Property address fields blank', () => {
     expect(buildPropertyImportDataFromOpportunity({
       Project_Addresses__City__s: 'Miami',
       Project_Addresses__StateCode__s: 'FL',
     })).toEqual({
-      status: 'invalid',
-      error: 'Missing required Property address fields: Postal Code',
+      status: 'ready',
+      data: {
+        Property__address: { street: '', city: 'Miami', state: 'FL', postalCode: '', country: '' },
+        Property__address_search: { street: '', city: 'Miami', state: 'FL', postalCode: '', country: '' },
+        Property__city: 'Miami',
+        Property__state: 'FL',
+        Property__zipCode: '',
+      },
     })
   })
 

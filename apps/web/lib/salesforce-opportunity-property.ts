@@ -131,19 +131,6 @@ export function buildPropertyImportDataFromOpportunity(row: ImportRow): Property
   const longitude = readAddressPart(row, SALESFORCE_ADDRESS_FIELDS.longitude)
   const geocodeAccuracy = readAddressPart(row, SALESFORCE_ADDRESS_FIELDS.geocodeAccuracy)
 
-  if (![street, city, postalCode, state, country, latitude, longitude, geocodeAccuracy].some(Boolean)) {
-    return { status: 'empty' }
-  }
-
-  const missing = [
-    !city ? 'City' : null,
-    !state ? 'State' : null,
-    !postalCode ? 'Postal Code' : null,
-  ].filter((part): part is string => part !== null)
-  if (missing.length) {
-    return { status: 'invalid', error: `Missing required Property address fields: ${missing.join(', ')}` }
-  }
-
   const address: Record<string, unknown> = {
     street,
     city,
