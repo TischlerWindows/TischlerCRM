@@ -60,13 +60,10 @@ export function useInfiniteRecordList<T extends RecordWithId>({
   const loadMore = useCallback(async () => {
     if (!enabled || loading || !hasMore || requestInFlightRef.current) return
     requestInFlightRef.current = true
-  normalize,
     setLoadingMore(true)
     setLoadError(false)
     try {
-      const page = await apiClient.getRecords(objectApiName, { limit: PAGE_SIZE, offset: offsetRef.current })
-  const normalizeRef = useRef(normalize ?? defaultNormalize<T>)
-  normalizeRef.current = normalize ?? defaultNormalize<T>
+        const page = await apiClient.getRecords(objectApiName, { limit: PAGE_SIZE, offset: offsetRef.current })
       const normalizedPage = normalizeRef.current(page)
       setRecords((current) => {
         const currentIds = new Set(current.map((record) => record.id))
@@ -91,7 +88,6 @@ export function useInfiniteRecordList<T extends RecordWithId>({
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) void loadMore()
     }, { root: null, rootMargin: '400px 0px' })
-      const normalizedPage = normalizeRef.current(page)
     return () => observer.disconnect()
   }, [enabled, hasMore, loadError, loadMore, loading, loadingMore])
 
