@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useIsMobileViewport, useIsLandscapeMobile } from '@/lib/use-is-mobile-viewport';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -52,6 +52,8 @@ interface CustomRecord {
   [key: string]: any;
 }
 
+const RECORDS_PAGE_SIZE = 100;
+
 export default function CustomObjectRecordsPage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -61,6 +63,14 @@ export default function CustomObjectRecordsPage() {
   
   const [records, setRecords] = useState<CustomRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
+  const [recordsOffset, setRecordsOffset] = useState(0);
+  const [hasMoreRecords, setHasMoreRecords] = useState(true);
+  const [loadingMoreRecords, setLoadingMoreRecords] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const loadingMoreRef = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
@@ -161,22 +171,70 @@ export default function CustomObjectRecordsPage() {
 
   // Load records from API
   useEffect(() => {
+    let cancelled = false;
     const loadRecords = async () => {
       try {
         const apiName = objectDef?.apiName || slug;
-        const apiRecords = await recordsService.getRecords(apiName);
-        if (apiRecords && apiRecords.length > 0) {
-          const flatRecords = apiRecords.map(r => recordsService.flattenRecord(r) as CustomRecord);
-          setRecords(flatRecords);
-        }
+        setRecords([]);
+        setRecordsError(null);
+        setRecordsOffset(0);
+        setHasMoreRecords(true);
+        const apiRecords = await apiClient.getRecords(apiName, { limit: RECORDS_PAGE_SIZE, offset: 0 });
+        if (cancelled) return;
+        setRecords(apiRecords.map((record: any) => recordsService.flattenRecord(record) as CustomRecord));
+        setRecordsOffset(apiRecords.length);
+        setHasMoreRecords(apiRecords.length === RECORDS_PAGE_SIZE);
       } catch (error) {
         console.error('Failed to load records from API:', error);
+        if (!cancelled) setRecordsError('Could not load records. Please try again.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     loadRecords();
+    return () => { cancelled = true; };
   }, [storageKey, slug, objectDef]);
+
+  const canLoadAllRecords = sidebarFilter === 'all' && listViews.activeView.id === 'all-records';
+  const loadMoreRecords = useCallback(async () => {
+    if (!canLoadAllRecords || !hasMoreRecords || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMoreRecords(true);
+    setLoadMoreError(false);
+    try {
+      const apiName = objectDef?.apiName || slug;
+      const apiRecords = await apiClient.getRecords(apiName, {
+        limit: RECORDS_PAGE_SIZE,
+        offset: recordsOffset,
+      });
+      const flatRecords = apiRecords.map((record: any) => recordsService.flattenRecord(record) as CustomRecord);
+      setRecords((current) => {
+        const currentIds = new Set(current.map((record) => record.id));
+        return [...current, ...flatRecords.filter((record) => !currentIds.has(record.id))];
+      });
+      setRecordsOffset((offset) => offset + apiRecords.length);
+      setHasMoreRecords(apiRecords.length === RECORDS_PAGE_SIZE);
+    } catch (error) {
+      console.error('Failed to load more records:', error);
+      setLoadMoreError(true);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMoreRecords(false);
+    }
+  }, [canLoadAllRecords, hasMoreRecords, objectDef, recordsOffset, slug]);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    const root = mainContentRef.current;
+    if (!sentinel || !root || loading || !canLoadAllRecords || !hasMoreRecords
+      || loadingMoreRecords || loadMoreError || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) void loadMoreRecords();
+    }, { root, rootMargin: '400px 0px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [canLoadAllRecords, hasMoreRecords, loadMoreError, loadMoreRecords, loading, loadingMoreRecords]);
 
   // Load visible columns from preferences
   useEffect(() => {
@@ -619,7 +677,7 @@ export default function CustomObjectRecordsPage() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div ref={mainContentRef} className="flex-1 overflow-y-auto">
       <div className="px-6 py-6">
         {/* Actions */}
         <div className="mb-6 flex justify-between items-center">
@@ -652,6 +710,12 @@ export default function CustomObjectRecordsPage() {
         </div>
 
         <ListViewManager fields={AVAILABLE_COLUMNS.map(column => ({ id: column.id, label: column.label }))} views={listViews.views} activeView={listViews.activeView} pinnedViewId={listViews.pinnedViewId} canManage={hasAppPermission('manageListViews')} onSelect={listViews.selectView} onPin={listViews.pinView} onSave={listViews.saveView} onDelete={listViews.deleteView} />
+
+        {recordsError && (
+          <div role="alert" className="my-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {recordsError}
+          </div>
+        )}
 
         {/* Search */}
         <div className="mb-6">
@@ -773,6 +837,16 @@ export default function CustomObjectRecordsPage() {
             </p>
           </div>
         )}
+
+        <div ref={loadMoreSentinelRef} aria-live="polite" className="flex min-h-10 items-center justify-center py-3 text-sm text-gray-500">
+          {canLoadAllRecords && loadingMoreRecords && 'Loading more records...'}
+          {canLoadAllRecords && loadMoreError && (
+            <button type="button" onClick={() => void loadMoreRecords()} className="text-brand-navy underline">
+              Could not load more records. Retry
+            </button>
+          )}
+          {canLoadAllRecords && !hasMoreRecords && records.length > 0 && 'All records loaded.'}
+        </div>
       </div>
 
       {/* No Page Layouts Dialog */}
