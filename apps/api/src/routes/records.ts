@@ -44,20 +44,46 @@ function formatYearScopedNumber(year: number, sequence: number): string {
   return `${String(year % 100).padStart(2, '0')}${String(sequence).padStart(3, '0')}`;
 }
 
-function getPropertyOpportunityId(
+async function getOpportunityLookupFieldApiName(childObjectId: string): Promise<string | undefined> {
+  const opportunityObject = await prisma.customObject.findFirst({
+    where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+  });
+  if (!opportunityObject) return undefined;
+  const relationship = await prisma.relationship.findFirst({
+    where: { childObjectId, parentObjectId: opportunityObject.id },
+    include: { field: { select: { apiName: true } } },
+  });
+  return relationship?.field.apiName;
+}
+
+function getOpportunityLookupRecordId(
   data: Record<string, unknown>,
-  fields: Array<{ apiName: string; type: string; lookupObject?: string | null }>,
+  objectApiName: string,
+  fieldApiName: string | undefined,
 ): string | undefined {
-  for (const field of fields) {
-    if (field.type !== 'Lookup' || field.lookupObject?.toLowerCase() !== 'opportunity') continue;
-    const bareName = field.apiName.replace(/^[A-Za-z]+__/, '');
-    const value = data[field.apiName] ?? data[bareName] ?? data[`Property__${bareName}`];
+  if (fieldApiName) {
+    const bareName = fieldApiName.replace(/^[A-Za-z]+__/, '');
+    const value = data[fieldApiName] ?? data[bareName] ?? data[`${objectApiName}__${bareName}`];
     if (typeof value === 'string' && value.trim()) return value.trim();
     if (value && typeof value === 'object') {
       const reference = value as Record<string, unknown>;
       const id = reference.lookup ?? reference.id ?? reference.value;
       if (typeof id === 'string' && id.trim()) return id.trim();
     }
+  }
+
+  const fallback = Object.entries(data).find(([key, value]) => {
+    const bareName = key.replace(/^[A-Za-z]+__/, '').toLowerCase();
+    return bareName.includes('opportunity')
+      && !bareName.includes('number')
+      && !bareName.includes('name')
+      && (typeof value === 'string' || (value !== null && typeof value === 'object'));
+  })?.[1];
+  if (typeof fallback === 'string' && fallback.trim()) return fallback.trim();
+  if (fallback && typeof fallback === 'object') {
+    const reference = fallback as Record<string, unknown>;
+    const id = reference.lookup ?? reference.id ?? reference.value;
+    if (typeof id === 'string' && id.trim()) return id.trim();
   }
   return undefined;
 }
@@ -107,9 +133,11 @@ function formatStandalonePropertyNumber(sequence: number): string {
 
 async function getLinkedOpportunityNumber(
   data: Record<string, unknown>,
-  propertyFields: Array<{ apiName: string; type: string; lookupObject?: string | null }>,
+  objectId: string,
+  objectApiName: string,
 ): Promise<string | undefined> {
-  const opportunityId = getPropertyOpportunityId(data, propertyFields)
+  const fieldApiName = await getOpportunityLookupFieldApiName(objectId)
+  const opportunityId = getOpportunityLookupRecordId(data, objectApiName, fieldApiName)
   if (!opportunityId) return undefined
   const numbers = await getOpportunityNumbersById([opportunityId])
   return numbers.get(opportunityId)
@@ -793,7 +821,7 @@ export async function recordRoutes(app: FastifyInstance) {
     delete normalizedData.__propertyOpportunityNumber;
     for (const field of object.fields) {
       if (field.apiName === 'propertyNumber') {
-        const linkedOpportunityNumber = await getLinkedOpportunityNumber(normalizedData, object.fields);
+        const linkedOpportunityNumber = await getLinkedOpportunityNumber(normalizedData, object.id, apiName);
         const copiedNumber = linkedOpportunityNumber
           ?? (typeof importedPropertyOpportunityNumber === 'string' ? importedPropertyOpportunityNumber : undefined);
         let propertyNumber = copiedNumber;
@@ -1606,11 +1634,12 @@ export async function recordRoutes(app: FastifyInstance) {
 
     // Keep Property numbers aligned with their Opportunity lookup.
     if (apiName.toLowerCase() === 'property') {
-      const previousOpportunityId = getPropertyOpportunityId(beforeData, object.fields);
-      const opportunityId = getPropertyOpportunityId(mergedData, object.fields);
+      const opportunityFieldApiName = await getOpportunityLookupFieldApiName(object.id);
+      const previousOpportunityId = getOpportunityLookupRecordId(beforeData, apiName, opportunityFieldApiName);
+      const opportunityId = getOpportunityLookupRecordId(mergedData, apiName, opportunityFieldApiName);
       const lookupChanged = previousOpportunityId !== opportunityId;
       if (opportunityId) {
-        const linkedNumber = await getLinkedOpportunityNumber(mergedData, object.fields);
+        const linkedNumber = await getLinkedOpportunityNumber(mergedData, object.id, apiName);
         if (linkedNumber) {
           mergedData.propertyNumber = linkedNumber;
           mergedData.Property__propertyNumber = linkedNumber;
@@ -1901,8 +1930,11 @@ export async function recordRoutes(app: FastifyInstance) {
     const errors: Array<{ row: number; error: string }> = [];
     // Maps original SF Id value → newly created CRM record id
     const idMap: Record<string, string> = {};
+    const propertyOpportunityFieldApiName = apiName.toLowerCase() === 'property'
+      ? await getOpportunityLookupFieldApiName(object.id)
+      : undefined;
     const propertyOpportunityNumberById = apiName.toLowerCase() === 'property'
-      ? await getOpportunityNumbersById(rows.map((rawData) => getPropertyOpportunityId(rawData ?? {}, object.fields) ?? ''))
+      ? await getOpportunityNumbersById(rows.map((rawData) => getOpportunityLookupRecordId(rawData ?? {}, apiName, propertyOpportunityFieldApiName) ?? ''))
       : new Map<string, string>()
 
     for (let i = 0; i < rows.length; i++) {
@@ -1935,7 +1967,7 @@ export async function recordRoutes(app: FastifyInstance) {
         let exhaustedYearNumberField: string | null = null;
         for (const field of autoNumberFields) {
           if (field.apiName === 'propertyNumber') {
-            const opportunityId = getPropertyOpportunityId(rawData, object.fields)
+            const opportunityId = getOpportunityLookupRecordId(rawData, apiName, propertyOpportunityFieldApiName)
             const linkedNumber = opportunityId ? propertyOpportunityNumberById.get(opportunityId) : undefined
             const importedOpportunityNumber = typeof rawData.__propertyOpportunityNumber === 'string'
               ? rawData.__propertyOpportunityNumber.trim()
