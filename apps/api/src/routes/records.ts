@@ -938,7 +938,8 @@ export async function recordRoutes(app: FastifyInstance) {
     const importedPropertyOpportunityNumber = normalizedData.__propertyOpportunityNumber;
     delete normalizedData.__propertyOpportunityNumber;
     const workOrderPropertyFieldApiName = apiName.toLowerCase() === 'workorder'
-      ? await getRelatedLookupFieldApiName(object.id, 'Property')
+      ? object.fields.find((field) => field.apiName.replace(/^[A-Za-z]+__/, '').toLowerCase() === 'property')?.apiName
+        ?? await getRelatedLookupFieldApiName(object.id, 'Property')
       : undefined;
     const workOrderPropertyId = apiName.toLowerCase() === 'workorder'
       ? getOpportunityLookupRecordId(normalizedData, apiName, workOrderPropertyFieldApiName, 'Property')
@@ -986,7 +987,14 @@ export async function recordRoutes(app: FastifyInstance) {
 
       const currentVal = normalizedData[field.apiName] ?? normalizedData[fieldApiName];
       const isEmpty = !currentVal || currentVal === 'N/A';
-      if (fieldApiName in autoNumberFormats && isEmpty) {
+      const hasWorkOrderPropertyPrefix = fieldApiName === 'workOrderNumber'
+        && !!linkedWorkOrderPropertyNumber
+        && typeof currentVal === 'string'
+        && currentVal.toUpperCase().startsWith(`${linkedWorkOrderPropertyNumber}-WO`.toUpperCase());
+      const shouldPrefixWorkOrderNumber = fieldApiName === 'workOrderNumber'
+        && !!linkedWorkOrderPropertyNumber
+        && !hasWorkOrderPropertyPrefix;
+      if (fieldApiName in autoNumberFormats && (isEmpty || shouldPrefixWorkOrderNumber)) {
         if (fieldApiName in YEAR_SCOPED_NUMBER_PREFIXES) {
           const existingRecords = await prisma.record.findMany({
             where: { objectId: object.id, deletedAt: null },
@@ -2110,7 +2118,8 @@ export async function recordRoutes(app: FastifyInstance) {
       ? await getOpportunityNumbersById(rows.map((rawData) => getOpportunityLookupRecordId(rawData ?? {}, apiName, propertyOpportunityFieldApiName) ?? ''))
       : new Map<string, string>()
     const workOrderPropertyFieldApiName = apiName.toLowerCase() === 'workorder'
-      ? await getRelatedLookupFieldApiName(object.id, 'Property')
+      ? object.fields.find((field) => field.apiName.replace(/^[A-Za-z]+__/, '').toLowerCase() === 'property')?.apiName
+        ?? await getRelatedLookupFieldApiName(object.id, 'Property')
       : undefined;
     const workOrderPropertyNumberById = apiName.toLowerCase() === 'workorder'
       ? await getPropertyNumbersById(rows.map((rawData) =>
@@ -2172,9 +2181,22 @@ export async function recordRoutes(app: FastifyInstance) {
             }
             continue
           }
+          const workOrderPropertyId = fieldApiName === 'workOrderNumber'
+            ? getOpportunityLookupRecordId(rawData, apiName, workOrderPropertyFieldApiName, 'Property')
+            : undefined;
+          const linkedPropertyNumber = workOrderPropertyId
+            ? workOrderPropertyNumberById.get(workOrderPropertyId)
+            : undefined;
           const currentVal = normalizedData[field.apiName] ?? normalizedData[fieldApiName];
           const isEmpty = !currentVal || currentVal === 'N/A';
-          if (isEmpty) {
+          const hasWorkOrderPropertyPrefix = fieldApiName === 'workOrderNumber'
+            && !!linkedPropertyNumber
+            && typeof currentVal === 'string'
+            && currentVal.toUpperCase().startsWith(`${linkedPropertyNumber}-WO`.toUpperCase());
+          const shouldPrefixWorkOrderNumber = fieldApiName === 'workOrderNumber'
+            && !!linkedPropertyNumber
+            && !hasWorkOrderPropertyPrefix;
+          if (isEmpty || shouldPrefixWorkOrderNumber) {
             if (fieldApiName in YEAR_SCOPED_NUMBER_PREFIXES) {
               if ((maxAutoNumbers[fieldApiName] ?? 0) >= 999) {
                 exhaustedYearNumberField = field.label;
@@ -2190,12 +2212,6 @@ export async function recordRoutes(app: FastifyInstance) {
             const padWidth = (fieldApiName === 'propertyNumber' || fieldApiName === 'leadNumber' || fieldApiName === 'opportunityNumber' || fieldApiName === 'workOrderNumber' || fieldApiName === 'teamMemberNumber' || fieldApiName === 'taskNumber') ? 4 : 3;
             maxAutoNumbers[fieldApiName] = (maxAutoNumbers[fieldApiName] || 0) + 1;
             const workOrderSuffix = `${prefix}${String(maxAutoNumbers[fieldApiName]).padStart(padWidth, '0')}`;
-            const workOrderPropertyId = fieldApiName === 'workOrderNumber'
-              ? getOpportunityLookupRecordId(rawData, apiName, workOrderPropertyFieldApiName, 'Property')
-              : undefined;
-            const linkedPropertyNumber = workOrderPropertyId
-              ? workOrderPropertyNumberById.get(workOrderPropertyId)
-              : undefined;
             const generatedNum = fieldApiName === 'workOrderNumber' && linkedPropertyNumber
               ? `${linkedPropertyNumber}-${workOrderSuffix}`
               : workOrderSuffix;
